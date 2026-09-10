@@ -78,4 +78,77 @@ describe("checkout validation", () => {
     expect(defaultPaymentMethodFor("NL")).toBe("ideal");
     expect(defaultPaymentMethodFor("BE")).toBe("bancontact");
   });
+
+  // Regression test: Zod skips an object's own `.superRefine`/`.check()`
+  // entirely once any field on that object has already failed its own
+  // check — so a postcode-format check living in checkoutFormSchema's
+  // top-level refinement never ran (and never reached the shopper) on the
+  // very common case of *any other* field also being wrong on the same
+  // submit, most commonly the terms checkbox (unchecked by default). This
+  // must report BOTH problems at once, not just one.
+  it("reports an invalid postcode together with an unrelated field error (e.g. unchecked terms), not instead of it", () => {
+    const result = checkoutFormSchema.safeParse({
+      ...validBase,
+      shipping: { ...validBase.shipping, postalCode: "NOTAPOSTCODE" },
+      acceptedTerms: false,
+    });
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths).toContain("shipping.postalCode");
+    expect(paths).toContain("acceptedTerms");
+  });
+
+  it("reports an invalid billing postcode on its own", () => {
+    const result = checkoutFormSchema.safeParse({
+      ...validBase,
+      billingDifferent: true,
+      billing: {
+        firstName: "Jan",
+        lastName: "Jansen",
+        country: "NL" as const,
+        street: "Kerkstraat",
+        houseNumber: "12",
+        postalCode: "BAD",
+        city: "Amsterdam",
+      },
+    });
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths).toContain("billing.postalCode");
+  });
+
+  // Known, narrower residual limitation (documented in DECISIONS.md): the
+  // billing-address-required-fields logic still lives in
+  // checkoutFormSchema's own top-level `.check()`, which — same Zod
+  // behavior as above — does not run at all if *any* field anywhere in
+  // the submission (including a nested field like shipping.postalCode)
+  // already has an issue. So this specific combination (a different
+  // billing address AND some unrelated error on the same submit) only
+  // surfaces the unrelated error on that attempt; the billing postcode
+  // error appears once the shopper fixes it and resubmits. Unlike the
+  // acceptedTerms case above, this one was not restructured — billing
+  // fields are only present/required for the minority of shoppers who
+  // check "Factuuradres is anders", so the impact is much smaller than the
+  // original bug (which fired on every single first submit, since the
+  // terms checkbox starts unchecked).
+  it("[known limitation] an unrelated error on the same submit can still suppress the billing postcode error", () => {
+    const result = checkoutFormSchema.safeParse({
+      ...validBase,
+      shipping: { ...validBase.shipping, postalCode: "NOTAPOSTCODE" },
+      billingDifferent: true,
+      billing: {
+        firstName: "Jan",
+        lastName: "Jansen",
+        country: "NL" as const,
+        street: "Kerkstraat",
+        houseNumber: "12",
+        postalCode: "BAD",
+        city: "Amsterdam",
+      },
+    });
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths).toContain("shipping.postalCode");
+    expect(paths).not.toContain("billing.postalCode");
+  });
 });

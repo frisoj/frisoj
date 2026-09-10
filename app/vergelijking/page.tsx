@@ -102,7 +102,7 @@ export default function ComparisonPage() {
         <p className="mt-2 max-w-2xl text-ink-muted">
           {site.brand} is ontworpen voor huishoudens met één tot drie katten
           binnen het aangegeven gewichtsbereik (zie de specificaties op de{" "}
-          <a href={`/${site.productSlug}`} className="text-accent hover:underline">
+          <a href={`/${site.productSlug}`} className="text-accent underline hover:text-accent-dark">
             productpagina
           </a>
           ). Heb je meer dan drie katten in huis, een erg zware kat boven het

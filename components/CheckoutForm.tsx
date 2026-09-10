@@ -368,11 +368,11 @@ export default function CheckoutForm({ csrfToken }: { csrfToken: string }) {
               />
               <span>
                 Ik ga akkoord met de{" "}
-                <Link href="/algemene-voorwaarden" className="font-semibold text-accent hover:underline">
+                <Link href="/algemene-voorwaarden" className="font-semibold text-accent underline hover:text-accent-dark">
                   algemene voorwaarden
                 </Link>{" "}
                 en ben op de hoogte van het{" "}
-                <Link href="/herroepingsrecht" className="font-semibold text-accent hover:underline">
+                <Link href="/herroepingsrecht" className="font-semibold text-accent underline hover:text-accent-dark">
                   herroepingsrecht
                 </Link>
                 .

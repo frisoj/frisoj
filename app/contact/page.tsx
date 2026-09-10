@@ -28,7 +28,7 @@ export default async function ContactPage() {
         <aside className="space-y-6 rounded-2xl border border-border bg-surface p-6 text-sm">
           <div>
             <p className="font-semibold text-ink">E-mail</p>
-            <a href={`mailto:${site.email}`} className="text-accent hover:underline">
+            <a href={`mailto:${site.email}`} className="text-accent underline hover:text-accent-dark">
               {site.email}
             </a>
           </div>

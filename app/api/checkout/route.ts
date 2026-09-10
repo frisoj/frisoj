@@ -102,7 +102,16 @@ export async function POST(request: NextRequest) {
   });
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? site.url;
+  // Absolute — Mollie requires a fully-qualified redirectUrl/webhookUrl.
   const redirectUrl = `${siteUrl}/bedankt/${order.order_number}`;
+  // Relative — used for the browser's own client-side navigation below
+  // (no Mollie involved). Using the absolute `redirectUrl` there would
+  // silently navigate the shopper to whatever NEXT_PUBLIC_SITE_URL/
+  // site.url happens to point at instead of staying on the host they're
+  // actually on — harmless in production once that env var matches the
+  // real domain, but it broke every preview/staging deploy and this exact
+  // local environment (no NEXT_PUBLIC_SITE_URL set) outright.
+  const thankYouPath = `/bedankt/${order.order_number}`;
 
   const mollie = getMollieClient();
   if (!mollie) {
@@ -111,7 +120,7 @@ export async function POST(request: NextRequest) {
     // the shopper straight to the thank-you page, which will show the
     // correct "pending" state and explain payment isn't set up yet — see
     // DECISIONS.md. This keeps the whole flow testable without live keys.
-    return NextResponse.json({ redirectUrl, mollieConfigured: false, orderNumber: order.order_number });
+    return NextResponse.json({ redirectUrl: thankYouPath, mollieConfigured: false, orderNumber: order.order_number });
   }
 
   try {
@@ -133,7 +142,7 @@ export async function POST(request: NextRequest) {
     // non-PII order number for operational debugging.
     console.error(`Mollie payment creation failed for order ${order.order_number}`);
     return NextResponse.json(
-      { error: "Betaling kon niet worden gestart. Probeer het opnieuw.", redirectUrl },
+      { error: "Betaling kon niet worden gestart. Probeer het opnieuw.", redirectUrl: thankYouPath },
       { status: 502 },
     );
   }

@@ -53,7 +53,7 @@ export default function CookieBanner() {
           We gebruiken noodzakelijke cookies om de site te laten werken (o.a.
           winkelwagen). Met jouw toestemming gebruiken we ook analytische en
           marketingcookies om bezoek en aankopen te meten. Lees ons{" "}
-          <Link href="/cookiebeleid" className="text-accent hover:underline">
+          <Link href="/cookiebeleid" className="text-accent underline hover:text-accent-dark">
             cookiebeleid
           </Link>
           .

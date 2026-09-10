@@ -41,7 +41,7 @@ export default async function ThankYouPage({
         </div>
         <p className="mt-8 text-sm text-ink-muted">
           Blijft het mislukken? Mail ons op{" "}
-          <a href={`mailto:${site.email}`} className="text-accent hover:underline">
+          <a href={`mailto:${site.email}`} className="text-accent underline hover:text-accent-dark">
             {site.email}
           </a>
           .
@@ -109,11 +109,11 @@ export default async function ThankYouPage({
 
       <p className="mt-8 text-center text-sm text-ink-muted">
         Vragen over je bestelling? Mail{" "}
-        <a href={`mailto:${site.email}`} className="text-accent hover:underline">
+        <a href={`mailto:${site.email}`} className="text-accent underline hover:text-accent-dark">
           {site.email}
         </a>{" "}
         of bekijk de status via{" "}
-        <Link href="/order-volgen" className="text-accent hover:underline">
+        <Link href="/order-volgen" className="text-accent underline hover:text-accent-dark">
           Order volgen
         </Link>
         .
