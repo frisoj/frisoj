@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -7,6 +9,13 @@ import DeferredWidgets from "@/components/DeferredWidgets";
 import { CartProvider } from "@/lib/cart-context";
 import { site } from "@/lib/site";
 import { organizationJsonLd, websiteJsonLd, JsonLd } from "@/lib/jsonld";
+
+// Vercel Web Analytics + Speed Insights: first-party, cookieless page-view
+// and Core Web Vitals collection — not gated behind the cookie banner like
+// GA4/Meta/TikTok, since (per Vercel's own privacy design) neither sets a
+// cookie or otherwise tracks an identifiable visitor across sites. Both
+// are no-ops until the project is actually deployed on Vercel with
+// Analytics/Speed Insights enabled in the dashboard — see README.md.
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -73,6 +82,8 @@ export default function RootLayout({
           <Footer />
           <DeferredWidgets />
         </CartProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
