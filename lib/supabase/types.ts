@@ -100,6 +100,52 @@ export type ReviewInviteRow = {
   created_at: string;
 };
 
+export type BlogPostRow = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  body: string | null;
+  meta_description: string | null;
+  cover_image_url: string | null;
+  hero_image_alt: string | null;
+  author_name: string;
+  is_published: boolean;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const FAQ_CATEGORIES = [
+  "product_werking",
+  "veiligheid_kat",
+  "vulling_onderhoud",
+  "bestellen_betalen",
+  "verzending",
+  "retour_garantie",
+] as const;
+export type FaqCategory = (typeof FAQ_CATEGORIES)[number];
+
+export const FAQ_CATEGORY_LABELS: Record<FaqCategory, string> = {
+  product_werking: "Product & werking",
+  veiligheid_kat: "Veiligheid en kat",
+  vulling_onderhoud: "Vulling en onderhoud",
+  bestellen_betalen: "Bestellen en betalen",
+  verzending: "Verzending",
+  retour_garantie: "Retour en garantie",
+};
+
+export type FaqItemRow = {
+  id: string;
+  category: FaqCategory;
+  question: string;
+  answer: string;
+  sort_order: number;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "In afwachting van betaling",
   betaald: "Betaald",
