@@ -5,20 +5,18 @@ import StickyAddToCart from "@/components/StickyAddToCart";
 import SectionHeading from "@/components/SectionHeading";
 import FaqItem from "@/components/FaqItem";
 import AddToCartButton from "@/components/AddToCartButton";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { site } from "@/lib/site";
+import { listPublishedFaqs } from "@/lib/faq";
+import { buildMetadata } from "@/lib/seo";
+import { breadcrumbJsonLd, JsonLd, productJsonLd } from "@/lib/jsonld";
 
-export const metadata: Metadata = {
-  title: `${site.productName} — €${site.price}`,
+export const metadata: Metadata = buildMetadata({
+  title: `${site.productName} — €${site.price} | ${site.brand}`,
   description:
     "De PureLitter zelfreinigende kattenbak: automatische reiniging, app-bediening en geschikt voor 1-3 katten. €179 incl. BTW, levering in 2-5 werkdagen in NL/BE.",
-  alternates: { canonical: `/${site.productSlug}` },
-  openGraph: {
-    title: `${site.productName} — €${site.price}`,
-    description:
-      "Automatische reiniging, app-bediening en minder geur in huis. Bekijk de specificaties en bestel.",
-    url: `/${site.productSlug}`,
-  },
-};
+  path: `/${site.productSlug}`,
+});
 
 const galleryImages = [
   { src: "/images/product-1.svg", alt: "Placeholder: vooraanzicht van de PureLitter kattenbak" },
@@ -52,37 +50,16 @@ const comparisonRows = [
   { feature: "Tijdsinvestering per week", manual: "± 30-60 minuten", purelitter: "± 5 minuten (legen opvangbak)" },
 ];
 
-const faqs = [
-  {
-    question: "Hoeveel kost verzending?",
-    answer: "Verzending naar Nederland en België is gratis, zonder minimale besteldrempel.",
-  },
-  {
-    question: "Wat als mijn kat de bak niet vertrouwt?",
-    answer:
-      "Katten hebben soms enkele dagen nodig om te wennen. Onze handleiding bevat een stapsgewijs wenschema; kom je er niet uit, dan helpt onze klantenservice je graag verder.",
-  },
-  {
-    question: "Kan ik de bak retourneren?",
-    answer:
-      "Ja, je hebt 14 dagen bedenktijd vanaf ontvangst om de bak ongebruikt en in originele verpakking te retourneren.",
-  },
-  {
-    question: "Welke garantie krijg ik?",
-    answer: "Op de PureLitter kattenbak zit 2 jaar garantie op fabricagefouten.",
-  },
-];
+export default async function ProductPage() {
+  const allFaqs = await listPublishedFaqs();
+  const previewFaqs = allFaqs.slice(0, 5);
 
-export default function ProductPage() {
   return (
     <div className="pb-24 md:pb-0">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
-        <nav aria-label="Broodkruimel" className="mb-6 text-sm text-ink-muted">
-          <Link href="/" className="hover:text-accent">
-            Home
-          </Link>{" "}
-          / <span className="text-ink">{site.productName}</span>
-        </nav>
+        <JsonLd data={productJsonLd()} />
+        <JsonLd data={breadcrumbJsonLd([{ label: site.productName }])} />
+        <Breadcrumbs items={[{ label: site.productName }]} />
 
         <div className="grid gap-10 lg:grid-cols-2">
           <ProductGallery images={galleryImages} />
@@ -225,14 +202,20 @@ export default function ProductPage() {
           </div>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ preview */}
         <section className="mt-16">
           <SectionHeading eyebrow="Veelgestelde vragen" title="Vragen over dit product" />
           <div className="mt-6 space-y-4">
-            {faqs.map((faq) => (
-              <FaqItem key={faq.question} question={faq.question} answer={faq.answer} />
+            {previewFaqs.map((faq) => (
+              <FaqItem key={faq.id} question={faq.question} answer={faq.answer} />
             ))}
           </div>
+          <Link
+            href="/veelgestelde-vragen"
+            className="mt-6 inline-block rounded-full border border-border px-5 py-2.5 text-sm font-semibold text-ink hover:border-accent hover:text-accent"
+          >
+            Alle veelgestelde vragen bekijken →
+          </Link>
         </section>
       </div>
 

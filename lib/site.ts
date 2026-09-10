@@ -33,6 +33,6 @@ export const nav = [
   { href: "/hoe-werkt-het", label: "Hoe werkt het" },
   { href: "/vergelijking", label: "Vergelijking" },
   { href: "/blog", label: "Blog" },
-  { href: "/faq", label: "FAQ" },
+  { href: "/veelgestelde-vragen", label: "FAQ" },
   { href: "/contact", label: "Contact" },
 ] as const;
