@@ -18,6 +18,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <nav className="flex gap-4 text-sm font-semibold text-ink">
             <Link href="/admin/orders" className="hover:text-accent">Bestellingen</Link>
             <Link href="/admin/reviews" className="hover:text-accent">Reviews</Link>
+            <Link href="/admin/blog" className="hover:text-accent">Blog</Link>
+            <Link href="/admin/faq" className="hover:text-accent">FAQ</Link>
           </nav>
           <LogoutButton />
         </div>
