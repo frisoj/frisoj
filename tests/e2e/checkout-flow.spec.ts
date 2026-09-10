@@ -38,7 +38,7 @@ test("home -> product -> cart -> checkout -> thank-you (pending, no live Mollie)
 
   await page.getByRole("button", { name: /betalen/i }).click();
 
-  await expect(page).toHaveURL(/\/bedankt\/KB-/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/bedankt\/[0-9a-f-]{36}$/, { timeout: 15_000 });
   await expect(
     page.getByRole("heading", { name: /betaling in behandeling|bedankt voor je bestelling/i }),
   ).toBeVisible();
@@ -87,8 +87,11 @@ test("order tracking: correct order number + email shows status, wrong email doe
   await page.getByLabel("Plaats").fill("Utrecht");
   await page.getByLabel(/algemene voorwaarden/i).check();
   await page.getByRole("button", { name: /betalen/i }).click();
-  await expect(page).toHaveURL(/\/bedankt\/(KB-[\w-]+)/, { timeout: 15_000 });
-  const orderNumber = page.url().split("/bedankt/")[1];
+  await expect(page).toHaveURL(/\/bedankt\/[0-9a-f-]{36}$/, { timeout: 15_000 });
+  const bodyText = await page.locator("body").innerText();
+  const match = bodyText.match(/KB-\d{4}-\d{6}/)?.[0];
+  expect(match).toBeTruthy();
+  const orderNumber = match as string;
 
   await page.goto("/order-volgen");
   await page.getByLabel("Ordernummer").fill(orderNumber);

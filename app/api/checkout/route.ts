@@ -102,8 +102,13 @@ export async function POST(request: NextRequest) {
   });
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? site.url;
+  // The thank-you page is keyed by the order's random UUID `id`, not its
+  // 6-digit `order_number` — the order number alone is guessable/enumerable
+  // and must never double as an access credential for the order's personal
+  // data. See lib/order-number.ts isValidUuid and lib/orders.ts getOrderById.
+  //
   // Absolute — Mollie requires a fully-qualified redirectUrl/webhookUrl.
-  const redirectUrl = `${siteUrl}/bedankt/${order.order_number}`;
+  const redirectUrl = `${siteUrl}/bedankt/${order.id}`;
   // Relative — used for the browser's own client-side navigation below
   // (no Mollie involved). Using the absolute `redirectUrl` there would
   // silently navigate the shopper to whatever NEXT_PUBLIC_SITE_URL/
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
   // actually on — harmless in production once that env var matches the
   // real domain, but it broke every preview/staging deploy and this exact
   // local environment (no NEXT_PUBLIC_SITE_URL set) outright.
-  const thankYouPath = `/bedankt/${order.order_number}`;
+  const thankYouPath = `/bedankt/${order.id}`;
 
   const mollie = getMollieClient();
   if (!mollie) {
