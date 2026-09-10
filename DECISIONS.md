@@ -126,8 +126,174 @@ be updated in a single file once real data is available.
   for this once deployed, and `metadataBase` should be wired to read from it
   in a later phase.
 
-## Verified before handoff
+## Verified before handoff (Phase 1)
 
 - `npm run lint` — passes with 0 errors, 0 warnings.
 - `npm run build` — passes, all routes (`/`, `/zelfreinigende-kattenbak`)
   prerender as static content.
+
+---
+
+# Decisions & placeholders — Phase 2 (cart, checkout, Mollie, emails, admin)
+
+## Cart persistence
+
+- **Cookie-based, client-only** (`lib/cart-context.tsx`), as instructed —
+  "simplest choice". A single JSON cookie (`pl_cart`, 30-day max-age,
+  `samesite=lax`) is read/written entirely in the browser via
+  `document.cookie`; nothing server-side ever reads it. This was chosen over
+  `localStorage` only because the brief named cookies explicitly; either
+  would have worked equally well since nothing server-rendered depends on
+  cart contents. The cart is hydrated after mount (not during SSR) to avoid
+  a server/client markup mismatch — see the `isHydrated` flag exposed by
+  `useCart()`.
+- Prices are **never trusted from the cart cookie** at checkout — a
+  tampered cookie can change what's displayed client-side, but
+  `app/api/checkout/route.ts` re-looks-up every line's price server-side via
+  `lib/catalog.ts` by `variantId` before creating the order.
+
+## No live Supabase / Mollie / Resend credentials in this environment
+
+None of the three external services have real credentials available here.
+Rather than blocking Phase 2 on provisioning them, every integration point
+is built against the real SDKs/clients with a clearly-labelled fallback so
+the whole flow is testable end-to-end today, and switches over to "real"
+behaviour the moment env vars are set — no code changes needed:
+
+- **Supabase** (`lib/supabase/server.ts`, `lib/orders.ts`): if
+  `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are unset, every
+  data-layer function in `lib/orders.ts` falls back to an in-memory mock
+  store (a module-level singleton on `globalThis`, see `mockDb()`). This is
+  **not durable** — it resets on every server restart/redeploy — and is only
+  meant for local dev/demo/tests. `npm test` runs entirely against this mock
+  store. Once a real project exists, set the env vars and nothing else
+  changes.
+- **Mollie** (`lib/mollie.ts`): if `MOLLIE_API_KEY` is unset,
+  `getMollieClient()` returns `null` and the checkout route creates the
+  order (status `pending`) but redirects straight to the thank-you page
+  instead of to a real payment — the thank-you page then correctly shows the
+  "pending" state. No payment can be simulated without a real (test-mode)
+  Mollie account; see TESTING.md for the full manual walkthrough once one is
+  provisioned.
+- **Resend** (`lib/email/send.ts`): if `RESEND_API_KEY` is unset, every
+  `send*Email` function logs `[email:skip] ... would have sent "<subject>"`
+  instead of calling the API — no PII in that log line, just the subject.
+- **Supabase Auth for /admin** (`middleware.ts`→`proxy.ts`,
+  `app/admin/login`): needs `NEXT_PUBLIC_SUPABASE_URL` +
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` at minimum (to sign in) plus a real user
+  created in Supabase Auth. Without them, `/admin/login` shows an explicit
+  "not configured yet" notice instead of a silent failure.
+
+## Order number format & guest lookup
+
+- Format `KB-<year>-<6 random digits>` (`lib/order-number.ts`), e.g.
+  `KB-2026-482913`. Random rather than strictly sequential, to avoid a
+  race condition between concurrent checkouts without a DB sequence/lock;
+  `createPendingOrder` retries a few times on the (very unlikely)
+  unique-constraint collision.
+- The **thank-you page** (`/bedankt/[ordernummer]`) looks the order up by
+  number alone (no email required in the URL) since it's the direct Mollie
+  `redirectUrl` target and the number itself isn't guessable in practice
+  within a session. **Guest order tracking** (`/order-volgen`) and any other
+  "look up my own order" path additionally require the exact email used at
+  checkout (`getOrderByNumberAndEmail`) — see the RLS note in
+  `supabase/migrations/0002_checkout.sql` for why this check lives in
+  server code rather than in an RLS policy.
+
+## Payment / webhook security
+
+- The Mollie webhook (`/api/mollie/webhook`) **never trusts the POST body**
+  beyond extracting the payment id — it always refetches the payment from
+  Mollie's API before applying any status change, per the brief.
+- **Idempotency**: keyed on `(paymentId, resultingStatus)`, recorded in the
+  `processed_webhook_events` table (or its mock-store equivalent). This
+  means a genuinely new transition (`open`→`paid`) is never blocked by an
+  earlier delivery of `open`, but a redelivered `paid` webhook for the same
+  payment is a no-op — see `tests/webhook-idempotency.test.ts`.
+- **Rate limiting** (`lib/rate-limit.ts`) is a simple in-memory fixed-window
+  limiter keyed by client IP, applied to `/api/checkout` and
+  `/api/checkout/retry` (8 req/min) and `/api/orders/lookup` (15 req/min).
+  This is single-instance only — if the app ever scales to multiple
+  serverless instances without shared state, swap this for a shared store
+  (e.g. Upstash Redis).
+- **No personal data in logs**: server-side `console.error` calls only ever
+  log the order number, never email/address/phone (see
+  `app/api/checkout/route.ts`, `app/api/checkout/retry/route.ts`).
+- **CSRF**: `/api/checkout` and `/api/checkout/retry` use a double-submit
+  cookie token (`lib/csrf.ts`) — the checkout/thank-you pages set a
+  `csrf_token` cookie server-side and the client must echo it back in an
+  `x-csrf-token` header. Admin mutations use Next.js Server Actions
+  (`lib/admin-actions.ts`), which have Next's built-in same-origin/Origin
+  header CSRF protection.
+
+## Conversion tracking
+
+- `hasMarketingConsent()` (`lib/analytics.ts`) is an explicit **stub** — it
+  reads a single `localStorage` flag (`pl_marketing_consent`). The real
+  cookie-consent banner is Phase 3 scope; when it ships, only this one
+  function needs to change (e.g. to read from the consent-management
+  library's API instead), nothing else in the purchase-tracking path.
+- Fired at most once per order: `ConversionTracker` only fires
+  GA4/Meta/TikTok pixels when `orders.conversion_tracked_at` is still null
+  (passed from the server-rendered thank-you page), and then calls
+  `/api/orders/track-conversion` to set that flag server-side — so even a
+  page reload or a retried fetch can't double-fire.
+
+## Emails via Resend
+
+- Sender `bestellingen@purelitter.nl` and owner recipient
+  `orders@purelitter.nl` (overridable via `OWNER_NOTIFICATION_EMAIL`) are
+  both **placeholders** pending real domain verification in Resend and a
+  real owner inbox — see `.env.example`.
+- Templates (`lib/email/templates.ts`) are hand-written table-based HTML
+  (for broad email-client support) with inlined colors matching
+  `app/globals.css`'s tokens (CSS custom properties don't work reliably in
+  email), plus a plain-text fallback for every message — Resend's `text`
+  param is always sent alongside `html`.
+- **Time-triggered emails use Vercel Cron** (`vercel.json`: abandoned-cart
+  hourly, review-invites daily at 08:00 UTC), per the brief's "simplest
+  choice" — both routes are protected by an optional `CRON_SECRET` bearer
+  token and are idempotent (they only ever pick up orders where the
+  relevant `*_sent_at` column is still null, and set it before returning).
+
+## Admin
+
+- Supabase Auth (email/password) gates `/admin/*` via `proxy.ts` (Next.js
+  16 renamed the `middleware.ts` convention to `proxy.ts` — migrated during
+  this phase; export is now named `proxy` instead of `middleware`), which
+  additionally checks the signed-in user's email against `ADMIN_EMAILS` —
+  having *any* Supabase Auth account is not sufficient on its own.
+- Status transitions are constrained by an explicit forward-only state
+  machine (`ORDER_STATUS_TRANSITIONS` in `lib/supabase/types.ts`, guarded by
+  `lib/order-transitions.ts`) so the admin UI can only ever offer valid next
+  steps — see `tests/admin-status-transitions.test.ts`.
+- Refunds call `mollie.paymentRefunds.create(...)` directly from a
+  server action, gated by a JS `confirm()` dialog on the button
+  (`components/admin/ConfirmSubmitButton.tsx`) per the brief's "with
+  confirmation" requirement.
+- Deliberately unstyled/utilitarian beyond the shared Tailwind tokens —
+  "simple, functional design" was explicit in the brief; no design-system
+  polish was spent here.
+
+## Testing
+
+- **Vitest** was added (none was present before) — pinned to `vitest@2` /
+  `@types/node@^20` because the latest `vitest@5` requires
+  `@types/node@^22`, which conflicts with `@mollie/api-client`'s own
+  `@types/node-fetch` peer range in this project; revisit the pin once
+  `@types/node` is bumped project-wide.
+- `server-only` (which unconditionally throws outside Next's RSC bundler)
+  is aliased to a no-op stub in `vitest.config.ts` so `lib/orders.ts` and
+  friends can be unit tested directly with plain Node — see
+  `tests/stubs/server-only.ts`.
+- 24 tests across 4 files: cart price math, checkout zod validation,
+  webhook idempotency (against the mock order store), and admin status
+  transitions. See TESTING.md for the manual, human-in-the-loop test script
+  covering real Mollie test-mode payments, real emails and the admin UI.
+
+## Verified before handoff (Phase 2)
+
+- `npm run lint` — 0 errors, 0 warnings.
+- `npm run build` — passes; see the route list in the build output for
+  every new page/API route.
+- `npm test` — 24/24 passing.
