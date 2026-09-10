@@ -297,3 +297,207 @@ behaviour the moment env vars are set — no code changes needed:
 - `npm run build` — passes; see the route list in the build output for
   every new page/API route.
 - `npm test` — 24/24 passing.
+
+---
+
+# Decisions & placeholders — Phase 3 (blog, comparison, FAQ, legal, admin, SEO)
+
+## Blog/kennisbank data layer
+
+- `lib/blog.ts` follows the exact same mock/Supabase fallback pattern as
+  `lib/orders.ts` (Phase 2): reads/writes go to Supabase's `blog_posts`
+  table when `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are
+  set, and otherwise fall back to an in-memory mock store (module-level
+  singleton on `globalThis`), seeded with the 5 real articles below. This
+  means `/blog` and `/admin/blog` both work today with **no live Supabase
+  project**, and content added via `/admin/blog` is visible immediately in
+  that same server process — it is **not durable** across restarts without
+  a real database, exactly like the Phase 2 order mock store.
+- `supabase/migrations/0003_blog_faq.sql` extends `blog_posts` (from
+  `0001_init.sql`) with `meta_description`, `hero_image_alt`,
+  `author_name`, and adds a new `faq_items` table with the same
+  mock/Supabase pattern (`lib/faq.ts`).
+- The 5 seeded articles (`lib/blog-content/*.md.ts`) are real, hand-written
+  Dutch content (1000-1500 words each), not lorem ipsum: a 2026 buying
+  guide, a cost/benefit analysis, a wenschema, a kattenbakvulling guide,
+  and a "why does it smell" troubleshooting guide. Every numeric claim
+  either comes from the Phase 1 placeholder spec sheet (already flagged
+  there) or is explicitly hedged/omitted — no invented statistics. Where a
+  number genuinely couldn't be estimated responsibly (e.g. exact vulling
+  quantities, which vary per bak model), the article says so explicitly
+  rather than inventing one. All health/medical framing points to "raadpleeg
+  een dierenarts" — no diagnostic or treatment claims are made anywhere.
+- `lib/markdown.ts` is a small, dependency-free Markdown→HTML renderer
+  (headings, paragraphs, bold/italic, links, lists, GFM-style tables,
+  blockquotes) rather than pulling in `remark`/`react-markdown` — the
+  content set is fully controlled (seed data + the `/admin/blog` editor
+  behind the auth-gated `/admin`), so a general CommonMark parser wasn't
+  needed. Its output is only ever rendered via `dangerouslySetInnerHTML`
+  for content that is either seeded by us or entered by an authenticated
+  admin — never raw public user input.
+- Blog cover images are hand-authored placeholder SVGs
+  (`public/images/blog/*.svg`), following the exact same "Placeholder"
+  caption convention as the Phase 1 product images — replace with real
+  photography/illustration per article before launch.
+
+## Comparison page (`/vergelijking`)
+
+- Our own row uses the Phase 1 placeholder specs already on the product
+  page (clearly labelled there as placeholders). Competitor
+  (Litter-Robot, PetKit, Catlink, one premium manual box) specs are only
+  asserted where we're reasonably confident from general market
+  positioning (e.g. "most models have an app"); anything we can't verify
+  is marked **`[CONTROLEREN]`** in `lib/comparison.ts` rather than guessed
+  — search that string before publishing to find every row that needs a
+  human to check the competitor's actual current spec sheet. No negative
+  or unverifiable claims about any competitor are made.
+- Includes an explicit, honest "wanneer zijn wij niet de beste keuze"
+  section (households with >3 cats, very heavy cats) per the brief.
+
+## FAQ (`/veelgestelde-vragen`)
+
+- 26 seeded questions across the 6 requested categories
+  (`lib/faq.ts`), editable via `/admin/faq`. Rendered as native
+  `<details>`/`<summary>` (via the existing `FaqItem` component) grouped by
+  category — fully readable and navigable with JavaScript disabled; the
+  rotate-icon affordance is CSS-only progressive enhancement.
+- The product page's 5-question preview now reads from this same data
+  layer (`listPublishedFaqs().slice(0, 5)`) instead of a separate hardcoded
+  list, so editing a question in `/admin/faq` updates both places.
+
+## Cookie consent
+
+- Phase 2 shipped `hasMarketingConsent()` as a stub reading one
+  localStorage flag with no UI to set it. Phase 3 adds a real, minimal
+  cookie banner (`components/CookieBanner.tsx`): "Alleen noodzakelijk" vs.
+  "Accepteren", writing the same flag via new `setMarketingConsent()` /
+  `getStoredConsent()` helpers in `lib/analytics.ts`. **No code changes**
+  were needed at any existing call site (`ConversionTracker.tsx`,
+  GA4/Meta/TikTok gating) — they already gated on `hasMarketingConsent()`.
+  `/cookiebeleid` can reopen the banner via `reopenCookieBanner()`
+  (a `CustomEvent`), so a visitor can change their mind at any time.
+- Only marketing/analytics cookies are gated; functional cookies (cart,
+  CSRF, Supabase Auth admin session) are always active as strictly
+  necessary cookies, consistent with ePrivacy guidance.
+
+## Legal/service pages
+
+- All six pages (`algemene-voorwaarden`, `privacyverklaring`,
+  `cookiebeleid`, `herroepingsrecht`, `verzending-en-retour`, `garantie`)
+  pull business identity from the single central `lib/site.ts` config
+  established in Phase 1 (`site.legalName`, `site.kvk`, `site.btw`,
+  `site.address`, `site.email`) — updating that one file updates every
+  legal page at once. Additional placeholders specific to this content:
+  - `[DATUM INVULLEN]` — "laatst bijgewerkt" date on
+    `algemene-voorwaarden` and `privacyverklaring`; needs a real date once
+    the text is legally reviewed and published.
+  - `[BRON INVULLEN]` — the definitive carrier name (verzending-en-retour)
+    and confirmation of which verwerkersovereenkomsten are actually signed
+    (privacyverklaring).
+  - Every legal page carries a visible note that it needs review by a
+    qualified jurist before publication — this is boilerplate written to
+    match Dutch/Belgian consumer law (herroepingsrecht 14 days, 2-year
+    conformity warranty, EU ODR link) but is **not a substitute for legal
+    review**.
+- `/herroepingsrecht` includes a downloadable EU model withdrawal form as
+  a real, valid PDF (`public/downloads/herroepingsformulier.pdf`),
+  hand-generated with a small dependency-free PDF writer
+  (`scripts` used only at authoring time, not shipped) rather than pulling
+  in a PDF library for one static document.
+- Footer (Phase 1) now links to all six pages via a new `legalNav` export
+  in `lib/site.ts`, plus payment-method name badges (iDEAL, Bancontact,
+  Creditcard, Apple Pay, Klarna) — no real payment-network logo assets
+  were fetched from anywhere; only their names are shown as plain text
+  badges. Replace with real logo SVGs (with the appropriate usage
+  permissions) before launch if a more branded look is wanted.
+
+## Admin extensions
+
+- `/admin/blog`: Markdown editor with a Schrijven/Voorvertoning tab toggle
+  (client-side preview via `lib/markdown.ts`, no round-trip needed). Hero
+  image accepts either a plain URL/path (always available) or a file
+  upload to Supabase Storage bucket `blog-images` via `lib/storage.ts` —
+  upload is disabled in the UI and throws a clear error if attempted
+  without a live Supabase project, per the same degrade-gracefully
+  contract as the rest of the app. The `blog-images` bucket itself is
+  **not** created by any migration here (Supabase Storage buckets aren't
+  managed by SQL migrations) — create it manually (public read) once a
+  real project exists.
+- `/admin/faq`: inline add/edit/delete per question, category dropdown,
+  numeric sort order, published toggle.
+
+## SEO
+
+- `app/sitemap.ts` / `app/robots.ts` (Next.js Metadata Route conventions)
+  generate `/sitemap.xml` / `/robots.txt` dynamically — the sitemap always
+  reflects whatever is actually published in `lib/blog.ts`, static pages
+  included by hand. `/admin`, `/api`, `/afrekenen`, `/bedankt` are
+  disallowed, matching the brief.
+- `lib/jsonld.tsx` centralizes every JSON-LD block (Organization, WebSite,
+  BreadcrumbList, Product/Offer, FAQPage, BlogPosting) — the root layout's
+  previously-inline Organization/WebSite objects now call this file too.
+  `AggregateRating` is intentionally never emitted (no real reviews exist
+  yet — same honest-empty-state decision as Phase 1/2); add it only once
+  real, published reviews exist.
+- `lib/seo.ts`'s `buildMetadata()` is the one place canonical + OG/Twitter
+  + hreflang (`nl-NL`, `nl-BE`, `x-default` — all three currently point at
+  the same URL, since there is only one, non-localized version of the
+  site; revisit if NL/BE ever get distinct content) are generated; adopted
+  on the home page, product page and every new Phase 3 page.
+- **www vs. non-www**: `www.purelitter.nl` was chosen as canonical (it was
+  already `site.url` in Phase 1) — `next.config.ts` now 301-redirects the
+  apex domain to `www` via a host-matched redirect rule. Trailing slash is
+  explicitly `false` (Next's default), stated in `next.config.ts` rather
+  than left implicit.
+- Google Search Console / Bing Webmaster verification are wired via
+  `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` / `NEXT_PUBLIC_BING_SITE_VERIFICATION`
+  env vars (rendered as `<meta>` tags in `app/layout.tsx`); both are empty
+  by default and simply omitted from the HTML until set.
+- Fixed two real broken links surfaced by the new internal-link checker:
+  the homepage's "Hoe werkt het?" button pointed at `/hoe-werkt-het`,
+  which has never existed as a page (an intentional Phase 1 scope
+  decision) — it now anchors to the existing on-page section instead
+  (`#hoe-werkt-het`); a stray `/faq` link now points directly at
+  `/veelgestelde-vragen` (a 301 redirect from `/faq` also still exists for
+  any external/bookmarked links).
+- `scripts/check-internal-links.mjs` and `scripts/validate-jsonld.mjs` are
+  standalone, dependency-free Node scripts (also wrapped as
+  `tests/internal-links.test.ts` / exercised via
+  `tests/structured-data.test.ts` so they run in CI with `npm test`).
+  Neither one crawls a live site over HTTP — they're static/structural
+  checks against the source tree and the real JSON-LD generator
+  functions, respectively.
+- Breadcrumbs (`components/Breadcrumbs.tsx`, paired with
+  `breadcrumbJsonLd()`) were added to every new Phase 3 page plus
+  `/winkelwagen` and `/order-volgen`. The checkout/payment/post-payment
+  pages themselves (`/afrekenen`, `/bedankt/[ordernummer]`,
+  `/beoordelen/[token]`) were deliberately left untouched, per this
+  phase's explicit "do not change the checkout or payment flow"
+  instruction — those stay noindex'd (see `robots: { index: false }` on
+  each) and are excluded from the sitemap/robots.txt anyway, so the SEO
+  value of adding breadcrumbs there is minimal.
+
+## Testing (Phase 3 additions)
+
+- `tests/contact-validation.test.ts` — zod schema for the contact form,
+  including the honeypot rejection path.
+- `tests/sitemap.test.ts` — asserts the generated sitemap includes the
+  homepage/product page, every seeded published blog post, excludes
+  admin/api/checkout/thank-you paths, and has no duplicate URLs.
+- `tests/structured-data.test.ts` — structural validation of every
+  `lib/jsonld.tsx` generator against the required schema.org properties
+  for its `@type`.
+- `tests/internal-links.test.ts` — wraps
+  `scripts/check-internal-links.mjs`; fails the suite if any `href`/`src`
+  in `app/`, `components/` or `lib/blog-content/` points at a route or
+  public asset that doesn't exist.
+
+## Verified before handoff (Phase 3)
+
+- `npm run lint` — 0 errors, 0 warnings.
+- `npm run build` — passes; see the route list in the build output,
+  including the new `/blog`, `/vergelijking`, `/veelgestelde-vragen`,
+  `/over-ons`, `/contact`, six legal pages, `/admin/blog`, `/admin/faq`,
+  `/sitemap.xml` and `/robots.txt` routes.
+- `npm test` — 41/41 passing (24 Phase 2 + 17 new Phase 3 tests).
+- `npm run check:links` / `npm run check:jsonld` — both pass.
