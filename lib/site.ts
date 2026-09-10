@@ -34,5 +34,16 @@ export const nav = [
   { href: "/vergelijking", label: "Vergelijking" },
   { href: "/blog", label: "Blog" },
   { href: "/veelgestelde-vragen", label: "FAQ" },
+  { href: "/over-ons", label: "Over ons" },
   { href: "/contact", label: "Contact" },
+] as const;
+
+/** Legal/service pages, linked from the footer (not the primary nav). */
+export const legalNav = [
+  { href: "/algemene-voorwaarden", label: "Algemene voorwaarden" },
+  { href: "/privacyverklaring", label: "Privacyverklaring" },
+  { href: "/cookiebeleid", label: "Cookiebeleid" },
+  { href: "/herroepingsrecht", label: "Herroepingsrecht" },
+  { href: "/verzending-en-retour", label: "Verzending en retour" },
+  { href: "/garantie", label: "Garantie" },
 ] as const;
