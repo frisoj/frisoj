@@ -119,6 +119,7 @@ export default function HomePage() {
               height={800}
               className="h-auto w-full"
               priority
+              fetchPriority="high"
             />
           </div>
         </div>

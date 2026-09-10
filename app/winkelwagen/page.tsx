@@ -10,7 +10,14 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 export default function CartPage() {
   const { items, totals, setQuantity, removeItem, isHydrated } = useCart();
 
-  if (isHydrated && items.length === 0) {
+  // See CheckoutForm.tsx for why this early-return exists: the cart cookie
+  // is only readable client-side, so a stable placeholder avoids a
+  // full-page → "cart is empty" layout shift on a fresh load of this page.
+  if (!isHydrated) {
+    return <div className="mx-auto min-h-[70vh] max-w-5xl px-4 py-10 sm:py-14" aria-hidden="true" />;
+  }
+
+  if (items.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         <h1 className="font-heading text-3xl font-semibold text-ink">Je winkelwagen is leeg</h1>

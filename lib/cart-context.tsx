@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { CartItem } from "@/lib/cart";
 import { calculateCartTotals } from "@/lib/cart";
 
@@ -53,6 +53,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  // Whatever element had focus when the drawer was opened (an "In
+  // winkelwagen" button, the header's cart icon, ...) — restored on close
+  // so keyboard/screen-reader users land back where they were, not at the
+  // top of the page.
+  const triggerElementRef = useRef<HTMLElement | null>(null);
 
   // Cart cookie is only readable client-side, so hydrate after mount to
   // avoid a server/client markup mismatch. This one-time bootstrap from an
@@ -79,7 +84,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, item];
     });
-    if (options?.openDrawer !== false) setIsDrawerOpen(true);
+    if (options?.openDrawer !== false) {
+      if (typeof document !== "undefined") {
+        triggerElementRef.current = document.activeElement as HTMLElement | null;
+      }
+      setIsDrawerOpen(true);
+    }
   }, []);
 
   const removeItem = useCallback((variantId: string) => {
@@ -94,8 +104,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearCart = useCallback(() => setItems([]), []);
-  const openDrawer = useCallback(() => setIsDrawerOpen(true), []);
-  const closeDrawer = useCallback(() => setIsDrawerOpen(false), []);
+  const openDrawer = useCallback(() => {
+    if (typeof document !== "undefined") {
+      triggerElementRef.current = document.activeElement as HTMLElement | null;
+    }
+    setIsDrawerOpen(true);
+  }, []);
+  const closeDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+    triggerElementRef.current?.focus?.();
+    triggerElementRef.current = null;
+  }, []);
 
   const totals = useMemo(() => calculateCartTotals(items), [items]);
 

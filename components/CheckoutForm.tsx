@@ -145,7 +145,20 @@ export default function CheckoutForm({ csrfToken }: { csrfToken: string }) {
     }
   }
 
-  if (isHydrated && items.length === 0) {
+  // The cart cookie is only readable client-side, so on the very first
+  // paint (a fresh full-page load of /afrekenen, not a client-side Link
+  // navigation from a page that already hydrated the cart) we don't yet
+  // know whether the cart is empty. Showing the full two-column form and
+  // then, a tick later, collapsing it down to this short message produced
+  // a large Cumulative Layout Shift (0.62, flagged by Lighthouse) — show a
+  // stable, minimal placeholder instead until hydration settles, so there
+  // is at most one small→real content transition, not a big form→tiny
+  // message reversal.
+  if (!isHydrated) {
+    return <div className="mx-auto min-h-[70vh] max-w-6xl px-4 py-10 sm:py-14" aria-hidden="true" />;
+  }
+
+  if (items.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         <h1 className="font-heading text-3xl font-semibold text-ink">Je winkelwagen is leeg</h1>

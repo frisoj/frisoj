@@ -22,6 +22,7 @@ export default function ProductGallery({ images }: { images: GalleryImage[] }) {
           height={800}
           className="h-auto w-full"
           priority
+          fetchPriority="high"
         />
       </div>
       <div
