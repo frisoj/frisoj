@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -17,11 +16,18 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = getSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    // Signs in via a server route (not the browser SDK directly) so
+    // repeated attempts are rate-limited server-side — see
+    // app/api/admin/login/route.ts.
+    const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
     setLoading(false);
-    if (signInError) {
-      setError("Inloggen mislukt. Controleer je e-mailadres en wachtwoord.");
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      setError(body?.error ?? "Inloggen mislukt. Controleer je e-mailadres en wachtwoord.");
       return;
     }
     router.push("/admin/orders");

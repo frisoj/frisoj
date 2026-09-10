@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getReviewInviteByToken, submitReview, getOrderById } from "@/lib/orders";
 import { site } from "@/lib/site";
+import { rateLimit, clientIpFrom } from "@/lib/rate-limit";
 
 // POST /api/reviews/submit — only a valid, unused review-invite token
 // (mailed to a real buyer 7 days after delivery) may submit a review. The
@@ -17,6 +18,12 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const ip = clientIpFrom(request.headers);
+  const { allowed } = rateLimit(`review-submit:${ip}`, 10, 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Te veel pogingen. Probeer het later opnieuw." }, { status: 429 });
+  }
+
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Ongeldige gegevens." }, { status: 400 });
