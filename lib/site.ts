@@ -13,6 +13,17 @@ export const site = {
   address: "[BEDRIJFSADRES]",
   email: "info@purelitter.nl",
   phone: "[TELEFOONNUMMER]",
+  // EU GPSR (General Product Safety Regulation, in force since 13 Dec
+  // 2024) requires every physical consumer product sold in the EU to
+  // display the manufacturer's name/address and, when the manufacturer is
+  // outside the EU (as is typical for dropshipped electronics), an EU-based
+  // "responsible person"/importer's name and address too. Missing from
+  // Phase 1-3 — added as a placeholder here, same convention as kvk/btw/
+  // address above, and rendered on the product page (see
+  // app/zelfreinigende-kattenbak/page.tsx). Must be filled in with the
+  // real supplier/importer details before launch — see LAUNCH-CHECKLIST.md.
+  gpsrManufacturer: "[GPSR-FABRIKANT-NAAM-EN-ADRES]",
+  gpsrResponsiblePerson: "[GPSR-VERANTWOORDELIJKE-PERSOON-EU-NAAM-EN-ADRES]",
   productName: "PureLitter Zelfreinigende Kattenbak",
   productSlug: "zelfreinigende-kattenbak",
   price: 179,

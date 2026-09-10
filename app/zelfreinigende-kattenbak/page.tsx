@@ -129,6 +129,10 @@ export default async function ProductPage() {
             Specificaties zijn placeholders voor Fase 1 — vervang door de
             werkelijke productdata. Zie DECISIONS.md.
           </p>
+          <p className="mt-2 text-xs text-ink-muted">
+            Productveiligheidsinformatie (EU GPSR): fabrikant — {site.gpsrManufacturer}.
+            Verantwoordelijke persoon in de EU — {site.gpsrResponsiblePerson}.
+          </p>
         </section>
 
         {/* Wat zit in de doos */}
