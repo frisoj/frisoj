@@ -1,4 +1,5 @@
 import { site } from "@/lib/site";
+import AddToCartButton from "@/components/AddToCartButton";
 
 export default function StickyAddToCart() {
   return (
@@ -10,15 +11,15 @@ export default function StickyAddToCart() {
             €{site.price},-
           </p>
         </div>
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          title="Bestellen komt beschikbaar in de volgende fase"
-          className="flex-1 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white opacity-90"
-        >
-          In winkelwagen
-        </button>
+        <AddToCartButton
+          variantId={site.defaultVariantId}
+          sku={site.defaultSku}
+          productSlug={site.productSlug}
+          name={site.productName}
+          unitPriceCents={site.price * 100}
+          image="/images/product-1.svg"
+          className="flex-1 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-dark"
+        />
       </div>
     </div>
   );

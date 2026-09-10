@@ -17,6 +17,14 @@ export const site = {
   productSlug: "zelfreinigende-kattenbak",
   price: 179,
   currency: "EUR",
+  // Placeholder ids for the single Phase 1 product/variant. The product page
+  // is still static content (no Supabase fetch yet), so these are fixed
+  // constants rather than DB-driven — replace with the real product_variants
+  // row id once the catalog is seeded. Used by the cart so line items carry
+  // a stable identity across the cart/checkout/order flow.
+  defaultVariantId: "00000000-0000-4000-8000-000000000001",
+  defaultSku: "PL-KATTENBAK-STD",
+  defaultProductId: "00000000-0000-4000-8000-000000000000",
 } as const;
 
 export const nav = [

@@ -4,6 +4,7 @@ import ProductGallery from "@/components/ProductGallery";
 import StickyAddToCart from "@/components/StickyAddToCart";
 import SectionHeading from "@/components/SectionHeading";
 import FaqItem from "@/components/FaqItem";
+import AddToCartButton from "@/components/AddToCartButton";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -110,15 +111,17 @@ export default function ProductPage() {
               <li>✓ Levering binnen 2-5 werkdagen</li>
             </ul>
 
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title="Bestellen komt beschikbaar in de volgende fase"
-              className="mt-8 hidden w-full rounded-full bg-accent px-6 py-3 text-base font-semibold text-white opacity-90 sm:block md:w-auto md:px-10"
-            >
-              In winkelwagen
-            </button>
+            <div className="hidden sm:block">
+              <AddToCartButton
+                variantId={site.defaultVariantId}
+                sku={site.defaultSku}
+                productSlug={site.productSlug}
+                name={site.productName}
+                unitPriceCents={site.price * 100}
+                image="/images/product-1.svg"
+                className="mt-8 w-full rounded-full bg-accent px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-dark md:w-auto md:px-10"
+              />
+            </div>
           </div>
         </div>
 

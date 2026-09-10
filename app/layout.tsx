@@ -3,6 +3,8 @@ import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import CartDrawer from "@/components/CartDrawer";
+import { CartProvider } from "@/lib/cart-context";
 import { site } from "@/lib/site";
 
 const fraunces = Fraunces({
@@ -77,11 +79,14 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Ga naar inhoud
         </a>
-        <Header />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-        <Footer />
+        <CartProvider>
+          <Header />
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+          <Footer />
+          <CartDrawer />
+        </CartProvider>
       </body>
     </html>
   );

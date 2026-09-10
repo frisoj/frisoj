@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { nav, site } from "@/lib/site";
+import CartIndicator from "@/components/CartIndicator";
 
 export default function Header() {
   return (
@@ -28,10 +29,11 @@ export default function Header() {
         <div className="flex items-center gap-3">
           <Link
             href={`/${site.productSlug}`}
-            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-dark"
+            className="hidden rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-dark sm:block"
           >
             Bekijk product
           </Link>
+          <CartIndicator />
         </div>
       </div>
       <nav aria-label="Mobiele navigatie" className="md:hidden">
