@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import SectionHeading from "@/components/SectionHeading";
 import ContactForm from "@/components/ContactForm";
-import { getOrCreateCsrfToken } from "@/lib/csrf";
+import { getCsrfToken } from "@/lib/csrf";
 import { site } from "@/lib/site";
 import { buildMetadata } from "@/lib/seo";
 import { breadcrumbJsonLd, JsonLd } from "@/lib/jsonld";
@@ -14,7 +14,7 @@ export const metadata: Metadata = buildMetadata({
 });
 
 export default async function ContactPage() {
-  const csrfToken = await getOrCreateCsrfToken();
+  const csrfToken = await getCsrfToken();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">

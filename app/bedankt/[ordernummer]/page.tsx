@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderByNumber } from "@/lib/orders";
-import { getOrCreateCsrfToken } from "@/lib/csrf";
+import { getCsrfToken } from "@/lib/csrf";
 import { formatEuro } from "@/lib/cart";
 import { site } from "@/lib/site";
 import ConversionTracker from "@/components/ConversionTracker";
@@ -23,7 +23,7 @@ export default async function ThankYouPage({
 
   if (!order) notFound();
 
-  const csrfToken = await getOrCreateCsrfToken();
+  const csrfToken = await getCsrfToken();
 
   if (order.status === "mislukt") {
     return (

@@ -11,7 +11,13 @@
   --color-ink: #241f1a;
   --color-ink-muted: #6b6459;
   --color-border: #e7e0d6;
-  --color-accent: #c05c34;
+  /* #c05c34 (the original brief-chosen terracotta) fails WCAG AA at 4.5:1
+     both as white-on-accent (4.36:1) and as accent-on-cream text (4.08:1) —
+     found via a Lighthouse/axe accessibility audit. Darkened slightly to
+     #b0502d (5.21:1 / 4.87:1) to pass AA while keeping the same warm
+     terracotta hue; accent-dark (hover state) already passed and is
+     unchanged. */
+  --color-accent: #b0502d;
   --color-accent-dark: #a04a29;
   --color-accent-tint: #f3e4d8;
   --color-success: #4b7b52;

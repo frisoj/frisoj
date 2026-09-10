@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getOrCreateCsrfToken } from "@/lib/csrf";
+import { getCsrfToken } from "@/lib/csrf";
 import CheckoutForm from "@/components/CheckoutForm";
 
 export const metadata: Metadata = {
@@ -8,6 +8,6 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const csrfToken = await getOrCreateCsrfToken();
+  const csrfToken = await getCsrfToken();
   return <CheckoutForm csrfToken={csrfToken} />;
 }

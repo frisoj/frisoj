@@ -12,6 +12,21 @@ import { cookies } from "next/headers";
 
 const COOKIE_NAME = "csrf_token";
 
+// Reads the token for use in a Server Component (the checkout/thank-you/
+// contact pages read this to embed in their forms). It never creates the
+// cookie itself: Server Components cannot mutate cookies ("Cookies can
+// only be modified in a Server Action or Route Handler") — that throws in
+// production (`next start`), not just in theory — so proxy.ts (middleware)
+// guarantees the cookie already exists for these exact routes before the
+// page renders. See proxy.ts's `ensureCsrfCookie`.
+export async function getCsrfToken(): Promise<string> {
+  const store = await cookies();
+  return store.get(COOKIE_NAME)?.value ?? "";
+}
+
+// Kept for any future Server Action / Route Handler that needs to both
+// read and, if absent, create the token in a context where mutating
+// cookies is actually allowed.
 export async function getOrCreateCsrfToken(): Promise<string> {
   const store = await cookies();
   const existing = store.get(COOKIE_NAME)?.value;

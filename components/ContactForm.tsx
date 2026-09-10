@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { contactFormSchema } from "@/lib/validation/contact";
 
 type FieldErrors = Record<string, string>;
 
 export default function ContactForm({ csrfToken }: { csrfToken: string }) {
+  const nameErrorId = useId();
+  const emailErrorId = useId();
+  const messageErrorId = useId();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
@@ -87,9 +90,15 @@ export default function ContactForm({ csrfToken }: { csrfToken: string }) {
           name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          aria-invalid={errors.name ? true : undefined}
+          aria-describedby={errors.name ? nameErrorId : undefined}
           className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-ink"
         />
-        {errors.name && <p className="mt-1 text-sm text-red-700">{errors.name}</p>}
+        {errors.name && (
+          <p id={nameErrorId} role="alert" className="mt-1 text-sm text-red-700">
+            {errors.name}
+          </p>
+        )}
       </div>
 
       <div>
@@ -102,9 +111,15 @@ export default function ContactForm({ csrfToken }: { csrfToken: string }) {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={errors.email ? true : undefined}
+          aria-describedby={errors.email ? emailErrorId : undefined}
           className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-ink"
         />
-        {errors.email && <p className="mt-1 text-sm text-red-700">{errors.email}</p>}
+        {errors.email && (
+          <p id={emailErrorId} role="alert" className="mt-1 text-sm text-red-700">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       <div>
@@ -131,9 +146,15 @@ export default function ContactForm({ csrfToken }: { csrfToken: string }) {
           rows={5}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          aria-invalid={errors.message ? true : undefined}
+          aria-describedby={errors.message ? messageErrorId : undefined}
           className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-ink"
         />
-        {errors.message && <p className="mt-1 text-sm text-red-700">{errors.message}</p>}
+        {errors.message && (
+          <p id={messageErrorId} role="alert" className="mt-1 text-sm text-red-700">
+            {errors.message}
+          </p>
+        )}
       </div>
 
       {submitError && <p className="text-sm text-red-700">{submitError}</p>}

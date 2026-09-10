@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { cloneElement, isValidElement, useId, useMemo, useState } from "react";
+import type { ReactElement } from "react";
 import { useCart } from "@/lib/cart-context";
 import { formatEuro } from "@/lib/cart";
 import {
@@ -26,6 +27,7 @@ function flattenIssues(issues: { path: PropertyKey[]; message: string }[]): Fiel
 
 export default function CheckoutForm({ csrfToken }: { csrfToken: string }) {
   const { items, totals, isHydrated } = useCart();
+  const termsErrorId = useId();
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -347,6 +349,8 @@ export default function CheckoutForm({ csrfToken }: { csrfToken: string }) {
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
+                aria-invalid={errors["acceptedTerms"] ? true : undefined}
+                aria-describedby={errors["acceptedTerms"] ? termsErrorId : undefined}
                 className="mt-0.5 h-4 w-4 rounded border-border text-accent focus-visible:outline-accent"
               />
               <span>
@@ -361,7 +365,7 @@ export default function CheckoutForm({ csrfToken }: { csrfToken: string }) {
                 .
               </span>
             </label>
-            {errors["acceptedTerms"] && <ErrorText>{errors["acceptedTerms"]}</ErrorText>}
+            {errors["acceptedTerms"] && <ErrorText id={termsErrorId}>{errors["acceptedTerms"]}</ErrorText>}
 
             <label className="flex items-start gap-3 text-sm text-ink">
               <input
@@ -393,19 +397,31 @@ export default function CheckoutForm({ csrfToken }: { csrfToken: string }) {
   );
 }
 
+// Wires each field's input to its error message via `aria-describedby` +
+// `aria-invalid` (not just visual proximity), so a screen-reader user
+// tabbing into a field — not only one hearing the role="alert" announcement
+// at the moment an error first appears — still gets the error read out as
+// part of the field's accessible description.
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  const errorId = useId();
+  const child = isValidElement(children)
+    ? cloneElement(children as ReactElement<{ id?: string; "aria-invalid"?: boolean; "aria-describedby"?: string }>, {
+        "aria-invalid": error ? true : undefined,
+        "aria-describedby": error ? errorId : undefined,
+      })
+    : children;
   return (
     <label className="block text-sm" data-error={error ? "true" : undefined}>
       <span className="mb-1 block font-medium text-ink">{label}</span>
-      {children}
-      {error && <ErrorText>{error}</ErrorText>}
+      {child}
+      {error && <ErrorText id={errorId}>{error}</ErrorText>}
     </label>
   );
 }
 
-function ErrorText({ children }: { children: React.ReactNode }) {
+function ErrorText({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <span role="alert" className="mt-1 block text-sm text-accent-dark">
+    <span id={id} role="alert" className="mt-1 block text-sm text-accent-dark">
       {children}
     </span>
   );
