@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "check:links": "node scripts/check-internal-links.mjs",
     "check:jsonld": "node scripts/validate-jsonld.mjs"
   },

@@ -6,6 +6,16 @@ tests (`npm test`) cover cart math, checkout validation, webhook idempotency
 and admin status transitions — this document covers everything that needs a
 human clicking through the real flow.
 
+**Phase 4 note:** `npm run test:e2e` (Playwright + axe-core) now covers a
+good chunk of this automatically — the full home→product→cart→checkout→
+thank-you path, checkout validation, guest order tracking, cookie-banner
+consent, and an accessibility sweep of every public page — against this
+environment's documented no-live-credentials fallback behavior (see
+DECISIONS.md). It runs in CI (`.github/workflows/ci.yml`) on every PR.
+What's below is still the only way to verify the parts that genuinely need
+a real Mollie test-mode payment, real Supabase Auth, and real Resend
+emails — Playwright can't fake those.
+
 ## 0. Prerequisites
 
 1. A Supabase project with both migrations applied (`supabase/migrations/0001_init.sql`

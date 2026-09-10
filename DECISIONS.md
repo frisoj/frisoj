@@ -501,3 +501,264 @@ behaviour the moment env vars are set — no code changes needed:
   `/sitemap.xml` and `/robots.txt` routes.
 - `npm test` — 41/41 passing (24 Phase 2 + 17 new Phase 3 tests).
 - `npm run check:links` / `npm run check:jsonld` — both pass.
+
+---
+
+# Decisions & fixes — Phase 4 (production-readiness audit)
+
+Phase 4 was an audit pass, not a feature phase: **no new functionality was
+added** (the one content exception is the EU GPSR disclosure below, which
+is legally-required text, not a feature). Everything here is either a real
+bug found and fixed, a genuine performance/accessibility/security gap
+closed, or infrastructure (CI, error pages, monitoring hooks) needed for a
+production launch. See the PR/commit history on this branch for the exact
+diffs — this section summarizes *why* each change was made.
+
+## Real bugs found and fixed
+
+- **`/afrekenen` and `/contact` 500'd under `next start`** (never caught by
+  `npm run dev` or the unit-test suite — only surfaced by a Lighthouse
+  smoke test against a real production build). Root cause: those Server
+  Components (plus `/bedankt/[ordernummer]`) called
+  `getOrCreateCsrfToken()`, which tries to *set* a cookie — Next.js only
+  allows mutating cookies from a Server Action or Route Handler, not a
+  Server Component render. Fixed by moving CSRF-cookie creation into
+  `proxy.ts` (middleware), which already runs before these pages render;
+  `lib/csrf.ts` now also exposes a read-only `getCsrfToken()` for the pages
+  themselves to call. This was launch-blocking: it broke the checkout page
+  itself in production.
+- **Checkout's "no Mollie configured" fallback sent the browser an
+  absolute redirect URL** built from `NEXT_PUBLIC_SITE_URL`/`site.url`.
+  Anywhere that env var doesn't match the actual host — every preview
+  deploy, and this local dev/audit environment, which has neither set —
+  the shopper's browser was sent to the placeholder production domain
+  instead of staying on the real host. Now uses a relative path for the
+  browser's own navigation; the real Mollie API calls still get (and
+  require) the absolute URL.
+- **Zod silently dropped the postcode-format error whenever any other
+  field also failed on the same submit** — most commonly the terms
+  checkbox, unchecked by default, so a very common first-submit shape (bad
+  postcode + box not yet ticked) showed only the terms error. Root cause:
+  Zod does not run an object's own `.superRefine()`/`.check()` at all if
+  any field on that same object already has an issue. Fixed by moving the
+  postcode-format check onto the address sub-schema itself (decoupling it
+  from unrelated top-level fields like `acceptedTerms`/`email`). A
+  narrower residual case remains and is deliberately documented rather
+  than silently left as a surprise: a bad *billing* postcode combined with
+  an unrelated error can still be suppressed on that one submit, since the
+  "billing fields required if different" logic still lives in the
+  top-level check (this only affects the minority of shoppers who tick
+  "Factuuradres is anders"). See the `[known limitation]` test in
+  `tests/checkout-validation.test.ts`.
+- **WCAG AA color contrast**: the brief-chosen accent `#C05C34` failed
+  4.5:1 both as white-on-accent (4.36:1, e.g. every primary button) and as
+  accent-on-cream body text (4.08:1) — found by Lighthouse's
+  `color-contrast` audit on the homepage. Darkened to `#B0502D` (5.21:1 /
+  4.87:1), same hue, no other design token touched.
+- **Inline links relying on color alone**: several links embedded inside a
+  sentence of surrounding text (cookie banner, `/vergelijking`, the
+  thank-you page, `/contact`, the checkout terms checkbox label) used
+  `hover:underline` — invisible as a link until hovered, which fails
+  axe's `link-in-text-block` rule (color contrast between the link and
+  the surrounding muted text was only 1.12:1, nowhere near the 3:1 this
+  rule requires when there's no other distinguishing style). Changed to a
+  permanent `underline`.
+- **Mini-cart drawer had no real focus trap** despite `aria-modal="true"`
+  (Tab could reach the page behind the overlay) and **never returned focus
+  to the triggering element on close** (e.g. the "In winkelwagen" button).
+  `lib/cart-context.tsx` now tracks whatever had focus when the drawer
+  opened and restores it on close; `CartDrawer.tsx` traps Tab/Shift+Tab
+  within the dialog. Escape-to-close already worked.
+- **Missing EU GPSR manufacturer/importer disclosure** on the product
+  page — a legal requirement for physical consumer products sold in the
+  EU (in force since 13 Dec 2024), absent from Phase 1-3 entirely. Added
+  as two new placeholders in `lib/site.ts` (`gpsrManufacturer`,
+  `gpsrResponsiblePerson`), same convention as `kvk`/`btw`/`address`.
+
+## Performance
+
+- `priority` on `next/image` was not, by itself, enough to get
+  `fetchpriority="high"` onto the actual `<img>`/preload `<link>` in this
+  Next.js version (confirmed by reading `get-img-props.js` — `priority`
+  only sets `loading="eager"` and adds the preload; `fetchPriority` is an
+  entirely separate prop). Added `fetchPriority="high"` alongside
+  `priority` on the three real hero/gallery images (home hero, product
+  gallery, and the blog article cover image, which had no `priority` at
+  all before this). Home mobile LCP: 3.0s → 2.4s (simulated slow-4G
+  throttling via Lighthouse's own `--throttling-method=simulate`, not a
+  real-device measurement).
+- `/afrekenen` and `/winkelwagen` rendered the *full* page before the cart
+  cookie was readable (client-only, read after mount), then collapsed to a
+  short "cart is empty" message once hydration confirmed 0 items — a 0.62
+  Cumulative Layout Shift on `/afrekenen` in Lighthouse. Both now show a
+  stable, minimally-sized placeholder until hydration resolves, so there
+  is at most one small→real content transition rather than a big
+  form→tiny-message reversal. CLS: 0.621 → 0.094.
+- `CartDrawer` and `CookieBanner` (root layout, every single page, render
+  nothing on first paint) are now loaded via `next/dynamic({ ssr: false })`
+  through a small client wrapper (`components/DeferredWidgets.tsx`)
+  instead of being bundled into every page's initial hydration payload.
+  Admin's own JS is already excluded from public-page bundles for free —
+  Next's App Router code-splits per route segment, so `/admin/*` chunks
+  were never shipped to `/`, `/zelfreinigende-kattenbak`, etc.
+- `npm audit`: upgraded `vitest` 2 → 5 (+ `@types/node` 20 → 22, + `vite` 7
+  as a direct devDependency, `--legacy-peer-deps`) to clear 5
+  vulnerabilities (1 critical, 1 high, 3 moderate) in `@vitest/mocker`/
+  `vite`/`esbuild`'s dev server — all dev-only, never shipped to
+  production, but worth clearing anyway. Production dependencies had 0
+  vulnerabilities before and after.
+- Lighthouse (desktop preset + mobile/simulated-throttled, against a real
+  `next build && next start`, Chromium via Playwright's bundled browser)
+  on `/`, `/zelfreinigende-kattenbak`, a blog article, `/vergelijking` and
+  `/afrekenen` — see the session's final report for the full before/after
+  score table. All five pages now score ≥92 on every category on mobile,
+  ≥96 on desktop; the one outlier (`/afrekenen` SEO 66) is the *intended*
+  `noindex` on the checkout page, not a regression — Lighthouse correctly
+  flags a noindex'd page as "not crawlable" and there is no reason to
+  index it.
+- No original image asset in `public/images/` exceeds 300KB — they are all
+  hand-authored placeholder SVGs (Phase 1/3 decision), which `next/image`
+  further optimizes at request time.
+
+## Accessibility
+
+- axe-core (`@axe-core/playwright`) scanned across all 16 public pages
+  plus the cookie banner and mini-cart drawer as their own dialogs — zero
+  critical/serious violations after the contrast/link-underline/focus-trap
+  fixes above (see `tests/e2e/accessibility.spec.ts`).
+- Checkout and contact form fields now wire their error message to the
+  input via `aria-describedby` + `aria-invalid`, not just visual proximity
+  plus a one-time `role="alert"` announcement — a screen reader tabbing
+  back into an already-invalid field now hears why, not just silence.
+- Skip link, keyboard navigation home → product → cart → checkout, and
+  `prefers-reduced-motion` were manually re-verified; no further gaps
+  found beyond what's fixed above.
+
+## Security
+
+- **Security headers** (`next.config.ts`, new `headers()` function):
+  Content-Security-Policy (script-src limited to self + Google Tag
+  Manager + Meta Pixel + TikTok Pixel, since those are the only
+  third-party scripts this site ever loads, and only after cookie
+  consent), Strict-Transport-Security, X-Content-Type-Options,
+  X-Frame-Options, Referrer-Policy, Permissions-Policy, plus an explicit
+  `X-Robots-Tag: noindex` on `/admin/*` as defense-in-depth on top of the
+  existing per-page `robots` metadata. The CSP uses `'unsafe-inline'` on
+  `script-src` rather than a nonce — wiring a nonce through every inline
+  script (Next's own hydration data, JSON-LD blocks, the post-consent
+  analytics snippets) is a larger change than this audit pass covers; it's
+  called out as a follow-up in RUNBOOK.md.
+- **Admin login moved off the browser Supabase SDK onto a new server route**
+  (`app/api/admin/login/route.ts`) so sign-in attempts are rate-limited
+  per IP (8/5min) — every other public form (checkout, contact, order
+  lookup) already had this, admin login did not. The allowlist check now
+  also runs before a session cookie is ever set, not only on the next
+  `/admin` request via `proxy.ts`.
+- **`/api/reviews/submit` was missing rate limiting** — every other public
+  POST endpoint already had it (checkout 8/min, checkout/retry 8/min,
+  contact — see below, order lookup 15/min). Added 10/min per IP.
+- **Row Level Security reviewed** across all three migrations
+  (`supabase/migrations/*.sql`): every table has RLS enabled; the only
+  `for all`/write policies are `to service_role`; the only `authenticated`
+  policies are strictly "read/update your own row via `auth.uid()`"; guest
+  order lookup (no Supabase Auth session) deliberately has **no** RLS
+  policy at all — `supabase/migrations/0002_checkout.sql` explains why
+  (Postgres RLS can't see the client's claimed order_number/email pair, so
+  a `using (true)` policy "scoped" to it would actually let the anon key
+  enumerate every order). Guest lookup instead goes through a server-side
+  helper using the service-role key, which itself enforces the
+  order_number+email match. No live Supabase project exists in this
+  environment to run an actual anon-key RLS penetration test against —
+  this is a static read of the policies, not a live test. Running that
+  live test against a real project is a `LAUNCH-CHECKLIST.md` item.
+- **Mollie webhook idempotency/never-trust-the-body re-verified**
+  (`app/api/mollie/webhook/route.ts`, `tests/webhook-idempotency.test.ts`)
+  — unchanged from Phase 2, still correct: the payment is always refetched
+  from Mollie by id before any status change, and a redelivered
+  `(paymentId, status)` pair is a no-op recorded in
+  `processed_webhook_events`.
+- **`npm audit`**: 0 vulnerabilities in production dependencies (before
+  and after this phase); 5 dev-only vulnerabilities (1 critical, 1 high, 3
+  moderate, all in the Vitest/Vite/esbuild dev-server toolchain, never
+  shipped) fixed by upgrading Vitest — see Performance above.
+- **Error pages** (`app/error.tsx`, `app/global-error.tsx`, new): there was
+  no error boundary anywhere, so an unhandled render error fell through to
+  Next's default screen. Both now show a calm, on-brand page with only the
+  Next-generated opaque `digest` (explicitly designed by Next to be shown
+  to users as a support reference) — never the message or stack trace.
+  `lib/error-reporting.ts` logs PII-free to the server console, matching
+  the rule the checkout/webhook routes already followed.
+- Verified (unchanged from Phase 2): the Supabase service-role key is only
+  ever imported by `lib/supabase/server.ts` (marked `import "server-only"`,
+  which throws if bundled into client code) and every `NEXT_PUBLIC_*` env
+  var in `.env.example` is genuinely a public value (Supabase anon key,
+  GA4/Meta/TikTok IDs, Search Console verification codes, site URL) — none
+  of them are secrets.
+
+## Testing
+
+- **Playwright** (`@playwright/test` + `@axe-core/playwright`, new
+  devDependencies) added as `tests/e2e/`: full home→product→cart→checkout
+  →thank-you (against this environment's documented no-live-Mollie
+  "pending" fallback — a real Mollie test-mode payment still needs a human
+  with real credentials, per `TESTING.md`), checkout validation (bad
+  postcode, missing terms checkbox), guest order tracking (correct vs.
+  wrong email), cookie-banner consent + no-marketing-requests-before-or-
+  after-consent (no pixel IDs are configured in this environment, so this
+  is verified structurally — no `googletagmanager.com`/
+  `connect.facebook.net`/`analytics.tiktok.com` request ever fires), admin
+  fail-closed/rate-limited/noindex behavior, and the full axe accessibility
+  sweep above. 27/27 passing.
+- 3 new Vitest regression tests for the postcode-validation bug above
+  (`tests/checkout-validation.test.ts`), including one explicitly named
+  `[known limitation]` for the narrower residual case.
+- `.github/workflows/ci.yml` (new): lint, `tsc --noEmit`, unit tests,
+  link/JSON-LD checks, production build, and the full Playwright suite on
+  every PR and push to `main`. Needs no secrets — every integration
+  degrades to its documented mock behavior without credentials.
+- **Total after Phase 4**: 44/44 Vitest tests, 27/27 Playwright tests,
+  `npm run lint` 0 errors/warnings, `npm run build` clean, `npm run
+  check:links`/`check:jsonld` clean.
+
+## Monitoring & analytics
+
+- **No live Sentry account/DSN exists in this environment.** Rather than
+  install `@sentry/nextjs` with nothing to configure it against (dead
+  weight, and a false "monitoring is set up" impression), added
+  `lib/error-reporting.ts` as the single call site both new error
+  boundaries use — it already logs PII-free to the server console, and
+  will forward to `window.Sentry.captureException` the moment a Sentry (or
+  Sentry-compatible) snippet is added, with zero other code changes
+  needed. See `RUNBOOK.md` for the concrete steps to wire a real Sentry
+  project (or a lighter alternative) once an account exists.
+- **`@vercel/analytics` + `@vercel/speed-insights`** (new dependencies)
+  added to the root layout — both are first-party and cookieless per
+  Vercel's own privacy design (no cookie, no cross-site tracking), so they
+  are *not* gated behind the cookie-consent banner, unlike GA4/Meta/
+  TikTok. Both are inert until the project is actually deployed on Vercel
+  with Analytics/Speed Insights turned on in the dashboard for it.
+- GA4/Meta/TikTok event firing (`view_item`, `add_to_cart`,
+  `begin_checkout`, `purchase`) was not re-implemented (Phase 2/3 code,
+  unchanged) — no pixel IDs are configured in this environment so nothing
+  can fire to verify live. `TESTING.md` documents how the owner checks
+  each platform's own debug tool once real IDs are set.
+
+## Documentation
+
+- `RUNBOOK.md` (new): what to do for a failed webhook, a missing-email
+  complaint, a return/refund, and a Mollie/Supabase outage.
+- `LAUNCH-CHECKLIST.md` (new): the pre-launch checklist for the human
+  owner.
+- This Phase 4 section.
+- Full remaining-placeholder list: see `LAUNCH-CHECKLIST.md` — it's kept
+  there rather than duplicated here so there is exactly one place a
+  non-technical owner needs to check before launch.
+
+## Verified before handoff (Phase 4)
+
+- `npm run lint` — 0 errors, 0 warnings.
+- `npm run build` — passes, all 39 routes.
+- `npm test` — 44/44 passing.
+- `npx playwright test` — 27/27 passing.
+- `npm run check:links` / `npm run check:jsonld` — both pass.
+- `npm audit` — 0 vulnerabilities.
