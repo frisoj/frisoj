@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 type LookupResult = {
   orderNumber: string;
@@ -43,6 +44,7 @@ export default function OrderTrackingPage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-14 sm:py-20">
+      <Breadcrumbs items={[{ label: "Order volgen" }]} />
       <h1 className="font-heading text-3xl font-semibold text-ink sm:text-4xl">Order volgen</h1>
       <p className="mt-3 text-ink-muted">Vul je ordernummer en e-mailadres in om de status van je bestelling te bekijken.</p>
 

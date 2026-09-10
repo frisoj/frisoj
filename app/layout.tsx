@@ -7,6 +7,7 @@ import CartDrawer from "@/components/CartDrawer";
 import CookieBanner from "@/components/CookieBanner";
 import { CartProvider } from "@/lib/cart-context";
 import { site } from "@/lib/site";
+import { organizationJsonLd, websiteJsonLd, JsonLd } from "@/lib/jsonld";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -42,41 +43,26 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "/",
+    languages: { "nl-NL": site.url, "nl-BE": site.url, "x-default": site.url },
+  },
+  other: {
+    ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+      ? { "google-site-verification": process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+      : {}),
+    ...(process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+      ? { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION }
+      : {}),
   },
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const organizationJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: site.legalName,
-    alternateName: site.brand,
-    url: site.url,
-    email: site.email,
-    logo: `${site.url}/images/hero-litterbox.svg`,
-  };
-
-  const websiteJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: site.brand,
-    url: site.url,
-    inLanguage: "nl-NL",
-  };
-
   return (
     <html lang="nl" className={`${fraunces.variable} ${inter.variable} h-full`}>
       <body className="flex min-h-full flex-col bg-cream text-ink antialiased">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
-        />
+        <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={websiteJsonLd()} />
         <a href="#main-content" className="skip-link">
           Ga naar inhoud
         </a>

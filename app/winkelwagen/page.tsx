@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useCart } from "@/lib/cart-context";
 import { formatEuro } from "@/lib/cart";
 import QuantityStepper from "@/components/QuantityStepper";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 export default function CartPage() {
   const { items, totals, setQuantity, removeItem, isHydrated } = useCart();
@@ -28,6 +29,7 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:py-14">
+      <Breadcrumbs items={[{ label: "Winkelwagen" }]} />
       <h1 className="font-heading text-3xl font-semibold text-ink sm:text-4xl">Winkelwagen</h1>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_320px]">

@@ -5,19 +5,14 @@ import UspBar from "@/components/UspBar";
 import SectionHeading from "@/components/SectionHeading";
 import FaqItem from "@/components/FaqItem";
 import { site } from "@/lib/site";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `${site.brand} — De zelfreinigende kattenbak die écht werkt`,
+export const metadata: Metadata = buildMetadata({
+  title: `${site.brand} — zelfreinigende kattenbak die écht werkt`,
   description:
-    "Ontdek de PureLitter zelfreinigende kattenbak: minder scheppen, minder geur, meer rust voor jou en je kat. Levering in NL/BE binnen 2-5 werkdagen.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: `${site.brand} — De zelfreinigende kattenbak die écht werkt`,
-    description:
-      "Minder scheppen, minder geur, meer rust. Bekijk de PureLitter zelfreinigende kattenbak.",
-    url: "/",
-  },
-};
+    "Minder scheppen, minder geur, meer rust voor jou en je kat. Levering in NL/BE binnen 2-5 werkdagen, 14 dagen bedenktijd.",
+  path: "/",
+});
 
 const steps = [
   {
@@ -109,7 +104,7 @@ export default function HomePage() {
                 Bekijk de kattenbak — €{site.price}
               </Link>
               <Link
-                href="/hoe-werkt-het"
+                href="#hoe-werkt-het"
                 className="rounded-full border border-border px-6 py-3 text-base font-semibold text-ink transition-colors hover:border-accent hover:text-accent"
               >
                 Hoe werkt het?
@@ -132,7 +127,7 @@ export default function HomePage() {
       <UspBar />
 
       {/* Hoe het werkt */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+      <section id="hoe-werkt-het" className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
         <SectionHeading
           eyebrow="Simpel & snel"
           title="Hoe het werkt in 3 stappen"
@@ -214,7 +209,7 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-8 text-center">
-            <Link href="/faq" className="font-semibold text-accent hover:underline">
+            <Link href="/veelgestelde-vragen" className="font-semibold text-accent hover:underline">
               Bekijk alle veelgestelde vragen →
             </Link>
           </div>

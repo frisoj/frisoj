@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:links": "node scripts/check-internal-links.mjs",
+    "check:jsonld": "node scripts/validate-jsonld.mjs"
   },
   "dependencies": {
     "@mollie/api-client": "^4.6.0",

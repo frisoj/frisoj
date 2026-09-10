@@ -30,7 +30,7 @@ export const site = {
 export const nav = [
   { href: "/", label: "Home" },
   { href: "/zelfreinigende-kattenbak", label: "Product" },
-  { href: "/hoe-werkt-het", label: "Hoe werkt het" },
+  { href: "/#hoe-werkt-het", label: "Hoe werkt het" },
   { href: "/vergelijking", label: "Vergelijking" },
   { href: "/blog", label: "Blog" },
   { href: "/veelgestelde-vragen", label: "FAQ" },
