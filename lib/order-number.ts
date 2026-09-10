@@ -17,3 +17,11 @@ export function generateOrderNumber(date: Date = new Date()): string {
 export function isValidOrderNumber(value: string): boolean {
   return /^KB-\d{4}-\d{6}$/.test(value);
 }
+
+// Orders are also identified by their (unguessable, random) UUID primary
+// key — used anywhere a link/request must prove the holder actually has
+// access to this specific order, since order_number alone is only 6 random
+// digits and easily enumerable. See lib/orders.ts getOrderById.
+export function isValidUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}

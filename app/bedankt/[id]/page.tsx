@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderByNumber } from "@/lib/orders";
+import { getOrderById } from "@/lib/orders";
+import { isValidUuid } from "@/lib/order-number";
 import { getCsrfToken } from "@/lib/csrf";
 import { formatEuro } from "@/lib/cart";
 import { site } from "@/lib/site";
@@ -16,10 +17,11 @@ export const metadata: Metadata = {
 export default async function ThankYouPage({
   params,
 }: {
-  params: Promise<{ ordernummer: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const { ordernummer } = await params;
-  const order = await getOrderByNumber(ordernummer);
+  const { id } = await params;
+  if (!isValidUuid(id)) notFound();
+  const order = await getOrderById(id);
 
   if (!order) notFound();
 
@@ -34,7 +36,7 @@ export default async function ThankYouPage({
           verlopen. Er is nog niets afgeschreven. Je kunt het opnieuw proberen.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3">
-          <RetryPaymentButton orderNumber={order.order_number} csrfToken={csrfToken} />
+          <RetryPaymentButton orderId={order.id} csrfToken={csrfToken} />
           <Link href="/winkelwagen" className="text-sm text-ink-muted underline hover:text-accent">
             Terug naar winkelwagen
           </Link>
@@ -67,6 +69,7 @@ export default async function ThankYouPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
       <ConversionTracker
+        orderId={order.id}
         orderNumber={order.order_number}
         totalCents={order.total_cents}
         alreadyTracked={Boolean(order.conversion_tracked_at)}

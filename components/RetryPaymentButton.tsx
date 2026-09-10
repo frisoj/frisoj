@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function RetryPaymentButton({ orderNumber, csrfToken }: { orderNumber: string; csrfToken: string }) {
+export default function RetryPaymentButton({ orderId, csrfToken }: { orderId: string; csrfToken: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,7 +13,7 @@ export default function RetryPaymentButton({ orderNumber, csrfToken }: { orderNu
       const res = await fetch("/api/checkout/retry", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-        body: JSON.stringify({ orderNumber }),
+        body: JSON.stringify({ orderId }),
       });
       const data = await res.json();
       if (!res.ok) {

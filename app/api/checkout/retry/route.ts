@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getOrderByNumber, setMolliePayment } from "@/lib/orders";
+import { getOrderById, setMolliePayment } from "@/lib/orders";
 import { getMollieClient, toMollieMethod } from "@/lib/mollie";
 import { rateLimit, clientIpFrom } from "@/lib/rate-limit";
 import { verifyCsrfToken, CSRF_COOKIE_NAME } from "@/lib/csrf";
+import { isValidUuid } from "@/lib/order-number";
 import { site } from "@/lib/site";
 import type { PaymentMethod } from "@/lib/validation/checkout";
 
 // POST /api/checkout/retry — "Opnieuw betalen" on the thank-you page for an
 // order whose payment failed/expired/was canceled. Starts a brand new
 // Mollie payment for the same order; does not create a new order.
+//
+// Identified by the order's UUID `id` (only ever seen by the shopper who
+// holds the /bedankt/[id] link), never by `order_number` — the order number
+// is a 6-digit human-facing code and must not double as proof of ownership,
+// or anyone could enumerate it and trigger payments on someone else's order.
 
-const schema = z.object({ orderNumber: z.string().min(1) });
+const schema = z.object({ orderId: z.string().min(1) });
 
 export async function POST(request: NextRequest) {
   const csrfCookie = request.cookies.get(CSRF_COOKIE_NAME)?.value;
@@ -27,16 +33,18 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Ongeldig verzoek." }, { status: 400 });
+  if (!parsed.success || !isValidUuid(parsed.data.orderId)) {
+    return NextResponse.json({ error: "Ongeldig verzoek." }, { status: 400 });
+  }
 
-  const order = await getOrderByNumber(parsed.data.orderNumber);
+  const order = await getOrderById(parsed.data.orderId);
   if (!order) return NextResponse.json({ error: "Bestelling niet gevonden." }, { status: 404 });
   if (order.status === "betaald") {
     return NextResponse.json({ error: "Deze bestelling is al betaald." }, { status: 400 });
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? site.url;
-  const redirectUrl = `${siteUrl}/bedankt/${order.order_number}`;
+  const redirectUrl = `${siteUrl}/bedankt/${order.id}`;
 
   const mollie = getMollieClient();
   if (!mollie) {
