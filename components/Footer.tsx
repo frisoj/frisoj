@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { nav, site } from "@/lib/site";
+import { legalNav, nav, site } from "@/lib/site";
+
+const paymentMethods = ["iDEAL", "Bancontact", "Creditcard", "Apple Pay", "Klarna"];
 
 export default function Footer() {
   return (
     <footer className="mt-16 border-t border-border bg-surface">
       <div className="mx-auto max-w-6xl px-4 py-12">
-        <div className="grid gap-10 sm:grid-cols-3">
+        <div className="grid gap-10 sm:grid-cols-4">
           <div>
             <p className="font-heading text-lg font-semibold text-ink">
               {site.brand}
@@ -14,6 +16,13 @@ export default function Footer() {
               {site.tagline}. Premium, hygiënisch kattengemak — geleverd in
               Nederland en België.
             </p>
+            <ul className="mt-4 flex flex-wrap gap-2 text-xs text-ink-muted" aria-label="Accepteerde betaalmethoden">
+              {paymentMethods.map((method) => (
+                <li key={method} className="rounded-full border border-border bg-cream px-2.5 py-1">
+                  {method}
+                </li>
+              ))}
+            </ul>
           </div>
           <nav aria-label="Footernavigatie">
             <p className="text-sm font-semibold text-ink">Navigatie</p>
@@ -24,6 +33,18 @@ export default function Footer() {
                     href={item.href}
                     className="rounded hover:text-accent"
                   >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <nav aria-label="Juridische informatie">
+            <p className="text-sm font-semibold text-ink">Juridisch</p>
+            <ul className="mt-3 space-y-2 text-sm text-ink-muted">
+              {legalNav.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className="rounded hover:text-accent">
                     {item.label}
                   </Link>
                 </li>

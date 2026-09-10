@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
+import CookieBanner from "@/components/CookieBanner";
 import { CartProvider } from "@/lib/cart-context";
 import { site } from "@/lib/site";
 
@@ -86,6 +87,7 @@ export default function RootLayout({
           </main>
           <Footer />
           <CartDrawer />
+          <CookieBanner />
         </CartProvider>
       </body>
     </html>

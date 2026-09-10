@@ -1,17 +1,52 @@
 "use client";
 
-// Cookie-consent stub. The real cookie banner is Phase 3 scope (see
-// DECISIONS.md) — this stub reads a single localStorage flag so the
-// conversion-tracking code (GA4/Meta/TikTok Purchase events) already has a
-// concrete gate to call, and swapping in a real consent-management banner
-// later only means changing this one function's implementation.
+// Cookie consent. Phase 2 shipped `hasMarketingConsent()` as a stub reading
+// a single localStorage flag; Phase 3 adds the real cookie banner
+// (components/CookieBanner.tsx) that writes this same flag, so every call
+// site that already gated on `hasMarketingConsent()` (conversion tracking
+// below, ConversionTracker.tsx) now reflects a real, explicit user choice
+// with no code changes needed on their end.
+const CONSENT_KEY = "pl_marketing_consent";
+export const COOKIE_BANNER_REOPEN_EVENT = "pl:open-cookie-banner";
+export const COOKIE_CONSENT_CHANGED_EVENT = "pl:cookie-consent-changed";
+
+export type ConsentValue = "granted" | "denied";
+
 export function hasMarketingConsent(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem("pl_marketing_consent") === "granted";
+    return window.localStorage.getItem(CONSENT_KEY) === "granted";
   } catch {
     return false;
   }
+}
+
+export function getStoredConsent(): ConsentValue | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.localStorage.getItem(CONSENT_KEY);
+    return value === "granted" || value === "denied" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setMarketingConsent(value: ConsentValue) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CONSENT_KEY, value);
+    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, { detail: value }));
+  } catch {
+    // localStorage unavailable (private mode/blocked) — consent simply
+    // won't persist across reloads; tracking stays off, which is the safe
+    // default.
+  }
+}
+
+/** Reopens the cookie banner (used by the "wijzig voorkeuren" link on /cookiebeleid). */
+export function reopenCookieBanner() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(COOKIE_BANNER_REOPEN_EVENT));
 }
 
 type PurchasePayload = {
