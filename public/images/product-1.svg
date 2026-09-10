@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Placeholder: vooraanzicht van de kattenbak">
+  <defs>
+    <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FBF8F4"/>
+      <stop offset="100%" stop-color="#F0E6D9"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg1)"/>
+  <rect x="200" y="260" width="400" height="320" rx="56" fill="#FFFFFF" stroke="#DCD1C1" stroke-width="3"/>
+  <rect x="240" y="230" width="320" height="70" rx="35" fill="#FFFFFF" stroke="#DCD1C1" stroke-width="3"/>
+  <circle cx="400" cy="265" r="14" fill="#C05C34"/>
+  <rect x="340" y="380" width="120" height="50" rx="12" fill="#C05C34"/>
+  <text x="400" y="740" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#8A7F6E">Placeholder — vooraanzicht</text>
+</svg>

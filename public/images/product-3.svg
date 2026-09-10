@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Placeholder: app-bediening bij de kattenbak">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F3E4D8"/>
+      <stop offset="100%" stop-color="#FBF8F4"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg3)"/>
+  <rect x="280" y="200" width="240" height="420" rx="36" fill="#FFFFFF" stroke="#DCD1C1" stroke-width="3"/>
+  <rect x="310" y="250" width="180" height="120" rx="14" fill="#F3E4D8"/>
+  <rect x="310" y="390" width="180" height="24" rx="12" fill="#C05C34"/>
+  <rect x="310" y="430" width="180" height="24" rx="12" fill="#E7D2BD"/>
+  <text x="400" y="740" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#8A7F6E">Placeholder — app-bediening</text>
+</svg>

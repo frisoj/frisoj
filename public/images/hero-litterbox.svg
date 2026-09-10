@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Placeholder productfoto van de zelfreinigende kattenbak">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F3E4D8"/>
+      <stop offset="100%" stop-color="#E7D2BD"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EFE9E1"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <ellipse cx="400" cy="640" rx="260" ry="30" fill="#C05C34" opacity="0.08"/>
+  <rect x="180" y="330" width="440" height="260" rx="60" fill="url(#body)" stroke="#D8CDBE" stroke-width="3"/>
+  <rect x="230" y="300" width="340" height="70" rx="35" fill="url(#body)" stroke="#D8CDBE" stroke-width="3"/>
+  <circle cx="400" cy="335" r="16" fill="#C05C34"/>
+  <rect x="330" y="440" width="140" height="60" rx="14" fill="#C05C34" opacity="0.9"/>
+  <circle cx="250" cy="460" r="10" fill="#B7AC9C"/>
+  <circle cx="550" cy="460" r="10" fill="#B7AC9C"/>
+  <path d="M180 590 q220 60 440 0" fill="none" stroke="#D8CDBE" stroke-width="3"/>
+  <text x="400" y="740" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#8A7F6E">Placeholder productbeeld — vervang door echte fotografie</text>
+</svg>
