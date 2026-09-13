@@ -61,6 +61,13 @@ Bijgewerkt op 13 september 2026, na de tweede correctieronde.
    - AI Prompt Pack → `Plannerij-AI-Prompt-Pack.zip`
    - Printable Bundel → `Plannerij-Printable-Bundel.zip`
    - Complete Bundel 2027 → `Plannerij-Complete-Bundel-2027.zip`
+
+   **Nog wél te doen:** het nieuwe gratis product *Gratis Weekplanner +
+   Gewoontetracker* (€0,00) moet op dezelfde manier gekoppeld worden aan
+   `Plannerij-Gratis-Weekplanner-A4.pdf` en `-A5.pdf`. Zonder die koppeling
+   krijgt iemand die de gratis download bestelt geen downloadmail — en dat is
+   juist de manier waarop je e-mailadressen verzamelt. Stap voor stap uitgelegd
+   in `marketing/11-gratis-weggever.md`.
 3. **Winkelnaam** – Instellingen → Winkelgegevens → naam "Plannerij", plus
    klantenservice-e-mail en bedrijfsgegevens. De Admin API kent geen mutatie om
    de winkelnaam te wijzigen.
