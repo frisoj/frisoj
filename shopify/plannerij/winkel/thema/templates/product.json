@@ -345,7 +345,7 @@
                     "text": {
                       "type": "text",
                       "settings": {
-                        "text": "<p>Direct na betaling verschijnt je downloadlink op het bedankpagina-scherm en ontvang je dezelfde link per e-mail. Geen verzendkosten, geen wachten.</p>",
+                        "text": "<p>Direct na betaling verschijnt je downloadlink direct op je scherm en krijg je dezelfde link per e-mail. Geen verzendkosten, geen wachten.</p>",
                         "width": "100%",
                         "max_width": "normal",
                         "alignment": "left",
