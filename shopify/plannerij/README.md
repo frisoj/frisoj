@@ -8,10 +8,11 @@ een Excel-budgetplanner, een AI-prompt pack en printables.
 
 | Map | Inhoud |
 |---|---|
-| `producten/` | De verkoopklare bestanden (PDF, XLSX, CSV, TXT) plus zip-bundels per product. Dit zijn de bestanden die aan de Shopify Digital Products-producten gekoppeld moeten worden. |
-| `afbeeldingen/` | Productmockups (1600×1600), herobanner, logo. Staan ook in Shopify → Content → Files. |
-| `generators/` | Python-scripts waarmee alle producten opnieuw gegenereerd kunnen worden (`make_planner.py`, `make_printables.py`, `make_budget.py`, `make_prompts_pdf.py`, `mockups.py`). Vereist `reportlab`, `openpyxl`, `pillow`, `pymupdf` en de Google-fonts Inter en Playfair Display in `generators/fonts/`. |
-| `winkel/` | Thema-JSON (Horizon-kopie "Plannerij (Horizon)"), beleidsteksten en een checklist. |
+| `producten/` | De verkoopklare bestanden (PDF, XLSX, CSV, TXT) plus zip-bundels per product, en de gratis weekplanner. Dit zijn de bestanden die aan de Shopify Digital Products-producten gekoppeld moeten worden. |
+| `afbeeldingen/` | Productmockups (1600×1600), herobanner, logo. Staan ook in Shopify → Content → Files. Submappen: `pinterest/` (30 pins, 1000×1500), `social/` (56 beelden voor Instagram en TikTok), `email/` (12 mailbanners). |
+| `generators/` | Python-scripts waarmee alles opnieuw gegenereerd kan worden: producten (`make_planner.py`, `make_printables.py`, `make_budget.py`, `make_prompts_pdf.py`, `make_gratis.py`) en beeldmateriaal (`mockups.py`, `clean_images.py`, `pins.py`, `social.py`, `email_images.py`). Vereist `reportlab`, `openpyxl`, `pillow`, `pymupdf` en de Google-fonts Inter en Playfair Display in `generators/fonts/`. |
+| `marketing/` | Het complete marketingmateriaal: positionering, Pinterest, Instagram/TikTok, e-mail, launchplan, advertenties, productteksten, uploadlijsten en de instellingen die in Shopify staan. Begin bij `01-positionering-en-doelgroepen.md`. |
+| `winkel/` | Thema-JSON, beleidsteksten, blogartikelen als HTML, QA-rapport en de checklist met wat er nog handmatig moet gebeuren. |
 
 ## Producten en prijzen
 
@@ -34,7 +35,24 @@ python3 make_planner.py      # digitale + printbare planner 2027
 python3 make_printables.py   # printable bundel A4/A5
 python3 make_budget.py       # budgetplanner xlsx
 python3 make_prompts_pdf.py  # prompt pack pdf/csv/txt (leest prompts.json)
+python3 make_gratis.py       # gratis weekplanner + gewoontetracker (A4/A5)
 python3 mockups.py           # productafbeeldingen
+python3 pins.py              # 30 Pinterest-pins (1000x1500)
+python3 social.py            # Instagram/TikTok: carrousels, covers, stories
+python3 email_images.py      # banners voor de e-mailcampagnes
 ```
 
-De scripts schrijven naar een scratch-map; pas `OUT`/`BASE` bovenin aan als je ze lokaal draait.
+De oudere productscripts (`make_planner.py` en de andere `make_*.py` behalve
+`make_gratis.py`, plus `mockups.py`) schrijven naar een scratch-map; pas `OUT`/`BASE`
+bovenin aan als je ze lokaal draait. De nieuwere scripts bepalen hun paden zelf en
+schrijven direct in `afbeeldingen/` en `producten/`.
+
+## Waar staat wat in de winkel
+
+| Onderdeel | Waar |
+|---|---|
+| Producten, collecties, pagina's, blog | live op `umaktx-cz.myshopify.com` |
+| Wat nog handmatig moet (betalingen, winkelnaam, beleid) | `winkel/CHECKLIST.md` |
+| Klantsegmenten, korte URL's, linkpagina, UTM's | `marketing/12-marketing-instellingen-shopify.md` |
+| Pins uploaden | `marketing/08-pins-uploadlijst.md` |
+| Social posten | `marketing/09-social-uploadlijst.md` |

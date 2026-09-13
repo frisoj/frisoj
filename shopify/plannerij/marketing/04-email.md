@@ -374,3 +374,32 @@ Plannerij
 - Verlaten winkelwagen: Automatiseringen → "Verlaten winkelwagen herstellen"; wachttijd 4 uur; één mail.
 - Bedankmails per product: Automatiseringen → "Bedankt na aankoop" met conditie op producttitel (of tag "planner", "budget", "prompts", "printables", "bundel").
 - Nieuwsbrieven: handmatig versturen; D1 op de lanceringsdag, D2 rond half september of zodra er minstens 50 abonnees zijn (anders liever eerst verder bouwen).
+
+---
+
+## F. Banners voor elke mail
+
+De afbeeldingen staan klaar in `afbeeldingen/email/`. In Shopify Email voeg je ze
+toe met het blok **Afbeelding** bovenaan de mail (Uploaden → bestand kiezen). Ze
+zijn 1200 px breed gerenderd, dus ze blijven scherp op een telefoon.
+
+| Mail | Bestand |
+|---|---|
+| Welkom 1 | `mail-welkom-1.png` |
+| Welkom 2 | `mail-welkom-2.png` |
+| Welkom 3 | `mail-welkom-3.png` |
+| Verlaten winkelwagen | `mail-verlaten-winkelwagen.png` |
+| Nieuwsbrief D1 · Lancering | `mail-lancering.png` |
+| Nieuwsbrief D2 · "2027 begint eerder" | `mail-2027.png` |
+| Mail over de gratis weekplanner | `mail-gratis-weekplanner.png` |
+| C1 · Digitale Planner 2027 | `mail-product-planner.png` |
+| C2 · Budgetplanner | `mail-product-budget.png` |
+| C3 · AI Prompt Pack | `mail-product-prompts.png` |
+| C4 · Printable Bundel | `mail-product-printables.png` |
+| C5 · Complete Bundel 2027 | `mail-product-bundel.png` |
+
+Opnieuw maken of aanpassen: `python3 generators/email_images.py`.
+
+**Alt-tekst niet vergeten.** Shopify Email vraagt erom en sommige mailprogramma's
+laden afbeeldingen niet. Houd het simpel, bijvoorbeeld: "Tablet met de weekpagina
+van de Digitale Planner 2027 naast een geprinte maandpagina."
