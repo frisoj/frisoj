@@ -1,6 +1,6 @@
 # Plannerij – status en resterende stappen
 
-Bijgewerkt op 13 september 2026, na de tweede correctieronde.
+Bijgewerkt op 13 september 2026, na de marketingronde.
 
 ## Opgeloste storingen op de live site
 
@@ -30,9 +30,12 @@ Bijgewerkt op 13 september 2026, na de tweede correctieronde.
   SKU, beschrijving, tags, SEO-titel en -omschrijving en 5 of 6 afbeeldingen.
 - **4 collecties** (Planners, Budget & geld, AI & productiviteit, Bundels) met
   eigen tekstvrije collectiefoto en SEO.
-- **Hoofdmenu en footermenu**, 6 pagina's, blog met 7 artikelen (allemaal met
-  afbeelding), kortingscode WELKOM10.
-- **Thema "Plannerij (Horizon)"** is het live thema: homepage, header met
+- **1 gratis product** (Gratis Weekplanner + Gewoontetracker, €0,00) met een eigen
+  landingspagina `/pages/gratis-weekplanner`, om e-mailadressen mee te verzamelen.
+- **Hoofdmenu en footermenu**, 8 pagina's, blog met 16 artikelen (allemaal met
+  afbeelding, alt-tekst, tags, SEO-titel en meta-omschrijving), kortingscode
+  WELKOM10.
+- **Thema "Plannerij v2 (alle templates)"** is het live thema: homepage, header met
   aankondigingsbalk, footer met nieuwsbrief en productpagina.
 - **Afbeeldingen zonder ingebakken tekst.** De eerste set mockups had de
   merknaam, producttitel en een badge in de afbeelding staan, terwijl het thema
@@ -40,16 +43,24 @@ Bijgewerkt op 13 september 2026, na de tweede correctieronde.
   hero- en collectiefoto's zijn vervangen door tekstvrije versies onder dezelfde
   bestandsnaam, dus de live pagina's gebruiken ze meteen.
 
+## Marketing staat klaar
+
+- **9 klantsegmenten** (per product, nieuwsbrief-zonder-aankoop, upsell naar de
+  bundel, recente kopers) om je e-mails gericht te versturen.
+- **12 korte URL's**: `/planner`, `/budget`, `/prompts`, `/printables`, `/bundel`,
+  `/gratis`, `/links`, `/shop`, `/blog`, `/faq` en twee varianten.
+- **Linkpagina `/pages/links`** voor in je Instagram- en TikTok-bio.
+- **30 Pinterest-pins**, **56 Instagram/TikTok-beelden** en **12 mailbanners**,
+  met uploadlijsten waarin titel, bord, doel-URL, caption en hashtags al klaar
+  staan: `marketing/08`, `09` en `04-email.md` onderdeel F.
+- Uitleg van alles wat in Shopify zelf staat: `marketing/12`.
+
 ## Nog te doen (kan niet via de API)
 
-1. **Thema v2 publiceren.** Dit is de belangrijkste klik. Het live thema is nog de
-   eerste versie: daar staat op de winkelwagen "Cart", op het contactformulier
-   "Submit" en op de collectie-, 404- en zoekpagina's de standaardtekst van
-   Horizon. De kopie "Plannerij v2 (alle templates)" heeft al die pagina's in het
-   Nederlands. Online Store → Thema's → "Plannerij v2 (alle templates)" →
-   Acties → Publiceren. Thema's publiceren en naar het live thema schrijven zijn
-   in deze omgeving geblokkeerd, dus dit kan alleen jij.
-   Optioneel daarna: Online Store → Pagina's → Over Plannerij en Veelgestelde
+1. ~~**Thema v2 publiceren.**~~ Gedaan: "Plannerij v2 (alle templates)" is het live
+   thema. De winkelwagen, het contactformulier, de collectie-, 404- en
+   zoekpagina's staan daarmee in het Nederlands.
+   Optioneel nog: Online Store → Pagina's → Over Plannerij en Veelgestelde
    vragen → Sjabloon op respectievelijk `over-ons` en `veelgestelde-vragen`
    zetten voor de uitgebreide opmaak. Zonder die stap werken de pagina's gewoon,
    ze zijn dan alleen soberder.
