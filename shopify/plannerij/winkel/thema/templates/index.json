@@ -1768,7 +1768,7 @@
                 "text": {
                   "type": "text",
                   "settings": {
-                    "text": "<p>Ja. Je ontvangt een Excel-bestand (.xlsx) en een link om een kopie in Google Sheets te maken. Alle formules werken in beide programma's.</p>",
+                    "text": "<p>Ja. Je ontvangt een Excel-bestand (.xlsx). Upload het naar Google Drive en open het met Google Sheets; alle formules werken in beide programma's, en ook in Apple Numbers.</p>",
                     "width": "100%",
                     "max_width": "normal",
                     "alignment": "left",
