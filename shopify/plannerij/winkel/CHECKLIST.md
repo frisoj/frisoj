@@ -2,8 +2,11 @@
 
 Wat al via de API is ingericht: 5 digitale producten (concept, met prijs,
 beschrijving, afbeeldingen en SEO), 4 collecties, hoofd- en footermenu,
-6 pagina's, blog met 3 artikelen, kortingscode WELKOM10, thema-kopie
-"Plannerij (Horizon)" met homepage, en 25 afbeeldingen in Content → Files.
+6 pagina's (Over ons en FAQ met eigen opgemaakte template), blog met artikelen,
+kortingscode WELKOM10, thema-kopie "Plannerij (Horizon)" met homepage, collectie-,
+product-, contact-, blog-, artikel-, 404-, zoek-, winkelwagen- en wachtwoordtemplate, en
+25 afbeeldingen in Content → Files. QA-rapport: `winkel/QA-rapport.md`.
+Marketingmateriaal: `marketing/`.
 
 ## Nog te doen (kan niet via de API)
 
