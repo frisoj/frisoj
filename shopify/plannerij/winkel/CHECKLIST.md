@@ -1,6 +1,26 @@
 # Plannerij – status en resterende stappen
 
-Bijgewerkt op 13 september 2026, na de correctieronde.
+Bijgewerkt op 13 september 2026, na de tweede correctieronde.
+
+## Opgeloste storingen op de live site
+
+- **404 bij de collecties in het menu.** De vier collecties waren niet
+  gepubliceerd op het verkoopkanaal Webshop, dus `/collections/planners` en de
+  andere drie gaven "page not found". Alle vier staan nu gepubliceerd.
+- **404 bij Over ons en Veelgestelde vragen.** Beide pagina's verwezen naar een
+  eigen sjabloon dat alleen in thema v2 zit, niet in het live thema. De verwijzing
+  is verwijderd, zodat ze het standaardsjabloon gebruiken; de volledige tekst
+  stond al op de pagina's zelf.
+- **Lege contactpagina.** De pagina had wel een formulier maar geen tekst. Er
+  staat nu een korte uitleg, drie tips voor je schrijft en links naar levering,
+  retour en licentie.
+- **Lege collectiepagina's.** Drie collecties hadden maar één product. De Complete
+  Bundel hoort inhoudelijk in Planners, Budget & geld en AI & productiviteit en
+  staat daar nu ook in.
+- **Menu's opgeschoond.** Hoofdmenu: Home, Shop (met Alle producten, Planners,
+  Budget & geld, AI & productiviteit, Bundels), Blog, Over ons, Contact.
+  Footer: Veelgestelde vragen, Levering, Retourbeleid, Licentie en gebruik,
+  Algemene voorwaarden, Contact. Geen dubbele of dode links meer.
 
 ## Staat live in de winkel
 
@@ -22,12 +42,17 @@ Bijgewerkt op 13 september 2026, na de correctieronde.
 
 ## Nog te doen (kan niet via de API)
 
-1. **Thema v2 publiceren.** De kopie "Plannerij v2 (alle templates)" bevat
-   bovenop het live thema de Nederlandse templates voor collectie, pagina,
-   contact, blog, artikel, 404, zoeken, winkelwagen en wachtwoordpagina, plus de
-   opgemaakte Over-ons- en FAQ-pagina. Online Store → Thema's →
-   "Plannerij v2 (alle templates)" → Acties → Publiceren. Thema's publiceren is
-   in deze omgeving geblokkeerd, dus dit is één klik voor jou.
+1. **Thema v2 publiceren.** Dit is de belangrijkste klik. Het live thema is nog de
+   eerste versie: daar staat op de winkelwagen "Cart", op het contactformulier
+   "Submit" en op de collectie-, 404- en zoekpagina's de standaardtekst van
+   Horizon. De kopie "Plannerij v2 (alle templates)" heeft al die pagina's in het
+   Nederlands. Online Store → Thema's → "Plannerij v2 (alle templates)" →
+   Acties → Publiceren. Thema's publiceren en naar het live thema schrijven zijn
+   in deze omgeving geblokkeerd, dus dit kan alleen jij.
+   Optioneel daarna: Online Store → Pagina's → Over Plannerij en Veelgestelde
+   vragen → Sjabloon op respectievelijk `over-ons` en `veelgestelde-vragen`
+   zetten voor de uitgebreide opmaak. Zonder die stap werken de pagina's gewoon,
+   ze zijn dan alleen soberder.
 2. **Bestanden koppelen in Digital Products.** De connector geeft sinds vanmiddag
    "Could not authorize this store with Digital Products", dus de uploadknop
    opent niet meer vanuit de chat. Open Apps → Digital Products en koppel per
