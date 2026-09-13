@@ -1,361 +1,172 @@
-# 03 · Instagram en TikTok – eerste 4 weken
+# 03 · Instagram en TikTok — Plannerij
 
-20 posts en reels, 5 per week. Alles is copy-paste; pas alleen de datums aan.
+20 posts en reels voor 4 weken (5 per week). Elke post is bruikbaar op Instagram (feed, reel of carrousel) en TikTok (video). Toon: rustig, laten zien, geen hype.
 
-## Werkwijze
+**Praktisch**
+- Reels/TikToks: 15–40 seconden, verticaal 9:16, eigen stem of rustige muziek, ondertitels altijd aan.
+- Beeldstijl: zand (#F4EFE6) achtergrond, salie-groen (#5F7A61) accenten, tekst in donker (#1F2A24). Handen + tablet, of printer + papier. Geen stockfoto's van lachende mensen.
+- Link in bio: naar de winkel. In captions "link in bio" en de kortingscode WELKOM10.
+- Hashtags: 10–15 per post, Nederlands, mix van grote en kleine. Op TikTok 3–5 uit dezelfde lijst.
+- Geen "nog maar even", geen verzonnen aantallen, geen "iedereen is er blij mee".
 
-- **Eén opname, twee kanalen.** Elke reel wordt op Instagram én TikTok geplaatst. Op TikTok kort je de caption in tot de hook plus 4 tot 6 hashtags; de rest zeg je in de video.
-- **Beeldtaal.** Zand-achtergrond, echte handen, echte tablet, echte printer. Geen stockfoto's. Tekst-overlays in donker (#1F2A24) met saliegroene (#5F7A61) accenten, lettertype Inter. Maximaal twee regels tekst per scherm.
-- **Geluid.** Rustige, trending audio op laag volume of geen muziek met voice-over. Geen snelle cuts, geen "wacht tot het einde".
-- **Lengte.** Reels 15 tot 40 seconden. Carrousels 5 tot 8 slides, eerste slide is de hook in grote letters.
-- **Link.** Instagram: "link in bio" naar de winkel (gebruik een simpele linkpagina met de vijf producten en het blog). TikTok: link in bio naar de winkel.
-- **Call to action.** Altijd één: bewaar, deel, reageer, of link in bio. Nooit alle vier.
-- **Eerlijkheid.** Geen "bestseller", geen "bijna uitverkocht", geen verzonnen reacties van klanten. Zodra er echte reacties zijn, vraag toestemming en deel die.
-- **Bio.** "Plannerij · Rust in je hoofd begint met overzicht. Nederlandse digitale planners, budgetplanners, AI-prompts en printables. Direct downloaden ↓"
-
-## Vaste hashtagsets
-
-Combineer per post een set met een paar specifieke tags.
-
-- **Basis:** #plannerij #plannen #overzicht #rustinjehoofd #organiseren #productiviteit
-- **Planner:** #digitaleplanner #goodnotesplanner #ipadplanner #samsungnotes #planner2027 #weekplanning #notability
-- **Budget:** #budgetteren #budgetplanner #huishoudboekje #sparen #spaardoelen #geldzaken #maandbudget
-- **Prompts:** #chatgptnederlands #aiprompts #chatgpttips #ai #zzp #ondernemen #contentcreatie
-- **Printables:** #printables #printableplanner #gewoontetracker #maaltijdplanner #weekplanner #schoonmaakschema
-- **Studie:** #studietips #studeren #studentenleven #tentamens #studieplanning
-- **Gezin:** #gezinsplanning #mentaleload #drukgezin #huishouden #moederleven
+Vaste hashtagbasis (kies per post): #plannerij #digitaleplanner #goodnotesnederlands #planner2027 #weekplanner #budgetplanner #printables #gewoontetracker #overzicht #rustinjehoofd #planningtips #huishoudboekje #sparen #chatgptnederlands #productiviteit #studietips #mamalife #zzp #adhdnederland #organiseren
 
 ---
 
-## Week 1 · Lancering
+## Week 1 — Kennismaking en de planner
 
-### Post 1 · Reel · Productdemo (maandag)
-**Hook (eerste 2 sec, tekst in beeld):** "Een Nederlandse planner voor je iPad. Zo werkt hij."
-**Script (25 sec, screenrecording GoodNotes, voice-over of tekst):**
-1. Open de planner op de jaarpagina. "Dit is de Digitale Planner 2027."
-2. Tik op "MRT" in de zijbalk → maandpagina. "Elke maand een overzicht met weeknummers en feestdagen."
-3. Tik op weeknummer 12 → weekpagina. "Elke week maandag tot en met zondag, met top 3 en notities."
-4. Schrijf met de pen "tentamen statistiek" op donderdag.
-5. Tik op "Doelen" bovenin. "Doelen, gewoontetracker en notities zitten er ook in."
-6. Eindscherm: mockup planner-1-hero.png. "Direct te downloaden, link in bio."
-**Caption:**
-Een planner die gewoon Nederlands is: weekstart op maandag, weeknummers, feestdagen van Nederland en België. Werkt in GoodNotes, Notability en Samsung Notes, en er zit een printbare versie bij.
+### Post 1 · Reel · Productdemo (Digitale Planner 2027)
+- **Hook (eerste 2 sec, tekst in beeld):** "Een Nederlandse planner voor 2027 die je gewoon in GoodNotes opent."
+- **Script:** Tablet op tafel, open de planner. Tik op "Januari", tik op week 2, laat weeknummer en feestdag zien. Schrijf één taak met de pen. Tik op de gewoontetracker en vink af. Eindshot: overzicht van maand + week naast elkaar.
+- **Caption:** Dit is de Digitale Planner 2027 van Plannerij. Nederlands, weekstart op maandag, weeknummers en feestdagen van Nederland en België al ingevuld. 12 maandpagina's, 53 weekpagina's, per maand een gewoontetracker, doelen en notities. Alles is met elkaar gelinkt, dus je tikt van maand naar week en terug. Werkt in GoodNotes, Notability en Samsung Notes, en er zit een printbare A4/A5-versie bij. Introductieprijs €14,95. Met WELKOM10 krijg je 10% extra. Link in bio.
+- **Hashtags:** #plannerij #digitaleplanner #goodnotesnederlands #planner2027 #ipadplanner #weekplanner #samsungnotes #notability #planningtips #overzicht #rustinjehoofd #organiseren
+- **Beeldmateriaal:** eigen schermopname of video van tablet; als fallback planner-1-hero.png + planner-3 als stills.
 
-Dit is de Digitale Planner 2027. Link in bio.
-**Hashtags:** #plannerij #digitaleplanner #goodnotesplanner #ipadplanner #samsungnotes #planner2027 #weekplanning #plannen #overzicht #rustinjehoofd #productiviteit #notability
-**Beeldmateriaal:** screenrecording van de PDF in GoodNotes (iPad) of Samsung Notes; eindscherm `planner-1-hero.png`.
+### Post 2 · Carrousel · Tip
+- **Hook (slide 1):** "5 dingen die in een Nederlandse planner horen (en in de meeste ontbreken)."
+- **Slides:** 2. Weekstart op maandag. 3. Weeknummers. 4. Feestdagen NL én BE. 5. Genoeg witruimte. 6. Een plek voor losse gedachten. 7. "Dit zit allemaal in de Digitale Planner 2027 · link in bio."
+- **Caption:** Veel planners zijn vertaald uit het Engels: week begint op zondag, Thanksgiving staat erin, weeknummers ontbreken. Voor ons werkte dat niet, dus we hebben er zelf een gemaakt. Welke van de vijf mis jij het vaakst? Link in bio, WELKOM10 voor 10% korting.
+- **Hashtags:** #plannerij #digitaleplanner #planner2027 #weekplanner #weeknummers #planningtips #goodnotesnederlands #overzicht #organiseren #studietips #productiviteit
+- **Beeldmateriaal:** 7 slides in zand met donkere tekst; slide 7 met planner-2-maand.
 
-### Post 2 · Carrousel · Wat zit erin (dinsdag)
-**Hook (slide 1):** "Wat zit er in de Digitale Planner 2027?"
-**Slides:**
-2. `planner-5-jaar.png` – "Jaaroverzicht met alle maanden, tik en je bent er."
-3. `planner-2-maand.png` – "12 maandpagina's met weeknummers, focus en belangrijke data."
-4. `planner-3-week.png` – "53 weekpagina's, maandag t/m zondag, top 3 en vooruitblik."
-5. `planner-4-gewoontes.png` – "Gewoontetracker per maand, één bolletje per dag."
-6. `planner-6-printbaar.png` – "Ook printbaar in A4 en A5."
-7. Tekstslide: "€14,95 · direct downloaden · WELKOM10 voor 10% korting."
-**Caption:**
-Alles wat in de Digitale Planner 2027 zit, in zes slides. Gedateerd, hyperlinked, Nederlands. Voor GoodNotes, Notability en Samsung Notes.
+### Post 3 · Reel · "Zo gebruik ik"
+- **Hook:** "Zo plan ik mijn week in drie minuten (zondagavond, thee erbij)."
+- **Script:** Voice-over of ondertitels. 1) Open de maandpagina: wat staat er vast? 2) Ga naar de weekpagina, zet drie dingen die écht moeten bovenaan. 3) Vul de rest losjes in. 4) Gewoontetracker: kies twee gewoontes, niet tien. 5) Sluit de tablet. Klaar.
+- **Caption:** Weekplanning hoeft geen project te zijn. Drie minuten, drie prioriteiten, twee gewoontes. Ik gebruik hiervoor de Digitale Planner 2027 op de iPad, maar de printbare versie werkt precies hetzelfde. Hoe plan jij je week? Link in bio.
+- **Hashtags:** #plannerij #weekplanning #digitaleplanner #zondagroutine #planningtips #rustinjehoofd #gewoontetracker #goodnotesnederlands #productiviteit #overzicht #planner2027
+- **Beeldmateriaal:** video van boven: handen, tablet, kop thee.
 
-Bewaar deze post als je in september al aan 2027 denkt. Link in bio.
-**Hashtags:** #plannerij #digitaleplanner #goodnotesplanner #planner2027 #ipadplanner #weekplanning #gewoontetracker #plannen #overzicht #organiseren #productiviteit
-**Beeldmateriaal:** de zes planner-mockups, tekstslide in zand met donkere tekst.
+### Post 4 · Feedpost · Tip (blog)
+- **Hook (beeldtekst):** "Digitaal of papier? Je hoeft niet te kiezen."
+- **Caption:** De vraag die we het meest krijgen: moet ik een digitale of een papieren planner nemen? Ons antwoord staat in een rustig blogartikel: wat past bij hoe jij werkt, en waarom onze planner allebei is (hyperlinked PDF + printbare A4/A5). Lees het via de link in bio, onder "Blog".
+- **Hashtags:** #plannerij #digitaleplanner #papierenplanner #planner2027 #planningtips #goodnotesnederlands #printables #overzicht #organiseren #bulletjournal
+- **Beeldmateriaal:** planner-6-printbaar (tablet naast geprinte pagina).
 
-### Post 3 · Reel · Tip (woensdag)
-**Hook:** "Zondagavond, 10 minuten. Dit plan ik."
-**Script (30 sec, tablet of papier, handen in beeld):**
-1. "Eén: de drie dingen die deze week echt moeten." (schrijf ze in Top 3 prioriteiten)
-2. "Twee: vaste afspraken op de juiste dag." (zet twee afspraken neer)
-3. "Drie: één ding voor mezelf." (schrijf 'wandelen do' op donderdag)
-4. "Meer niet. De rest komt door de week."
-5. Eindscherm: weekpagina ingevuld.
-**Caption:**
-Een weekplanning hoeft niet vol. Drie prioriteiten, de vaste afspraken en één ding voor jezelf. De rest vul je aan als het komt.
-
-Zo gebruik ik de weekpagina van de Digitale Planner. Werkt net zo goed op de printbare weekplanner.
-
-Wat is jouw ene ding voor jezelf deze week?
-**Hashtags:** #plannerij #weekplanning #zondagavond #plannen #overzicht #rustinjehoofd #digitaleplanner #productiviteit #timemanagement #organiseren #weekplanner
-**Beeldmateriaal:** handen + tablet (of A4 weekplanner + pen) op zand-achtergrond, bovenaanzicht.
-
-### Post 4 · Post · Merkintroductie (donderdag)
-**Hook (beeld):** `hero-banner.png` bijgesneden naar 4:5, of `logo-square.png` op zand.
-**Caption:**
-Hallo, wij zijn Plannerij.
-
-We maken Nederlandse digitale hulpmiddelen voor mensen die overzicht willen zonder ingewikkeld systeem:
-· een Digitale Planner 2027 voor tablet (met printbare versie)
-· een Budgetplanner voor Excel en Google Sheets
-· een pack met 200 Nederlandse AI-prompts
-· een bundel van 12 printables
-
-Alles in het Nederlands, met Nederlandse feestdagen en euro's. Eén keer kopen, direct downloaden, geen abonnement.
-
-Rust in je hoofd begint met overzicht. Fijn dat je er bent.
-**Hashtags:** #plannerij #nieuwewebshop #digitaleplanner #budgetplanner #printables #aiprompts #plannen #overzicht #rustinjehoofd #organiseren #nederlands
-**Beeldmateriaal:** `hero-banner.png` (bijsnijden) of `logo-square.png`; als tweede slide `bundel-1-hero.png`.
-
-### Post 5 · Reel · "Zo gebruik ik" Budgetplanner (vrijdag)
-**Hook:** "Een uitgave bijhouden kost 20 seconden. Kijk."
-**Script (20 sec, screenrecording Google Sheets op telefoon of laptop):**
-1. Open tabblad "September". "Ik ga naar de maand."
-2. Scroll naar het uitgavenlogboek. Typ: datum, "Albert Heijn", bedrag, kies categorie "Boodschappen".
-3. Scroll omhoog: het totaal bij Boodschappen is bijgewerkt. "En het maandtotaal klopt meteen."
-4. Tik naar tabblad "Jaaroverzicht". "En hier zie ik het hele jaar."
-5. Eindscherm: `budget-1-hero.png`.
-**Caption:**
-Budgetteren mislukt meestal niet door gebrek aan discipline, maar omdat het te veel werk is. Daarom: één regel per uitgave, categorie kiezen, klaar. De formules doen de rest.
-
-De Budgetplanner werkt in Excel, Google Sheets en Numbers. Nederlands, in euro's. Link in bio.
-**Hashtags:** #plannerij #budgetplanner #budgetteren #huishoudboekje #maandbudget #sparen #geldzaken #googlesheets #excel #overzicht #spaardoelen #financieelinzicht
-**Beeldmateriaal:** screenrecording Google Sheets (mobiel, staand); eindscherm `budget-1-hero.png`.
+### Post 5 · Reel · Productdemo (Printable Bundel)
+- **Hook:** "12 printables, A4 en A5, ongedateerd. Printen en beginnen."
+- **Script:** Printer draait. Pagina voor pagina op tafel leggen: weekplanner, dagplanner, gewoontetracker, to-do, brain dump, maaltijdplanner, doelen, maandbudget, schoonmaakschema, notities. Eén pagina invullen met een pen. Eindshot: weekplanner op de koelkast.
+- **Caption:** De Printable Bundel: 12 Nederlandse printables in A4 en A5. Ongedateerd, dus je print ze zo vaak als je wilt. Voor op de koelkast, in een map of op je bureau. Introductieprijs €7,95, met WELKOM10 nog 10% eraf. Link in bio.
+- **Hashtags:** #plannerij #printables #weekplanner #gewoontetracker #maaltijdplanner #schoonmaakschema #printableplanner #organiseren #mamalife #huishouden #overzicht #rustinjehoofd
+- **Beeldmateriaal:** eigen video; fallback printables-1-hero.png + printables-2 t/m 5.
 
 ---
 
-## Week 2 · Verdieping per product
+## Week 2 — Geld en overzicht
 
-### Post 6 · Carrousel · 5 prompts uit het pack (maandag)
-**Hook (slide 1):** "5 Nederlandse ChatGPT-prompts die je vandaag kunt gebruiken"
-**Slides (tekst op zand, één prompt per slide, invulvelden in groen):**
-2. "Je bent een planner. Maak een realistische weekplanning voor [aantal] uur werk, [aantal] uur studie en [verplichtingen]. Zet rustmomenten erin en geef per dag maximaal drie prioriteiten."
-3. "Je bent een budgetcoach. Ik verdien netto [bedrag] per maand en heb deze vaste lasten: [lijst]. Stel een maandbudget voor met een spaarbedrag en leg elke keuze in één zin uit."
-4. "Je bent een geduldige docent. Leg [onderwerp] uit alsof ik het voor het eerst hoor, in maximaal 200 woorden, en stel daarna drie controlevragen."
-5. "Je bent een klantenservicemedewerker. Schrijf een vriendelijke, korte reactie op deze klacht: [klacht]. Erken het probleem, bied één oplossing en sluit af met een concrete vervolgstap."
-6. "Je bent een kok voor een druk gezin. Maak een weekmenu voor [aantal] personen, budget [bedrag], met [voorkeuren]. Geef een boodschappenlijst per categorie."
-7. Tekstslide: "Dit zijn 5 van de 200. AI Prompt Pack: 10 categorieën, PDF + CSV + TXT, €9,95. Link in bio."
-**Caption:**
-Vijf prompts, gewoon in het Nederlands. Vul de [haken] in, plak in ChatGPT, Claude of Gemini en je hebt een bruikbaar antwoord.
+### Post 6 · Reel · Productdemo (Budgetplanner)
+- **Hook:** "Een budgetplanner in Google Sheets die gewoon in euro's en in het Nederlands is."
+- **Script:** Schermopname laptop. Open jaardashboard (grafiek). Klik naar tabblad "Maart". Typ één uitgave in het logboek, laat zien dat het totaal meebeweegt. Klik naar spaardoelen, dan abonnementenchecker. Terug naar dashboard.
+- **Caption:** Budgetplanner voor Excel en Google Sheets: jaardashboard met grafiek, 12 maandtabbladen met uitgavenlogboek, spaardoelen, schulden, abonnementenchecker en de 52-weken spaarchallenge. Je vult in, de rest rekent zichzelf uit. Eenmalig €12,95 (introductieprijs), geen abonnement. WELKOM10 via de link in bio.
+- **Hashtags:** #plannerij #budgetplanner #googlesheets #excel #huishoudboekje #maandbudget #sparen #spaardoelen #geldzaken #financieeloverzicht #budgetteren #overzicht
+- **Beeldmateriaal:** schermopname; fallback budget-1-hero.png + budget-3.
 
-Het AI Prompt Pack heeft er 200, verdeeld over ondernemen, marketing, content, e-mail, productiviteit, studie, carrière, geld, persoonlijke groei en huishouden.
+### Post 7 · Carrousel · Tip
+- **Hook (slide 1):** "Maandbudget maken in 4 stappen."
+- **Slides:** 2. Schrijf je netto-inkomen op. 3. Zet je vaste lasten eronder (huur, energie, verzekeringen, abonnementen). 4. Kies een bedrag voor sparen en zet dat apart vóór je de rest uitgeeft. 5. Wat overblijft is je maandbudget voor boodschappen en de rest; log je uitgaven. 6. "Hulp nodig? Volledige uitleg op het blog, link in bio."
+- **Caption:** Een maandbudget is geen straf, het is weten waar je aan toe bent. Vier stappen, meer is het niet. In ons blogartikel staat het uitgebreider, met een gratis aanpak zonder tool en met onze budgetplanner als je liever een kant-en-klaar bestand hebt. Link in bio.
+- **Hashtags:** #plannerij #maandbudget #budgetteren #huishoudboekje #sparen #geldtips #budgetplanner #excel #googlesheets #financieeloverzicht #overzicht
+- **Beeldmateriaal:** 6 slides, salie-groene cijfers op zand; slide 6 met budget-2.
 
-Bewaar deze post voor als je even niet weet hoe je het moet vragen.
-**Hashtags:** #plannerij #chatgptnederlands #aiprompts #chatgpttips #chatgpt #ai #productiviteit #zzp #studietips #huishouden #overzicht #tijdbesparen
-**Beeldmateriaal:** tekstslides op zand; laatste slide `prompts-1-hero.png`.
+### Post 8 · Reel · "Zo gebruik ik"
+- **Hook:** "De abonnementenchecker: dit doe ik één keer per kwartaal."
+- **Script:** Open tabblad abonnementen. Lees rustig op wat erin staat (voorbeeld: streaming, sportschool, cloudopslag, software). Laat maand- en jaartotaal zien. Zet één regel op "opzeggen". Eindshot: het jaartotaal dat lager wordt.
+- **Caption:** Abonnementen lopen stilletjes door. Daarom zit er in onze budgetplanner een tabblad dat ze per maand en per jaar optelt. Eén keer per kwartaal doorlopen is genoeg. Welk abonnement heb jij het langst niet gebruikt? Budgetplanner via de link in bio.
+- **Hashtags:** #plannerij #abonnementen #budgetplanner #sparen #geldbesparen #huishoudboekje #googlesheets #excel #geldtips #overzicht #minimalisme
+- **Beeldmateriaal:** schermopname budget-5 met voorbeeldregels (fictieve, generieke namen als "Streaming", "Sportschool").
 
-### Post 7 · Reel · Before/after brain dump (dinsdag)
-**Hook:** "Mijn hoofd om 21.00 uur. En om 21.10 uur."
-**Script (20 sec):**
-1. "Voor": telefoonscherm met 14 losse notities, plakbriefjes op tafel, to-dolijst in drie apps. Tekst: "Alles overal."
-2. Knip. Brain dump-printable op tafel, pen erbij. Schrijf tien dingen op zonder volgorde. Tekst: "Eerst alles eruit."
-3. Omcirkel drie dingen. Tekst: "Dan drie kiezen."
-4. "Na": dagplanner met de drie dingen in Top 3. Tekst: "Meer hoeft niet vandaag."
-**Caption:**
-Een vol hoofd wordt niet leger van nóg een app. Wel van één pagina waar alles op mag, zonder volgorde. Daarna kies je drie dingen. De rest blijft staan tot morgen.
+### Post 9 · Feedpost · Tip
+- **Hook (beeldtekst):** "Spaarchallenge 52 weken: €1 in week 1, €52 in week 52 = €1.378."
+- **Caption:** De 52-weken spaarchallenge is simpel: elke week leg je het weeknummer in euro's opzij. Week 1 = €1, week 30 = €30, eind van het jaar = €1.378. Te veel aan het eind? Draai de volgorde om, of halveer de bedragen. In de budgetplanner staat het tabblad klaar en telt het mee op je dashboard. Link in bio.
+- **Hashtags:** #plannerij #52wekenspaarchallenge #spaarchallenge #sparen #spaartips #budgetplanner #geldzaken #huishoudboekje #googlesheets #overzicht #doelen
+- **Beeldmateriaal:** budget-4 met de som groot in beeld.
 
-De brain dump en de dagplanner zitten in de Printable Bundel (12 printables, A4 en A5). Link in bio.
-**Hashtags:** #plannerij #braindump #rustinjehoofd #overprikkeld #printables #dagplanner #overzicht #plannen #mentaleload #zelfzorg #printableplanner #organiseren
-**Beeldmateriaal:** twee opstellingen op dezelfde tafel; printables uit `Plannerij-Printable-Bundel-A4.pdf` geprint.
-
-### Post 8 · Reel · Tip abonnementen (woensdag)
-**Hook:** "Doe dit één keer per jaar en je weet wat je echt betaalt."
-**Script (25 sec, screenrecording Budgetplanner, tabblad Abonnementen):**
-1. "Open je bankapp, filter op terugkerende afschrijvingen."
-2. "Zet ze in de abonnementenchecker: naam, bedrag, per maand of per jaar."
-3. De jaartotalen vullen zich. "Dit is wat het per jaar kost."
-4. "Zet bij elke regel: houden, opzeggen of twijfel."
-5. Eindscherm: `budget-5-abonnementen.png`. "Wat zeg jij op?"
-**Caption:**
-Abonnementen zijn klein per maand en groot per jaar. De abonnementenchecker in de Budgetplanner zet ze onder elkaar en rekent het jaartotaal uit. Daarna is opzeggen ineens makkelijk.
-
-Reageer met het abonnement dat jij eigenlijk niet meer gebruikt. Zonder oordeel.
-**Hashtags:** #plannerij #abonnementen #budgetteren #budgetplanner #sparen #geldzaken #huishoudboekje #bewustleven #overzicht #maandbudget #excel #googlesheets
-**Beeldmateriaal:** screenrecording; eindscherm `budget-5-abonnementen.png`.
-
-### Post 9 · Post · Printables in het echt (donderdag)
-**Hook (beeld):** geprinte weekplanner en maaltijdplanner met magneet op een koelkast.
-**Caption:**
-Sommige dingen werken beter op papier. De weekplanner en de maaltijdplanner hangen hier op de koelkast, de gewoontetracker ligt op het bureau.
-
-De Printable Bundel heeft 12 ongedateerde printables in A4 en A5: weekplanner, dagplanner, gewoontetracker, to-do, brain dump, maaltijdplanner, doelen, maandbudget, schoonmaakschema en notities. Printen zo vaak je wilt.
-
-Welke zou jij ophangen? (Ik zet er vandaag een poll over in mijn stories.)
-**Hashtags:** #plannerij #printables #printableplanner #weekplanner #maaltijdplanner #schoonmaakschema #gezinsplanning #huishouden #organiseren #overzicht #koelkastplanner
-**Beeldmateriaal:** eigen foto (koelkast, daglicht); slide 2 `printables-2-overzicht.png`. Stories: poll "Weekplanner / Maaltijdplanner / Gewoontetracker / Schoonmaakschema".
-
-### Post 10 · Reel · Productdemo printables (vrijdag)
-**Hook:** "Van download naar bureau in 2 minuten."
-**Script (20 sec, versneld):**
-1. Laptop: download de bundel, open de A5-PDF. Tekst: "A4 én A5 zitten erbij."
-2. Printen op gewoon papier. Tekst: "Gewone printer, gewoon papier."
-3. A5-vellen in een ringband of op een klembord.
-4. Vul de dagplanner in met pen. Tekst: "Klaar."
-5. Eindscherm: `printables-1-hero.png`.
-**Caption:**
-Geen gedoe: PDF downloaden, printen, gebruiken. De Printable Bundel komt in A4 en A5, dus hij past ook in een ringband of op een klembord.
-
-€7,95 voor 12 printables die je oneindig kunt herprinten. Link in bio.
-**Hashtags:** #plannerij #printables #printableplanner #dagplanner #gewoontetracker #plannen #overzicht #organiseren #papierenplanner #a5planner #rustinjehoofd
-**Beeldmateriaal:** opname printer + bureau; eindscherm `printables-1-hero.png`.
+### Post 10 · Reel · Productdemo (AI Prompt Pack)
+- **Hook:** "200 Nederlandse prompts. Zo werkt het."
+- **Script:** Open de PDF, scroll door de 10 categorieën. Kopieer één prompt (bijv. "Herschrijf deze mail vriendelijker en korter"), plak in ChatGPT of Claude, laat het resultaat zien. Dan: open de CSV in Sheets, laat zien dat je kunt filteren op categorie.
+- **Caption:** Het AI Prompt Pack: 200 Nederlandse prompts voor ChatGPT, Claude en Gemini, in 10 categorieën (o.a. mails, teksten, studie, planning, werk). Als PDF om te lezen, CSV om te importeren, TXT om te kopiëren. Introductieprijs €9,95. Link in bio, WELKOM10 voor 10% korting.
+- **Hashtags:** #plannerij #chatgptnederlands #aiprompts #prompts #chatgpt #claude #gemini #productiviteit #zzp #werktips #studietips #tijdbesparen
+- **Beeldmateriaal:** schermopname; fallback prompts-1-hero.png + prompts-2.
 
 ---
 
-## Week 3 · Gebruik in het echt
+## Week 3 — Voor wie het is
 
-### Post 11 · Reel · "Zo gebruik ik" maandagochtend (maandag)
-**Hook:** "Maandag 8.00 uur. Vijf minuten, dan begin ik."
-**Script (25 sec, tablet, handen in beeld, rustig):**
-1. Open de weekpagina. Lees de "vooruitblik" die je vorige week schreef.
-2. Zet twee dingen uit de vooruitblik in Top 3.
-3. Kijk naar de maandpagina: "Belangrijke data" → zet een deadline in de week.
-4. Sluit af: "Meer heb ik niet nodig om te starten."
-**Caption:**
-De vooruitblik van vorige week is de start van deze week. Dat is het hele systeem: vrijdag drie regels vooruitkijken, maandag drie regels overnemen.
+### Post 11 · Reel · "Zo gebruik ik" (student)
+- **Hook:** "Tentamenweek plannen in 2 minuten met weeknummers."
+- **Script:** Open de maandpagina, zoek de tentamenweek op via weeknummer. Zet per dag één vak op de weekpagina. Zet in de gewoontetracker "20 min herhalen". Sluit af met notitiepagina "vragen voor het werkcollege".
+- **Caption:** Roosters werken met weeknummers, dus je planner ook. In de Digitale Planner 2027 staan ze op elke week- en maandpagina. Handig voor tentamens, deadlines en je bijbaanrooster. Voor GoodNotes, Notability en Samsung Notes. Link in bio.
+- **Hashtags:** #plannerij #studieplanner #studietips #student #tentamens #digitaleplanner #goodnotesnederlands #planner2027 #weeknummers #hbo #universiteit #studeren
+- **Beeldmateriaal:** tablet op collegebank/bureau, eigen opname.
 
-Werkt in de Digitale Planner 2027 en in de printbare weekplanner. Hoe start jij je week?
-**Hashtags:** #plannerij #maandag #weekplanning #digitaleplanner #goodnotesplanner #plannen #overzicht #rustinjehoofd #productiviteit #routine #ipadplanner
-**Beeldmateriaal:** iPad met planner, kop koffie, ochtendlicht.
+### Post 12 · Carrousel · "Zo gebruik ik" (ouder)
+- **Hook (slide 1):** "Onze keukenmuur: drie printables en verder niets."
+- **Slides:** 2. Weekplanner: wie is waar, wanneer. 3. Maaltijdplanner: zes avonden ingevuld, één vrij. 4. Schoonmaakschema: wat er deze week echt moet. 5. "Elke zondag 10 minuten. Printable Bundel · link in bio."
+- **Caption:** Een gedeelde agenda is fijn voor afspraken, maar de koelkast wint het van elke app als het om het gezin gaat. Drie printables uit de Printable Bundel, elke zondag opnieuw geprint. Welke zou jij ophangen?
+- **Hashtags:** #plannerij #printables #gezinsplanner #mamalife #papalife #maaltijdplanner #schoonmaakschema #weekplanner #huishouden #organiseren #overzicht
+- **Beeldmateriaal:** foto's van geprinte pagina's op koelkast of prikbord; fallback printables-2, -3, -5.
 
-### Post 12 · Carrousel · Digitaal of papier? (dinsdag)
-**Hook (slide 1):** "Digitale planner of papieren planner? 5 vragen om het te weten."
-**Slides:**
-2. "Heb je je tablet altijd bij je? Ja → digitaal. Nee → papier."
-3. "Verander je vaak van planning? Ja → digitaal (wissen, verplaatsen). Nee → papier."
-4. "Onthoud je beter wat je met de hand schrijft? Beide kan: op een tablet schrijf je ook met de hand."
-5. "Wil je één planner voor jaren? Papier is per jaar; een digitale planner is een bestand dat je elk jaar opnieuw koopt of print."
-6. "Twijfel je? Combineer: digitale planner voor de week, printables voor het gezin en op het bureau."
-7. "Uitgebreidere versie op het blog: link in bio → 'Digitale planner of papieren planner 2027'."
-**Caption:**
-Er is geen goed of fout. Het gaat om wat je daadwerkelijk openslaat. Vijf vragen om het voor jezelf te bepalen, en op het blog staat de langere versie.
+### Post 13 · Reel · Tip (zzp'er)
+- **Hook:** "Drie prompts die ik als zzp'er elke week gebruik."
+- **Script:** Toon drie prompts uit het pack op scherm, één voor één, met kort het resultaat: 1) offerte-opvolgmail, 2) LinkedIn-post uit een ruwe notitie, 3) weekplanning uit een lijst losse taken.
+- **Caption:** Schrijfwerk is bij veel zzp'ers de grootste tijdvreter. Deze drie prompts uit het AI Prompt Pack gebruik ik zelf wekelijks. Ze zijn in het Nederlands geschreven, dus het resultaat leest ook als Nederlands. 200 prompts, 10 categorieën, link in bio.
+- **Hashtags:** #plannerij #zzp #freelancer #chatgptnederlands #aiprompts #ondernemen #zzptips #productiviteit #tijdbesparen #werktips #claude #prompts
+- **Beeldmateriaal:** schermopname met prompts-3.
 
-Bewaar voor als je in december weer twijfelt.
-**Hashtags:** #plannerij #digitaleplanner #papierenplanner #planner2027 #plannen #goodnotes #printables #overzicht #organiseren #productiviteit #plannertips
-**Beeldmateriaal:** tekstslides op zand; slide 6 `planner-6-printbaar.png`.
+### Post 14 · Feedpost · Tip (overprikkeling)
+- **Hook (beeldtekst):** "Als je hoofd vol is: één vel, één kader, alles eruit."
+- **Caption:** De brain dump is de meest gebruikte pagina uit onze Printable Bundel, en de simpelste. Geen categorieën, geen prioriteiten, eerst alleen leegmaken. Sorteren komt daarna, met de dagplanner (drie prioriteiten, meer niet). We maken geen beloftes over concentratie of ADHD; dit is een hulpmiddel, geen behandeling. Maar als het jou helpt om te beginnen, is dat genoeg. Link in bio.
+- **Hashtags:** #plannerij #braindump #rustinjehoofd #overprikkeld #adhdnederland #neurodivergent #dagplanner #printables #prikkelarm #overzicht #zelfzorg
+- **Beeldmateriaal:** printables-4 (brain dump + dagplanner), veel witruimte.
 
-### Post 13 · Reel · Live prompt-demo (woensdag)
-**Hook:** "Weekmenu voor vier personen, in 30 seconden. Zonder na te denken."
-**Script (30 sec, screenrecording ChatGPT of Claude):**
-1. Plak de prompt uit de categorie Huishouden & gezin (weekmenu met budget en boodschappenlijst), vul in: 4 personen, €90, geen vis, twee vegetarische dagen.
-2. Antwoord verschijnt: zeven maaltijden en een boodschappenlijst.
-3. "Kopieer de boodschappenlijst naar de maaltijdplanner-printable." Toon de geprinte maaltijdplanner ingevuld.
-4. Eindscherm: `prompts-6-categorieen.png`.
-**Caption:**
-Een goede prompt is half werk. Deze zit in het AI Prompt Pack, categorie Huishouden & gezin. Vul personen, budget en voorkeuren in en je hebt een weekmenu met boodschappenlijst.
-
-Werkt in ChatGPT, Claude en Gemini. 200 prompts, Nederlands, €9,95. Link in bio.
-**Hashtags:** #plannerij #chatgptnederlands #aiprompts #weekmenu #maaltijdplanner #gezinsplanning #huishouden #chatgpttips #ai #tijdbesparen #overzicht #mentaleload
-**Beeldmateriaal:** screenrecording + korte opname van de geprinte maaltijdplanner.
-
-### Post 14 · Post · Gewoontetracker (donderdag)
-**Hook (beeld):** `planner-4-gewoontes.png` of close-up van de geprinte gewoontetracker met drie ingekleurde rijen.
-**Caption:**
-Een gewoontetracker is geen scorebord. Het is een manier om te zien wat je wél deed, ook in een week die rommelig was.
-
-Tips die voor ons werken:
-· maximaal drie gewoontes per maand
-· een gemiste dag inkleuren doe je niet, doorgaan wel
-· onderaan de maand: wat ging goed, wat kan beter, volgende maand
-
-De gewoontetracker zit in de Digitale Planner 2027 (per maand) en als losse printable in de Printable Bundel.
-
-Welke gewoonte zet jij deze maand bovenaan?
-**Hashtags:** #plannerij #gewoontetracker #habittracker #gewoontes #routine #digitaleplanner #printables #overzicht #rustinjehoofd #zelfzorg #plannen
-**Beeldmateriaal:** `planner-4-gewoontes.png` en/of `printables-4-gewoontetracker.png`; eigen foto met pen.
-
-### Post 15 · Reel · Before/after budget (vrijdag)
-**Hook:** "Dezelfde maand, twee keer. Eén keer zonder budget, één keer met."
-**Script (25 sec):**
-1. "Zonder": bankapp scrollen, wenkbrauwen fronsen, tekst: "Waar is het gebleven?"
-2. "Met": Budgetplanner-maandtabblad, begroot naast werkelijk, categorie Boodschappen loopt op. Tekst: "Op dag 18 zie je het al."
-3. Jaaroverzicht: spaarquote per maand. Tekst: "En aan het eind van het jaar zie je het patroon."
-4. Eindscherm: `budget-2-jaaroverzicht.png`.
-**Caption:**
-Het verschil zit niet in méér geld, maar in eerder zien. Een maandbudget met begroot naast werkelijk laat op dag 18 zien wat je op dag 30 anders niet had geweten.
-
-De Budgetplanner voor Excel en Google Sheets, in het Nederlands. Blog over maandbudget maken via de link in bio.
-**Hashtags:** #plannerij #budgetplanner #maandbudget #budgetteren #sparen #huishoudboekje #geldzaken #spaardoelen #overzicht #excel #googlesheets #financieelinzicht
-**Beeldmateriaal:** twee korte scènes + screenrecording; eindscherm `budget-2-jaaroverzicht.png`.
+### Post 15 · Reel · Productdemo (Complete Bundel)
+- **Hook:** "Alles van Plannerij in één download. Dit zit erin."
+- **Script:** Vier snelle shots: planner op tablet, budgetsheet op laptop, prompts in ChatGPT, printables op tafel. Eindshot: bundel-1-hero.png met "€29,95 i.p.v. €45,80".
+- **Caption:** De Complete Bundel 2027: Digitale Planner 2027, Budgetplanner (Excel en Google Sheets), AI Prompt Pack (200 prompts) en de Printable Bundel (12 printables). Los kost het samen €45,80; als bundel €29,95. Met WELKOM10 gaat er nog 10% af. Link in bio.
+- **Hashtags:** #plannerij #completebundel #planner2027 #digitaleplanner #budgetplanner #printables #chatgptnederlands #overzicht #rustinjehoofd #organiseren #nieuwjaar2027
+- **Beeldmateriaal:** eigen opnames; fallback bundel-1-hero.png.
 
 ---
 
-## Week 4 · Bundel en doelgroepen
+## Week 4 — Verdieping en 2027 komt eraan
 
-### Post 16 · Reel · Productdemo Complete Bundel (maandag)
-**Hook:** "Alles van Plannerij in 30 seconden."
-**Script (30 sec, snelle maar rustige montage):**
-1. Digitale Planner op tablet: tik door jaar → maand → week. (7 sec)
-2. Budgetplanner: maandtabblad en jaaroverzicht. (7 sec)
-3. Prompt Pack: PDF openen, scroll door een categorie. (6 sec)
-4. Printables: drie geprinte vellen op tafel. (5 sec)
-5. Eindscherm: `bundel-1-hero.png`. Tekst: "Complete Bundel 2027 · €29,95 in plaats van €45,80."
-**Caption:**
-De Complete Bundel 2027: Digitale Planner 2027 (met printbare versie), Budgetplanner voor Excel en Google Sheets, AI Prompt Pack met 200 Nederlandse prompts en de Printable Bundel.
+### Post 16 · Carrousel · Tip
+- **Hook (slide 1):** "Waarom 2027 plannen nu al slim is (ook al is het pas september)."
+- **Slides:** 2. Studiejaar en schooljaar lopen al. 3. Je leert de planner rustig kennen vóór januari. 4. Doelen voor 2027 bedenk je beter in het najaar dan op 31 december. 5. De printbare versie gebruik je nu al voor losse weken. 6. "Digitale Planner 2027 · introductieprijs · link in bio."
+- **Caption:** Wij begonnen zelf ook altijd in januari, en tegen februari was de planner alweer vergeten. Nu beginnen in het najaar werkt beter: je bouwt de gewoonte op terwijl er nog niets "moet". Link in bio.
+- **Hashtags:** #plannerij #planner2027 #digitaleplanner #doelen #jaarplanning #planningtips #goodnotesnederlands #overzicht #gewoontes #najaar
+- **Beeldmateriaal:** slides op zand; slide 6 met planner-1-hero.png.
 
-Los €45,80, samen €29,95. Eén download, geen abonnement. Link in bio.
-**Hashtags:** #plannerij #completebundel #digitaleplanner #budgetplanner #aiprompts #printables #planner2027 #overzicht #rustinjehoofd #plannen #organiseren
-**Beeldmateriaal:** vier korte opnames + `bundel-1-hero.png`.
+### Post 17 · Reel · "Zo gebruik ik"
+- **Hook:** "Mijn gewoontetracker: twee gewoontes, geen tien."
+- **Script:** Open de gewoontetracker in de planner. Laat een maand zien met twee ingevulde rijen. Vertel (ondertiteld): "Vorig jaar had ik er acht. Na twee weken stopte ik. Nu twee, en die houd ik vol." Vink de dag van vandaag af.
+- **Caption:** De gewoontetracker in de Digitale Planner 2027 heeft ruimte voor meer, maar dat betekent niet dat je die moet vullen. Twee gewoontes die je volhoudt zijn meer waard dan acht die je opgeeft. Welke twee zou jij kiezen?
+- **Hashtags:** #plannerij #gewoontetracker #habittracker #gewoontes #routine #digitaleplanner #goodnotesnederlands #planner2027 #rustinjehoofd #zelfzorg #kleinbeginnen
+- **Beeldmateriaal:** planner-4 in video; close-up van het afvinken.
 
-### Post 17 · Carrousel · 52-weken spaarchallenge (dinsdag)
-**Hook (slide 1):** "De 52-weken spaarchallenge, uitgelegd in 5 slides."
-**Slides:**
-2. "Week 1: €1. Week 2: €2. Week 52: €52. Samen €1.378 na een jaar."
-3. "Te veel in december? Draai hem om: begin met €52 en eindig met €1."
-4. "Of kies een vast bedrag per week dat past bij jouw budget. Het gaat om het ritme, niet om het bedrag."
-5. "In de Budgetplanner zit een tabblad waarin je per week afvinkt en het totaal meeloopt."
-6. `budget-4-spaardoelen.png` – "Koppel het aan een spaardoel, dan zie je waar je voor spaart."
-7. "Budgetplanner Excel & Google Sheets, €12,95. Link in bio."
-**Caption:**
-De 52-weken spaarchallenge is populair omdat hij simpel is. Hij mislukt meestal in november, als de bedragen groot worden. Daarom: draai hem om, of kies je eigen bedrag.
+### Post 18 · Feedpost · Tip (prompts)
+- **Hook (beeldtekst):** "Prompt: 'Knip deze taak op in stappen van maximaal 20 minuten.'"
+- **Caption:** Eén van de prompts uit de categorie Planning in het AI Prompt Pack. Plak je taak eronder, en ChatGPT of Claude geeft je een lijstje met korte, haalbare stappen. Handig als beginnen het lastigste is. 200 Nederlandse prompts, link in bio.
+- **Hashtags:** #plannerij #chatgptnederlands #aiprompts #productiviteit #uitstelgedrag #planningtips #claude #chatgpt #rustinjehoofd #werktips #studietips
+- **Beeldmateriaal:** prompts-5 met de prompt groot in beeld.
 
-In de Budgetplanner zit de challenge als tabblad, gekoppeld aan je spaardoelen. Bewaar deze post voor januari, of begin gewoon deze week.
-**Hashtags:** #plannerij #52wekenspaarchallenge #spaarchallenge #sparen #spaardoelen #budgetteren #budgetplanner #geldzaken #huishoudboekje #overzicht #bewustleven
-**Beeldmateriaal:** tekstslides op zand; `budget-4-spaardoelen.png`.
+### Post 19 · Reel · Productdemo (printbaar + digitaal)
+- **Hook:** "Dezelfde planner, twee manieren: tablet én papier."
+- **Script:** Split-screen of afwisselend: links de weekpagina op de tablet, rechts dezelfde weekpagina geprint op A5. Vul beide in. Eindshot: beide naast elkaar.
+- **Caption:** Bij de Digitale Planner 2027 zit een printbare A4/A5-versie. Handig als je op je werk liever papier hebt en thuis je tablet, of als je gewoon wilt uitproberen wat bij je past. Eén aankoop, beide versies. Link in bio.
+- **Hashtags:** #plannerij #digitaleplanner #papierenplanner #printableplanner #planner2027 #goodnotesnederlands #weekplanner #a5planner #overzicht #organiseren
+- **Beeldmateriaal:** planner-6-printbaar als still; eigen video voor de reel.
 
-### Post 18 · Reel · "Zo gebruik ik" op Android (woensdag)
-**Hook:** "Geen iPad? De planner werkt ook op een Samsung-tablet."
-**Script (25 sec, screenrecording Samsung Notes):**
-1. Open Samsung Notes → importeer de PDF. "Importeren als PDF, niet als afbeelding."
-2. Tik op een maand in de zijbalk. "De links werken gewoon."
-3. Schrijf met de S Pen op een weekpagina.
-4. "Zelfde bestand werkt in GoodNotes, Notability en de meeste PDF-notitie-apps."
-5. Eindscherm: `planner-1-hero.png`.
-**Caption:**
-Veel digitale planners zijn gemaakt met alleen de iPad in gedachten. De Digitale Planner 2027 is een PDF met hyperlinks en werkt daardoor ook in Samsung Notes en andere PDF-notitie-apps op Android.
-
-Tip: importeer als PDF (niet als afbeelding), anders werken de links niet. Vragen over jouw app? Stel ze hieronder.
-**Hashtags:** #plannerij #samsungnotes #androidplanner #digitaleplanner #samsungtablet #spen #planner2027 #plannen #overzicht #goodnotesplanner #weekplanning
-**Beeldmateriaal:** screenrecording Samsung Notes; eindscherm `planner-1-hero.png`.
-
-### Post 19 · Reel · Tip voor studenten (donderdag)
-**Hook:** "Tentamen over 4 weken? Reken terug, niet vooruit."
-**Script (30 sec, tablet of papier):**
-1. Zet de tentamendatum op de maandpagina bij "Belangrijke data".
-2. "Week 4 (tentamenweek): alleen herhalen. Week 3: oefentoetsen. Week 2: samenvatten. Week 1: alles lezen."
-3. Schrijf per week één regel in de weekpagina's.
-4. "Gewoontetracker: elke dag 25 minuten. Niet meer."
-5. Eindscherm: `planner-5-jaar.png`.
-**Caption:**
-Terugrekenen vanaf de tentamendatum voorkomt dat alles in de laatste week landt. Vier weken, vier regels, en een gewoontetracker met één gewoonte: elke dag 25 minuten.
-
-Werkt in de Digitale Planner 2027 (weeknummers helpen bij het terugrekenen). Wil je AI laten overhoren? De prompts daarvoor zitten in het AI Prompt Pack, categorie Studie & leren.
-**Hashtags:** #plannerij #studietips #studeren #tentamens #studieplanning #studentenleven #digitaleplanner #goodnotesplanner #ipadplanner #plannen #overzicht #hbo #universiteit
-**Beeldmateriaal:** tablet met maand- en weekpagina; eindscherm `planner-5-jaar.png`.
-
-### Post 20 · Post · Eerste maand (vrijdag)
-**Hook (beeld):** `logo-wordmark.png` op zand, of een foto van je werkplek met tablet en printables.
-**Caption:**
-Vier weken geleden ging Plannerij open. Dank aan iedereen die heeft gekeken, gereageerd, bewaard of iets heeft gekocht. Dat maakt echt verschil voor een nieuwe winkel.
-
-Wat er de komende tijd komt:
-· meer korte demo's van hoe we de producten zelf gebruiken
-· antwoorden op jullie vragen (stel ze gerust hieronder)
-· een nieuwsbrief met tips, ongeveer twee keer per maand
-
-Nog niets gekocht en wil je het proberen? WELKOM10 geeft 10% korting op alles. Link in bio.
-**Hashtags:** #plannerij #nieuwewebshop #dankjewel #digitaleplanner #budgetplanner #printables #aiprompts #overzicht #rustinjehoofd #plannen #kleineondernemer
-**Beeldmateriaal:** `logo-wordmark.png` of eigen werkplekfoto; als tweede slide `hero-banner.png` bijgesneden.
+### Post 20 · Carrousel · Samenvatting maand
+- **Hook (slide 1):** "Vier weken Plannerij: dit hebben we gedeeld."
+- **Slides:** 2. Digitale Planner 2027 (planner-1-hero). 3. Budgetplanner (budget-1-hero). 4. AI Prompt Pack (prompts-1-hero). 5. Printable Bundel (printables-1-hero). 6. Complete Bundel (bundel-1-hero). 7. "Vragen? Stuur een DM. WELKOM10 · link in bio."
+- **Caption:** Een maand geleden ging Plannerij open. Dank aan iedereen die keek, vragen stelde of iets bestelde. Dit is wat er nu in de winkel staat. Volgende maand: nieuwe tips en een blik op 2027. Vragen over welk product bij je past? Stuur gerust een bericht.
+- **Hashtags:** #plannerij #digitaleplanner #budgetplanner #printables #chatgptnederlands #planner2027 #overzicht #rustinjehoofd #nederlandsewebshop #kleineondernemer #organiseren
+- **Beeldmateriaal:** de vijf hero-mockups.
 
 ---
 
-## Stories (dagelijks, 1 tot 3 per dag, geen script nodig)
-
-- Screenshot van een ingevulde weekpagina (persoonlijke gegevens onleesbaar).
-- Poll: "Digitaal of papier?", "Welke printable eerst?", "Budget in Excel of Sheets?".
-- Vragensticker: "Wat wil je zien in de planner?"
-- Elke aankoop (zonder naam): "Er ging vandaag een Budgetplanner de deur uit. Dank!" Alleen als het waar is.
-- Elke reel opnieuw delen op de dag van plaatsing.
-
-## Reageren op comments en DM's
-
-- Binnen 24 uur. Vriendelijk, kort, met de vraag beantwoord in de eerste zin.
-- Vragen over compatibiliteit: gebruik de antwoorden uit `01-positionering-en-doelgroepen.md`, hoofdstuk 3.
-- Kritiek: bedanken, serieus nemen, indien nodig verbeteren en dat laten weten.
+## Reageren op reacties en DM's (korte richtlijn)
+- Vraag over compatibiliteit: geef een direct antwoord (GoodNotes, Notability, Samsung Notes, elke PDF-lezer met linkondersteuning; budgetplanner: Excel 2016 of nieuwer en Google Sheets).
+- Vraag over korting: WELKOM10, 10% op de eerste bestelling.
+- Kritiek: bedanken, serieus nemen, eventueel verbeteren. Niet in discussie gaan in het openbaar.
+- Nooit anderen vragen om reviews te "plaatsen"; wel vragen: "Mis je iets in de planner? Laat het weten."

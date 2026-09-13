@@ -23,9 +23,12 @@ Marketingmateriaal: `marketing/`.
 3. **Winkelnaam** – Instellingen → Winkelgegevens → naam "Plannerij"
    (de API kan de naam niet wijzigen). Zet daar ook het e-mailadres voor
    klanten en (verplicht in de EU) je bedrijfsgegevens.
-4. **Thema publiceren** – Online Store → Thema's → "Plannerij (Horizon)" →
-   Acties → Publiceren. Controleer eerst in de editor het logo en de
-   homepage-secties.
+4. **Thema v2 publiceren** – "Plannerij (Horizon)" is al live (homepage,
+   header, footer, productpagina). De kopie "Plannerij v2 (alle templates)"
+   bevat daarbovenop de Nederlandse collectie-, pagina-, contact-, blog-,
+   artikel-, 404-, zoek-, winkelwagen- en wachtwoordtemplates plus de
+   opgemaakte Over-ons- en FAQ-pagina's. Online Store → Thema's →
+   "Plannerij v2 (alle templates)" → Acties → Publiceren.
 5. **Beleid** – Instellingen → Beleid: plak de teksten uit
    `winkel/beleid.md` in Retourbeleid, Verzendbeleid en Algemene voorwaarden
    (de app heeft geen schrijfrechten op beleidsteksten; ze staan wel al als
