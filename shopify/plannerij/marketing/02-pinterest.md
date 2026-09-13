@@ -43,19 +43,19 @@ Tip: maak bord 8 pas aan als er minstens 10 pins zijn; lege borden ogen leeg.
 **Pin 2**
 - Titel: Zo ziet een Nederlandse weekpagina eruit in GoodNotes
 - Beschrijving: Weekplanner op je iPad zonder Engelse feestdagen of weekstart op zondag. De Digitale Planner 2027 heeft 53 weekpagina's met weeknummers en NL/BE-feestdagen, plus notitieruimte. Werkt in GoodNotes, Notability en Samsung Notes. https://umaktx-cz.myshopify.com/products/digitale-planner-2027
-- Afbeelding: planner-3 (weekpagina-detail)
+- Afbeelding: planner-3-week
 - Bord: Planning en overzicht
 
 **Pin 3**
 - Titel: Gewoontetracker per maand in je digitale planner
 - Beschrijving: Elke maand een eigen gewoontetracker, direct in je planner. Vink af op je tablet, geen losse app nodig. Onderdeel van de Nederlandse Digitale Planner 2027 voor GoodNotes en Samsung Notes. https://umaktx-cz.myshopify.com/products/digitale-planner-2027
-- Afbeelding: planner-4 (gewoontetracker-detail)
+- Afbeelding: planner-4-gewoontes
 - Bord: Gewoontes en routines
 
 **Pin 4**
 - Titel: Digitale planner of papieren planner? Zo kies je voor 2027
 - Beschrijving: Twijfel je tussen een iPad-planner en papier? In dit artikel zetten we de voor- en nadelen rustig op een rij, met tips om te beginnen. Spoiler: je hoeft niet te kiezen, onze planner heeft ook een printbare A4/A5-versie. https://umaktx-cz.myshopify.com/blogs/blog/digitale-planner-of-papieren-planner-2027
-- Afbeelding: planner-6 (printbare versie naast tablet) met tekstbalk "Digitaal of papier?"
+- Afbeelding: planner-6-printbaar met tekstbalk "Digitaal of papier?"
 - Bord: Digitale planner Nederlands
 
 **Pin 5**
@@ -67,7 +67,7 @@ Tip: maak bord 8 pas aan als er minstens 10 pins zijn; lege borden ogen leeg.
 **Pin 6**
 - Titel: Studieplanner 2027 voor iPad – weeknummers en deadlines op één plek
 - Beschrijving: Colleges, deadlines en bijbaan in één digitale planner met weeknummers (handig voor je rooster). Nederlands, gedateerd voor 2027, met doelenpagina's en notities. Voor GoodNotes, Notability en Samsung Notes. https://umaktx-cz.myshopify.com/products/digitale-planner-2027
-- Afbeelding: planner-5 (doelen/notities-detail) met tekstbalk "Studieplanner 2027"
+- Afbeelding: planner-5-jaar (jaaroverzicht) met tekstbalk "Studieplanner 2027"
 - Bord: Digitale planner Nederlands
 
 ---
@@ -83,25 +83,25 @@ Tip: maak bord 8 pas aan als er minstens 10 pins zijn; lege borden ogen leeg.
 **Pin 8**
 - Titel: Maandbudget maken in Excel of Google Sheets – stap voor stap
 - Beschrijving: Hoe maak je een maandbudget dat je ook volhoudt? In dit artikel leggen we het rustig uit: inkomsten, vaste lasten, variabele uitgaven en sparen. Met een kant-en-klare Nederlandse budgetplanner als je liever niet zelf bouwt. https://umaktx-cz.myshopify.com/blogs/blog/maandbudget-maken-excel-google-sheets
-- Afbeelding: budget-2 (maandtabblad) met tekstbalk "Maandbudget maken"
+- Afbeelding: budget-3-januari (maandtabblad) met tekstbalk "Maandbudget maken"
 - Bord: Budget en sparen
 
 **Pin 9**
 - Titel: 52-weken spaarchallenge in Google Sheets – vink elke week af
 - Beschrijving: De 52-weken spaarchallenge zit standaard in onze Nederlandse budgetplanner: elke week een bedrag, automatisch opgeteld. Ook spaardoelen met voortgang en een abonnementenchecker. Voor Excel en Google Sheets. https://umaktx-cz.myshopify.com/products/budgetplanner-excel-google-sheets
-- Afbeelding: budget-4 (spaarchallenge-tabblad)
+- Afbeelding: eigen schermafbeelding van het tabblad 'Spaarpotjes 52 weken'; fallback budget-4-spaardoelen
 - Bord: Budget en sparen
 
 **Pin 10**
 - Titel: Abonnementenchecker: zie in één keer wat je per maand kwijt bent
 - Beschrijving: Streaming, sport, apps, verzekeringen: in de abonnementenchecker van onze budgetplanner zie je per maand en per jaar wat je betaalt. Onderdeel van de Nederlandse budgetplanner voor Excel en Google Sheets. https://umaktx-cz.myshopify.com/products/budgetplanner-excel-google-sheets
-- Afbeelding: budget-5 (abonnementen-tabblad)
+- Afbeelding: budget-5-abonnementen
 - Bord: Budget en sparen
 
 **Pin 11**
 - Titel: Jaardashboard met grafiek: je inkomsten en uitgaven in één oogopslag
 - Beschrijving: Het jaardashboard van onze budgetplanner telt alle maanden automatisch op en toont een grafiek van inkomsten, uitgaven en sparen. Nederlands, in euro's, voor Excel en Google Sheets. Eenmalige aankoop, geen abonnement. https://umaktx-cz.myshopify.com/products/budgetplanner-excel-google-sheets
-- Afbeelding: budget-3 (dashboard-detail)
+- Afbeelding: budget-2-jaaroverzicht
 - Bord: Planning en overzicht
 
 **Pin 12**
@@ -123,31 +123,31 @@ Tip: maak bord 8 pas aan als er minstens 10 pins zijn; lege borden ogen leeg.
 **Pin 14**
 - Titel: Nederlandse ChatGPT-prompts die je tijd besparen (met voorbeelden)
 - Beschrijving: Waarom werken Engelse promptlijsten vaak niet voor Nederlandse mails en teksten? In dit artikel delen we voorbeelden van prompts die wél goed Nederlands opleveren, en hoe je ze aanpast. https://umaktx-cz.myshopify.com/blogs/blog/nederlandse-chatgpt-prompts-tijd-besparen
-- Afbeelding: prompts-2 (categorie-overzicht) met tekstbalk "Tijd besparen met prompts"
+- Afbeelding: prompts-6-categorieen met tekstbalk "Tijd besparen met prompts"
 - Bord: ChatGPT en AI prompts Nederlands
 
 **Pin 15**
 - Titel: Prompts voor mails en klantcommunicatie – Nederlands en direct bruikbaar
 - Beschrijving: Offerte opvolgen, nette afwijzing, herinnering sturen: met deze Nederlandse prompts schrijf je in ChatGPT of Claude in een paar seconden een goede eerste versie. Onderdeel van het AI Prompt Pack (200 prompts). https://umaktx-cz.myshopify.com/products/ai-prompt-pack-nederlands
-- Afbeelding: prompts-3 (categorie werk/mails)
+- Afbeelding: prompts-2-pagina (pagina uit E-mail & klantcommunicatie)
 - Bord: ChatGPT en AI prompts Nederlands
 
 **Pin 16**
 - Titel: AI-prompts voor studenten: samenvatten, oefenvragen, planning
 - Beschrijving: Laat ChatGPT of Claude je helpen met samenvatten, oefenvragen maken en je tentamenweek plannen. Nederlandse prompts, kant-en-klaar. Onderdeel van het AI Prompt Pack: 200 prompts, PDF + CSV + TXT. https://umaktx-cz.myshopify.com/products/ai-prompt-pack-nederlands
-- Afbeelding: prompts-4 (categorie studie)
+- Afbeelding: prompts-3-pagina (pagina uit Studie & leren)
 - Bord: Planning en overzicht
 
 **Pin 17**
 - Titel: Prompts om grote taken op te knippen in kleine stappen
 - Beschrijving: Moeite met beginnen? Deze Nederlandse prompts laten ChatGPT of Claude een taak opdelen in kleine, haalbare stappen met tijdsinschatting. Rustig en concreet. Uit het AI Prompt Pack van Plannerij. https://umaktx-cz.myshopify.com/products/ai-prompt-pack-nederlands
-- Afbeelding: prompts-5 (categorie planning/productiviteit)
+- Afbeelding: prompts-4-pagina (pagina uit Productiviteit & planning)
 - Bord: Rust in je hoofd
 
 **Pin 18**
 - Titel: Prompt Pack als CSV: laad 200 prompts in je eigen tool
 - Beschrijving: Het AI Prompt Pack komt als PDF om te lezen, als CSV om te importeren en als TXT om te kopiëren. 200 Nederlandse prompts voor ChatGPT, Claude en Gemini in 10 categorieën. Eenmalige aankoop. https://umaktx-cz.myshopify.com/products/ai-prompt-pack-nederlands
-- Afbeelding: prompts-6 (bestandsformaten)
+- Afbeelding: prompts-1-hero.png met tekstbalk "PDF · CSV · TXT"
 - Bord: ChatGPT en AI prompts Nederlands
 
 ---
@@ -163,31 +163,31 @@ Tip: maak bord 8 pas aan als er minstens 10 pins zijn; lege borden ogen leeg.
 **Pin 20**
 - Titel: Weekplanner printable A4 – Nederlands, ongedateerd
 - Beschrijving: Rustige weekplanner om te printen: maandag t/m zondag, ruimte voor prioriteiten en notities. Ongedateerd, dus elke week opnieuw te gebruiken. In A4 en A5. Onderdeel van de Printable Bundel met 12 pagina's. https://umaktx-cz.myshopify.com/products/printable-bundel-weekplanner-gewoontetracker
-- Afbeelding: printables-2 (weekplanner)
+- Afbeelding: printables-2-overzicht (weekplanner uitgelicht)
 - Bord: Printables en weekplanners
 
 **Pin 21**
 - Titel: Maaltijdplanner en boodschappenlijst voor op de koelkast
 - Beschrijving: Print de maaltijdplanner, vul de week in en hang hem op de koelkast. Minder "wat eten we vandaag?", minder impulsboodschappen. Nederlandse printable in A4 en A5, uit de Printable Bundel. https://umaktx-cz.myshopify.com/products/printable-bundel-weekplanner-gewoontetracker
-- Afbeelding: printables-3 (maaltijdplanner)
+- Afbeelding: printables-5-maaltijdplanner
 - Bord: Printables en weekplanners
 
 **Pin 22**
 - Titel: Brain dump printable: alles uit je hoofd op één vel
 - Beschrijving: Eén vel, één kader, alles wat rondzingt in je hoofd. Daarna pas sorteren. De brain dump zit in onze Printable Bundel samen met een dagplanner met drie prioriteiten en een gewoontetracker. A4 en A5. https://umaktx-cz.myshopify.com/products/printable-bundel-weekplanner-gewoontetracker
-- Afbeelding: printables-4 (brain dump + dagplanner)
+- Afbeelding: printables-3-dagplanner (met brain dump als tweede beeld)
 - Bord: Rust in je hoofd
 
 **Pin 23**
 - Titel: Schoonmaakschema printen – per week en per maand
 - Beschrijving: Een schoonmaakschema dat je gewoon afvinkt: dagelijkse, wekelijkse en maandelijkse taken op één pagina. Nederlandse printable in A4 en A5, onderdeel van de Printable Bundel met 12 pagina's. https://umaktx-cz.myshopify.com/products/printable-bundel-weekplanner-gewoontetracker
-- Afbeelding: printables-5 (schoonmaakschema)
+- Afbeelding: printables-2-overzicht met tekstbalk "Schoonmaakschema"
 - Bord: Printables en weekplanners
 
 **Pin 24**
 - Titel: Gewoontetracker printable – 30 dagen afvinken
 - Beschrijving: Gewoontetracker om te printen: gewoontes in de rijen, dagen in de kolommen, afvinken maar. Ongedateerd, dus elke maand opnieuw. Onderdeel van de Nederlandse Printable Bundel (12 printables, A4 en A5). https://umaktx-cz.myshopify.com/products/printable-bundel-weekplanner-gewoontetracker
-- Afbeelding: printables-1-hero.png met tekstbalk "Gewoontetracker"
+- Afbeelding: printables-4-gewoontetracker
 - Bord: Gewoontes en routines
 
 ---
@@ -215,13 +215,13 @@ Tip: maak bord 8 pas aan als er minstens 10 pins zijn; lege borden ogen leeg.
 **Pin 28**
 - Titel: Bundel voor ouders: gezinsplanner, maaltijdplanner en budget in één
 - Beschrijving: Weekpagina's voor het gezin, maaltijdplanner en schoonmaakschema om te printen, budgetplanner met abonnementenchecker. De Complete Bundel 2027 van Plannerij, Nederlandstalig. https://umaktx-cz.myshopify.com/products/complete-bundel-2027
-- Afbeelding: collage van planner-3 + printables-3 + budget-2
+- Afbeelding: collage van planner-3-week + printables-5-maaltijdplanner + budget-3-januari
 - Bord: Printables en weekplanners
 
 **Pin 29**
 - Titel: Bundel voor zzp'ers: weekplanner, budget en prompts voor je mails
 - Beschrijving: Weeknummers voor je planning, budgetplanner voor wisselend inkomen en 200 Nederlandse prompts voor mails, offertes en social media. Alles samen in de Complete Bundel 2027. https://umaktx-cz.myshopify.com/products/complete-bundel-2027
-- Afbeelding: collage van planner-2-maand + budget-3 + prompts-3
+- Afbeelding: collage van planner-2-maand + budget-2-jaaroverzicht + prompts-2-pagina
 - Bord: ChatGPT en AI prompts Nederlands
 
 **Pin 30**
