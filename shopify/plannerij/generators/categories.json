@@ -1,0 +1,42 @@
+[
+  {
+    "categorie": "Ondernemen & strategie",
+    "intro": "Van eerste idee tot groeiplan: deze prompts helpen je scherper te kijken naar je markt, je aanbod en je keuzes. Gebruik ze als sparringpartner die kritisch meedenkt, niet als orakel."
+  },
+  {
+    "categorie": "Marketing & social media",
+    "intro": "Zichtbaar worden zonder elke dag te hoeven verzinnen wat je post. Deze prompts helpen je met strategie, contentkalenders, campagnes en teksten die passen bij jouw doelgroep en kanaal."
+  },
+  {
+    "categorie": "Content & copywriting",
+    "intro": "Teksten die gelezen worden en iets doen: van websitepagina tot blogartikel en productbeschrijving. Deze prompts geven de AI structuur en toon mee, zodat je geen grijze standaardtekst terugkrijgt."
+  },
+  {
+    "categorie": "E-mail & klantcommunicatie",
+    "intro": "De juiste woorden op het juiste moment, zonder er een halve ochtend over te doen. Van offerte-opvolging tot het afhandelen van een klacht: deze prompts helpen je vriendelijk, duidelijk en professioneel te blijven."
+  },
+  {
+    "categorie": "Productiviteit & planning",
+    "intro": "Meer overzicht en minder gedoe in je week. Gebruik deze prompts om taken te ordenen, prioriteiten te kiezen, vergaderingen korter te maken en routines te bouwen die je ook volhoudt."
+  },
+  {
+    "categorie": "Studie & leren",
+    "intro": "Sneller begrijpen, beter onthouden en met minder stress naar een tentamen of presentatie. Deze prompts maken van de AI een geduldige uitlegger, overhoorder en studiecoach."
+  },
+  {
+    "categorie": "Carrière & solliciteren",
+    "intro": "Van cv tot salarisgesprek: laat de AI je voorbereiden, je verhaal aanscherpen en oefenen tot je zeker bent. Alles is afgestemd op de Nederlandse arbeidsmarkt en manier van solliciteren."
+  },
+  {
+    "categorie": "Geld & financiën",
+    "intro": "Grip op je geld, zakelijk en privé. Deze prompts helpen je met begroten, sparen, belastingvragen voorbereiden en financiële keuzes rustig doorrekenen. Controleer bedragen en regels altijd bij een adviseur of officiële bron."
+  },
+  {
+    "categorie": "Persoonlijke groei & gezondheid",
+    "intro": "Beter slapen, meer bewegen, rustiger denken en bewuster kiezen. Deze prompts maken van de AI een coach die vragen stelt en praktische stappen voorstelt. Bij medische klachten blijft je huisarts de eerste stap."
+  },
+  {
+    "categorie": "Huishouden & gezin",
+    "intro": "Minder mentale belasting thuis: maaltijden, schoonmaak, vakanties en de logistiek van een gezin. Laat de AI het denkwerk voorbereiden zodat jij alleen nog hoeft te kiezen."
+  }
+]
