@@ -53,11 +53,9 @@ Bijgewerkt op 13 september 2026, na de tweede correctieronde.
    vragen → Sjabloon op respectievelijk `over-ons` en `veelgestelde-vragen`
    zetten voor de uitgebreide opmaak. Zonder die stap werken de pagina's gewoon,
    ze zijn dan alleen soberder.
-2. **Bestanden koppelen in Digital Products** (op 13 september handmatig gedaan in
-   de app; controleer met een gratis testbestelling of de download echt aankomt).
-   De connector geeft "Could not authorize this store with Digital Products",
-   dus koppelen en uitlezen kan niet vanuit de chat. In de app hoort per product
-   de bestandsnaam te staan in plaats van de link "Asset toevoegen":
+2. ~~**Bestanden koppelen in Digital Products.**~~ Gedaan op 13 september en
+   getest met een gratis testbestelling: order #1001 staat op betaald en
+   afgehandeld, de download werd automatisch geleverd. De koppeling per product:
    - Digitale Planner 2027 → `Plannerij-Digitale-Planner-2027.zip`
    - Budgetplanner → `Plannerij-Budgetplanner.xlsx`
    - AI Prompt Pack → `Plannerij-AI-Prompt-Pack.zip`
