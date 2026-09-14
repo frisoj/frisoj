@@ -17,6 +17,8 @@ Lees in deze volgorde:
 | 7 | [07-trading-journal.md](07-trading-journal.md) | Journal-template en wekelijkse review |
 | 8 | [mql5/PropRiskCalculator.mq5](mql5/PropRiskCalculator.mq5) | MT5-script: lotgrootte uit risico-% en stop-afstand |
 | 9 | [mql5/PropFirmGuard.mq5](mql5/PropFirmGuard.mq5) | MT5-EA: bewaakt dag- en totaalverlies, sluit alles bij je eigen limiet |
+| 10 | [08-automatisch-handelen-vanaf-telefoon.md](08-automatisch-handelen-vanaf-telefoon.md) | Automatisch demo-handelen zonder pc: VPS + Remote Desktop, stap voor stap |
+| 11 | [mql5/PropDemoTrader.mq5](mql5/PropDemoTrader.mq5) | MT5-EA: handelt setup A automatisch met 0,5% risico en daglimiet (demo) |
 
 ## De drie regels die alles bepalen
 
