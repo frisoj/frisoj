@@ -1,6 +1,6 @@
 # Plannerij – status en resterende stappen
 
-Bijgewerkt op 13 september 2026, na de marketingronde.
+Bijgewerkt op 14 september 2026, na de marketingronde.
 
 ## Opgeloste storingen op de live site
 
@@ -8,9 +8,8 @@ Bijgewerkt op 13 september 2026, na de marketingronde.
   gepubliceerd op het verkoopkanaal Webshop, dus `/collections/planners` en de
   andere drie gaven "page not found". Alle vier staan nu gepubliceerd.
 - **404 bij Over ons en Veelgestelde vragen.** Beide pagina's verwezen naar een
-  eigen sjabloon dat alleen in thema v2 zit, niet in het live thema. De verwijzing
-  is verwijderd, zodat ze het standaardsjabloon gebruiken; de volledige tekst
-  stond al op de pagina's zelf.
+  sjabloon dat toen alleen in thema v2 zat, niet in het live thema. Nu v2 zelf
+  live staat, gebruiken ze dat sjabloon weer en werkt de uitgebreide opmaak.
 - **Lege contactpagina.** De pagina had wel een formulier maar geen tekst. Er
   staat nu een korte uitleg, drie tips voor je schrijft en links naar levering,
   retour en licentie.
@@ -54,16 +53,18 @@ Bijgewerkt op 13 september 2026, na de marketingronde.
   met uploadlijsten waarin titel, bord, doel-URL, caption en hashtags al klaar
   staan: `marketing/08`, `09` en `04-email.md` onderdeel F.
 - Uitleg van alles wat in Shopify zelf staat: `marketing/12`.
+- **Pinterest**: alle 6 producten staan op het verkoopkanaal Pinterest, de 30
+  pinafbeeldingen staan in Shopify Files, en `marketing/pinterest-bulk-upload.csv`
+  maakt en plant ze in één upload. Uitleg in `marketing/14`.
 
 ## Nog te doen (kan niet via de API)
 
 1. ~~**Thema v2 publiceren.**~~ Gedaan: "Plannerij v2 (alle templates)" is het live
    thema. De winkelwagen, het contactformulier, de collectie-, 404- en
    zoekpagina's staan daarmee in het Nederlands.
-   Optioneel nog: Online Store → Pagina's → Over Plannerij en Veelgestelde
-   vragen → Sjabloon op respectievelijk `over-ons` en `veelgestelde-vragen`
-   zetten voor de uitgebreide opmaak. Zonder die stap werken de pagina's gewoon,
-   ze zijn dan alleen soberder.
+   Ook de sjablonen staan nu goed: Over Plannerij gebruikt `over-ons` en
+   Veelgestelde vragen gebruikt `veelgestelde-vragen`, de uitgebreide opmaak uit
+   het thema.
 2. ~~**Bestanden koppelen in Digital Products.**~~ Gedaan op 13 september en
    getest met een gratis testbestelling: order #1001 staat op betaald en
    afgehandeld, de download werd automatisch geleverd. De koppeling per product:
@@ -95,6 +96,17 @@ Bijgewerkt op 13 september 2026, na de marketingronde.
    komt.
 7. **Domein** – plannerij.nl of plannerij.com kopen en koppelen via
    Instellingen → Domeinen.
+
+## Wat alleen jij kunt doen, in volgorde van belang
+
+1. **Betalingen aanzetten** (punt 5). Zonder dit kan niemand iets kopen; al het
+   andere hieronder is pas daarna zinvol.
+2. **Het gratis product koppelen in Digital Products** (punt 2).
+3. **De CSV uploaden bij Pinterest** — borden eerst, zie `marketing/14`.
+4. Winkelnaam, beleid, checkout en domein (punten 3, 4, 6, 7).
+5. **Posten op Instagram en TikTok** en **e-mails versturen**: beeld en tekst
+   liggen klaar in `marketing/09` en `marketing/04-email.md`, maar posten en
+   versturen gebeurt in die apps zelf. Daar kan de Shopify-API niet bij.
 
 ## Handig om te weten
 
