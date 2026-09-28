@@ -38,6 +38,15 @@ const PARAM_LABELS = {
   "risk.timeStopCandles": "Tijdslimiet (candles)",
   "risk.maxPositionPct": "Max. positie (%)",
 };
+const PARAM_SHORT = {
+  "ensemble.buyThreshold": "koop",
+  "ensemble.sellThreshold": "verkoop",
+  "risk.stopAtrMult": "stop",
+  "risk.takeProfitR": "doel",
+  "risk.riskPerTradePct": "risico",
+  "risk.trailingAtrMult": "trail",
+  "risk.breakEvenAtR": "BE",
+};
 const HONEST_NOTE =
   "Resultaten uit het verleden zijn geen garantie voor de toekomst. Fees (0,25% per kant) en slippage zijn meegerekend.";
 const MAX_CANDLES_WARN = 20000;
@@ -89,7 +98,7 @@ function alpha(c, a) {
 function tickFormatter(time, type) {
   const d = new Date(Number(time) * 1000);
   if (type === 0) return String(d.getFullYear());
-  if (type === 1) return d.toLocaleDateString("nl-NL", { month: "short", year: "2-digit" });
+  if (type === 1) return d.toLocaleDateString("nl-NL", { month: "short" });
   if (type === 2) return d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
   return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
 }
@@ -139,6 +148,8 @@ function barPath(x, y, w, h, r) {
   r = Math.min(r, w / 2, h);
   return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
 }
+
+const dm = (ms) => new Date(ms).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit" });
 
 const num = (v) => {
   const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
@@ -194,7 +205,7 @@ export function mountBacktest(ctx, el) {
         <div class="bt-row2">
           <div class="form-row"><label for="bt-interval">Interval</label>
             <select id="bt-interval" class="select" name="interval">
-              ${INTERVALS.map((iv) => `<option value="${iv}">${iv} · ${INTERVAL_LABELS[iv]}</option>`).join("")}
+              ${INTERVALS.map((iv) => `<option value="${iv}">${iv}</option>`).join("")}
             </select></div>
           <div class="form-row"><label for="bt-days">Periode (dagen)</label>
             <input id="bt-days" class="input" type="number" name="days" min="1" max="365" step="1" value="30"></div>
@@ -228,8 +239,8 @@ export function mountBacktest(ctx, el) {
 
         <div class="bt-sep"><span>Optimaliseren</span></div>
         <p class="pn-hint">Probeert automatisch tientallen combinaties van instellingen en zoekt de beste.</p>
-        <div class="bt-row2">
-          <div class="form-row"><label for="bt-obj">Doel</label>
+        <div>
+          <div class="form-row"><label for="bt-obj">Doel (wat is "beste"?)</label>
             <select id="bt-obj" class="select" name="objective">
               ${Object.entries(OBJECTIVES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}
             </select></div>
@@ -332,7 +343,7 @@ export function mountBacktest(ctx, el) {
     if (saved.trainRatio) F("trainRatio").value = saved.trainRatio;
     F("strategy").innerHTML =
       `<option value="">Drempels &amp; risico (ensemble)</option>` +
-      state.strategies.map((s) => `<option value="${esc(s.id)}">Parameters: ${esc(s.name)}</option>`).join("");
+      state.strategies.map((s) => `<option value="${esc(s.id)}">Parameters van ${esc(s.name)}</option>`).join("");
     if (saved.strategy !== undefined) F("strategy").value = saved.strategy;
     fillAdvanced(cfg);
     updateEstimate();
@@ -590,10 +601,17 @@ export function mountBacktest(ctx, el) {
         fontSize: 11,
         fontFamily: cssVar("--font") || undefined,
         panes: { separatorColor: T.border, separatorHoverColor: alpha(T.accent, 0.15) },
+        attributionLogo: false, // bronvermelding staat in de footer (A9)
       },
       grid: { vertLines: { color: T.grid }, horzLines: { color: T.grid } },
       rightPriceScale: { borderColor: T.border },
-      timeScale: { borderColor: T.border, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickFormatter },
+      timeScale: {
+        borderColor: T.border,
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: tickFormatter,
+        minBarSpacing: 0.02, // duizenden equity-punten moeten in één scherm passen
+      },
       localization: { locale: "nl-NL", timeFormatter: (s) => fmt.dateTime(Number(s) * 1000) },
       crosshair: {
         vertLine: { color: alpha(T.muted, 0.5), labelBackgroundColor: T.border },
@@ -848,7 +866,7 @@ export function mountBacktest(ctx, el) {
       const maxN = Math.max(...bins.map((b) => b.n));
       const H = 200;
       const ml = 30;
-      const mr = 10;
+      const mr = 18;
       const mt = 18;
       const mb = 26;
       const pw = w - ml - mr;
@@ -968,7 +986,7 @@ export function mountBacktest(ctx, el) {
                   .sort((a, b) => b[1] - a[1])
                   .map(
                     ([r, c]) => `<div class="bt-exit-row"><span class="bt-exit" data-r="${esc(r)}">${esc(fmt.exitReason(r))}</span>
-                      <span class="pn-bar"><i style="width:${((c / trades.length) * 100).toFixed(1)}%"></i></span><span class="mono">${c}</span></div>`,
+                      <span class="pn-bar"><i class="bt-exit-bar" data-r="${esc(r)}" style="width:${((c / trades.length) * 100).toFixed(1)}%"></i></span><span class="mono">${c}</span></div>`,
                   )
                   .join("")
               : '<div class="pn-empty">Geen trades.</div>'
@@ -1197,7 +1215,7 @@ export function mountBacktest(ctx, el) {
         const cur = currentValue(k, cfg);
         const same = cur === v;
         return `<tr><td>${esc(paramLabel(k))}</td><td class="mono r">${esc(cur === undefined ? "–" : fmtParam(cur))}</td>
-          <td class="mono r ${same ? "muted" : ""}"><b>${esc(fmtParam(v))}</b></td></tr>`;
+          <td class="mono r">${same ? `<span class="muted">${esc(fmtParam(v))} (gelijk)</span>` : `<b>${esc(fmtParam(v))}</b>`}</td></tr>`;
       })
       .join("");
     const warn = [];
@@ -1262,30 +1280,29 @@ export function mountBacktest(ctx, el) {
       ${simWarning(state.info?.dataSource === "simulated")}
       <h4 class="bt-subh">Out-of-sample resultaat <span class="muted">— alle testperiodes aan elkaar geplakt (de instellingen kenden deze data niet)</span></h4>
       ${kpiCards(res.oosMetrics, initial)}
-      <div class="bt-2col">
-        <div class="panel bt-card">
-          <div class="pn-head"><div class="panel-title">Train vs. test per fold</div>
-            <div class="pn-legend"><span><i class="lg-box muted-box"></i>train (in-sample)</span><span><i class="lg-box acc-box"></i>test (out-of-sample)</span></div></div>
+      <div class="panel bt-card">
+        <div class="pn-head"><div class="panel-title">Train vs. test per fold</div>
+          <div class="pn-legend"><span><i class="lg-box muted-box"></i>train (in-sample)</span><span><i class="lg-box acc-box"></i>test (out-of-sample)</span></div></div>
+        <div class="bt-wf-grid">
           <div class="bt-folds-chart"></div>
-          <p class="pn-hint">Is het test-rendement veel lager dan het train-rendement? Dan zijn de instellingen 'overfit': ze passen op het verleden, niet op de toekomst.</p>
-        </div>
-        <div class="panel bt-card">
-          <div class="pn-head"><div class="panel-title">Folds</div></div>
           <div class="bt-table-wrap"><table class="table bt-folds">
-            <thead><tr><th>#</th><th>Testperiode</th><th class="r">Train</th><th class="r">Test</th><th class="r">Test DD</th><th class="r">Trades</th><th>Beste parameters</th></tr></thead>
+            <thead><tr><th>#</th><th>Testperiode</th><th class="r">Train</th><th class="r">Test</th><th class="r">Test DD</th><th class="r">Trades</th><th>Instellingen</th></tr></thead>
             <tbody>${folds
               .map(
                 (f) => `<tr>
                 <td class="muted">${f.index + 1}</td>
-                <td class="mono" title="Train: ${esc(fmt.date(f.trainFrom))} → ${esc(fmt.date(f.trainTo))}">${esc(fmt.date(f.testFrom))} → ${esc(fmt.date(f.testTo))}</td>
+                <td class="mono" title="Train: ${esc(fmt.dateTime(f.trainFrom))} → ${esc(fmt.dateTime(f.trainTo))} · Test: ${esc(fmt.dateTime(f.testFrom))} → ${esc(fmt.dateTime(f.testTo))}">${esc(dm(f.testFrom))} → ${esc(dm(f.testTo))}</td>
                 <td class="r mono ${fmt.pnlClass(f.trainMetrics?.totalReturnPct)}">${esc(fmt.pct(f.trainMetrics?.totalReturnPct, 2))}</td>
                 <td class="r mono ${fmt.pnlClass(f.testMetrics?.totalReturnPct)}"><b>${esc(fmt.pct(f.testMetrics?.totalReturnPct, 2))}</b></td>
                 <td class="r mono">${esc(fmt.pct(-Math.abs(f.testMetrics?.maxDrawdownPct ?? NaN), 1))}</td>
                 <td class="r mono">${esc(fmt.num(f.testMetrics?.trades, 0))}</td>
-                <td><div class="bt-pchips">${paramChips(f.bestParams)}</div></td></tr>`,
+                <td class="bt-fold-params">${Object.entries(f.bestParams || {})
+                  .map(([k, v]) => `<span title="${esc(paramLabel(k))}"><span class="muted">${esc(PARAM_SHORT[k] || k.split(".").pop())}</span> <b class="mono">${esc(fmtParam(v))}</b></span>`)
+                  .join("")}</td></tr>`,
               )
               .join("")}</tbody></table></div>
         </div>
+        <p class="pn-hint">Is het test-rendement veel lager dan het train-rendement? Dan zijn de instellingen 'overfit': ze passen op het verleden, niet op de toekomst. Wisselen de gekozen instellingen sterk per fold, dan is er geen stabiele 'beste' instelling.</p>
       </div>
       <div class="panel bt-card">
         <div class="pn-head"><div class="panel-title">Out-of-sample equity (aan elkaar geplakt)</div>

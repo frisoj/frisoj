@@ -36,6 +36,9 @@ function regimeIcon(regime) {
   return `<svg class="pn-ico" viewBox="0 0 15 15" aria-hidden="true">${p}</svg>`;
 }
 
+const nf2 = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed2 = (v) => (v > 0 ? "+" : "") + nf2.format(v);
+
 const compactEur = new Intl.NumberFormat("nl-NL", {
   style: "currency",
   currency: "EUR",
@@ -230,9 +233,9 @@ export function mountScanner(ctx, el) {
   function scoreBar(s) {
     const v = Math.max(-1, Math.min(1, Number(s) || 0));
     const w = Math.abs(v) * 50;
-    return `<div class="sc-score" title="Score ${esc(fmt.num(v, 2))}">
+    return `<div class="sc-score" title="Score ${esc(signed2(v))}">
       <span class="sc-score-track"><i class="${v >= 0 ? "is-pos" : "is-neg"}" style="left:${v >= 0 ? 50 : 50 - w}%;width:${w}%"></i></span>
-      <span class="mono">${v > 0 ? "+" : ""}${esc(fmt.num(v, 2))}</span></div>`;
+      <span class="mono">${esc(signed2(v))}</span></div>`;
   }
 
   function rsiBar(rsi) {
@@ -264,8 +267,8 @@ export function mountScanner(ctx, el) {
         <span class="stat-value"><span class="pos">${up}</span> / <span class="neg">${n - up}</span></span>
         <span class="sc-breadth"><i style="width:${((up / n) * 100).toFixed(1)}%"></i></span></div>
       <div class="sc-sum"><span class="stat-label">Gem. 24u</span><span class="stat-value ${fmt.pnlClass(avg)}">${esc(fmt.pct(avg, 2))}</span></div>
-      <div class="sc-sum"><span class="stat-label">Meest voorkomend regime</span><span class="stat-value sc-sum-reg" data-r="${esc(topRegime)}">${regimeIcon(topRegime)} ${esc(fmt.regime(topRegime))}</span></div>
-      ${best ? `<div class="sc-sum"><span class="stat-label">Hoogste score</span><span class="stat-value">${esc(best.market)} <small class="mono ${fmt.pnlClass(best.score)}">${best.score > 0 ? "+" : ""}${esc(fmt.num(best.score, 2))}</small></span></div>` : ""}`;
+      <div class="sc-sum"><span class="stat-label" title="Het regime dat het vaakst voorkomt">Hoofdregime</span><span class="stat-value sc-sum-reg" data-r="${esc(topRegime)}">${regimeIcon(topRegime)} ${esc(fmt.regime(topRegime))}</span></div>
+      ${best ? `<div class="sc-sum"><span class="stat-label">Hoogste score</span><span class="stat-value">${esc(best.market)} <small class="mono ${fmt.pnlClass(best.score)}">${esc(signed2(best.score))}</small></span></div>` : ""}`;
   }
 
   function renderTable(rows) {
@@ -303,7 +306,8 @@ export function mountScanner(ctx, el) {
   }
 
   function renderHeatmap(rows) {
-    const w = Math.floor(body.clientWidth - 2) || 1000;
+    // body heeft 6px padding links/rechts, .sc-heat 4px marge
+    const w = Math.floor(body.clientWidth - 12 - 8) || 1000;
     const h = Math.max(380, Math.min(620, Math.round(w * 0.46)));
     const items = rows
       .filter((r) => Number.isFinite(r.volumeQuote24h) && r.volumeQuote24h > 0)
@@ -417,7 +421,7 @@ export function mountScanner(ctx, el) {
       <div class="sc-pop-stats">
         <span>Prijs <b class="mono">${esc(fmt.price(r.price))}</b></span>
         <span>24u <b class="mono ${fmt.pnlClass(r.changePct24h)}">${esc(fmt.pct(r.changePct24h, 2))}</b></span>
-        <span>Score <b class="mono">${r.score > 0 ? "+" : ""}${esc(fmt.num(r.score, 2))}</b></span>
+        <span>Score <b class="mono">${esc(signed2(r.score))}</b></span>
         <span>Regime <b>${esc(fmt.regime(r.regime))}</b></span>
       </div>
       <div class="sc-pop-spark">${sparkline(r.sparkline, 260, 54)}</div>

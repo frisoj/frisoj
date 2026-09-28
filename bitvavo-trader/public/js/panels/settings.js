@@ -375,12 +375,12 @@ export function mountSettings(ctx, el) {
       </div>
       <div class="bt-row2 st-row2">
         <div class="st-field ${state.invalid.has("ensemble.buyThreshold") ? "is-invalid" : ""}" data-field="ensemble.buyThreshold">
-          <label for="st-buy">Koopdrempel <b class="mono pos st-val">${esc(fmt.num(buy, 2))}</b></label>
+          <label for="st-buy">Koopdrempel <b class="mono pos st-val">${esc(buy.toFixed(2).replace(".", ","))}</b></label>
           <input id="st-buy" type="range" class="st-range st-range-buy" min="0.05" max="1" step="0.05" value="${buy}" data-path="ensemble.buyThreshold" data-key="buyThreshold" data-scale="1">
           <div class="st-help">Hoger = strenger: minder, maar sterkere koopsignalen.</div>
         </div>
         <div class="st-field ${state.invalid.has("ensemble.sellThreshold") ? "is-invalid" : ""}" data-field="ensemble.sellThreshold">
-          <label for="st-sell">Verkoopdrempel <b class="mono neg st-val">${esc(fmt.num(sell, 2))}</b></label>
+          <label for="st-sell">Verkoopdrempel <b class="mono neg st-val">${esc(sell.toFixed(2).replace(".", ",").replace("-", "−"))}</b></label>
           <input id="st-sell" type="range" class="st-range st-range-sell" min="-1" max="-0.05" step="0.05" value="${sell}" data-path="ensemble.sellThreshold" data-key="sellThreshold" data-scale="1">
           <div class="st-help">Dichter bij 0 = sneller verkopen bij twijfel.</div>
         </div>
@@ -414,7 +414,7 @@ export function mountSettings(ctx, el) {
           <div class="st-weight">
             <span class="muted">Gewicht</span>
             <input type="range" class="st-range" min="0" max="${Math.max(3, w)}" step="0.1" value="${w}" data-path="ensemble.weights.${esc(s.id)}" data-key="weights" data-scale="1" ${on ? "" : "disabled"} aria-label="Gewicht ${esc(s.name)}">
-            <b class="mono st-val">${esc(fmt.num(w, 1))}</b>
+            <b class="mono st-val">${esc(w.toFixed(1).replace(".", ","))}</b>
           </div>
         </div>`;
       })
@@ -756,7 +756,7 @@ CAPITAL_LIMIT_EUR=50`;
     // Live feedback zonder de invoervelden opnieuw te tekenen
     if (t.type === "range") {
       const v = t.closest(".st-field, .st-weight")?.querySelector(".st-val");
-      if (v) v.textContent = fmt.num(Number(t.value), path.includes("weights") ? 1 : 2);
+      if (v) v.textContent = Number(t.value).toFixed(path.includes("weights") ? 1 : 2).replace(".", ",").replace("-", "−");
     }
     if (path.startsWith("ensemble.buy") || path.startsWith("ensemble.sell")) updateThresholdVis();
     if (path.startsWith("ensemble.weights")) {

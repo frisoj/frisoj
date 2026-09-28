@@ -91,7 +91,7 @@ export function mountRisk(ctx, el) {
       },
       {
         key: "exp",
-        label: "Blootstelling",
+        label: "In crypto",
         valueText: fmt.pct(exposurePct, 0, false),
         ratio: rc.maxTotalExposurePct > 0 ? exposurePct / rc.maxTotalExposurePct : 0,
         limitText: `max ${fmt.pct(rc.maxTotalExposurePct, 0, false)}`,
@@ -99,7 +99,7 @@ export function mountRisk(ctx, el) {
       },
       {
         key: "trades",
-        label: "Trades vandaag",
+        label: "Trades",
         valueText: `${tradesToday}/${rc.maxTradesPerDay ?? "–"}`,
         ratio: rc.maxTradesPerDay > 0 ? tradesToday / rc.maxTradesPerDay : 0,
         limitText: "per dag",
@@ -107,7 +107,7 @@ export function mountRisk(ctx, el) {
       },
       {
         key: "pos",
-        label: "Open posities",
+        label: "Posities",
         valueText: `${openCount}/${rc.maxOpenPositions ?? "–"}`,
         ratio: rc.maxOpenPositions > 0 ? openCount / rc.maxOpenPositions : 0,
         limitText: "tegelijk",
@@ -119,7 +119,7 @@ export function mountRisk(ctx, el) {
 
     const halted = s.halted?.halted;
     const banner = halted
-      ? `<div class="pn-banner pn-banner-bad risk-halt" role="alert">
+      ? `<div class="pn-banner pn-banner-bad pn-banner-ico risk-halt" role="alert">
           <svg class="pn-ico pn-ico-lg" viewBox="0 0 15 15" aria-hidden="true"><polygon points="4.6,1 10.4,1 14,4.6 14,10.4 10.4,14 4.6,14 1,10.4 1,4.6"/><line x1="5" y1="7.5" x2="10" y2="7.5"/></svg>
           <div><b>Handel gepauzeerd</b><div>${esc(s.halted.reason || "Een risicolimiet is bereikt.")}</div>
           <div class="muted">De bot opent geen nieuwe posities tot de limiet weer vrij is (meestal morgen).</div></div>

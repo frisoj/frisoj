@@ -23,6 +23,8 @@ const REGIME_HELP = {
   unknown: "Nog te weinig candles om het regime te bepalen.",
 };
 
+const NF2 = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 // Gauge-geometrie (SVG viewBox 0 0 240 142)
 const CX = 120;
 const CY = 122;
@@ -211,7 +213,7 @@ export function mountSignals(ctx, el) {
     q.value.dataset.a = d.action;
     q.ptr.style.transform = `rotate(${((score + 1) / 2) * 180}deg)`;
     q.ptrDot.dataset.a = d.action;
-    q.scoreTxt.textContent = (score > 0 ? "+" : "") + fmt.num(score, 2);
+    q.scoreTxt.textContent = (score > 0 ? "+" : "") + NF2.format(score);
     q.scoreTxt.dataset.a = d.action;
 
     q.action.dataset.a = d.action;

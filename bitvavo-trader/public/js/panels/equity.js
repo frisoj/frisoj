@@ -73,7 +73,7 @@ export function mountEquity(ctx, el) {
     <div class="eq-chart-wrap"><div class="eq-chart"></div><div class="eq-empty pn-empty" hidden></div></div>
     <div class="eq-stats">
       <div class="stat"><span class="stat-label">Rendement</span><span class="stat-value eq-s-ret">–</span></div>
-      <div class="stat" title="Grootste daling van een piek naar een dal"><span class="stat-label">Max. drawdown</span><span class="stat-value eq-s-dd">–</span></div>
+      <div class="stat" title="Max. drawdown: grootste daling van een piek naar een dal"><span class="stat-label">Max. daling</span><span class="stat-value eq-s-dd">–</span></div>
       <div class="stat"><span class="stat-label">Trades</span><span class="stat-value eq-s-trades">–</span></div>
       <div class="stat" title="Percentage winnende trades"><span class="stat-label">Winrate</span><span class="stat-value eq-s-win">–</span></div>
     </div>
@@ -104,10 +104,11 @@ export function mountEquity(ctx, el) {
         textColor: t.muted,
         fontSize: 11,
         fontFamily: cssVar("--font") || undefined,
+        attributionLogo: false, // bronvermelding staat in de footer (A9)
       },
       grid: { vertLines: { visible: false }, horzLines: { color: t.grid } },
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.08 } },
-      timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickFormatter },
+      timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickFormatter, minBarSpacing: 0.01 },
       localization: { locale: "nl-NL", timeFormatter: (s) => fmt.dateTime(Number(s) * 1000) },
       crosshair: {
         vertLine: { color: alpha(t.muted, 0.5), labelBackgroundColor: t.border },
@@ -158,7 +159,8 @@ export function mountEquity(ctx, el) {
     retEl.textContent = fmt.pct(ret, 2);
     retEl.className = `eq-ret mono ${fmt.pnlClass(ret)}`;
     const sr = $(".eq-s-ret");
-    sr.textContent = `${fmt.pct(ret, 2)} (${fmt.eurSigned(equity - start)})`;
+    sr.textContent = fmt.pct(ret, 2);
+    sr.title = `${fmt.eurSigned(equity - start)} t.o.v. start ${fmt.eur(start)}`;
     sr.className = `stat-value eq-s-ret ${fmt.pnlClass(ret)}`;
     const sd = $(".eq-s-dd");
     sd.textContent = fmt.pct(dd, 2);

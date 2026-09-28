@@ -334,6 +334,9 @@ bus.on("config-changed", (cfg) => {
   if (lastSnapshot && cfg && typeof cfg === "object") lastSnapshot.config = { ...lastSnapshot.config, ...cfg };
 });
 bus.on("connection", (d) => setConnection(d && d.status));
+bus.on("app-info", (info) => {
+  if (info && typeof info === "object") appInfo = { ...(appInfo || {}), ...info };
+});
 
 // ─────────────────────────────── Tabs ───────────────────────────────
 
@@ -520,7 +523,6 @@ async function boot() {
   try {
     const [state, info] = await Promise.all([api.getState(), api.info().catch(() => null)]);
     if (info) {
-      appInfo = info;
       bus.emit("app-info", info);
       const v = $("footer-version");
       if (v && info.version) v.textContent = `Bitvavo Trader v${info.version}`;

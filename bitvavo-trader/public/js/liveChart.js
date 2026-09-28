@@ -831,7 +831,7 @@ export function mountLiveChart(ctx, els) {
       ${st.hoverNote ? `<div class="hover-note">${esc(st.hoverNote)}</div>` : ""}`;
 
     const r = valueAt(ind.rsi, i);
-    const zone = r === null ? "" : r >= 70 ? "overkocht" : r <= 30 ? "oververkocht" : "";
+    const zone = r === null ? "" : r >= 70 ? "overgekocht" : r <= 30 ? "oververkocht" : "";
     legRsi.innerHTML = `<div class="row"><span class="ind" style="--c:${COLORS.rsi}"><i></i><span class="ttl">RSI 14</span><span class="v">${
       r === null ? "–" : nf(1).format(r)
     }</span></span>${zone ? `<span class="badge ${r >= 70 ? "badge-red" : "badge-green"}">${zone}</span>` : ""}</div>`;
@@ -915,6 +915,7 @@ export function mountLiveChart(ctx, els) {
 
   function renderToolbarPrice() {
     const price = currentPrice(st.market);
+    if (!st.candles.length && isNum(price)) st.decimals = decimalsFor(price);
     const pe = tb("[data-ct-price]");
     pe.textContent = isNum(price) ? fmtP(price) : "–";
     flash(pe, "__toolbar", price);
@@ -1010,7 +1011,7 @@ export function mountLiveChart(ctx, els) {
             low: Math.min(...w.map((c) => c.low)),
             volQuote: w.reduce((s, c) => s + (c.volume || 0) * (c.close || 0), 0),
             last: cs[cs.length - 1].close,
-            spark: cs.map((c) => c.close),
+            spark: cs.slice(-25).map((c) => c.close),
             at: Date.now(),
           };
         } catch (err) {

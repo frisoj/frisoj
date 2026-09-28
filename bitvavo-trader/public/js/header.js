@@ -91,7 +91,8 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     }
     let min = Math.min(...pts);
     let max = Math.max(...pts);
-    if (max - min < 1e-9) {
+    const flat = max - min < Math.max(1e-9, Math.abs(max) * 1e-6);
+    if (flat) {
       max += 1;
       min -= 1;
     }
@@ -99,12 +100,12 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     const xy = pts.map((v, i) => [(i / (n - 1)) * 100, 32 - ((v - min) / (max - min)) * 28]);
     const d = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join("");
     const up = pts[n - 1] >= pts[0];
-    const c = up ? "var(--green)" : "var(--red)";
+    const c = flat ? "var(--muted)" : up ? "var(--green)" : "var(--red)";
     el.innerHTML = `
       <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="${c}" stop-opacity="0.28"/><stop offset="1" stop-color="${c}" stop-opacity="0"/>
       </linearGradient></defs>
-      <path d="${d}L100,34L0,34Z" fill="url(#${gradId})"/>
+      ${flat ? "" : `<path d="${d}L100,34L0,34Z" fill="url(#${gradId})"/>`}
       <path d="${d}" fill="none" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`;
   }
 
@@ -310,10 +311,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
       confirmText: "Inschakelen",
       onConfirm: async (value) => {
         const res = await api.arm(value);
-        if (res && typeof res === "object") {
-          info = { ...(info || {}), ...res };
-          bus.emit("app-info", info);
-        }
+        if (res && typeof res === "object") bus.emit("app-info", res);
         await refreshState();
         ctx.toast("Live handel ingeschakeld — de bot handelt nu met echt geld", "warn");
       },
@@ -325,10 +323,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     btn.classList.add("busy");
     try {
       const res = await api.disarm();
-      if (res && typeof res === "object") {
-        info = { ...(info || {}), ...res };
-        bus.emit("app-info", info);
-      }
+      if (res && typeof res === "object") bus.emit("app-info", res);
       await refreshState();
       ctx.toast("Live handel uitgeschakeld — alleen signalen", "success");
     } catch (err) {
@@ -461,10 +456,13 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
 
   bus.on("snapshot", onSnapshot);
   bus.on("app-info", (i) => {
-    info = i;
+    if (!i || typeof i !== "object") return;
+    info = { ...(info || {}), ...i };
     bannerKey = "";
     renderBanner();
     renderStats();
+    // Armen/ontwapenen via een ander paneel: snapshot direct verversen
+    if (snap && typeof i.liveArmed === "boolean" && i.liveArmed !== !!snap.liveArmed) refreshState();
   });
   renderControls();
   if (snap) onSnapshot(snap);
