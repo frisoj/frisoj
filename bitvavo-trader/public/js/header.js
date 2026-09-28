@@ -132,9 +132,9 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     setStat(
       "day",
       esc(fmt.eurSigned(dayPnl)),
-      `<span class="${fmt.pnlClass(dayPct)}">${esc(fmt.pct(dayPct))}</span> <span title="Gerealiseerd (afgesloten trades) vandaag">· gerealiseerd ${esc(
+      `<span class="${fmt.pnlClass(dayPct)}">${esc(fmt.pct(dayPct))}</span> <span title="Gerealiseerd (afgesloten trades) vandaag: ${esc(
         fmt.eurSigned(a.realizedPnlToday),
-      )}</span>`,
+      )}">sinds 00:00</span>`,
       fmt.pnlClass(dayPnl),
       dayPnl,
     );

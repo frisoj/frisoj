@@ -104,10 +104,13 @@ describe("TradingEngine — integratie met echte modules", () => {
     engine.on("position-opened", () => opened++);
     engine.on("position-closed", () => closed++);
 
-    for (let i = 0; i < 240; i++) {
+    // 3 ticks per 15m-candle, ~20 uur (incl. dagwissel); daarna doortikken tot er
+    // een positie openstaat zodat de noodstop echt iets te sluiten heeft.
+    for (let i = 0; i < 600; i++) {
       await engine.tick();
       await checkLedger(engine, broker);
-      t += 5 * 60_000; // 3 ticks per 15m-candle, ~20 uur (incl. dagwissel)
+      if (i >= 240 && engine.snapshot().positions.length > 0) break;
+      t += 5 * 60_000;
     }
     const s = engine.snapshot();
     expect(opened).toBeGreaterThan(0);
@@ -115,12 +118,16 @@ describe("TradingEngine — integratie met echte modules", () => {
     expect(Object.keys(s.decisions).sort()).toEqual([...MARKETS].sort());
     expect(s.equityHistory.length).toBeGreaterThan(10);
 
+    const openAtKill = s.positions.length;
+    expect(openAtKill).toBeGreaterThan(0);
     await engine.killSwitch();
     await checkLedger(engine, broker);
     const after = engine.snapshot();
     expect(after.positions).toHaveLength(0);
     expect(after.running).toBe(false);
     expect(closed).toBe(after.trades.length);
+    expect(after.trades.slice(0, openAtKill).every((tr) => tr.exitReason === "kill-switch")).toBe(true);
+    expect((await broker.getBalances()).filter((b) => b.symbol !== "EUR")).toEqual([]);
 
     // Herstart: nieuwe broker, staat uit het bestand
     const broker2 = new PaperBroker({ startingQuote: 50, takerFee: cfg.risk.takerFee, slippagePct: cfg.risk.slippagePct, now });

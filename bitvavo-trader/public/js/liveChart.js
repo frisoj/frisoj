@@ -306,7 +306,12 @@ export function mountLiveChart(ctx, els) {
   });
 
   const main = LWC.createChart(mainEl, baseOptions(false));
-  const rsiChart = LWC.createChart(rsiEl, baseOptions(false));
+  const rsiChart = LWC.createChart(rsiEl, {
+    ...baseOptions(false),
+    // Alleen de 30/70-lijnen en de actuele waarde labelen (geen automatische ticks)
+    localization: { locale: "nl-NL", timeFormatter, tickmarksPriceFormatter: (prices) => prices.map(() => "") },
+    grid: { vertLines: { color: theme.grid }, horzLines: { visible: false } },
+  });
   const macdChart = LWC.createChart(macdEl, baseOptions(true));
   const charts = [main, rsiChart, macdChart];
 
@@ -393,11 +398,20 @@ export function mountLiveChart(ctx, els) {
     autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
   });
   rsiChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
-  const refLine = (price, color, style) =>
-    rsiSeries.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: false, title: "" });
-  refLine(70, "rgba(242, 73, 92, 0.55)", LineStyle.Dashed);
-  refLine(30, "rgba(30, 197, 128, 0.55)", LineStyle.Dashed);
-  refLine(50, "rgba(126, 136, 157, 0.3)", LineStyle.Dotted);
+  const refLine = (price, color, style, label) =>
+    rsiSeries.createPriceLine({
+      price,
+      color,
+      lineWidth: 1,
+      lineStyle: style,
+      axisLabelVisible: label,
+      axisLabelColor: "#1c2433",
+      axisLabelTextColor: color,
+      title: "",
+    });
+  refLine(70, "rgba(242, 73, 92, 0.6)", LineStyle.Dashed, true);
+  refLine(30, "rgba(30, 197, 128, 0.6)", LineStyle.Dashed, true);
+  refLine(50, "rgba(126, 136, 157, 0.3)", LineStyle.Dotted, false);
 
   // MACD
   let macdDecimals = 2;
@@ -508,7 +522,7 @@ export function mountLiveChart(ctx, els) {
     return out;
   }
 
-  const volColor = (c) => (c.close >= c.open ? "rgba(30, 197, 128, 0.32)" : "rgba(242, 73, 92, 0.32)");
+  const volColor = (c) => (c.close >= c.open ? "rgba(30, 197, 128, 0.26)" : "rgba(242, 73, 92, 0.26)");
   const bar = (c, i) => ({ time: st.times[i], open: c.open, high: c.high, low: c.low, close: c.close });
 
   function histData(hist) {
@@ -873,8 +887,31 @@ export function mountLiveChart(ctx, els) {
           compactNf.format(s.volQuote || 0),
         )}</b></span>`
       : "";
-    tb("[data-ct-upd]").textContent = st.loadedAt && st.candles.length ? `bijgewerkt ${fmt.timeSec(st.loadedAt)}` : "";
+    renderCountdown();
   }
+
+  function renderCountdown() {
+    const el = tb("[data-ct-upd]");
+    const iv = INTERVAL_MS[st.interval];
+    if (!iv || !st.candles.length) {
+      el.textContent = "";
+      return;
+    }
+    const left = iv - (Date.now() % iv);
+    const s = Math.floor(left / 1000);
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    const txt = hh ? `${hh}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`;
+    el.innerHTML = `candle sluit over <b class="mono">${txt}</b>${
+      st.loadedAt ? ` · bijgewerkt ${esc(fmt.time(st.loadedAt))}` : ""
+    }`;
+    el.title = "Pas als een candle gesloten is beoordeelt de bot hem";
+  }
+  setInterval(() => {
+    if (!document.hidden) renderCountdown();
+  }, 1000);
 
   function renderToolbarPrice() {
     const price = currentPrice(st.market);

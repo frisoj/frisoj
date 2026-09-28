@@ -323,6 +323,8 @@ export class TradingEngine extends EventEmitter {
     }
     await this.loadMarkets(true);
     if (this.mode === "live") await this.reconcileLiveBalances();
+    // stop()/killSwitch() kan intussen aangeroepen zijn: dan geen tick meer.
+    if (!this.running) return;
     await this.tick();
     this.scheduleNext();
   }
@@ -992,8 +994,13 @@ export class TradingEngine extends EventEmitter {
       }
     }
 
+    const epoch = this.epoch;
     const req: MarketOrderRequest = { market: pos.market, side: "sell", amount, clientOrderId: randomUUID() };
     const { res, threw } = await this.placeOrder(req, price);
+    if (epoch !== this.epoch || !this.positions.includes(pos)) {
+      this.log("warn", `Verkooporder ${pos.market} kwam binnen na een account-reset en wordt genegeerd`);
+      return null;
+    }
     this.emitEvent("order", res);
 
     if (this.isUnknownOutcome(res, threw)) {
