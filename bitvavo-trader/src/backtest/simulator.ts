@@ -183,7 +183,8 @@ export function simulate(
   const loopStart = Math.max(evalStart, 1);
 
   let cash = initialCapital;
-  let pos: Position | null = null;
+  // `as` keeps TS from narrowing to null: the closures below assign it.
+  let pos = null as Position | null;
   let posEntryIdx = -1;
   let posEntryScore = 0;
   let exposureCandles = 0;
@@ -322,8 +323,7 @@ export function simulate(
       if (tryEntry(i, prev)) rangeCheck(i); // entry at the open → this candle's range counts
     }
 
-    const p = pos as Position | null;
-    lastEquity = cash + (p ? p.amount * c.close : 0);
+    lastEquity = cash + (pos ? pos.amount * c.close : 0);
     eqValues[i - evalStart] = lastEquity;
   }
 
