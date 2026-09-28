@@ -209,21 +209,27 @@ export function mountLiveChart(ctx, els) {
   // ───────────── Toolbar ─────────────
 
   toolbarEl.innerHTML = `
-    <div class="ct-symbol">
-      <span class="mkt-icon" data-ct-icon>–</span>
-      <span data-ct-name>–</span>
-      <span class="badge badge-accent" data-ct-iv title="Candle-interval van de bot">–</span>
+    <div class="ct-row">
+      <div class="ct-symbol">
+        <span class="mkt-icon" data-ct-icon>–</span>
+        <span data-ct-name>–</span>
+        <span class="badge badge-accent" data-ct-iv title="Candle-interval van de bot">–</span>
+      </div>
+      <div class="ct-price" data-ct-price>–</div>
+      <div class="ct-change flat" data-ct-chg>–</div>
+      <div class="ct-stats" data-ct-stats></div>
     </div>
-    <div class="ct-price" data-ct-price>–</div>
-    <div class="ct-change flat" data-ct-chg>–</div>
-    <div class="ct-stats" data-ct-stats></div>
-    <div class="ct-toggles" role="group" aria-label="Indicatoren tonen/verbergen">
-      ${TOGGLE_DEFS.map(
-        (t) =>
-          `<button type="button" class="chip" data-toggle="${t.key}" aria-pressed="${!!st.toggles[t.key]}" title="${esc(
-            t.tip,
-          )}" style="--c:${t.color}"><span class="sw"></span>${esc(t.label)}</button>`,
-      ).join("")}
+    <div class="ct-row">
+      <div class="ct-toggles" role="group" aria-label="Indicatoren tonen/verbergen">
+        <span class="lbl">Tonen</span>
+        ${TOGGLE_DEFS.map(
+          (t) =>
+            `<button type="button" class="chip" data-toggle="${t.key}" aria-pressed="${!!st.toggles[t.key]}" title="${esc(
+              t.tip,
+            )}" style="--c:${t.color}"><span class="sw"></span>${esc(t.label)}</button>`,
+        ).join("")}
+      </div>
+      <span class="ct-updated" data-ct-upd></span>
     </div>`;
   const tb = (sel) => toolbarEl.querySelector(sel);
 
@@ -867,6 +873,7 @@ export function mountLiveChart(ctx, els) {
           compactNf.format(s.volQuote || 0),
         )}</b></span>`
       : "";
+    tb("[data-ct-upd]").textContent = st.loadedAt && st.candles.length ? `bijgewerkt ${fmt.timeSec(st.loadedAt)}` : "";
   }
 
   function renderToolbarPrice() {

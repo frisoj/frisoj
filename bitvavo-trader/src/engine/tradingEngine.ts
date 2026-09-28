@@ -420,6 +420,14 @@ export class TradingEngine extends EventEmitter {
     const pollChanged = prev.pollMs !== next.pollMs;
     this.config = next;
     this.risk = risk;
+    if (
+      this.mode === "paper" &&
+      (prev.risk.takerFee !== next.risk.takerFee || prev.risk.slippagePct !== next.risk.slippagePct)
+    ) {
+      // Paper broker (duck-typed) rekent met dezelfde kosten als de risk manager.
+      const b = this.broker as Broker & { setCosts?: (takerFee: number, slippagePct: number) => void };
+      if (typeof b.setCosts === "function") b.setCosts(next.risk.takerFee, next.risk.slippagePct);
+    }
 
     if (intervalChanged || marketsChanged) {
       this.lastEvaluated.clear();

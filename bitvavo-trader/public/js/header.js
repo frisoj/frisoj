@@ -52,6 +52,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
         <div class="stat-label">Bot-status</div>
         <div class="bot-state">
           <span class="dot off" data-dot></span><span data-bs>Laden…</span>
+          <span class="muted small mono" data-up></span>
           <span class="badge badge-red" data-halt hidden>HALTED</span>
         </div>
         <div class="stat-sub" data-tick>&nbsp;</div>
@@ -119,8 +120,8 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
       "equity",
       esc(fmt.eur(eq)),
       paper
-        ? `start ${esc(fmt.eur(start))} · oefengeld`
-        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : start))} · echt geld`,
+        ? `start ${esc(fmt.eur(start))}`
+        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : start))}`,
       "",
       eq,
     );
@@ -131,9 +132,9 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     setStat(
       "day",
       esc(fmt.eurSigned(dayPnl)),
-      `<span class="${fmt.pnlClass(dayPct)}">${esc(fmt.pct(dayPct))}</span> · gerealiseerd <span class="${fmt.pnlClass(
-        a.realizedPnlToday,
-      )}">${esc(fmt.eurSigned(a.realizedPnlToday))}</span>`,
+      `<span class="${fmt.pnlClass(dayPct)}">${esc(fmt.pct(dayPct))}</span> <span title="Gerealiseerd (afgesloten trades) vandaag">· gerealiseerd ${esc(
+        fmt.eurSigned(a.realizedPnlToday),
+      )}</span>`,
       fmt.pnlClass(dayPnl),
       dayPnl,
     );
@@ -233,9 +234,13 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
         cls += " warn";
       }
     }
-    if (snap.running && snap.startedAt) text += ` · draait ${fmt.duration(now - snap.startedAt)}`;
     tick.className = cls;
     tick.textContent = text;
+    const up = q("bot", "[data-up]");
+    if (up) {
+      up.textContent = snap.running && snap.startedAt ? fmt.duration(now - snap.startedAt) : "";
+      up.title = snap.running && snap.startedAt ? `Draait sinds ${fmt.dateTime(snap.startedAt)}` : "";
+    }
   }
   setInterval(renderTick, 1000);
 

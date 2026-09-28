@@ -98,6 +98,13 @@ describe("SimulatedFeed — markten", () => {
     }
   });
 
+  it("ondersteunt ook onbekende (geldig geformatteerde) markten deterministisch", async () => {
+    const a = await feedAt(NOW).getPrice("FOO-EUR");
+    expect(Number.isFinite(a) && a > 0).toBe(true);
+    expect(await feedAt(NOW).getPrice("foo-eur")).toBe(a);
+    expect(await feedAt(NOW, 5).getPrice("FOO-EUR")).not.toBe(a);
+  });
+
   it("gooit een Nederlandse fout bij een ongeldige markt of interval", async () => {
     const feed = feedAt(NOW);
     await expect(feed.getCandles("geen markt", "15m", 10)).rejects.toThrow(/Onbekende markt/);
@@ -248,6 +255,16 @@ describe("SimulatedFeed — consistentie tussen intervallen", () => {
     const agg = aggregate(minutes);
     expect([m15.open, m15.high, m15.low, m15.close]).toEqual([agg.open, agg.high, agg.low, agg.close]);
     expect(m15.volume).toBeCloseTo(agg.volume, 9);
+  });
+
+  it("getCandles en getHistory leveren dezelfde gesloten candles", async () => {
+    const f = feedAt(NOW, 11);
+    for (const interval of ["1m", "15m", "1h", "4h", "1d"] as Interval[]) {
+      const recent = await f.getCandles("ETH-EUR", interval, 120);
+      const closed = recent.slice(0, -1);
+      const hist = await f.getHistory("ETH-EUR", interval, closed[0].time, NOW);
+      expect(hist, interval).toEqual(closed);
+    }
   });
 
   it("candles sluiten naadloos op elkaar aan (open = vorige close)", async () => {

@@ -41,6 +41,8 @@ const PARAM_LABELS = {
 const HONEST_NOTE =
   "Resultaten uit het verleden zijn geen garantie voor de toekomst. Fees (0,25% per kant) en slippage zijn meegerekend.";
 const MAX_CANDLES_WARN = 20000;
+// Server begrenst het aantal dagen per interval (src/server/validation.ts)
+const MAX_DAYS = { "1m": 7, "5m": 30, "15m": 120, "30m": 180, "1h": 365, "2h": 365, "4h": 365, "6h": 365, "8h": 365, "12h": 365, "1d": 365 };
 const FORM_KEY = "bvt-backtest-form";
 
 function ensureCss() {
@@ -198,7 +200,7 @@ export function mountBacktest(ctx, el) {
             <input id="bt-days" class="input" type="number" name="days" min="1" max="365" step="1" value="30"></div>
         </div>
         <div class="form-row"><label for="bt-capital">Startkapitaal (€)</label>
-          <input id="bt-capital" class="input" type="number" name="capital" min="10" step="5" value="50"></div>
+          <input id="bt-capital" class="input" type="number" name="capital" min="5" step="5" value="50"></div>
         <div class="bt-est"></div>
 
         <details class="bt-adv">
@@ -241,7 +243,7 @@ export function mountBacktest(ctx, el) {
         <p class="pn-hint">De eerlijkste test: optimaliseert op een deel van de data en test op een stuk dat de optimizer níet gezien heeft. Gebruik minstens 60 dagen.</p>
         <div class="bt-row2">
           <div class="form-row"><label for="bt-folds">Folds (vensters)</label>
-            <input id="bt-folds" class="input" type="number" name="folds" min="2" max="10" step="1" value="4"></div>
+            <input id="bt-folds" class="input" type="number" name="folds" min="2" max="8" step="1" value="4"></div>
           <div class="form-row"><label for="bt-train">Train-deel</label>
             <input id="bt-train" class="input" type="number" name="trainRatio" min="0.5" max="0.9" step="0.05" value="0.7"></div>
         </div>
@@ -340,18 +342,22 @@ export function mountBacktest(ctx, el) {
     const days = num(F("days").value);
     const iv = F("interval").value;
     const est = $(".bt-est");
+    const maxDays = MAX_DAYS[iv] || 365;
+    F("days").max = String(maxDays);
     if (!(days > 0) || !INTERVAL_MS[iv]) {
       est.innerHTML = "";
       return;
     }
     const n = Math.round((days * 864e5) / INTERVAL_MS[iv]);
     const heavy = n > MAX_CANDLES_WARN;
-    est.className = `bt-est ${heavy ? "is-warn" : ""}`;
-    est.innerHTML = `≈ <b class="mono">${esc(fmt.num(n, 0))}</b> candles van ${esc(INTERVAL_LABELS[iv])}` +
-      (heavy ? ` — <b>veel data</b>: dit kan lang duren. Kies een groter interval of minder dagen.` : "");
+    const tooLong = days > maxDays;
+    est.className = `bt-est ${heavy || tooLong ? "is-warn" : ""}`;
+    est.innerHTML = `≈ <b class="mono">${esc(fmt.num(n, 0))}</b> candles van ${esc(INTERVAL_LABELS[iv])} · max. ${maxDays} dagen bij ${esc(iv)}` +
+      (tooLong ? ` — <b>te lang</b>: verlaag naar ${maxDays} dagen of kies een groter interval.` : "") +
+      (heavy && !tooLong ? ` — <b>veel data</b>: dit kan lang duren.` : "");
     const tr = num(F("trainRatio").value);
     const r = Number.isFinite(tr) ? Math.max(0.5, Math.min(0.9, tr)) : 0.7;
-    const folds = Math.max(2, Math.min(10, Math.round(num(F("folds").value)) || 4));
+    const folds = Math.max(2, Math.min(8, Math.round(num(F("folds").value)) || 4));
     $(".bt-split").innerHTML = Array.from({ length: folds }, (_, i) =>
       `<div class="bt-split-fold" title="Fold ${i + 1}"><i style="flex:${r}"></i><b style="flex:${1 - r}"></b></div>`).join("") +
       `<div class="bt-split-lbl"><span><i></i>train ${esc(fmt.num(r * 100, 0))}%</span><span><b></b>test ${esc(fmt.num((1 - r) * 100, 0))}%</span></div>`;
@@ -364,8 +370,9 @@ export function mountBacktest(ctx, el) {
     const days = Math.round(num(F("days").value));
     const initialCapital = num(F("capital").value);
     if (!market) errors.push("Kies een markt.");
-    if (!(days >= 1 && days <= 365)) errors.push("Periode moet tussen 1 en 365 dagen liggen.");
-    if (!(initialCapital >= 10)) errors.push("Startkapitaal moet minimaal €10 zijn (Bitvavo-minimum per order is €5).");
+    const maxDays = MAX_DAYS[interval] || 365;
+    if (!(days >= 1 && days <= maxDays)) errors.push(`Periode moet tussen 1 en ${maxDays} dagen liggen voor interval ${interval}.`);
+    if (!(initialCapital >= 5)) errors.push("Startkapitaal moet minimaal €5 zijn (het Bitvavo-minimum per order).");
     const buy = num(F("buyThreshold").value);
     const sell = num(F("sellThreshold").value);
     const stop = num(F("stopAtrMult").value);
@@ -394,11 +401,13 @@ export function mountBacktest(ctx, el) {
     if (kind === "walkforward") {
       const folds = Math.round(num(F("folds").value));
       const trainRatio = num(F("trainRatio").value);
-      if (!(folds >= 2 && folds <= 10)) errors.push("Aantal folds moet tussen 2 en 10 liggen.");
+      if (!(folds >= 2 && folds <= 8)) errors.push("Aantal folds moet tussen 2 en 8 liggen.");
       if (!(trainRatio >= 0.5 && trainRatio <= 0.9)) errors.push("Train-deel moet tussen 0,5 en 0,9 liggen.");
       req.folds = folds;
       req.trainRatio = trainRatio;
-      if (days < 30) errors.push("Walk-forward heeft minstens 30 dagen data nodig (liefst 60+).");
+      const candles = Math.round((days * 864e5) / (INTERVAL_MS[interval] || 9e5));
+      if (candles < 1000)
+        errors.push(`Te weinig data voor walk-forward (≈${fmt.num(candles, 0)} candles). Kies meer dagen of een kleiner interval (minstens ~1.000 candles).`);
     }
     return { req, errors };
   }
@@ -1046,7 +1055,7 @@ export function mountBacktest(ctx, el) {
               <td class="r mono">${esc(fmt.pct(-Math.abs(r.metrics?.maxDrawdownPct ?? NaN), 1))}</td>
               <td class="r mono">${esc(fmt.num(r.metrics?.trades, 0))}</td>
               <td class="r mono">${esc(fmt.pct(r.metrics?.winRatePct, 0, false))}</td>
-              <td class="r"><button type="button" class="btn btn-ghost btn-sm bt-apply" data-row="${i}" title="Deze combinatie in de bot zetten">Toepassen</button></td></tr>`,
+              <td class="r"><button type="button" class="btn btn-ghost pn-btn-sm bt-apply" data-row="${i}" title="Deze combinatie in de bot zetten">Toepassen</button></td></tr>`,
             )
             .join("")}</tbody></table></div>
       </div>`;
