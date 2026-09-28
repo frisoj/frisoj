@@ -1,0 +1,473 @@
+/**
+ * Risicobeheer (A4): positiegrootte, stops, take-profit, trailing/break-even,
+ * time-stop, dagelijkse verlieslimiet en validatie van risico-instellingen.
+ *
+ * Zowel de backtester als de live/paper-engine gebruiken deze klasse, dus alles
+ * is deterministisch en muteert NOOIT de invoer.
+ *
+ * Kapitaalbehoud gaat boven alles: bij twijfel wordt een entry afgewezen.
+ */
+import {
+  INTERVAL_MS,
+  type AccountSnapshot,
+  type Candle,
+  type EnsembleDecision,
+  type EntryPlan,
+  type ExitReason,
+  type HaltStatus,
+  type Interval,
+  type MarketInfo,
+  type Position,
+  type PositionUpdate,
+  type RiskConfig,
+  type RiskManagerLike,
+} from "../core/types";
+
+// ─────────────────────────────── Helpers ───────────────────────────────
+
+/** Totale round-trip kosten als fractie: 2 × taker fee + 2 × slippage. */
+export function roundTripCostPct(cfg: RiskConfig): number {
+  return 2 * cfg.takerFee + 2 * cfg.slippagePct;
+}
+
+/** Deel van de cash dat maximaal gebruikt wordt (marge voor afronding/fees). */
+const CASH_USAGE = 0.995;
+/** Bij ophogen naar de minimale order mag het risico max. dit × het budget zijn. */
+const MAX_BUMP_RISK_MULTIPLE = 2;
+/** Relatieve tolerantie voor het herkennen van stop-niveaus (initieel / break-even). */
+const LEVEL_REL_EPS = 1e-6;
+
+function isNum(x: unknown): x is number {
+  return typeof x === "number" && Number.isFinite(x);
+}
+
+/** Naar beneden afronden op centen (robuust tegen 0.29 * 100 = 28.999…). */
+function floorCents(x: number): number {
+  if (!isNum(x) || x <= 0) return 0;
+  return Math.floor(x * 100 + 1e-7) / 100;
+}
+
+/** Naar boven afronden op centen. */
+function ceilCents(x: number): number {
+  if (!isNum(x) || x <= 0) return 0;
+  return Math.ceil(x * 100 - 1e-7) / 100;
+}
+
+/** Nederlands getal: 1234.5 → "1234,50" (vaste decimalen). */
+function nl(x: number, decimals: number): string {
+  if (!Number.isFinite(x)) return String(x);
+  return x.toFixed(decimals).replace(".", ",");
+}
+
+function eur(x: number): string {
+  return `€${nl(x, 2)}`;
+}
+
+function pct(x: number, decimals = 1): string {
+  return `${nl(x, decimals)}%`;
+}
+
+/** Leesbare prijs voor zowel BTC (60000) als SHIB (0,00001234). */
+function price(x: number): string {
+  if (!Number.isFinite(x)) return String(x);
+  const a = Math.abs(x);
+  if (a >= 1000) return nl(x, 2);
+  if (a >= 1) return nl(x, 4);
+  if (a === 0) return "0";
+  return x.toPrecision(5).replace(".", ",");
+}
+
+/** Getal zonder overbodige nullen, met komma: 0.5 → "0,5", 10 → "10". */
+function num(x: number): string {
+  return String(x).replace(".", ",");
+}
+
+// ─────────────────────────────── Validatie ───────────────────────────────
+
+interface Bound {
+  label: string;
+  min: number;
+  max: number;
+  integer?: boolean;
+  /** 0 is ook toegestaan (functie uit), anders [min, max] */
+  zeroAllowed?: boolean;
+}
+
+const BOUNDS: Record<keyof RiskConfig, Bound> = {
+  riskPerTradePct: { label: "Risico per trade (%)", min: 0.1, max: 10 },
+  maxPositionPct: { label: "Max. positiegrootte (%)", min: 1, max: 100 },
+  maxOpenPositions: { label: "Max. open posities", min: 1, max: 10, integer: true },
+  maxTotalExposurePct: { label: "Max. totale blootstelling (%)", min: 1, max: 100 },
+  stopAtrMult: { label: "Stop-loss (× ATR)", min: 0.5, max: 10 },
+  takeProfitR: { label: "Take-profit (× R)", min: 0.5, max: 10 },
+  trailingAtrMult: { label: "Trailing stop (× ATR)", min: 0.5, max: 10, zeroAllowed: true },
+  breakEvenAtR: { label: "Break-even vanaf (× R)", min: 0, max: 5 },
+  dailyLossLimitPct: { label: "Dagelijkse verlieslimiet (%)", min: 0.5, max: 50 },
+  maxTradesPerDay: { label: "Max. trades per dag", min: 1, max: 100, integer: true },
+  cooldownCandlesAfterLoss: { label: "Afkoelperiode na verlies (candles)", min: 0, max: 500, integer: true },
+  minEdgeFeeMultiple: { label: "Minimale winstruimte (× kosten)", min: 0, max: 20 },
+  takerFee: { label: "Taker fee (fractie)", min: 0, max: 0.01 },
+  makerFee: { label: "Maker fee (fractie)", min: 0, max: 0.01 },
+  slippagePct: { label: "Slippage (fractie)", min: 0, max: 0.02 },
+  minOrderQuote: { label: "Minimale orderwaarde (EUR)", min: 0, max: Number.POSITIVE_INFINITY },
+  timeStopCandles: { label: "Tijdstop (candles)", min: 0, max: 10000, integer: true },
+};
+
+const RISK_KEYS = Object.keys(BOUNDS) as (keyof RiskConfig)[];
+
+function checkValue(key: keyof RiskConfig, value: unknown): string | null {
+  const b = BOUNDS[key];
+  const name = `${b.label} (${key})`;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return `${name} moet een geldig getal zijn (nu: ${JSON.stringify(value) ?? String(value)})`;
+  }
+  if (b.integer && !Number.isInteger(value)) {
+    return `${name} moet een geheel getal zijn (nu: ${num(value)})`;
+  }
+  if (b.zeroAllowed && value === 0) return null;
+  if (value < b.min || value > b.max) {
+    if (b.max === Number.POSITIVE_INFINITY) {
+      return `${name} moet ${num(b.min)} of hoger zijn (nu: ${num(value)})`;
+    }
+    const range = `tussen ${num(b.min)} en ${num(b.max)}`;
+    return b.zeroAllowed
+      ? `${name} moet 0 (uit) of ${range} zijn (nu: ${num(value)})`
+      : `${name} moet ${range} liggen (nu: ${num(value)})`;
+  }
+  return null;
+}
+
+/**
+ * Valideer (een deel van) de risico-instellingen. Elke opgegeven key moet een
+ * bekende instelling zijn met een eindig getal binnen verstandige grenzen.
+ * Foutmeldingen zijn Nederlands en noemen het veld.
+ */
+export function validateRiskConfig(partial: Partial<RiskConfig>): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (partial === null || typeof partial !== "object" || Array.isArray(partial)) {
+    return { ok: false, errors: ["Risico-instellingen moeten een object zijn"] };
+  }
+  for (const key of Object.keys(partial)) {
+    if (!Object.prototype.hasOwnProperty.call(BOUNDS, key)) {
+      errors.push(`Onbekende risico-instelling: ${key}`);
+      continue;
+    }
+    const err = checkValue(key as keyof RiskConfig, (partial as Record<string, unknown>)[key]);
+    if (err) errors.push(err);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+/** Volledige config-check (alle keys verplicht, onbekende keys genegeerd). */
+function validateFullConfig(cfg: RiskConfig): string[] {
+  if (cfg === null || typeof cfg !== "object") return ["Risico-instellingen ontbreken"];
+  const errors: string[] = [];
+  for (const key of RISK_KEYS) {
+    const err = checkValue(key, (cfg as unknown as Record<string, unknown>)[key]);
+    if (err) errors.push(err);
+  }
+  return errors;
+}
+
+// ─────────────────────────────── RiskManager ───────────────────────────────
+
+export class RiskManager implements RiskManagerLike {
+  readonly cfg: RiskConfig;
+  readonly interval: Interval;
+  private readonly intervalMs: number;
+
+  constructor(cfg: RiskConfig, interval: Interval) {
+    const ms = INTERVAL_MS[interval];
+    if (!isNum(ms)) throw new Error(`Onbekend interval: ${String(interval)}`);
+    this.cfg = cfg;
+    this.interval = interval;
+    this.intervalMs = ms;
+  }
+
+  /** Round-trip kosten (fractie) voor de huidige config. */
+  get roundTripCost(): number {
+    return roundTripCostPct(this.cfg);
+  }
+
+  // ───────────── Entry ─────────────
+
+  planEntry(
+    decision: EnsembleDecision,
+    account: AccountSnapshot,
+    market: MarketInfo | undefined,
+    now: number,
+  ): EntryPlan {
+    const cfg = this.cfg;
+    const reasons: string[] = [];
+    const marketName = decision.market;
+    const openPositions = Array.isArray(account.openPositions) ? account.openPositions : [];
+
+    // Config-sanity: met een kapotte config wordt er nooit gekocht.
+    const cfgErrors = validateFullConfig(cfg);
+    if (cfgErrors.length > 0) {
+      reasons.push(`Ongeldige risico-instellingen: ${cfgErrors.join("; ")}`);
+    }
+    const rtc = roundTripCostPct(cfg);
+
+    // 1. Signaal
+    if (decision.action !== "buy") {
+      reasons.push(`Geen koopsignaal (actie: ${decision.action})`);
+    }
+
+    // 2. Dagelijkse verlieslimiet / equity
+    const halt = this.haltStatus(account);
+    if (halt.halted) reasons.push(halt.reason ?? "Handel gestopt door risicobeheer");
+
+    // 3. Trades per dag
+    if (!(account.tradesToday < cfg.maxTradesPerDay)) {
+      reasons.push(`Maximum aantal trades per dag bereikt (${account.tradesToday}/${cfg.maxTradesPerDay})`);
+    }
+
+    // 4. Aantal open posities
+    if (!(openPositions.length < cfg.maxOpenPositions)) {
+      reasons.push(`Maximum aantal open posities bereikt (${openPositions.length}/${cfg.maxOpenPositions})`);
+    }
+
+    // 5. Al een positie in deze markt
+    if (openPositions.some((p) => p.market === marketName)) {
+      reasons.push(`Er staat al een positie open in ${marketName}`);
+    }
+
+    // 6. Afkoelperiode na verlies
+    const lastLoss = account.lastLossAt?.[marketName];
+    if (isNum(lastLoss) && cfg.cooldownCandlesAfterLoss > 0) {
+      const cooldownMs = cfg.cooldownCandlesAfterLoss * this.intervalMs;
+      const elapsed = now - lastLoss;
+      if (elapsed < cooldownMs) {
+        const left = Math.max(1, Math.ceil((cooldownMs - elapsed) / this.intervalMs));
+        const minutes = Math.ceil((cooldownMs - elapsed) / 60_000);
+        reasons.push(
+          `Afkoelperiode na verlies in ${marketName}: nog ${left} ${left === 1 ? "candle" : "candles"} (~${minutes} min) wachten`,
+        );
+      }
+    }
+
+    // 7. Marktstatus
+    if (market && market.status !== "trading") {
+      reasons.push(`Markt ${marketName} is niet actief (status: ${market.status})`);
+    }
+
+    // 8. Koers en ATR
+    const refPrice = decision.price;
+    const atr = decision.atr;
+    const priceOk = isNum(refPrice) && refPrice > 0;
+    const atrOk = isNum(atr) && atr > 0;
+    if (!priceOk) reasons.push(`Ongeldige koers voor ${marketName} (${String(refPrice)})`);
+    if (!atrOk) reasons.push("ATR onbekend of 0 (te weinig data voor een stop-loss)");
+
+    let entry = 0;
+    let stop = 0;
+    let takeProfit = 0;
+    let quoteAmount = 0;
+    let riskQuote = 0;
+    let bumped = false;
+
+    if (priceOk && atrOk) {
+      entry = refPrice * (1 + cfg.slippagePct);
+      const stopDist = cfg.stopAtrMult * atr;
+      stop = entry - stopDist;
+      takeProfit = entry + cfg.takeProfitR * stopDist;
+
+      // 9. Stop moet boven 0 liggen
+      const stopOk = isNum(stop) && stop > 0;
+      if (!stopOk) {
+        reasons.push(`Stop-loss zou op of onder 0 liggen (${price(stop)}): ATR te groot t.o.v. de koers`);
+      }
+
+      // 10. Fee-edge: afstand naar take-profit moet de kosten ruim dekken
+      const edge = (takeProfit - entry) / entry;
+      const requiredEdge = cfg.minEdgeFeeMultiple * rtc;
+      if (!(edge >= requiredEdge - 1e-12)) {
+        reasons.push(
+          `Te weinig winstruimte t.o.v. kosten: doel +${pct(edge * 100, 2)} < ${num(cfg.minEdgeFeeMultiple)}× kosten (${pct(requiredEdge * 100, 2)})`,
+        );
+      }
+
+      // 11. Positiegrootte
+      if (stopOk) {
+        const equity = isNum(account.equity) ? account.equity : 0;
+        const cash = isNum(account.cashQuote) ? account.cashQuote : 0;
+        const riskBudget = Math.max(0, equity) * (cfg.riskPerTradePct / 100);
+        const lossPerUnit = stopDist + entry * rtc;
+        const riskAt = (q: number): number => (q / (1 + cfg.takerFee) / entry) * lossPerUnit;
+
+        const quoteByRisk = (riskBudget / lossPerUnit) * entry * (1 + cfg.takerFee);
+        const posCap = Math.max(0, equity) * (cfg.maxPositionPct / 100);
+        const exposure = openPositions.reduce((s, p) => s + (isNum(p.costQuote) ? p.costQuote : 0), 0);
+        const exposureCap = Math.max(0, Math.max(0, equity) * (cfg.maxTotalExposurePct / 100) - exposure);
+        const cashCap = Math.max(0, cash * CASH_USAGE);
+
+        const raw = Math.min(quoteByRisk, posCap, exposureCap, cashCap);
+        let q = floorCents(raw);
+
+        const marketMin = market?.minOrderQuote;
+        const minOrder = isNum(marketMin) && marketMin >= 0 ? marketMin : cfg.minOrderQuote;
+
+        if (!(q >= minOrder - 1e-9) || q <= 0) {
+          const bump = Math.max(ceilCents(minOrder), 0.01);
+          const eps = 1e-9;
+          const fitsPos = bump <= posCap + eps;
+          const fitsExposure = bump <= exposureCap + eps;
+          const fitsCash = bump <= cashCap + eps;
+          const bumpRisk = riskAt(bump);
+          const riskOk = bumpRisk <= MAX_BUMP_RISK_MULTIPLE * riskBudget + eps;
+          if (fitsPos && fitsExposure && fitsCash && riskOk) {
+            q = bump;
+            bumped = true;
+          } else {
+            reasons.push(`Te klein: ${eur(q)} < minimum ${eur(minOrder)}`);
+            if (!fitsCash) {
+              reasons.push(
+                `Onvoldoende saldo: ${eur(cash)} beschikbaar (max. ${eur(cashCap)} bruikbaar), minimaal ${eur(bump)} nodig`,
+              );
+            }
+            if (!fitsPos) {
+              reasons.push(
+                `Max. positiegrootte (${pct(cfg.maxPositionPct, 0)} van equity = ${eur(posCap)}) is kleiner dan het minimum ${eur(bump)}`,
+              );
+            }
+            if (!fitsExposure) {
+              reasons.push(
+                `Max. totale blootstelling (${pct(cfg.maxTotalExposurePct, 0)}): nog ${eur(exposureCap)} ruimte, minimum is ${eur(bump)}`,
+              );
+            }
+            if (!riskOk) {
+              reasons.push(
+                `Risico bij minimale order (${eur(bumpRisk)}) is meer dan ${MAX_BUMP_RISK_MULTIPLE}× het risicobudget (${eur(riskBudget)})`,
+              );
+            }
+            q = 0;
+          }
+        }
+        quoteAmount = q;
+        riskQuote = q > 0 ? riskAt(q) : 0;
+      }
+    }
+
+    const approved = reasons.length === 0;
+    if (approved) {
+      const stopPct = ((stop - entry) / entry) * 100;
+      const tpPct = ((takeProfit - entry) / entry) * 100;
+      reasons.push(
+        `Koop ${eur(quoteAmount)}${bumped ? " (opgehoogd naar minimum)" : ""} ${marketName} @ ~${price(entry)}` +
+          ` | stop ${price(stop)} (${pct(stopPct, 2)})` +
+          ` | doel ${price(takeProfit)} (+${pct(tpPct, 2)})` +
+          ` | risico ${eur(riskQuote)}`,
+      );
+    }
+
+    return {
+      approved,
+      reasons,
+      market: marketName,
+      // Afgewezen → nooit een bedrag teruggeven dat per ongeluk uitgevoerd kan worden.
+      quoteAmount: approved ? quoteAmount : 0,
+      expectedEntryPrice: isNum(entry) ? entry : 0,
+      stopPrice: isNum(stop) ? stop : 0,
+      takeProfitPrice: isNum(takeProfit) ? takeProfit : 0,
+      riskQuote: approved ? riskQuote : 0,
+    };
+  }
+
+  // ───────────── Positiebeheer ─────────────
+
+  updatePosition(pos: Position, candle: Candle, atr: number, closedCandle: boolean): PositionUpdate {
+    const cfg = this.cfg;
+    const rtc = roundTripCostPct(cfg);
+
+    const prevHigh = isNum(pos.highestPrice) ? pos.highestPrice : pos.entryPrice;
+    const highest = isNum(candle.high) ? Math.max(prevHigh, candle.high) : prevHigh;
+    const currentStop = isNum(pos.stopPrice) ? pos.stopPrice : pos.initialStopPrice;
+
+    // 1. Stop (altijd eerst: bij stop én take-profit in één candle wint de stop)
+    if (isNum(currentStop) && isNum(candle.low) && candle.low <= currentStop) {
+      const exitPrice = isNum(candle.open) ? Math.min(candle.open, currentStop) : currentStop;
+      return {
+        exit: true,
+        exitReason: this.classifyStop(pos, currentStop, rtc),
+        exitPrice,
+        stopPrice: currentStop,
+        highestPrice: highest,
+      };
+    }
+
+    // 2. Take-profit
+    const tp = pos.takeProfitPrice;
+    if (isNum(tp) && tp > 0 && isNum(candle.high) && candle.high >= tp) {
+      const exitPrice = isNum(candle.open) ? Math.max(candle.open, tp) : tp;
+      return { exit: true, exitReason: "take-profit", exitPrice, stopPrice: currentStop, highestPrice: highest };
+    }
+
+    // 3. Time-stop (alleen op gesloten candles; caller heeft candlesHeld al opgehoogd)
+    if (
+      closedCandle &&
+      cfg.timeStopCandles > 0 &&
+      pos.candlesHeld >= cfg.timeStopCandles &&
+      isNum(candle.close) &&
+      candle.close <= pos.entryPrice * (1 + rtc)
+    ) {
+      return {
+        exit: true,
+        exitReason: "time-stop",
+        exitPrice: candle.close,
+        stopPrice: currentStop,
+        highestPrice: highest,
+      };
+    }
+
+    // 4. Stop verhogen voor volgende candles (nooit verlagen)
+    let newStop = currentStop;
+    const R = pos.entryPrice - pos.initialStopPrice;
+    if (isNum(R) && R > 0) {
+      if (cfg.breakEvenAtR > 0 && highest >= pos.entryPrice + cfg.breakEvenAtR * R) {
+        newStop = Math.max(newStop, pos.entryPrice * (1 + rtc));
+      }
+      if (closedCandle && cfg.trailingAtrMult > 0 && isNum(atr) && atr > 0 && highest >= pos.entryPrice + R) {
+        newStop = Math.max(newStop, highest - cfg.trailingAtrMult * atr);
+      }
+    }
+
+    return { exit: false, stopPrice: newStop, highestPrice: highest };
+  }
+
+  /** Welke soort stop werd geraakt: initiële stop, break-even of trailing. */
+  private classifyStop(pos: Position, stop: number, rtc: number): ExitReason {
+    const eps = Math.abs(pos.entryPrice) * LEVEL_REL_EPS;
+    if (!isNum(pos.initialStopPrice) || stop <= pos.initialStopPrice + eps) return "stop-loss";
+    const breakEven = pos.entryPrice * (1 + rtc);
+    if (Math.abs(stop - breakEven) <= eps) return "break-even";
+    return "trailing-stop";
+  }
+
+  shouldExitOnSignal(pos: Position, decision: EnsembleDecision): boolean {
+    return decision.action === "sell" && decision.market === pos.market;
+  }
+
+  // ───────────── Dagelijkse limiet ─────────────
+
+  haltStatus(account: AccountSnapshot): HaltStatus {
+    const equity = account.equity;
+    if (!isNum(equity)) {
+      return { halted: true, reason: "Equity onbekend: handel gestopt uit voorzorg" };
+    }
+    if (equity <= 0) {
+      return { halted: true, reason: `Equity is ${eur(equity)}: geen kapitaal meer om mee te handelen` };
+    }
+    const dayStart = account.dayStartEquity;
+    if (isNum(dayStart) && dayStart > 0) {
+      const changePct = ((equity - dayStart) / dayStart) * 100;
+      if (-changePct >= this.cfg.dailyLossLimitPct - 1e-9) {
+        return {
+          halted: true,
+          reason: `Dagelijkse verlieslimiet bereikt (${pct(changePct)}, limiet -${pct(this.cfg.dailyLossLimitPct)})`,
+        };
+      }
+    }
+    return { halted: false };
+  }
+}

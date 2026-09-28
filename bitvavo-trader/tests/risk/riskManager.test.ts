@@ -1,0 +1,686 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_RISK_CONFIG } from "../../src/core/defaults";
+import {
+  INTERVAL_MS,
+  type AccountSnapshot,
+  type Candle,
+  type EnsembleDecision,
+  type MarketInfo,
+  type Position,
+  type RiskConfig,
+} from "../../src/core/types";
+import { RiskManager, roundTripCostPct, validateRiskConfig } from "../../src/risk/riskManager";
+
+// ─────────────────────────────── Fixtures ───────────────────────────────
+
+const NOW = Date.UTC(2026, 8, 28, 12, 0, 0);
+
+function cfg(over: Partial<RiskConfig> = {}): RiskConfig {
+  return { ...DEFAULT_RISK_CONFIG, ...over };
+}
+
+function rm(over: Partial<RiskConfig> = {}, interval: "15m" | "1h" = "15m"): RiskManager {
+  return new RiskManager(cfg(over), interval);
+}
+
+function decision(over: Partial<EnsembleDecision> = {}): EnsembleDecision {
+  return {
+    market: "BTC-EUR",
+    time: NOW - INTERVAL_MS["15m"],
+    price: 100,
+    action: "buy",
+    score: 0.5,
+    confidence: 0.6,
+    regime: "trend-up",
+    atr: 1,
+    votes: [],
+    ...over,
+  };
+}
+
+function account(over: Partial<AccountSnapshot> = {}): AccountSnapshot {
+  return {
+    cashQuote: 50,
+    equity: 50,
+    dayStartEquity: 50,
+    tradesToday: 0,
+    realizedPnlToday: 0,
+    openPositions: [],
+    lastLossAt: {},
+    ...over,
+  };
+}
+
+function marketInfo(over: Partial<MarketInfo> = {}): MarketInfo {
+  return {
+    market: "BTC-EUR",
+    base: "BTC",
+    quote: "EUR",
+    status: "trading",
+    minOrderQuote: 5,
+    minOrderBase: 0,
+    pricePrecision: 5,
+    quantityDecimals: 8,
+    notionalDecimals: 2,
+    ...over,
+  };
+}
+
+function position(over: Partial<Position> = {}): Position {
+  return {
+    id: "pos_test",
+    market: "BTC-EUR",
+    side: "long",
+    entryTime: NOW,
+    entryPrice: 100,
+    amount: 0.2,
+    costQuote: 20.05,
+    entryFeeQuote: 0.05,
+    stopPrice: 96,
+    initialStopPrice: 96,
+    takeProfitPrice: 108,
+    highestPrice: 100,
+    candlesHeld: 0,
+    entryReason: "test",
+    ...over,
+  };
+}
+
+function candle(open: number, high: number, low: number, close: number): Candle {
+  return { time: NOW, open, high, low, close, volume: 1 };
+}
+
+/** Verwachte sizing volgens het contract (defaults, tenzij overschreven). */
+function expectedSizing(c: RiskConfig, price: number, atr: number, equity: number) {
+  const rtc = 2 * c.takerFee + 2 * c.slippagePct;
+  const entry = price * (1 + c.slippagePct);
+  const stop = entry - c.stopAtrMult * atr;
+  const tp = entry + c.takeProfitR * (entry - stop);
+  const riskBudget = (equity * c.riskPerTradePct) / 100;
+  const lossPerUnit = entry - stop + entry * rtc;
+  const quoteByRisk = (riskBudget / lossPerUnit) * entry * (1 + c.takerFee);
+  const riskAt = (q: number) => (q / (1 + c.takerFee) / entry) * lossPerUnit;
+  return { rtc, entry, stop, tp, riskBudget, lossPerUnit, quoteByRisk, riskAt };
+}
+
+// ─────────────────────────────── roundTripCostPct ───────────────────────────────
+
+describe("roundTripCostPct", () => {
+  it("is 2× taker fee + 2× slippage als fractie", () => {
+    expect(roundTripCostPct(DEFAULT_RISK_CONFIG)).toBeCloseTo(0.006, 12);
+    expect(roundTripCostPct(cfg({ takerFee: 0.001, slippagePct: 0 }))).toBeCloseTo(0.002, 12);
+  });
+});
+
+// ─────────────────────────────── planEntry: sizing ───────────────────────────────
+
+describe("planEntry — sizing", () => {
+  it("€50 account met defaults: maxPositionPct (45%) is de bindende cap", () => {
+    const r = rm();
+    const plan = r.planEntry(decision(), account(), marketInfo(), NOW);
+    const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 1, 50);
+
+    expect(plan.approved).toBe(true);
+    expect(plan.market).toBe("BTC-EUR");
+    expect(plan.expectedEntryPrice).toBeCloseTo(100.05, 10);
+    expect(plan.stopPrice).toBeCloseTo(98.05, 10);
+    expect(plan.takeProfitPrice).toBeCloseTo(104.05, 10);
+    // Risk-sizing zou ~€28,93 geven, maar 45% van €50 = €22,50 bindt.
+    expect(e.quoteByRisk).toBeCloseTo(28.93, 2);
+    expect(plan.quoteAmount).toBe(22.5);
+    expect(plan.riskQuote).toBeCloseTo(e.riskAt(22.5), 10);
+    expect(plan.riskQuote).toBeCloseTo(0.5832, 3);
+    expect(plan.riskQuote).toBeLessThanOrEqual(e.riskBudget);
+    // Samenvatting bij goedkeuring
+    expect(plan.reasons).toHaveLength(1);
+    expect(plan.reasons[0]).toContain("Koop €22,50");
+  });
+
+  it("rondt het bedrag af naar beneden op centen", () => {
+    const plan = rm().planEntry(decision(), account({ equity: 50.37, cashQuote: 50.37 }), marketInfo(), NOW);
+    // 45% × 50,37 = 22,6665 → 22,66 (niet 22,67)
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(22.66);
+    expect(Math.round(plan.quoteAmount * 100) / 100).toBe(plan.quoteAmount);
+  });
+
+  it("risk-based sizing bindt bij grote ATR (en risico ≤ budget)", () => {
+    const plan = rm().planEntry(decision({ atr: 3 }), account(), marketInfo(), NOW);
+    const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 3, 50);
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(Math.floor(e.quoteByRisk * 100) / 100);
+    expect(plan.quoteAmount).toBe(11.39);
+    expect(plan.stopPrice).toBeCloseTo(94.05, 10);
+    expect(plan.takeProfitPrice).toBeCloseTo(112.05, 10);
+    expect(plan.riskQuote).toBeCloseTo(e.riskAt(11.39), 10);
+    expect(plan.riskQuote).toBeLessThanOrEqual(e.riskBudget + 1e-12);
+    expect(plan.riskQuote).toBeGreaterThan(e.riskBudget - 0.01);
+  });
+
+  it("cash-cap: max 99,5% van de beschikbare cash", () => {
+    const other = position({ market: "ETH-EUR", costQuote: 20 });
+    const plan = rm().planEntry(
+      decision(),
+      account({ cashQuote: 8, equity: 50, openPositions: [other] }),
+      marketInfo(),
+      NOW,
+    );
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(7.96); // 8 × 0,995
+  });
+
+  it("exposure-cap: maxTotalExposurePct × equity − bestaande blootstelling", () => {
+    const other = position({ market: "ETH-EUR", costQuote: 37 });
+    const plan = rm().planEntry(
+      decision(),
+      account({ cashQuote: 13, equity: 50, openPositions: [other] }),
+      marketInfo(),
+      NOW,
+    );
+    // 90% × 50 − 37 = 8 (cash-cap 12,935; pos-cap 22,5)
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(8);
+  });
+
+  it("hoogt op naar het minimum als dat binnen alle caps past en risico ≤ 2× budget", () => {
+    const plan = rm().planEntry(decision({ atr: 9 }), account(), marketInfo(), NOW);
+    const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 9, 50);
+    expect(e.quoteByRisk).toBeLessThan(5);
+    expect(e.quoteByRisk).toBeCloseTo(4.0443, 3);
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(5);
+    expect(plan.riskQuote).toBeCloseTo(e.riskAt(5), 10);
+    expect(plan.riskQuote).toBeGreaterThan(e.riskBudget);
+    expect(plan.riskQuote).toBeLessThanOrEqual(2 * e.riskBudget);
+    expect(plan.reasons[0]).toContain("opgehoogd naar minimum");
+  });
+
+  it("wijst af onder het minimum als het risico bij het minimum > 2× budget is", () => {
+    const plan = rm().planEntry(decision({ atr: 9 }), account({ equity: 20, cashQuote: 20 }), marketInfo(), NOW);
+    const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 9, 20);
+    expect(e.riskAt(5)).toBeGreaterThan(2 * e.riskBudget);
+    expect(plan.approved).toBe(false);
+    expect(plan.quoteAmount).toBe(0);
+    expect(plan.riskQuote).toBe(0);
+    expect(plan.reasons).toContain("Te klein: €1,61 < minimum €5,00");
+    expect(plan.reasons.some((x) => x.includes("risicobudget"))).toBe(true);
+  });
+
+  it("wijst af als de cash te laag is voor de minimale order", () => {
+    const plan = rm().planEntry(decision(), account({ cashQuote: 4, equity: 50 }), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toContain("Te klein: €3,98 < minimum €5,00");
+    expect(plan.reasons.some((x) => x.startsWith("Onvoldoende saldo"))).toBe(true);
+  });
+
+  it("wijst af als de max. positiegrootte kleiner is dan het minimum", () => {
+    const plan = rm().planEntry(decision(), account({ cashQuote: 10, equity: 10 }), marketInfo(), NOW);
+    // 45% × €10 = €4,50 < €5
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toContain("Te klein: €4,50 < minimum €5,00");
+    expect(plan.reasons.some((x) => x.startsWith("Max. positiegrootte"))).toBe(true);
+  });
+
+  it("gebruikt minOrderQuote van de markt boven die van de config", () => {
+    // Markt-minimum €25 > pos-cap €22,50 → afwijzen
+    const rejected = rm().planEntry(decision(), account(), marketInfo({ minOrderQuote: 25 }), NOW);
+    expect(rejected.approved).toBe(false);
+    expect(rejected.reasons).toContain("Te klein: €22,50 < minimum €25,00");
+    // Zonder MarketInfo → config-minimum (€5)
+    const noMarket = rm().planEntry(decision(), account(), undefined, NOW);
+    expect(noMarket.approved).toBe(true);
+    expect(noMarket.quoteAmount).toBe(22.5);
+    // Config-minimum €30 zonder MarketInfo → afwijzen
+    const cfgMin = rm({ minOrderQuote: 30 }).planEntry(decision(), account(), undefined, NOW);
+    expect(cfgMin.approved).toBe(false);
+  });
+});
+
+// ─────────────────────────────── planEntry: afwijzingen ───────────────────────────────
+
+describe("planEntry — afwijzingen", () => {
+  it("geen koopsignaal", () => {
+    for (const action of ["sell", "hold"] as const) {
+      const plan = rm().planEntry(decision({ action }), account(), marketInfo(), NOW);
+      expect(plan.approved).toBe(false);
+      expect(plan.quoteAmount).toBe(0);
+      expect(plan.reasons).toEqual([`Geen koopsignaal (actie: ${action})`]);
+    }
+  });
+
+  it("dagelijkse verlieslimiet bereikt", () => {
+    const plan = rm().planEntry(decision(), account({ equity: 47, cashQuote: 47 }), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons.some((x) => x.startsWith("Dagelijkse verlieslimiet bereikt (-6,0%"))).toBe(true);
+  });
+
+  it("max trades per dag", () => {
+    const plan = rm().planEntry(decision(), account({ tradesToday: 6 }), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toEqual(["Maximum aantal trades per dag bereikt (6/6)"]);
+    expect(rm().planEntry(decision(), account({ tradesToday: 5 }), marketInfo(), NOW).approved).toBe(true);
+  });
+
+  it("max open posities", () => {
+    const open = [
+      position({ id: "a", market: "ETH-EUR", costQuote: 5 }),
+      position({ id: "b", market: "SOL-EUR", costQuote: 5 }),
+    ];
+    const plan = rm().planEntry(decision(), account({ openPositions: open, cashQuote: 40 }), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toEqual(["Maximum aantal open posities bereikt (2/2)"]);
+  });
+
+  it("al een positie in deze markt", () => {
+    const open = [position({ market: "BTC-EUR", costQuote: 10 })];
+    const plan = rm().planEntry(decision(), account({ openPositions: open, cashQuote: 40 }), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toEqual(["Er staat al een positie open in BTC-EUR"]);
+  });
+
+  it("afkoelperiode na verlies: exact op de grens", () => {
+    const r = rm({ cooldownCandlesAfterLoss: 4 }, "15m");
+    const cooldownMs = 4 * INTERVAL_MS["15m"];
+    // 1 ms te vroeg → afgewezen
+    const early = r.planEntry(
+      decision(),
+      account({ lastLossAt: { "BTC-EUR": NOW - cooldownMs + 1 } }),
+      marketInfo(),
+      NOW,
+    );
+    expect(early.approved).toBe(false);
+    expect(early.reasons).toHaveLength(1);
+    expect(early.reasons[0]).toContain("Afkoelperiode na verlies in BTC-EUR: nog 1 candle");
+    // Precies op de grens → toegestaan
+    const exact = r.planEntry(decision(), account({ lastLossAt: { "BTC-EUR": NOW - cooldownMs } }), marketInfo(), NOW);
+    expect(exact.approved).toBe(true);
+    // Verlies net geleden → nog 4 candles
+    const fresh = r.planEntry(decision(), account({ lastLossAt: { "BTC-EUR": NOW } }), marketInfo(), NOW);
+    expect(fresh.reasons[0]).toContain("nog 4 candles");
+    // Verlies in een andere markt telt niet
+    const other = r.planEntry(decision(), account({ lastLossAt: { "ETH-EUR": NOW } }), marketInfo(), NOW);
+    expect(other.approved).toBe(true);
+    // Interval telt mee: 1h → 4 uur
+    const hourly = rm({ cooldownCandlesAfterLoss: 4 }, "1h");
+    const h = hourly.planEntry(
+      decision(),
+      account({ lastLossAt: { "BTC-EUR": NOW - 4 * 3_600_000 + 60_000 } }),
+      marketInfo(),
+      NOW,
+    );
+    expect(h.approved).toBe(false);
+    // Cooldown 0 → uit
+    expect(
+      rm({ cooldownCandlesAfterLoss: 0 }).planEntry(decision(), account({ lastLossAt: { "BTC-EUR": NOW } }), marketInfo(), NOW)
+        .approved,
+    ).toBe(true);
+  });
+
+  it("ATR ongeldig (NaN, 0, negatief)", () => {
+    for (const atr of [Number.NaN, 0, -1, Number.POSITIVE_INFINITY]) {
+      const plan = rm().planEntry(decision({ atr }), account(), marketInfo(), NOW);
+      expect(plan.approved).toBe(false);
+      expect(plan.quoteAmount).toBe(0);
+      expect(plan.reasons).toEqual(["ATR onbekend of 0 (te weinig data voor een stop-loss)"]);
+    }
+  });
+
+  it("markt niet in status trading", () => {
+    const plan = rm().planEntry(decision(), account(), marketInfo({ status: "halted" }), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toEqual(["Markt BTC-EUR is niet actief (status: halted)"]);
+  });
+
+  it("fee-edge: te weinig winstruimte bij een heel kleine ATR", () => {
+    // TP-afstand = 2 × 2 × 0,2 = 0,8 → 0,80% < 3 × 0,6% = 1,8%
+    const plan = rm().planEntry(decision({ atr: 0.2 }), account(), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toHaveLength(1);
+    expect(plan.reasons[0]).toContain("Te weinig winstruimte t.o.v. kosten");
+    expect(plan.reasons[0]).toContain("1,80%");
+    // Net boven de grens: 4 × atr / 100,05 ≥ 0,018 ↔ atr ≥ 0,450225
+    expect(rm().planEntry(decision({ atr: 0.4503 }), account(), marketInfo(), NOW).approved).toBe(true);
+    expect(rm().planEntry(decision({ atr: 0.45 }), account(), marketInfo(), NOW).approved).toBe(false);
+    // minEdgeFeeMultiple 0 → check uit
+    expect(rm({ minEdgeFeeMultiple: 0 }).planEntry(decision({ atr: 0.2 }), account(), marketInfo(), NOW).approved).toBe(
+      true,
+    );
+  });
+
+  it("stop zou ≤ 0 liggen bij een enorme ATR", () => {
+    const plan = rm().planEntry(decision({ atr: 60 }), account(), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.quoteAmount).toBe(0);
+    expect(plan.reasons.some((x) => x.startsWith("Stop-loss zou op of onder 0 liggen"))).toBe(true);
+  });
+
+  it("meerdere redenen tegelijk", () => {
+    const plan = rm().planEntry(
+      decision({ action: "hold", atr: Number.NaN }),
+      account({
+        equity: 40,
+        cashQuote: 40,
+        tradesToday: 10,
+        openPositions: [position({ market: "BTC-EUR" }), position({ id: "2", market: "ETH-EUR" })],
+        lastLossAt: { "BTC-EUR": NOW },
+      }),
+      marketInfo({ status: "auction" }),
+      NOW,
+    );
+    expect(plan.approved).toBe(false);
+    expect(plan.quoteAmount).toBe(0);
+    const joined = plan.reasons.join(" | ");
+    expect(joined).toContain("Geen koopsignaal");
+    expect(joined).toContain("Dagelijkse verlieslimiet bereikt");
+    expect(joined).toContain("Maximum aantal trades per dag");
+    expect(joined).toContain("Maximum aantal open posities");
+    expect(joined).toContain("al een positie open in BTC-EUR");
+    expect(joined).toContain("Afkoelperiode");
+    expect(joined).toContain("niet actief (status: auction)");
+    expect(joined).toContain("ATR onbekend");
+    expect(plan.reasons).toHaveLength(8);
+  });
+
+  it("ongeldige config → nooit kopen", () => {
+    const plan = new RiskManager(cfg({ riskPerTradePct: Number.NaN }), "15m").planEntry(
+      decision(),
+      account(),
+      marketInfo(),
+      NOW,
+    );
+    expect(plan.approved).toBe(false);
+    expect(plan.quoteAmount).toBe(0);
+    expect(plan.reasons[0]).toContain("Ongeldige risico-instellingen");
+    expect(plan.reasons[0]).toContain("riskPerTradePct");
+  });
+
+  it("onbekend interval → constructor gooit", () => {
+    expect(() => new RiskManager(cfg(), "3m" as never)).toThrow(/Onbekend interval/);
+  });
+
+  it("muteert de invoer niet", () => {
+    const acc = account({ openPositions: [position({ market: "ETH-EUR", costQuote: 10 })] });
+    const dec = decision();
+    const before = JSON.stringify({ acc, dec });
+    rm().planEntry(dec, acc, marketInfo(), NOW);
+    expect(JSON.stringify({ acc, dec })).toBe(before);
+  });
+});
+
+// ─────────────────────────────── updatePosition ───────────────────────────────
+
+describe("updatePosition", () => {
+  // entry 100, stop 96 (R = 4), TP 108, break-even-niveau = 100 × 1,006 = 100,6
+
+  it("stop-loss geraakt → exit op de stop", () => {
+    const u = rm().updatePosition(position(), candle(99, 99.5, 95, 97), 1, true);
+    expect(u).toMatchObject({ exit: true, exitReason: "stop-loss", exitPrice: 96, stopPrice: 96 });
+  });
+
+  it("stop precies aangeraakt (low == stop) → exit", () => {
+    const u = rm().updatePosition(position(), candle(98, 98, 96, 97), 1, false);
+    expect(u.exit).toBe(true);
+    expect(u.exitPrice).toBe(96);
+  });
+
+  it("gap down onder de stop → exit op de open", () => {
+    const u = rm().updatePosition(position(), candle(94, 95, 93, 94.5), 1, true);
+    expect(u).toMatchObject({ exit: true, exitReason: "stop-loss", exitPrice: 94 });
+  });
+
+  it("take-profit geraakt → exit op de take-profit", () => {
+    const u = rm().updatePosition(position(), candle(105, 109, 104, 106), 1, true);
+    expect(u).toMatchObject({ exit: true, exitReason: "take-profit", exitPrice: 108, highestPrice: 109 });
+  });
+
+  it("gap up boven de take-profit → exit op de open", () => {
+    const u = rm().updatePosition(position(), candle(110, 111, 109, 110.5), 1, true);
+    expect(u).toMatchObject({ exit: true, exitReason: "take-profit", exitPrice: 110 });
+  });
+
+  it("stop en take-profit in dezelfde candle → stop wint", () => {
+    const u = rm().updatePosition(position(), candle(100, 109, 95, 104), 1, true);
+    expect(u).toMatchObject({ exit: true, exitReason: "stop-loss", exitPrice: 96 });
+  });
+
+  it("geen exit binnen de range; highest wordt bijgewerkt", () => {
+    const u = rm().updatePosition(position(), candle(100, 101.5, 99, 101), 1, true);
+    expect(u).toEqual({ exit: false, stopPrice: 96, highestPrice: 101.5 });
+  });
+
+  it("break-even: stop naar entry × (1 + kosten) vanaf breakEvenAtR × R", () => {
+    const r = rm({ trailingAtrMult: 0 });
+    // high 103,9 < 104 (= entry + 1R) → nog niet
+    const below = r.updatePosition(position(), candle(101, 103.9, 100.5, 103), 1, true);
+    expect(below.exit).toBe(false);
+    expect(below.stopPrice).toBe(96);
+    // high 104 → break-even (ook op een niet-gesloten candle)
+    const at = r.updatePosition(position(), candle(101, 104, 101, 103), 1, false);
+    expect(at.exit).toBe(false);
+    expect(at.stopPrice).toBeCloseTo(100.6, 10);
+    expect(at.highestPrice).toBe(104);
+    // breakEvenAtR 0 → uit
+    const off = rm({ trailingAtrMult: 0, breakEvenAtR: 0 }).updatePosition(position(), candle(101, 106, 101, 105), 1, true);
+    expect(off.stopPrice).toBe(96);
+  });
+
+  it("break-even gebruikt highestPrice uit eerdere candles", () => {
+    const r = rm({ trailingAtrMult: 0 });
+    const u = r.updatePosition(position({ highestPrice: 104.5 }), candle(102, 102.5, 101.5, 102), 1, false);
+    expect(u.stopPrice).toBeCloseTo(100.6, 10);
+    expect(u.highestPrice).toBe(104.5);
+  });
+
+  it("trailing pas na 1R winst", () => {
+    const r = rm({ breakEvenAtR: 0 });
+    // high 103 < 104 → geen trailing
+    const before = r.updatePosition(position(), candle(101, 103, 100.5, 102.5), 1, true);
+    expect(before.stopPrice).toBe(96);
+    // high 106 ≥ 104 → stop = 106 − 2,5 × 1 = 103,5
+    const after = r.updatePosition(position(), candle(102, 106, 101, 105), 1, true);
+    expect(after.exit).toBe(false);
+    expect(after.stopPrice).toBeCloseTo(103.5, 10);
+    expect(after.highestPrice).toBe(106);
+  });
+
+  it("trailing alleen op gesloten candles", () => {
+    const r = rm({ breakEvenAtR: 0 });
+    const open = r.updatePosition(position(), candle(106, 106, 106, 106), 1, false);
+    expect(open.exit).toBe(false);
+    expect(open.stopPrice).toBe(96);
+    expect(open.highestPrice).toBe(106);
+    // Ongeldige ATR → geen trailing
+    const nanAtr = r.updatePosition(position(), candle(102, 106, 101, 105), Number.NaN, true);
+    expect(nanAtr.stopPrice).toBe(96);
+  });
+
+  it("break-even + trailing: de hoogste van de twee wint", () => {
+    const u = rm().updatePosition(position(), candle(101, 104, 101, 103.5), 1, true);
+    // BE 100,6; trailing 104 − 2,5 = 101,5
+    expect(u.stopPrice).toBeCloseTo(101.5, 10);
+    const wide = rm().updatePosition(position(), candle(101, 104, 101, 103.5), 3, true);
+    // trailing 104 − 7,5 = 96,5 < BE 100,6
+    expect(wide.stopPrice).toBeCloseTo(100.6, 10);
+  });
+
+  it("stops dalen nooit", () => {
+    const pos = position({ stopPrice: 103.5, highestPrice: 106 });
+    const u = rm().updatePosition(pos, candle(105, 106.5, 104, 105), 2, true);
+    // trailing zou 106,5 − 5 = 101,5 zijn → blijft 103,5
+    expect(u.exit).toBe(false);
+    expect(u.stopPrice).toBe(103.5);
+    expect(u.highestPrice).toBe(106.5);
+  });
+
+  it("exit-reden: break-even vs trailing-stop", () => {
+    const be = rm().updatePosition(position({ stopPrice: 100.6, highestPrice: 104 }), candle(101, 101, 100, 100.2), 1, true);
+    expect(be).toMatchObject({ exit: true, exitReason: "break-even" });
+    expect(be.exitPrice).toBeCloseTo(100.6, 10);
+
+    const trail = rm().updatePosition(
+      position({ stopPrice: 103.5, highestPrice: 106 }),
+      candle(103, 103.2, 102, 102.5),
+      1,
+      true,
+    );
+    // gap onder de trailing stop → exit op de open (103)
+    expect(trail).toMatchObject({ exit: true, exitReason: "trailing-stop", exitPrice: 103 });
+
+    // trailing stop tussen initiële stop en break-even → ook trailing-stop
+    const low = rm().updatePosition(position({ stopPrice: 98, highestPrice: 104 }), candle(99, 99, 97, 98), 1, true);
+    expect(low).toMatchObject({ exit: true, exitReason: "trailing-stop", exitPrice: 98 });
+  });
+
+  it("time-stop: na timeStopCandles gesloten candles zonder winst", () => {
+    const r = rm({ timeStopCandles: 48 });
+    const pos = position({ candlesHeld: 48 });
+    const u = r.updatePosition(pos, candle(100, 100.8, 99.5, 100.5), 1, true);
+    expect(u).toMatchObject({ exit: true, exitReason: "time-stop", exitPrice: 100.5 });
+    // precies op het kosten-niveau (100,6) → nog steeds time-stop
+    expect(r.updatePosition(pos, candle(100, 100.8, 99.5, 100.6), 1, true).exit).toBe(true);
+    // in de winst (boven entry + kosten) → geen time-stop
+    expect(r.updatePosition(pos, candle(100, 101.2, 99.5, 101), 1, true).exit).toBe(false);
+    // te vroeg
+    expect(r.updatePosition(position({ candlesHeld: 47 }), candle(100, 100.8, 99.5, 100.5), 1, true).exit).toBe(false);
+    // niet-gesloten candle → geen time-stop
+    expect(r.updatePosition(pos, candle(100, 100.8, 99.5, 100.5), 1, false).exit).toBe(false);
+    // timeStopCandles 0 → uit
+    expect(
+      rm({ timeStopCandles: 0 }).updatePosition(position({ candlesHeld: 5000 }), candle(100, 100.8, 99.5, 100.5), 1, true)
+        .exit,
+    ).toBe(false);
+  });
+
+  it("stop gaat vóór time-stop", () => {
+    const u = rm().updatePosition(position({ candlesHeld: 100 }), candle(97, 97, 95, 96.5), 1, true);
+    expect(u.exitReason).toBe("stop-loss");
+  });
+
+  it("muteert de positie niet", () => {
+    const pos = Object.freeze(position({ highestPrice: 100 }));
+    const snapshot = JSON.stringify(pos);
+    const u = rm().updatePosition(pos, candle(102, 106, 101, 105), 1, true);
+    expect(u.stopPrice).toBeGreaterThan(96);
+    rm().updatePosition(pos, candle(99, 99, 90, 91), 1, true);
+    rm().updatePosition(pos, candle(105, 110, 104, 109), 1, true);
+    expect(JSON.stringify(pos)).toBe(snapshot);
+  });
+
+  it("is deterministisch", () => {
+    const a = rm().updatePosition(position(), candle(102, 106, 101, 105), 1.3, true);
+    const b = rm().updatePosition(position(), candle(102, 106, 101, 105), 1.3, true);
+    expect(a).toEqual(b);
+  });
+});
+
+// ─────────────────────────────── shouldExitOnSignal ───────────────────────────────
+
+describe("shouldExitOnSignal", () => {
+  it("alleen bij een sell in dezelfde markt", () => {
+    const r = rm();
+    expect(r.shouldExitOnSignal(position(), decision({ action: "sell" }))).toBe(true);
+    expect(r.shouldExitOnSignal(position(), decision({ action: "hold" }))).toBe(false);
+    expect(r.shouldExitOnSignal(position(), decision({ action: "buy" }))).toBe(false);
+    expect(r.shouldExitOnSignal(position(), decision({ action: "sell", market: "ETH-EUR" }))).toBe(false);
+  });
+});
+
+// ─────────────────────────────── haltStatus ───────────────────────────────
+
+describe("haltStatus", () => {
+  it("grens van de dagelijkse verlieslimiet", () => {
+    const r = rm({ dailyLossLimitPct: 5 });
+    const at = r.haltStatus(account({ equity: 47.5, dayStartEquity: 50 }));
+    expect(at.halted).toBe(true);
+    expect(at.reason).toContain("Dagelijkse verlieslimiet bereikt (-5,0%");
+    expect(r.haltStatus(account({ equity: 47.51, dayStartEquity: 50 }))).toEqual({ halted: false });
+    const below = r.haltStatus(account({ equity: 46.9, dayStartEquity: 50 }));
+    expect(below.halted).toBe(true);
+    expect(below.reason).toContain("(-6,2%");
+    expect(r.haltStatus(account({ equity: 55, dayStartEquity: 50 })).halted).toBe(false);
+  });
+
+  it("equity ≤ 0 of ongeldig → gestopt", () => {
+    const r = rm();
+    expect(r.haltStatus(account({ equity: 0, dayStartEquity: 0 })).halted).toBe(true);
+    expect(r.haltStatus(account({ equity: -1 })).halted).toBe(true);
+    expect(r.haltStatus(account({ equity: Number.NaN })).halted).toBe(true);
+  });
+
+  it("dayStartEquity 0 → alleen de equity-check", () => {
+    expect(rm().haltStatus(account({ equity: 10, dayStartEquity: 0 })).halted).toBe(false);
+  });
+});
+
+// ─────────────────────────────── validateRiskConfig ───────────────────────────────
+
+describe("validateRiskConfig", () => {
+  it("accepteert de defaults en een lege partial", () => {
+    expect(validateRiskConfig(DEFAULT_RISK_CONFIG)).toEqual({ ok: true, errors: [] });
+    expect(validateRiskConfig({})).toEqual({ ok: true, errors: [] });
+    expect(validateRiskConfig({ trailingAtrMult: 0, breakEvenAtR: 0, timeStopCandles: 0, minOrderQuote: 0 }).ok).toBe(true);
+    expect(validateRiskConfig({ riskPerTradePct: 0.1, maxPositionPct: 100, maxOpenPositions: 10 }).ok).toBe(true);
+  });
+
+  it("wijst waarden buiten de grenzen af met het veld in de melding", () => {
+    const res = validateRiskConfig({ riskPerTradePct: 15 });
+    expect(res.ok).toBe(false);
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0]).toContain("riskPerTradePct");
+    expect(res.errors[0]).toContain("tussen 0,1 en 10");
+
+    expect(validateRiskConfig({ maxPositionPct: 0.5 }).ok).toBe(false);
+    expect(validateRiskConfig({ stopAtrMult: 0.4 }).ok).toBe(false);
+    expect(validateRiskConfig({ takeProfitR: 11 }).ok).toBe(false);
+    expect(validateRiskConfig({ breakEvenAtR: 6 }).ok).toBe(false);
+    expect(validateRiskConfig({ dailyLossLimitPct: 0.1 }).ok).toBe(false);
+    expect(validateRiskConfig({ maxTradesPerDay: 0 }).ok).toBe(false);
+    expect(validateRiskConfig({ cooldownCandlesAfterLoss: 501 }).ok).toBe(false);
+    expect(validateRiskConfig({ minEdgeFeeMultiple: 21 }).ok).toBe(false);
+    expect(validateRiskConfig({ takerFee: 0.02 }).ok).toBe(false);
+    expect(validateRiskConfig({ makerFee: -0.001 }).ok).toBe(false);
+    expect(validateRiskConfig({ slippagePct: 0.05 }).ok).toBe(false);
+    expect(validateRiskConfig({ minOrderQuote: -1 }).ok).toBe(false);
+    expect(validateRiskConfig({ timeStopCandles: 10001 }).ok).toBe(false);
+    expect(validateRiskConfig({ maxTotalExposurePct: 150 }).ok).toBe(false);
+  });
+
+  it("trailingAtrMult: 0 (uit) of 0,5–10", () => {
+    expect(validateRiskConfig({ trailingAtrMult: 0 }).ok).toBe(true);
+    expect(validateRiskConfig({ trailingAtrMult: 0.5 }).ok).toBe(true);
+    const bad = validateRiskConfig({ trailingAtrMult: 0.2 });
+    expect(bad.ok).toBe(false);
+    expect(bad.errors[0]).toContain("trailingAtrMult");
+    expect(bad.errors[0]).toContain("0 (uit)");
+  });
+
+  it("gehele getallen waar nodig", () => {
+    const res = validateRiskConfig({ maxOpenPositions: 2.5 });
+    expect(res.ok).toBe(false);
+    expect(res.errors[0]).toContain("maxOpenPositions");
+    expect(res.errors[0]).toContain("geheel getal");
+    expect(validateRiskConfig({ maxTradesPerDay: 3.3 }).ok).toBe(false);
+    expect(validateRiskConfig({ timeStopCandles: 1.5 }).ok).toBe(false);
+  });
+
+  it("geen getal / niet-eindig / onbekende key", () => {
+    const res = validateRiskConfig({
+      takerFee: Number.NaN,
+      slippagePct: "0.001" as unknown as number,
+      riskPerTradePct: Number.POSITIVE_INFINITY,
+      foo: 1,
+    } as Partial<RiskConfig>);
+    expect(res.ok).toBe(false);
+    expect(res.errors).toHaveLength(4);
+    expect(res.errors.some((e) => e.includes("takerFee") && e.includes("geldig getal"))).toBe(true);
+    expect(res.errors.some((e) => e.includes("slippagePct"))).toBe(true);
+    expect(res.errors.some((e) => e.includes("riskPerTradePct"))).toBe(true);
+    expect(res.errors).toContain("Onbekende risico-instelling: foo");
+    expect(validateRiskConfig({ riskPerTradePct: undefined }).ok).toBe(false);
+  });
+
+  it("geen object", () => {
+    expect(validateRiskConfig(null as unknown as Partial<RiskConfig>).ok).toBe(false);
+    expect(validateRiskConfig([] as unknown as Partial<RiskConfig>).ok).toBe(false);
+  });
+});

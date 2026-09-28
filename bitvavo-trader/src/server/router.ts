@@ -124,15 +124,35 @@ export async function readJsonBody(req: IncomingMessage, limit = MAX_BODY_BYTES)
   }
   const chunks: Buffer[] = [];
   let size = 0;
-  for await (const chunk of req) {
-    const buf = typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer);
-    size += buf.length;
-    if (size > limit) {
-      req.resume();
-      throw new HttpError(413, "Verzoek te groot (maximaal 1 MB).");
-    }
-    chunks.push(buf);
-  }
+  await new Promise<void>((resolve, reject) => {
+    const onData = (chunk: Buffer | string) => {
+      const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      size += buf.length;
+      if (size > limit) {
+        cleanup();
+        req.resume(); // rest weggooien zonder de verbinding te breken
+        reject(new HttpError(413, "Verzoek te groot (maximaal 1 MB)."));
+        return;
+      }
+      chunks.push(buf);
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (err: Error) => {
+      cleanup();
+      reject(new HttpError(400, `Kon het verzoek niet lezen: ${err.message}`));
+    };
+    const cleanup = () => {
+      req.off("data", onData);
+      req.off("end", onEnd);
+      req.off("error", onError);
+    };
+    req.on("data", onData);
+    req.on("end", onEnd);
+    req.on("error", onError);
+  });
   if (size === 0) return undefined;
   const text = Buffer.concat(chunks).toString("utf8").trim();
   if (text === "") return undefined;
