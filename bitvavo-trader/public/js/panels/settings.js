@@ -726,7 +726,7 @@ CAPITAL_LIMIT_EUR=50`;
     } catch (err) {
       state.saving = false;
       const msg = err?.message || String(err);
-      state.errors = msg.split(/(?<=[.!?)])\s+(?=[A-Z(])/).filter(Boolean);
+      state.errors = msg.split(/(?<=[.!?)])\s+(?=[A-Z])/).filter(Boolean);
       renderAll();
       markServerErrors(msg);
       el.querySelector(".st-errors")?.scrollIntoView({ behavior: "smooth", block: "center" });
