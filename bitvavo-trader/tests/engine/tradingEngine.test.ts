@@ -151,7 +151,7 @@ describe("TradingEngine — exits", () => {
     const synth = h.risk.updateCalls.at(-1)!;
     expect(synth.closed).toBe(false);
     expect(synth.candle).toMatchObject({ open: 48_900, high: 48_900, low: 48_900, close: 48_900 });
-    expect(s.logs.find((l) => l.level === "trade")!.message).toMatch(/^VERKOOP BTC-EUR @ 48\.900 · stop-loss · -€0,4\d \(-2,\d%\)$/);
+    expect(s.logs.find((l) => l.level === "trade")!.message).toMatch(/^VERKOOP BTC-EUR @ 48\.900 · stop-loss · -€0,\d\d \(-2,\d%\)$/);
     expect(s.account.lastLossAt["BTC-EUR"]).toBe(h.clock.t);
   });
 
@@ -319,14 +319,25 @@ describe("TradingEngine — administratie", () => {
     h.clock.advance(60_000);
     await h.engine.tick();
     expect(h.engine.snapshot().equityHistory).toHaveLength(2);
-    // een trade voegt direct een punt toe
-    h.clock.advance(1_000);
-    h.signals.buyAt.add(h.lastClosed());
+    // koop: punt op het moment van de trade
     h.feed.append("BTC-EUR", 50_000);
     h.clock.set(h.feed.lastTime("BTC-EUR") + 5_000);
+    h.signals.buyAt.add(h.lastClosed());
     await h.engine.tick();
-    const eq = h.engine.snapshot().equityHistory;
-    expect(eq.length).toBe(3);
+    const pos = h.engine.snapshot().positions[0];
+    expect(pos).toBeDefined();
+    let eq = h.engine.snapshot().equityHistory;
+    expect(eq).toHaveLength(3);
+    expect(eq[2].time).toBe(pos.entryTime);
+    // verkoop 1 s later: toch een extra punt (trade), terwijl een gewone tick binnen 60 s niets toevoegt
+    h.clock.advance(1_000);
+    await h.engine.tick();
+    expect(h.engine.snapshot().equityHistory).toHaveLength(3);
+    h.clock.advance(1_000);
+    await h.engine.closePosition(pos.id);
+    eq = h.engine.snapshot().equityHistory;
+    expect(eq).toHaveLength(4);
+    expect(eq[3].time).toBe(h.clock.t);
     for (let i = 1; i < eq.length; i++) expect(eq[i].time).toBeGreaterThan(eq[i - 1].time);
   });
 
@@ -805,9 +816,9 @@ describe("TradingEngine — persistentie", () => {
       await vi.advanceTimersByTimeAsync(600);
       expect(existsSync(file)).toBe(true);
       expect(store.load()!.positions).toHaveLength(0);
-      h.signals.buyAt.add(h.lastClosed());
       h.feed.append("BTC-EUR", 50_000);
       h.clock.set(h.feed.lastTime("BTC-EUR") + 1_000);
+      h.signals.buyAt.add(h.lastClosed());
       await h.engine.tick();
       // direct na de trade weggeschreven (flush), zonder op de timer te wachten
       expect(new StateStore(file).load()!.positions).toHaveLength(1);

@@ -72,7 +72,7 @@ export const emaTrend: StrategyDefinition = {
 
     return persistRun("ema-trend", n, warmupOf(params), {
       // Een trendmening leeft ongeveer een halve trage-EMA-periode
-      decayBars: Math.max(6, Math.round(p.slow / 2)),
+      decayBars: Math.max(6, Math.floor(p.slow / 2)),
       ready: (i) => i > 0 && finite(f[i], s[i], t[i], ax[i], f[i - 1], s[i - 1]),
 
       event: (i): SignalEvent | null => {

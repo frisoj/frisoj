@@ -173,6 +173,16 @@ describe("API: /api/candles", () => {
     expect(srv.feed.candleCalls.at(-1)).toEqual({ market: "BTC-EUR", interval: "15m", limit: 100 });
   });
 
+  it("begrenst limit op 50–1000", async () => {
+    srv = await startTestServer();
+    const low = await json(srv.base, "GET", "/api/candles?market=BTC-EUR&interval=1h&limit=25");
+    expect(low.status).toBe(200);
+    expect(low.data.candles).toHaveLength(50);
+    const high = await json(srv.base, "GET", "/api/candles?market=BTC-EUR&interval=1h&limit=5000");
+    expect(high.status).toBe(200);
+    expect(high.data.candles).toHaveLength(1000);
+  });
+
   it("gebruikt standaard limit 300", async () => {
     srv = await startTestServer();
     const r = await json(srv.base, "GET", "/api/candles?market=ETH-EUR&interval=1h");
@@ -184,9 +194,9 @@ describe("API: /api/candles", () => {
     ["market=DOGE-EUR&interval=15m", /Onbekende markt/],
     ["interval=15m", /markt/],
     ["market=BTC-EUR&interval=7m", /interval/],
-    ["market=BTC-EUR&interval=15m&limit=10", /limit/],
-    ["market=BTC-EUR&interval=15m&limit=5000", /limit/],
     ["market=BTC-EUR&interval=15m&limit=abc", /limit/],
+    ["market=BTC-EUR&interval=15m&limit=0", /limit/],
+    ["market=BTC-EUR&interval=15m&limit=12.5", /limit/],
   ])("400 voor %s", async (qs, msg) => {
     srv = await startTestServer();
     const r = await json(srv.base, "GET", `/api/candles?${qs}`);

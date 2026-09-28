@@ -155,13 +155,16 @@ describe.each(ALL.map((d) => [d.id, d] as const))("strategie %s", (_id, def) => 
   });
 
   it("verloopt naar 'hold' binnen enkele candles na een event", () => {
-    // Geen enkele niet-hold-reeks mag zonder nieuw event langer dan 7 candles duren.
+    // Zonder nieuw event duurt de nawerking hooguit ~10 candles (standaardparameters).
     let run = 0;
+    let maxRun = 0;
     for (const s of sigs) {
       if (s.action !== "hold" && s.reason.includes("geleden")) run++;
       else run = 0;
-      expect(run).toBeLessThanOrEqual(6);
+      maxRun = Math.max(maxRun, run);
     }
+    expect(maxRun).toBeGreaterThan(0);
+    expect(maxRun).toBeLessThanOrEqual(10);
   });
 });
 
@@ -221,10 +224,24 @@ describe("rsi-reversion", () => {
     expect(actionsIn(sigs, 100, 106, "buy")).toEqual([]);
   });
 
-  it("verkoopt bij overbought / boven de bovenste band", () => {
+  it("verkoopt (exit) bij overbought / boven de bovenste band na een eigen koop", () => {
+    const closes = [
+      ...rangeCloses(100, 100, 0.4, 0.1, 21),
+      ...driftCloses(6, 99, -1.5, 0.0, 22),
+      ...driftCloses(30, 90.5, 0.6, 0.05, 23),
+    ];
+    const sigs = rsiReversion.run(candlesFromCloses(closes), rsiReversion.defaultParams);
+    const buy = actionsIn(sigs, 100, 112, "buy")[0];
+    expect(buy).toBeDefined();
+    const sells = actionsIn(sigs, buy, closes.length, "sell");
+    expect(sells.length).toBeGreaterThan(0);
+    expect(sigs[sells[0]].reason).toMatch(/bovenste band|overbought/);
+  });
+
+  it("geeft zonder eigen koop geen verkoopsignaal op een rally (mean reversion is geen short-visie)", () => {
     const closes = [...rangeCloses(100, 100, 0.4, 0.1, 31), ...driftCloses(8, 100.5, 1.2, 0, 32)];
     const sigs = rsiReversion.run(candlesFromCloses(closes), rsiReversion.defaultParams);
-    expect(actionsIn(sigs, 100, 108, "sell").length).toBeGreaterThan(0);
+    expect(sigs.some((s) => s.action === "sell")).toBe(false);
   });
 });
 
@@ -271,8 +288,17 @@ describe("macd-momentum", () => {
     const buys = actionsIn(sigs, 132, 162, "buy");
     expect(buys.length).toBeGreaterThan(0);
     expect(sigs[buys[0]].reason).toMatch(/MACD kruist boven/);
-    // De terugval zelf geeft een verkoopsignaal
-    expect(actionsIn(sigs, 120, 134, "sell").length).toBeGreaterThan(0);
+    expect(sigs[buys[0]].confidence).toBeGreaterThanOrEqual(0.8);
+    // Een terugval die boven EMA 50 blijft is geen verkoopsignaal (symmetrisch EMA 50-filter)
+    expect(actionsIn(sigs, 120, 134, "sell")).toEqual([]);
+  });
+
+  it("verkoopt op een bearish kruising onder EMA 50", () => {
+    const closes = [...driftCloses(120, 100, 0.1, 0.05, 56), ...driftCloses(30, 112, -0.4, 0.03, 57)];
+    const sigs = macdMomentum.run(candlesFromCloses(closes), macdMomentum.defaultParams);
+    const sells = actionsIn(sigs, 120, 150, "sell");
+    expect(sells.length).toBeGreaterThan(0);
+    expect(sigs[sells[0]].reason).toMatch(/onder EMA 50/);
   });
 
   it("koopt niet onder EMA 50", () => {

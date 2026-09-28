@@ -15,7 +15,7 @@ export const REGIME_THRESHOLDS = {
   /** ATR% ≥ dit × zijn gemiddelde → "volatile" */
   volatileRatio: 1.6,
   /** ADX vanaf hier telt als trend */
-  adxTrend: 22,
+  adxTrend: 20,
   /** Minimale EMA 50-helling in ATR per candle voor een trend */
   minSlopeAtr: 0.03,
 };

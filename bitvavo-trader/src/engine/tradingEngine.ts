@@ -256,6 +256,8 @@ export class TradingEngine extends EventEmitter {
   /** market → candle-tijd waarvoor de afwijzingsredenen al gelogd zijn */
   private rejectLogged = new Map<string, number>();
   private throttle = new Map<string, { message: string; at: number }>();
+  /** Markten met een live order waarvan de uitkomst onbekend is: geen nieuwe entries */
+  private uncertain = new Set<string>();
   private paperBalances: Balance[] | undefined;
 
   constructor(deps: EngineDeps) {
@@ -305,6 +307,7 @@ export class TradingEngine extends EventEmitter {
   async start(): Promise<void> {
     if (this.running) return;
     this.restoreFromStore();
+    this.clearUncertain("herstart");
     this.running = true;
     this.startedAt = this.nowFn();
     const modeText = this.mode === "live" ? "LIVE" : "paper";
@@ -496,6 +499,7 @@ export class TradingEngine extends EventEmitter {
   arm(): void {
     if (this.mode !== "live" || this.armed) return;
     this.armed = true;
+    this.clearUncertain("opnieuw armen");
     this.log(
       "warn",
       `LIVE GEARMD: de bot plaatst nu ECHTE orders op Bitvavo (kapitaallimiet ${fmtEur(this.startingCapital)})`,
@@ -738,6 +742,14 @@ export class TradingEngine extends EventEmitter {
     if (this.positions.some((p) => p.market === market)) return;
     const halt = this.refreshHalt();
     if (halt.halted) return; // gelogd bij de overgang naar "gepauzeerd"
+    if (this.uncertain.has(market)) {
+      this.logRejection(
+        market,
+        decision.time,
+        `Geen koop ${market}: eerdere order met onbekende uitkomst — nieuwe entries geblokkeerd tot een herstart of opnieuw armen`,
+      );
+      return;
+    }
 
     const info = this.marketInfo.get(market);
     let plan: EntryPlan;
@@ -823,22 +835,42 @@ export class TradingEngine extends EventEmitter {
     }
     this.emitEvent("order", res);
 
-    if (res.status === "rejected" || !isNum(res.filledAmount) || res.filledAmount <= 0 || !(res.avgPrice > 0)) {
-      const note =
-        threw && this.mode === "live" ? " (controleer op Bitvavo of de order toch is uitgevoerd!)" : "";
+    // Onbekende uitkomst (live): NIET opnieuw versturen en geen positie openen.
+    if (this.isUnknownOutcome(res, threw)) {
+      this.uncertain.add(market);
       this.log(
-        "warn",
-        `Kooporder ${market} afgewezen: ${res.error ?? `status ${res.status}, niets gevuld`} — geen positie geopend${note}`,
+        "error",
+        `UITKOMST ONBEKEND bij koop ${market}: ${res.error ?? "geen antwoord van de broker"} — geen positie geopend en niet opnieuw verstuurd. ` +
+          `Controleer je Bitvavo-account! Nieuwe entries in ${market} zijn geblokkeerd tot een herstart of opnieuw armen.`,
       );
       return;
     }
+
+    // Beslis op status + gevulde hoeveelheid, niet op de aanwezigheid van `error`.
+    const filledAmount = isNum(res.filledAmount) ? res.filledAmount : 0;
+    if (res.status === "rejected" || filledAmount <= 0) {
+      this.log(
+        "warn",
+        `Kooporder ${market} afgewezen: ${res.error ?? `status ${res.status}, niets gevuld`} — geen positie geopend`,
+      );
+      return;
+    }
+    const filledQuote =
+      isNum(res.filledQuote) && res.filledQuote > 0 ? res.filledQuote : filledAmount * (res.avgPrice || price);
+    const entryPrice = isNum(res.avgPrice) && res.avgPrice > 0 ? res.avgPrice : filledQuote / filledAmount;
+    if (!isNum(entryPrice) || entryPrice <= 0) {
+      this.log("error", `Kooporder ${market} gevuld zonder bruikbare prijs — controleer je account`);
+      return;
+    }
+    if (res.error) this.log("warn", `Melding bij koop ${market}: ${res.error}`);
     if (res.status !== "filled") {
-      this.log("warn", `Kooporder ${market} niet volledig gevuld (status ${res.status}); alleen het gevulde deel telt`);
+      this.log(
+        "warn",
+        `Kooporder ${market} niet volledig gevuld (status ${res.status}); alleen het gevulde deel (${fmtEur(filledQuote)}) telt`,
+      );
     }
 
     const fee = isNum(res.feeQuote) && res.feeQuote > 0 ? res.feeQuote : 0;
-    const filledQuote = isNum(res.filledQuote) && res.filledQuote > 0 ? res.filledQuote : res.filledAmount * res.avgPrice;
-    const entryPrice = res.avgPrice;
     let stop = isNum(stopDist) && stopDist > 0 ? entryPrice - stopDist : plan.stopPrice;
     if (!isNum(stop) || stop <= 0 || stop >= entryPrice) {
       stop = entryPrice * 0.97;
@@ -853,7 +885,7 @@ export class TradingEngine extends EventEmitter {
       side: "long",
       entryTime: this.nowFn(),
       entryPrice,
-      amount: res.filledAmount,
+      amount: filledAmount,
       costQuote: filledQuote + fee,
       entryFeeQuote: fee,
       stopPrice: stop,
@@ -913,10 +945,35 @@ export class TradingEngine extends EventEmitter {
     let sellsEverything = false;
     if (this.mode === "live") {
       const { base } = splitMarket(pos.market, info);
+      let holding: Balance | undefined;
+      let known = false;
       try {
-        const balances = await this.broker.getBalances();
-        const avail = balances.find((b) => b.symbol === base)?.available;
-        if (isNum(avail) && avail > 0 && avail < amount) {
+        holding = (await this.broker.getBalances()).find((b) => b.symbol === base);
+        known = true;
+      } catch {
+        // Saldo onbekend: gewoon de volledige positie proberen te verkopen.
+      }
+      if (known) {
+        const avail = holding && isNum(holding.available) ? holding.available : 0;
+        const held = holding ? avail + (isNum(holding.inOrder) ? holding.inOrder : 0) : 0;
+        if (this.uncertain.has(pos.market) && held < pos.amount * 0.01) {
+          // Na een order met onbekende uitkomst is de positie van Bitvavo verdwenen:
+          // vermoedelijk is die verkoop toch uitgevoerd. Administratie bijwerken (schatting).
+          this.log(
+            "warn",
+            `${pos.market}: de positie staat niet meer op Bitvavo (vermoedelijk verkocht bij de order met onbekende uitkomst) — ` +
+              `in de administratie gesloten tegen de actuele koers ${fmtPrice(price)} (schatting, controleer je account)`,
+          );
+          const gross = pos.amount * price;
+          return this.bookExit(pos, reason, {
+            filled: pos.amount,
+            exitPrice: price,
+            gross,
+            fee: gross * this.config.risk.takerFee,
+            closeAll: true,
+          });
+        }
+        if (avail > 0 && avail < amount) {
           this.log(
             "warn",
             `Beschikbaar ${base}-saldo (${fmtAmount(avail)}) is lager dan de positie (${fmtAmount(amount)}); de bot verkoopt wat er is`,
@@ -924,8 +981,6 @@ export class TradingEngine extends EventEmitter {
           amount = avail;
           sellsEverything = true;
         }
-      } catch {
-        // Saldo onbekend: gewoon de volledige positie proberen te verkopen.
       }
     }
 
@@ -933,34 +988,65 @@ export class TradingEngine extends EventEmitter {
     const { res, threw } = await this.placeOrder(req, price);
     this.emitEvent("order", res);
 
-    if (res.status === "rejected" || !isNum(res.filledAmount) || res.filledAmount <= 0) {
+    if (this.isUnknownOutcome(res, threw)) {
+      this.uncertain.add(pos.market);
       this.pendingExit.set(pos.id, reason);
-      const note =
-        threw && this.mode === "live" ? " (controleer op Bitvavo of de order toch is uitgevoerd!)" : "";
       this.logThrottled(
         `sellfail:${pos.id}`,
         "error",
-        `Verkoop ${pos.market} (${label}) mislukt: ${res.error ?? `status ${res.status}, niets gevuld`} — positie blijft open, nieuwe poging bij de volgende tick${note}`,
+        `UITKOMST ONBEKEND bij verkoop ${pos.market} (${label}): ${res.error ?? "geen antwoord van de broker"} — controleer je Bitvavo-account! ` +
+          `De bot controleert bij de volgende tick het saldo en probeert het zo nodig opnieuw`,
         SELL_ERROR_THROTTLE_MS,
         true,
       );
       return null;
     }
 
+    const filledAmount = isNum(res.filledAmount) ? res.filledAmount : 0;
+    if (res.status === "rejected" || filledAmount <= 0) {
+      this.pendingExit.set(pos.id, reason);
+      this.logThrottled(
+        `sellfail:${pos.id}`,
+        "error",
+        `Verkoop ${pos.market} (${label}) mislukt: ${res.error ?? `status ${res.status}, niets gevuld`} — positie blijft open, nieuwe poging bij de volgende tick`,
+        SELL_ERROR_THROTTLE_MS,
+        true,
+      );
+      return null;
+    }
+    if (res.error) this.log("warn", `Melding bij verkoop ${pos.market}: ${res.error}`);
+
+    const filled = Math.min(filledAmount, pos.amount);
+    const rawGross = isNum(res.filledQuote) && res.filledQuote > 0 ? res.filledQuote : 0;
+    const exitPrice =
+      isNum(res.avgPrice) && res.avgPrice > 0 ? res.avgPrice : rawGross > 0 ? rawGross / filledAmount : price;
+    // Meer verkocht dan de positie (zou niet mogen): alleen het deel van de positie telt.
+    const gross = rawGross > 0 ? rawGross * (filled / filledAmount) : filled * exitPrice;
+    const fee = isNum(res.feeQuote) && res.feeQuote > 0 ? res.feeQuote * (filled / filledAmount) : 0;
+    // "filled" = de order is klaar: wat niet verkocht is (bijv. door een lager saldo) bestaat niet meer.
+    const closeAll = sellsEverything || res.status === "filled";
+    return this.bookExit(pos, reason, { filled, exitPrice, gross, fee, closeAll });
+  }
+
+  /** Boekt een (gedeeltelijke) exit in de administratie en stuurt events/logs. */
+  private async bookExit(
+    pos: Position,
+    reason: ExitReason,
+    fill: { filled: number; exitPrice: number; gross: number; fee: number; closeAll: boolean },
+  ): Promise<Trade> {
     const now = this.nowFn();
-    const filled = Math.min(res.filledAmount, pos.amount);
-    const exitPrice = res.avgPrice > 0 ? res.avgPrice : price;
-    const remaining = pos.amount - filled;
+    const info = this.marketInfo.get(pos.market);
+    const label = exitReasonLabel(reason);
+    const { filled, exitPrice, gross, fee } = fill;
+    const remaining = Math.max(0, pos.amount - filled);
     const minQuote = info?.minOrderQuote ?? this.config.risk.minOrderQuote;
     const minBase = info?.minOrderBase ?? 0;
-    const remainderSellable =
-      !sellsEverything && remaining > pos.amount * 1e-3 && remaining * exitPrice >= minQuote && remaining >= minBase;
-    const share = remainderSellable ? filled / pos.amount : 1;
+    const keepRemainder =
+      !fill.closeAll && remaining > pos.amount * 1e-3 && remaining * exitPrice >= minQuote && remaining >= minBase;
+    const share = keepRemainder ? filled / pos.amount : 1;
 
     const costPart = pos.costQuote * share;
     const entryFeePart = pos.entryFeeQuote * share;
-    const fee = isNum(res.feeQuote) && res.feeQuote > 0 ? res.feeQuote : 0;
-    const gross = isNum(res.filledQuote) && res.filledQuote > 0 ? res.filledQuote : filled * exitPrice;
     const proceeds = gross - fee;
     const pnl = proceeds - costPart;
     const pnlPct = costPart > 0 ? (pnl / costPart) * 100 : 0;
@@ -1002,7 +1088,7 @@ export class TradingEngine extends EventEmitter {
     this.trades.push(trade);
     if (this.trades.length > MAX_TRADES_KEPT) this.trades.splice(0, this.trades.length - MAX_TRADES_KEPT);
 
-    if (remainderSellable) {
+    if (keepRemainder) {
       pos.amount = remaining;
       pos.costQuote -= costPart;
       pos.entryFeeQuote -= entryFeePart;
@@ -1018,7 +1104,7 @@ export class TradingEngine extends EventEmitter {
       this.throttle.delete(`wouldsell:${pos.id}`);
       this.throttle.delete(`sellfail:${pos.id}`);
       this.throttle.delete(`risk:${pos.id}`);
-      if (!sellsEverything && remaining > pos.amount * 1e-6) {
+      if (!fill.closeAll && remaining > pos.amount * 1e-6) {
         const { base } = splitMarket(pos.market, info);
         this.log(
           "warn",
@@ -1036,6 +1122,21 @@ export class TradingEngine extends EventEmitter {
     );
     await this.persist(true);
     return trade;
+  }
+
+  /**
+   * Live: status "new" met "UITKOMST ONBEKEND" (of een broker die gooit) =
+   * we weten niet of de order is uitgevoerd.
+   */
+  private isUnknownOutcome(res: OrderResult, threw: boolean): boolean {
+    if (this.mode !== "live") return false;
+    if (threw) return true;
+    return (
+      res.status === "new" &&
+      !(isNum(res.filledAmount) && res.filledAmount > 0) &&
+      typeof res.error === "string" &&
+      res.error.trim().toUpperCase().startsWith("UITKOMST ONBEKEND")
+    );
   }
 
   private async placeOrder(req: MarketOrderRequest, price: number): Promise<{ res: OrderResult; threw: boolean }> {
@@ -1346,6 +1447,12 @@ export class TradingEngine extends EventEmitter {
     if (prev && (perKey || prev.message === message) && now - prev.at < windowMs) return;
     this.throttle.set(key, { message, at: now });
     this.log(level, message);
+  }
+
+  private clearUncertain(why: string): void {
+    if (this.uncertain.size === 0) return;
+    this.log("info", `Blokkade na onbekende orderuitkomst opgeheven (${why}) voor: ${[...this.uncertain].join(", ")}`);
+    this.uncertain.clear();
   }
 
   /** Afwijzingsredenen hooguit één keer per gesloten candle per markt. */

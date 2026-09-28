@@ -173,8 +173,17 @@ export class FakeBroker implements Broker {
     return [...this.balances.entries()].map(([symbol, available]) => ({ symbol, available, inOrder: 0 }));
   }
 
+  /** Gescripte antwoorden (FIFO) die voorrang krijgen op het standaardgedrag */
+  script: ((req: MarketOrderRequest, ref: number) => OrderResult)[] = [];
+
   async placeMarketOrder(req: MarketOrderRequest, ref: number): Promise<OrderResult> {
     if (this.throwOnOrder) throw new Error("netwerkfout");
+    const scripted = this.script.shift();
+    if (scripted) {
+      const r = scripted(req, ref);
+      this.orders.push({ req, ref, res: r });
+      return r;
+    }
     const base = req.market.split("-")[0];
     const common = {
       orderId: `ord-${++this.seq}`,

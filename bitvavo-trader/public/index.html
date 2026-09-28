@@ -68,7 +68,7 @@
     <main class="app-main">
       <section id="tab-live" class="tab-page" role="tabpanel" aria-label="Live">
         <div class="live-grid">
-          <div class="live-chart">
+          <div class="live-col live-main">
             <div id="market-tabs" class="market-tabs" role="tablist" aria-label="Markten"></div>
             <div class="panel chart-panel">
               <div id="chart-toolbar" class="chart-toolbar"></div>
@@ -78,9 +78,11 @@
                 <div id="chart-macd" class="chart-pane chart-pane-sub chart-pane-last"></div>
               </div>
             </div>
+            <section id="panel-positions" class="panel" aria-label="Open posities"></section>
+            <section id="panel-trades" class="panel" aria-label="Laatste trades"></section>
           </div>
 
-          <aside class="live-side">
+          <aside class="live-col live-side">
             <section id="panel-signals" class="panel slot" aria-label="Signalen">
               <div class="panel-loading"><span class="spinner"></span></div>
             </section>
@@ -92,9 +94,9 @@
             </section>
           </aside>
 
-          <section id="panel-positions" class="panel" aria-label="Open posities"></section>
-          <section id="panel-trades" class="panel" aria-label="Laatste trades"></section>
-          <section id="panel-log" class="panel live-log" aria-label="Logboek"></section>
+          <div class="live-col live-logcol">
+            <section id="panel-log" class="panel live-log" aria-label="Logboek"></section>
+          </div>
         </div>
       </section>
 

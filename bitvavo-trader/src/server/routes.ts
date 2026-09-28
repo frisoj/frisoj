@@ -302,7 +302,8 @@ export function buildApiRouter(deps: ApiDeps): Router {
     const known = new Set((await allMarkets()).map((m) => m.market));
     const market = parseMarket(query.get("market"), known);
     const interval = parseInterval(query.get("interval") ?? engine.snapshot().config.interval);
-    const limit = parseLimit(query.get("limit"), 300, 50, 1000);
+    // Buiten 50–1000 wordt begrensd (het dashboard vraagt bijv. 25 uur-candles voor 24u-statistieken)
+    const limit = Math.min(1000, Math.max(50, parseLimit(query.get("limit"), 300, 1, 100_000)));
     const candles = await feed.getCandles(market, interval, limit);
     const snap = engine.snapshot();
     const closed = closedCandles(candles, interval, now());
