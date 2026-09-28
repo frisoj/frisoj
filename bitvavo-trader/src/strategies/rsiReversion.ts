@@ -4,6 +4,8 @@ import { clamp01, finite, intParam, nl, numParam, persistRun, type SignalEvent }
 
 /** Na een "uitgerekte" candle mag de RSI binnen zoveel candles omhoog draaien. */
 const ARM_BARS = 3;
+/** Zonder exit vervalt een eigen trade na zoveel candles. */
+const MAX_TRADE_BARS = 96;
 
 const DEFAULTS = { rsiPeriod: 14, oversold: 30, overbought: 70, bbPeriod: 20, bbMult: 2 };
 
@@ -25,13 +27,16 @@ function warmupOf(params: StrategyParams): number {
 /**
  * RSI-terugkeer (mean reversion): koopt na een scherpe daling — RSI onder
  * oversold én slot onder de onderste Bollinger-band — zodra de RSI weer omhoog
- * draait. Verkoopt bij RSI boven overbought of slot boven de bovenste band.
+ * draait. Verkoopt (exit) bij RSI boven overbought of slot boven de bovenste
+ * band. Verkoopsignalen komen alleen na een eigen koop: "overbought" in een
+ * gezonde trend is voor een mean-reversion-systeem geen reden om short te
+ * denken, en zou de trendstrategieën in het ensemble systematisch wegstemmen.
  */
 export const rsiReversion: StrategyDefinition = {
   id: "rsi-reversion",
   name: "RSI-terugkeer",
   description:
-    "Mean reversion: koopt na een scherpe daling (RSI onder oversold én koers onder de onderste Bollinger-band) zodra de RSI weer omhoog draait. Verkoopt bij RSI boven overbought of koers boven de bovenste band.",
+    "Mean reversion: koopt na een scherpe daling (RSI onder oversold én koers onder de onderste Bollinger-band) zodra de RSI weer omhoog draait. Verkoopt (exit) bij RSI boven overbought of koers boven de bovenste band.",
   defaultParams: { ...DEFAULTS },
   paramSpace: {
     rsiPeriod: [7, 14, 21],
@@ -60,6 +65,8 @@ export const rsiReversion: StrategyDefinition = {
     let armedAt = -1; // laatste candle met RSI < oversold én slot < onderste band
     let minRsi = 100; // laagste RSI in de huidige setup
     let firedAt = -1; // laatste koop-event
+    let reset = true; // na een koop pas opnieuw "armen" als de RSI eerst boven oversold is geweest
+    let inTrade = false; // eigen mean-reversion-trade loopt (wacht op exit)
     const overheated = (i: number) => r[i] > p.overbought || c[i] > upper[i];
 
     return persistRun("rsi-reversion", n, warmupOf(params), {
@@ -67,7 +74,8 @@ export const rsiReversion: StrategyDefinition = {
 
       event: (i): SignalEvent | null => {
         // Setup bijhouden
-        if (r[i] < p.oversold && c[i] < lower[i]) {
+        if (!reset && r[i] >= p.oversold) reset = true;
+        if (reset && r[i] < p.oversold && c[i] < lower[i]) {
           const newSetup = armedAt < 0 || i - armedAt > ARM_BARS || firedAt > armedAt;
           minRsi = newSetup ? r[i] : Math.min(minRsi, r[i]);
           armedAt = i;
@@ -75,6 +83,8 @@ export const rsiReversion: StrategyDefinition = {
         const armed = armedAt >= 0 && i - armedAt <= ARM_BARS && firedAt < armedAt;
         if (armed && r[i] > r[i - 1]) {
           firedAt = i;
+          reset = false;
+          inTrade = true;
           const depth = clamp01((p.oversold - minRsi) / 15);
           return {
             action: "buy",
@@ -82,8 +92,10 @@ export const rsiReversion: StrategyDefinition = {
             reason: `RSI ${nl(r[i])} draait omhoog na daling onder onderste Bollinger-band`,
           };
         }
-        // Verkopen: overbought of boven de bovenste band (alleen de eerste candle is "vers")
-        if (overheated(i) && !overheated(i - 1)) {
+        // Exit van de eigen trade: overbought of boven de bovenste band
+        if (inTrade && i - firedAt > MAX_TRADE_BARS) inTrade = false;
+        if (inTrade && overheated(i)) {
+          inTrade = false;
           const rsiHot = r[i] > p.overbought;
           const bandHot = c[i] > upper[i];
           const conf = 0.6 + (rsiHot && bandHot ? 0.2 : 0) + 0.2 * clamp01((r[i] - p.overbought) / 15);
@@ -93,7 +105,8 @@ export const rsiReversion: StrategyDefinition = {
               : rsiHot
                 ? `RSI ${nl(r[i])} boven ${nl(p.overbought, 0)} (overbought)`
                 : "Koers boven bovenste Bollinger-band";
-          return { action: "sell", confidence: conf, reason };
+          // Exit (doel bereikt), geen bearish visie: korte nawerking
+          return { action: "sell", confidence: conf, reason, decayBars: 2 };
         }
         return null;
       },

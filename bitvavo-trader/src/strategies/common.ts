@@ -18,14 +18,16 @@ export const WARMUP_REASON = "Opwarmen: nog te weinig candles";
 export const NO_SIGNAL_REASON = "Geen signaal";
 
 /** Standaard: confidence zakt in 6 candles lineair naar 0,3 en daarna "hold". */
-export const DEFAULT_DECAY_BARS = 6;
-export const DEFAULT_FLOOR = 0.3;
+export const DEFAULT_DECAY_BARS = 10;
+export const DEFAULT_FLOOR = 0.35;
 
 export interface SignalEvent {
   action: "buy" | "sell";
   /** 0..1 */
   confidence: number;
   reason: string;
+  /** Optioneel: afwijkend aantal candles voor het verval van DIT event (bijv. korter voor exits). */
+  decayBars?: number;
 }
 
 export interface PersistSpec {
@@ -97,6 +99,7 @@ export function persistRun(
   const out: StrategySignal[] = new Array(n);
   let last: SignalEvent | null = null;
   let lastIdx = -1;
+  let lastDecay = decay;
 
   for (let i = 0; i < n; i++) {
     if (i < warmup || !spec.ready(i)) {
@@ -110,13 +113,14 @@ export function persistRun(
       out[i] = { strategy, action: ev.action, confidence, reason: ev.reason };
       last = { action: ev.action, confidence, reason: ev.reason };
       lastIdx = i;
+      lastDecay = ev.decayBars !== undefined ? Math.max(0, Math.round(ev.decayBars)) : decay;
       continue;
     }
     if (last) {
       const k = i - lastIdx;
-      if (k <= decay && spec.valid(i, last.action)) {
+      if (k <= lastDecay && spec.valid(i, last.action)) {
         const start = Math.max(last.confidence, floor);
-        const confidence = start - ((start - floor) * k) / decay;
+        const confidence = start - ((start - floor) * k) / lastDecay;
         out[i] = {
           strategy,
           action: last.action,

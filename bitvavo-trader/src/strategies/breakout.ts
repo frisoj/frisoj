@@ -22,14 +22,16 @@ function warmupOf(params: StrategyParams): number {
 /**
  * Donchian-uitbraak: koopt als de koers sluit boven het hoogste punt van de
  * vorige `period` candles én het volume duidelijk boven het gemiddelde ligt.
- * Verkoopt als de koers sluit onder het laagste punt van de vorige
- * `exitPeriod` candles.
+ * Verkoopt (exit) als de koers daarna sluit onder het laagste punt van de
+ * vorige `exitPeriod` candles. Verkoopsignalen komen alleen na een eigen
+ * uitbraak (een nieuwe low zonder lopende uitbraak zegt niets over deze
+ * strategie en zou koopsignalen van andere strategieën onnodig blokkeren).
  */
 export const breakout: StrategyDefinition = {
   id: "breakout",
   name: "Donchian-uitbraak",
   description:
-    "Koopt als de koers sluit boven het hoogste punt van de vorige N candles met duidelijk verhoogd volume. Verkoopt als de koers sluit onder het laagste punt van de kortere exit-periode.",
+    "Koopt als de koers sluit boven het hoogste punt van de vorige N candles met duidelijk verhoogd volume. Verkoopt (exit) als de koers daarna sluit onder het laagste punt van de kortere exit-periode.",
   defaultParams: { ...DEFAULTS },
   paramSpace: {
     period: [20, 30, 55],
@@ -54,16 +56,19 @@ export const breakout: StrategyDefinition = {
     const volRatio = (i: number) => (volAvg[i - 1] > 0 ? vol[i] / volAvg[i - 1] : 0);
     const above = (i: number) => c[i] > entry.upper[i];
     const confirmed = (i: number) => above(i) && volRatio(i) > p.volMult;
-    const below = (i: number) => c[i] < exit.lower[i];
+
+    // Interne toestand (alleen verleden): zit de strategie in een uitbraak-trade?
+    let inTrade = false;
 
     return persistRun("breakout", n, warmupOf(params), {
       ready: (i) =>
         i > 1 &&
         finite(entry.upper[i], entry.middle[i], exit.lower[i], exit.middle[i], volAvg[i - 1], volAvg[i - 2]) &&
-        finite(entry.upper[i - 1], exit.lower[i - 1]),
+        Number.isFinite(entry.upper[i - 1]),
 
       event: (i): SignalEvent | null => {
         if (confirmed(i) && !confirmed(i - 1)) {
+          inTrade = true;
           const ratio = volRatio(i);
           return {
             action: "buy",
@@ -71,13 +76,10 @@ export const breakout: StrategyDefinition = {
             reason: `Uitbraak boven ${p.period}-candle high (volume ${nl(ratio)}×)`,
           };
         }
-        if (below(i) && !below(i - 1)) {
-          const ratio = volRatio(i);
-          return {
-            action: "sell",
-            confidence: ratio > p.volMult ? 0.85 : 0.7,
-            reason: `Koers onder ${p.exitPeriod}-candle low`,
-          };
+        // Exit van een lopende uitbraak: slot onder de low van de exit-periode
+        if (inTrade && c[i] < exit.lower[i]) {
+          inTrade = false;
+          return { action: "sell", confidence: 0.75, reason: `Koers onder ${p.exitPeriod}-candle low (exit uitbraak)`, decayBars: 3 };
         }
         return null;
       },

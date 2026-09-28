@@ -75,7 +75,8 @@ export const vwapReversion: StrategyDefinition = {
         }
         if (inTrade && c[i] >= vw[i]) {
           inTrade = false;
-          return { action: "sell", confidence: 0.7, reason: "Koers terug bij VWAP (doel bereikt)" };
+          // Exit (doel bereikt), geen bearish visie: korte nawerking
+          return { action: "sell", confidence: 0.6, reason: "Koers terug bij VWAP (doel bereikt)", decayBars: 2 };
         }
         if (inTrade && i - firedAt > MAX_TRADE_BARS) inTrade = false;
 
@@ -85,7 +86,7 @@ export const vwapReversion: StrategyDefinition = {
           maxDev = newSetup ? d : Math.max(maxDev, d);
           armedAt = i;
         }
-        const armed = armedAt >= 0 && i - armedAt <= ARM_BARS && firedAt < armedAt;
+        const armed = !inTrade && armedAt >= 0 && i - armedAt <= ARM_BARS && firedAt < armedAt;
         if (armed && r[i] > r[i - 1] && r[i - 1] <= p.rsiMax) {
           firedAt = i;
           inTrade = true;

@@ -228,7 +228,12 @@ export function buildApiRouter(deps: ApiDeps): Router {
       validateRisk: services.validateRiskConfig,
       strategies: strategiesSafe(),
     });
-    const updated = engine.updateConfig(valid);
+    let updated: EngineConfig;
+    try {
+      updated = engine.updateConfig(valid);
+    } catch (err) {
+      throw new HttpError(400, (err as Error).message);
+    }
     try {
       deps.persistConfig?.(updated);
     } catch (err) {
@@ -270,7 +275,6 @@ export function buildApiRouter(deps: ApiDeps): Router {
     }
     if (!config.apiKey || !config.apiSecret) fail("Geen Bitvavo API-sleutel ingesteld.");
     engine.arm();
-    log("warn", "⚠ Live trading is GEARMD: de bot plaatst nu echte orders.");
     return getInfo();
   });
 

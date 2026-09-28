@@ -23,13 +23,13 @@ function warmupOf(params: StrategyParams): number {
 /**
  * MACD-momentum: koopt als de MACD-lijn boven de signaallijn kruist met een
  * stijgend histogram, alleen als de koers boven EMA 50 staat. Verkoopt op de
- * omgekeerde kruising (sterker onder EMA 50).
+ * omgekeerde kruising, alleen als de koers onder EMA 50 staat (symmetrisch filter).
  */
 export const macdMomentum: StrategyDefinition = {
   id: "macd-momentum",
   name: "MACD-momentum",
   description:
-    "Momentum: koopt als de MACD-lijn boven de signaallijn kruist met stijgend histogram en de koers boven EMA 50 staat. Verkoopt als de MACD weer onder de signaallijn kruist.",
+    "Momentum: koopt als de MACD-lijn boven de signaallijn kruist met stijgend histogram en de koers boven EMA 50 staat. Verkoopt bij de omgekeerde kruising onder EMA 50.",
   defaultParams: { ...DEFAULTS },
   paramSpace: {
     fast: [8, 12],
@@ -51,6 +51,7 @@ export const macdMomentum: StrategyDefinition = {
     const idleBelowTrend = "MACD positief, maar koers onder EMA 50";
     const idlePositive = "MACD boven signaallijn, geen nieuw signaal";
     const idleNegative = "MACD onder signaallijn";
+    const idleNegAbove = "MACD onder signaallijn, maar koers boven EMA 50";
 
     // Histogramversnelling in ATR-eenheden → extra confidence
     const accel = (i: number) => (a[i] > 0 ? (h[i] - h[i - 1]) / a[i] : 0);
@@ -68,20 +69,22 @@ export const macdMomentum: StrategyDefinition = {
             reason: "MACD kruist boven signaallijn, histogram stijgt (boven EMA 50)",
           };
         }
-        if (down) {
-          const underTrend = c[i] < e50[i];
+        if (down && c[i] < e50[i]) {
           return {
             action: "sell",
-            confidence: (underTrend ? 0.75 : 0.55) + 0.25 * clamp01(-accel(i) / 0.1),
-            reason: underTrend ? "MACD kruist onder signaallijn (onder EMA 50)" : "MACD kruist onder signaallijn",
+            confidence: 0.7 + 0.3 * clamp01(-accel(i) / 0.1),
+            reason: "MACD kruist onder signaallijn, histogram daalt (onder EMA 50)",
           };
         }
         return null;
       },
 
-      valid: (i, action) => (action === "buy" ? h[i] > 0 && c[i] > e50[i] : h[i] < 0),
+      // Mening blijft zolang het momentum dezelfde kant op wijst
+      valid: (i, action) =>
+        action === "buy" ? h[i] > 0 && c[i] > e50[i] : h[i] < 0 && h[i] <= h[i - 1] && c[i] < e50[i],
 
-      idle: (i) => (h[i] > 0 ? (c[i] > e50[i] ? idlePositive : idleBelowTrend) : idleNegative),
+      idle: (i) =>
+        h[i] > 0 ? (c[i] > e50[i] ? idlePositive : idleBelowTrend) : c[i] < e50[i] ? idleNegative : idleNegAbove,
     });
   },
 };

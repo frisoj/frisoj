@@ -87,7 +87,7 @@ export class BitvavoApiError extends Error {
     }
     if (this.kind !== "http") return false;
     if (this.errorCode !== null && OUTCOME_UNKNOWN_CODES.has(this.errorCode)) return true;
-    return this.status >= 500 && (this.errorCode === null || OUTCOME_UNKNOWN_CODES.has(this.errorCode));
+    return this.status >= 500;
   }
 
   /** Veilig om een (idempotent) GET-verzoek te herhalen. */
@@ -153,6 +153,15 @@ export function describeBitvavoErrorCode(code: number | null): string | null {
   return CODE_DESCRIPTIONS[code] ?? null;
 }
 
+function describeHttpStatus(status: number): string {
+  if (status === 429) return "te veel verzoeken (rate limit)";
+  if (status >= 500) return "serverfout bij Bitvavo";
+  if (status === 401 || status === 403) return "geen toegang (controleer je API-sleutel)";
+  if (status === 404) return "niet gevonden";
+  if (status > 0) return "verzoek geweigerd";
+  return "onbekende fout";
+}
+
 /** Bouwt de Nederlandse foutmelding voor een HTTP-fout van Bitvavo. */
 export function formatBitvavoHttpError(
   method: string,
@@ -161,12 +170,11 @@ export function formatBitvavoHttpError(
   errorCode: number | null,
   bitvavoMessage: string | null,
 ): string {
-  const desc = describeBitvavoErrorCode(errorCode);
-  const head = `Bitvavo-fout bij ${method} ${endpoint}`;
-  const what = desc ?? (status > 0 ? `HTTP ${status}` : "onbekende fout");
+  const what = describeBitvavoErrorCode(errorCode) ?? describeHttpStatus(status);
   const codePart = errorCode !== null ? `code ${errorCode}` : `HTTP ${status}`;
-  const original = bitvavoMessage ? `: "${bitvavoMessage}"` : "";
-  return `${head}: ${what} (${codePart}${original})`;
+  const cleaned = bitvavoMessage?.replace(/\s+/g, " ").trim().slice(0, 200);
+  const original = cleaned ? `: "${cleaned}"` : "";
+  return `Bitvavo-fout bij ${method} ${endpoint}: ${what} (${codePart}${original})`;
 }
 
 export function isBitvavoApiError(err: unknown): err is BitvavoApiError {
