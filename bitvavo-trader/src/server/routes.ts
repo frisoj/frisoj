@@ -21,7 +21,6 @@ import type {
   OptimizeObjective,
   Regime,
   RiskConfig,
-  RiskManagerLike,
   SignalMarker,
   StrategyId,
   StrategyMeta,
@@ -94,9 +93,6 @@ export interface Services {
   detectRegimes(candles: Candle[]): Regime[];
   validateRiskConfig: RiskValidator;
 }
-
-// Ongebruikt type-import voorkomen (RiskManagerLike hoort bij het contract van BacktestDeps)
-export type { RiskManagerLike };
 
 export interface ApiDeps {
   config: AppConfig;
