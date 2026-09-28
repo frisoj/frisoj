@@ -28,6 +28,12 @@ computer en is te bedienen via een dashboard in je browser.
 >
 > Dit is geen financieel advies.
 
+> ## 🚧 Status: live-modus nog uitgeschakeld
+>
+> Een grondige code-review vond nog kritieke problemen in het pad dat echte orders
+> plaatst (zie [`docs/REVIEW-STATUS.md`](docs/REVIEW-STATUS.md)). Tot die zijn opgelost,
+> weigert de bot te starten met `TRADING_MODE=live`. Oefenmodus en backtests werken wel.
+
 ---
 
 ## Snel starten (oefenmodus)

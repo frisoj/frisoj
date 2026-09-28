@@ -120,8 +120,22 @@ function printLogEntry(entry: LogEntry): void {
   else if (entry.level === "trade") console.log(`[${time}] € ${entry.message}`);
 }
 
+/**
+ * Tijdelijke blokkade: de code-review vond bevestigde kritieke problemen in
+ * het live-orderpad (zie docs/REVIEW-STATUS.md). Weghalen zodra die zijn opgelost.
+ */
+function refuseLiveUntilReviewed(mode: string): void {
+  if (mode === "live") {
+    throw new StartupError(
+      "Live trading is tijdelijk uitgeschakeld: de code-review vond nog kritieke problemen " +
+        "in het orderpad (zie docs/REVIEW-STATUS.md). Gebruik voorlopig TRADING_MODE=paper.",
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
+  refuseLiveUntilReviewed(config.mode);
   const engineConfig = structuredClone(config.engine);
 
   const client = new BitvavoClient({
