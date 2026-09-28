@@ -957,6 +957,7 @@
 }
 .eq-stats .stat-label {
   font-size: 10px;
+  letter-spacing: 0.03em;
 }
 .eq-stats .stat-value {
   font-size: 13px;

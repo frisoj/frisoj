@@ -148,7 +148,7 @@ export function mountScanner(ctx, el) {
     sortDir: -1,
     view: "table",
     filter: "",
-    activeTab: null,
+    activeTab: ctx.getActiveTab?.() || null,
     config: ctx.getState?.()?.config || null,
   };
   try {
