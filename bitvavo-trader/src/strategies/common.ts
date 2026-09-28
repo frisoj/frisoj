@@ -18,7 +18,7 @@ export const WARMUP_REASON = "Opwarmen: nog te weinig candles";
 export const NO_SIGNAL_REASON = "Geen signaal";
 
 /** Standaard: confidence zakt in 6 candles lineair naar 0,3 en daarna "hold". */
-export const DEFAULT_DECAY_BARS = 10;
+export const DEFAULT_DECAY_BARS = 8;
 export const DEFAULT_FLOOR = 0.35;
 
 export interface SignalEvent {

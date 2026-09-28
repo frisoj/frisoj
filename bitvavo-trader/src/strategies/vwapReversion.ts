@@ -92,7 +92,7 @@ export const vwapReversion: StrategyDefinition = {
           inTrade = true;
           return {
             action: "buy",
-            confidence: 0.7 + 0.3 * clamp01((maxDev - p.devAtr) / p.devAtr),
+            confidence: 0.8 + 0.2 * clamp01((maxDev - p.devAtr) / p.devAtr),
             reason: `Koers ${nl(maxDev)}× ATR onder VWAP, RSI ${nl(r[i])} draait omhoog`,
           };
         }

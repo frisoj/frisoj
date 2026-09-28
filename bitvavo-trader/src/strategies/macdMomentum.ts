@@ -65,7 +65,7 @@ export const macdMomentum: StrategyDefinition = {
         if (up && c[i] > e50[i]) {
           return {
             action: "buy",
-            confidence: 0.7 + 0.3 * clamp01(accel(i) / 0.1),
+            confidence: 0.8 + 0.2 * clamp01(accel(i) / 0.1),
             reason: "MACD kruist boven signaallijn, histogram stijgt (boven EMA 50)",
           };
         }

@@ -88,7 +88,7 @@ export const rsiReversion: StrategyDefinition = {
           const depth = clamp01((p.oversold - minRsi) / 15);
           return {
             action: "buy",
-            confidence: 0.7 + 0.3 * depth,
+            confidence: 0.8 + 0.2 * depth,
             reason: `RSI ${nl(r[i])} draait omhoog na daling onder onderste Bollinger-band`,
           };
         }

@@ -72,7 +72,7 @@ export const breakout: StrategyDefinition = {
           const ratio = volRatio(i);
           return {
             action: "buy",
-            confidence: 0.7 + 0.3 * clamp01((ratio / p.volMult - 1) / 1),
+            confidence: 0.8 + 0.2 * clamp01((ratio / p.volMult - 1) / 1),
             reason: `Uitbraak boven ${p.period}-candle high (volume ${nl(ratio)}×)`,
           };
         }

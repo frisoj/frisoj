@@ -97,7 +97,7 @@ export const emaTrend: StrategyDefinition = {
           lastBuy = i;
           return {
             action: "buy",
-            confidence: (fresh ? 0.75 : 0.7) + 0.25 * strength,
+            confidence: (fresh ? 0.8 : 0.75) + 0.2 * strength,
             reason: `${fresh ? crossUpReason : confirmReason} (ADX ${nl(ax[i], 0)})`,
           };
         }
@@ -111,7 +111,7 @@ export const emaTrend: StrategyDefinition = {
             lastBuy = i;
             return {
               action: "buy",
-              confidence: 0.7 + 0.25 * strength,
+              confidence: 0.75 + 0.2 * strength,
               reason: `${pullbackReason} (ADX ${nl(ax[i], 0)})`,
             };
           }
