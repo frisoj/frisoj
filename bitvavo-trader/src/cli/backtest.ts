@@ -91,11 +91,12 @@ const visible = (s: string) => s.replace(ANSI, "").length;
 const padEnd = (s: string, w: number) => s + " ".repeat(Math.max(0, w - visible(s)));
 const padStart = (s: string, w: number) => " ".repeat(Math.max(0, w - visible(s))) + s;
 
-/** Eenvoudige tabel: eerste kolom links, de rest rechts uitgelijnd. */
-function table(header: string[], rows: string[][]): string {
+/** Eenvoudige tabel: eerste kolom (en `leftCols`) links, de rest rechts uitgelijnd. */
+function table(header: string[], rows: string[][], leftCols: number[] = []): string {
   const widths = header.map((h, c) => Math.max(visible(h), ...rows.map((r) => visible(r[c] ?? ""))));
+  const left = new Set([0, ...leftCols]);
   const line = (cells: string[]) =>
-    cells.map((cell, c) => (c === 0 ? padEnd(cell, widths[c]) : padStart(cell, widths[c]))).join("  ");
+    cells.map((cell, c) => (left.has(c) ? padEnd(cell, widths[c]) : padStart(cell, widths[c]))).join("  ");
   return [bold(line(header)), dim(widths.map((w) => "─".repeat(w)).join("  ")), ...rows.map(line)].join("\n");
 }
 
@@ -268,7 +269,7 @@ function printTrades(result: BacktestResult, max = 10): void {
     nf2.format(t.rMultiple),
     EXIT_NL[t.exitReason] ?? t.exitReason,
   ]);
-  console.log(table(["Koop", "Verkoop", "Koopprijs", "Verkoopprijs", "Winst €", "Winst %", "R", "Reden"], rows));
+  console.log(table(["Koop", "Verkoop", "Koopprijs", "Verkoopprijs", "Winst €", "Winst %", "R", "Reden"], rows, [1, 7]));
 }
 
 // ─────────────────────────────── Main ───────────────────────────────
@@ -409,6 +410,7 @@ async function main(): Promise<void> {
             .map(([k, v]) => `${k.replace(/^ensemble\.|^risk\./, "")}=${String(v).replace(".", ",")}`)
             .join(" "),
         ]),
+        [6],
       ),
     );
     const o = wf.oosMetrics;

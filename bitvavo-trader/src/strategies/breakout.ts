@@ -38,7 +38,7 @@ export const breakout: StrategyDefinition = {
     exitPeriod: [10, 20],
     volMult: [1.2, 1.5, 2],
   },
-  preferredRegimes: ["trend-up", "volatile"],
+  preferredRegimes: ["trend-up", "volatile", "range"],
   warmup: warmupOf,
 
   run(candles: Candle[], params: StrategyParams) {
@@ -61,6 +61,8 @@ export const breakout: StrategyDefinition = {
     let inTrade = false;
 
     return persistRun("breakout", n, warmupOf(params), {
+      // Uitbraakmening leeft ongeveer één exit-periode
+      decayBars: Math.max(6, p.exitPeriod),
       ready: (i) =>
         i > 1 &&
         finite(entry.upper[i], entry.middle[i], exit.lower[i], exit.middle[i], volAvg[i - 1], volAvg[i - 2]) &&

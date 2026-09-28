@@ -5,7 +5,7 @@ import { clamp01, finite, nl, numParam, persistRun, type SignalEvent } from "./c
 const ATR_PERIOD = 14;
 const RSI_PERIOD = 14;
 /** Na een uitgerekte candle mag de RSI binnen zoveel candles omhoog draaien. */
-const ARM_BARS = 2;
+const ARM_BARS = 3;
 /** Na zoveel candles zonder terugkeer naar de VWAP vervalt de setup. */
 const MAX_TRADE_BARS = 48;
 const DAY_MS = 86_400_000;
