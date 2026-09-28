@@ -1,0 +1,26 @@
+{
+  "name": "bitvavo-trader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Visuele daytrading-bot voor Bitvavo met paper trading, backtests en risicobeheer",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "backtest": "tsx src/cli/backtest.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lightweight-charts": "^5.2.1",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  }
+}
