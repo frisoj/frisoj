@@ -331,25 +331,45 @@ export function mountSettings(ctx, el) {
     }
   }
 
+  function thrPos(v) {
+    return ((Math.max(-1, Math.min(1, Number(v) || 0)) + 1) / 2) * 100;
+  }
+
+  function updateThresholdVis() {
+    const vis = el.querySelector(".st-thr-vis");
+    if (!vis) return;
+    const e = state.draft.ensemble;
+    const ps = thrPos(e.sellThreshold);
+    const pb = Math.max(ps, thrPos(e.buyThreshold));
+    const set = (sel, left, width) => {
+      const n = vis.querySelector(sel);
+      if (n) {
+        n.style.left = `${left}%`;
+        if (width !== undefined) n.style.width = `${Math.max(0, width)}%`;
+      }
+    };
+    set(".st-thr-sell", 0, ps);
+    set(".st-thr-hold", ps, pb - ps);
+    set(".st-thr-buy", pb, 100 - pb);
+    set(".st-thr-l-sell", ps / 2);
+    set(".st-thr-l-hold", (ps + pb) / 2);
+    set(".st-thr-l-buy", (pb + 100) / 2);
+  }
+
   function renderThresholds() {
     const box = el.querySelector(".st-thresholds");
     if (!box) return;
     const e = state.draft.ensemble;
     const buy = Number(e.buyThreshold);
     const sell = Number(e.sellThreshold);
-    const pos = (v) => ((Math.max(-1, Math.min(1, v)) + 1) / 2) * 100;
     box.innerHTML = `
       <div class="st-thr-vis" aria-hidden="true">
         <div class="st-thr-bar">
-          <i class="st-thr-sell" style="left:0;width:${pos(sell)}%"></i>
-          <i class="st-thr-hold" style="left:${pos(sell)}%;width:${pos(buy) - pos(sell)}%"></i>
-          <i class="st-thr-buy" style="left:${pos(buy)}%;width:${100 - pos(buy)}%"></i>
+          <i class="st-thr-sell"></i><i class="st-thr-hold"></i><i class="st-thr-buy"></i>
           <span class="st-thr-zero" style="left:50%"></span>
         </div>
         <div class="st-thr-lbls">
-          <span style="left:${pos(sell) / 2}%">VERKOOP</span>
-          <span style="left:${(pos(sell) + pos(buy)) / 2}%">WACHT</span>
-          <span style="left:${(pos(buy) + 100) / 2}%">KOOP</span>
+          <span class="st-thr-l-sell">VERKOOP</span><span class="st-thr-l-hold">WACHT</span><span class="st-thr-l-buy">KOOP</span>
         </div>
         <div class="st-thr-axis"><span>−1</span><span>0</span><span>+1</span></div>
       </div>
@@ -369,6 +389,7 @@ export function mountSettings(ctx, el) {
         <span class="pn-switch"><input type="checkbox" data-path="ensemble.regimeFilter" ${e.regimeFilter ? "checked" : ""}><i></i></span>
         <span><b>Regimefilter</b><span class="st-help">Geen aankopen in een dalende trend; strategieën buiten hun favoriete marktfase tellen minder mee. Aanbevolen: aan.</span></span>
       </label>`;
+    updateThresholdVis();
   }
 
   function renderStrategies() {
@@ -532,7 +553,7 @@ CAPITAL_LIMIT_EUR=50`;
       <p class="pn-hint">Alleen nodig als in <span class="mono">.env</span> een <span class="mono">DASHBOARD_TOKEN</span> staat. Het token wordt alleen in deze browser bewaard.</p>
       <div class="st-token-row">
         <input class="input mono st-token" type="password" autocomplete="off" spellcheck="false" placeholder="${has ? "••••••••" : "token"}" aria-label="Dashboard-token">
-        <button type="button" class="btn btn-ghost st-token-show" title="Tonen/verbergen">👁</button>
+        <button type="button" class="btn btn-ghost st-token-show" title="Tonen/verbergen" aria-label="Token tonen of verbergen"><svg class="pn-ico" viewBox="0 0 15 15" aria-hidden="true"><path d="M1 7.5C2.8 4.3 5 3 7.5 3s4.7 1.3 6.5 4.5C12.2 10.7 10 12 7.5 12S2.8 10.7 1 7.5z"/><circle cx="7.5" cy="7.5" r="2"/></svg></button>
         <button type="button" class="btn st-token-save">Opslaan</button>
         <button type="button" class="btn btn-ghost st-token-clear" ${has ? "" : "disabled"}>Wissen</button>
       </div>`;
@@ -737,16 +758,7 @@ CAPITAL_LIMIT_EUR=50`;
       const v = t.closest(".st-field, .st-weight")?.querySelector(".st-val");
       if (v) v.textContent = fmt.num(Number(t.value), path.includes("weights") ? 1 : 2);
     }
-    if (path.startsWith("ensemble.buy") || path.startsWith("ensemble.sell")) {
-      const vis = el.querySelector(".st-thr-vis");
-      if (vis) {
-        const tmp = document.createElement("div");
-        const keepFocus = document.activeElement;
-        renderThresholds();
-        keepFocus?.id && document.getElementById(keepFocus.id)?.focus();
-        void tmp;
-      }
-    }
+    if (path.startsWith("ensemble.buy") || path.startsWith("ensemble.sell")) updateThresholdVis();
     if (path.startsWith("ensemble.weights")) {
       const e2 = state.draft.ensemble;
       const enabled = new Set(e2.enabled);
@@ -799,9 +811,7 @@ CAPITAL_LIMIT_EUR=50`;
       renderAll();
       ctx.toast("Wijzigingen ongedaan gemaakt.", "info");
     } else if (t.dataset.act === "defaults") {
-      const keepParams = false;
       state.draft = clone(DEFAULTS);
-      if (keepParams) state.draft.ensemble.params = clone(state.server.ensemble.params);
       state.errors = [];
       state.invalid.clear();
       renderAll();
