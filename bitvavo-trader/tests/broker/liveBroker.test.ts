@@ -584,6 +584,120 @@ describe("LiveBroker.placeMarketOrder", () => {
   });
 });
 
+describe("LiveBroker — beursminimum", () => {
+  /** Handler: genoeg saldo; POST /order krijgt `reply`. */
+  const sellSetup = (reply: Reply, market: MarketInfo = BTC) =>
+    setup((c) => {
+      if (c.url.pathname === "/v2/balance") return { body: [{ symbol: market.base, available: "1", inOrder: "0" }] };
+      if (c.method === "POST") return reply;
+      return { status: 404, body: { errorCode: 240, error: "No order found." } };
+    }, market);
+
+  it("een verkoop die Bitvavo weigert met code 217 (onder het minimum) → ONVERKOOPBAAR, geen lookup, niet opnieuw verstuurd", async () => {
+    const t = sellSetup({ status: 400, body: { errorCode: 217, error: "Minimum order size in quote currency is 5 EUR or 0.001 BTC." } });
+    // Onze referentiekoers zegt €5,01 (lokaal ≥ minimum → verstuurd); Bitvavo rekent lager en weigert.
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.0001 }, 50_100);
+    expect(t.posts()).toHaveLength(1);
+    expect(t.posts()[0].body).toMatchObject({ side: "sell", amount: "0.0001" });
+    expect(res.status).toBe("rejected");
+    expect(res.side).toBe("sell");
+    expect(res.filledAmount).toBe(0);
+    expect(res.orderId).toBe("");
+    expect(res.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    expect(res.error).toContain("Bitvavo weigert de verkoop");
+    expect(res.error).toContain("beursminimum van € 5,00 voor BTC-EUR");
+    expect(res.error).toContain("code 217");
+    expect(res.error).toContain("Minimum order size in quote currency is 5 EUR");
+    expect(res.error).toContain("ca. € 5,01");
+    expect(res.error).toContain("er is niets verkocht");
+    expect(res.error).toContain("schrijf de positie af");
+    // Definitieve afwijzing: GEEN lookup via clientOrderId (alleen het saldo en de POST).
+    expect(t.calls.map((c) => `${c.method} ${c.url.pathname}`)).toEqual(["GET /v2/balance", "POST /v2/order"]);
+  });
+
+  it("herkent ook een melding over het minimum zonder bekende code, en code 212 (hoeveelheid)", async () => {
+    const byText = sellSetup({ status: 400, body: { error: "Order value is below the minimum order size for this market." } });
+    const r1 = await byText.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.0002 }, 50_000);
+    expect(r1.status).toBe("rejected");
+    expect(r1.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    expect(r1.error).toContain("HTTP 400");
+    expect(byText.posts()).toHaveLength(1);
+
+    const eth: MarketInfo = { ...BTC, market: "ETH-EUR", base: "ETH", minOrderBase: 0.002, quantityDecimals: 4 };
+    const byBase = sellSetup({ status: 400, body: { errorCode: 212, error: "Amount is below the minimum allowed amount for this asset." } }, eth);
+    const r2 = await byBase.broker.placeMarketOrder({ market: "ETH-EUR", side: "sell", amount: 0.003 }, 3000);
+    expect(r2.status).toBe("rejected");
+    expect(r2.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    expect(r2.error).toContain("hoeveelheid 0,003 ETH is volgens Bitvavo lager dan het beursminimum voor ETH-EUR");
+    expect(r2.error).toContain("Amount is below the minimum allowed amount for this asset");
+    expect(r2.error).toContain("code 212");
+  });
+
+  it("alleen verkopen onder het minimum worden ONVERKOOPBAAR: koop-217, andere fouten en onbekende uitkomsten niet", async () => {
+    // Kooporder onder het minimum volgens Bitvavo: gewone afwijzing (geen positie om te markeren).
+    const buy = setup(() => ({ status: 400, body: { errorCode: 217, error: "Minimum order size in quote currency is 5 EUR." } }));
+    const rb = await buy.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 5 }, 50_000);
+    expect(rb.status).toBe("rejected");
+    expect(rb.error?.startsWith("ONVERKOOPBAAR")).toBe(false);
+    expect(rb.error).toContain("orderwaarde onder het minimum");
+
+    // Onvoldoende saldo / prijs onder het minimum: geen ONVERKOOPBAAR.
+    for (const body of [
+      { errorCode: 216, error: "Insufficient balance." },
+      { errorCode: 213, error: "Price is below the minimum allowed amount (0.000000000000001)." },
+    ]) {
+      const t = sellSetup({ status: 400, body });
+      const r = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.0002 }, 50_000);
+      expect(r.status).toBe("rejected");
+      expect(r.error?.startsWith("ONVERKOOPBAAR")).toBe(false);
+    }
+
+    // Serverfout met een "minimum"-tekst: uitkomst onbekend → opzoeken, nooit als onverkoopbaar melden.
+    const t5 = sellSetup({ status: 500, body: { error: "Minimum order size check failed" } });
+    const r5 = await t5.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.0002 }, 50_000);
+    expect(r5.status).toBe("new");
+    expect(r5.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
+    expect(t5.posts()).toHaveLength(1);
+  });
+
+  it("een ontbrekend/ongeldig/≤ 0 minimum in de marktinfo is ONBEKEND → €5, voor kopen en verkopen", async () => {
+    for (const minOrderQuote of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
+      const info = { ...BTC, minOrderQuote, minOrderBase: 0 } as MarketInfo;
+      const t = setup(() => ({ body: order() }), info);
+      const buy = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 4.99 }, 50_000);
+      expect(buy.status).toBe("rejected");
+      expect(buy.error).toContain("minimum van € 5,00");
+      const sell = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.00009 }, 50_000); // €4,50
+      expect(sell.status).toBe("rejected");
+      expect(sell.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+      expect(sell.error).toContain("beursminimum van € 5,00");
+      expect(t.calls).toHaveLength(0); // niets verstuurd
+    }
+  });
+
+  it("via client.markets(): minOrderInQuoteAsset 0 of ontbrekend → €5, orders eronder worden niet verstuurd", async () => {
+    for (const minQ of ["0", undefined, "abc", "-3"]) {
+      const calls: string[] = [];
+      const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input));
+        calls.push(`${init?.method ?? "GET"} ${url.pathname}`);
+        if (url.pathname === "/v2/markets") {
+          const m: Record<string, unknown> = { market: "BTC-EUR", status: "trading", base: "BTC", quote: "EUR", minOrderInBaseAsset: "0", pricePrecision: 5, quantityDecimals: 8, notionalDecimals: 2 };
+          if (minQ !== undefined) m.minOrderInQuoteAsset = minQ;
+          return new Response(JSON.stringify([m]));
+        }
+        return new Response(JSON.stringify(order()));
+      }) as typeof fetch;
+      const client = new BitvavoClient({ apiKey: "k".repeat(64), apiSecret: "s", fetchImpl, autoTimeSync: false });
+      const broker = new LiveBroker(client, { sleep: async () => {} });
+      const res = await broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 3 }, 50_000);
+      expect(res.status).toBe("rejected");
+      expect(res.error).toContain("minimum van € 5,00");
+      expect(calls).toEqual(["GET /v2/markets"]); // geen POST
+    }
+  });
+});
+
 describe("LiveBroker.lookupOrder", () => {
   const CID = "12345678-1234-4234-8234-123456789abc";
 

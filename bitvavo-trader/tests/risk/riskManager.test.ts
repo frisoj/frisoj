@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RISK_CONFIG } from "../../src/core/defaults";
+import { DEFAULT_RISK_CONFIG, EXCHANGE_MIN_ORDER_QUOTE } from "../../src/core/defaults";
 import {
   INTERVAL_MS,
   type AccountSnapshot,
@@ -368,6 +368,39 @@ describe("planEntry — sizing", () => {
     );
     expect(plan.approved).toBe(true);
     expect(plan.quoteAmount).toBe(10.95);
+  });
+
+  it("ook zonder MarketInfo telt voor de verkoopbaarheid bij de stop het beursminimum (€5), niet de hogere instelling", () => {
+    // Vroeger werd zonder MarketInfo max(instelling, €5) = €10 als BEURSminimum gebruikt:
+    // dan was bij de stop €12,90 nodig en werd deze €10,95-positie afgewezen.
+    const plan = rm({ minOrderQuote: 10, riskPerTradePct: 4.5 }).planEntry(decision({ atr: 10 }), account(), undefined, NOW);
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(10.95);
+    // De instelling blijft wél een ondergrens voor de koop zelf.
+    const small = rm({ minOrderQuote: 10 }).planEntry(decision({ atr: 4 }), account(), undefined, NOW);
+    expect(small.approved).toBe(false);
+    expect(small.reasons).toContain("Te klein: €8,74 < minimum €10,00");
+  });
+
+  it("een MarketInfo-minimum van 0 / NaN / negatief is ONBEKEND → €5 (EXCHANGE_MIN_ORDER_QUOTE), geen 'geen minimum'", () => {
+    expect(EXCHANGE_MIN_ORDER_QUOTE).toBe(5);
+    const low = { minOrderQuote: 1 };
+    for (const bad of [0, Number.NaN, -1, Number.POSITIVE_INFINITY]) {
+      const info = marketInfo({ minOrderQuote: bad });
+      // €4,04 is onder het beursminimum: afgewezen (met 0 als "geen minimum" zou €4,04 door de instelling van €1 komen).
+      const small = rm(low).planEntry(decision({ atr: 9 }), account(), info, NOW);
+      expect(small.approved).toBe(false);
+      expect(small.quoteAmount).toBe(0);
+      expect(small.reasons).toContain("Te klein: €4,04 < minimum €5,00");
+      // €5,53 zakt bij de stop onder €5: ook afgewezen (moet bij de stop verkoopbaar blijven).
+      const atStop = rm(low).planEntry(decision({ atr: 6.5 }), account(), info, NOW);
+      expect(atStop.approved).toBe(false);
+      expect(atStop.reasons.join(" ")).toContain("minimaal €5,94 nodig");
+      // Precies hetzelfde als zonder MarketInfo.
+      expect(atStop.reasons).toEqual(rm(low).planEntry(decision({ atr: 6.5 }), account(), undefined, NOW).reasons);
+      // Een ruime positie gaat gewoon door.
+      expect(rm(low).planEntry(decision(), account(), info, NOW).quoteAmount).toBe(22.5);
+    }
   });
 });
 

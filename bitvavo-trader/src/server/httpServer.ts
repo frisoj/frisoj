@@ -63,17 +63,26 @@ function setSecurityHeaders(res: ServerResponse): void {
 /** Exacte loopback-check (zie config.ts); hier opnieuw geëxporteerd voor bestaande imports. */
 export { isLoopbackHost };
 
-/** Hostnaam uit een Host-header (zonder poort), ook voor IPv6 "[::1]:4321" (en een kaal "::1"). */
-export function hostnameOf(hostHeader: string): string {
+/** `naam` of `naam:poort` (poort alleen cijfers) */
+const HOST_NAME_RE = /^([a-z0-9.-]+)(?::(\d{1,5}))?$/;
+/** `[ipv6]` of `[ipv6]:poort` */
+const HOST_IPV6_RE = /^(\[[0-9a-f:.]+\])(?::(\d{1,5}))?$/;
+
+/**
+ * Hostnaam (zonder poort) uit een Host-header, strikt geparst. Alleen
+ * `naam`, `naam:poort`, `[ipv6]` en `[ipv6]:poort` met een numerieke poort
+ * (0–65535) zijn geldig, bijv. "localhost:4321" → "localhost" en
+ * "[::1]:4321" → "[::1]". Al het andere geeft null: tekst na de host
+ * ("localhost:4321x", "[::1].evil.example"), "@", spaties, een lege poort of
+ * een IPv6-adres zonder haken.
+ */
+export function hostnameOf(hostHeader: string): string | null {
   const h = hostHeader.trim().toLowerCase();
-  if (h.startsWith("[")) {
-    const end = h.indexOf("]");
-    return end > 0 ? h.slice(0, end + 1) : h;
-  }
-  // Een IPv6-adres zonder haken (en dus zonder poort) is als geheel de hostnaam.
-  if (isIPv6(h)) return h;
-  const colon = h.lastIndexOf(":");
-  return colon > 0 ? h.slice(0, colon) : h;
+  const m = HOST_IPV6_RE.exec(h) ?? HOST_NAME_RE.exec(h);
+  if (!m) return null;
+  if (m[2] !== undefined && Number(m[2]) > 65_535) return null;
+  if (m[1].startsWith("[") && !isIPv6(m[1].slice(1, -1))) return null;
+  return m[1];
 }
 
 const CROSS_SITE_ERROR = "Verzoek van een andere website geweigerd.";
@@ -163,7 +172,9 @@ export function createApp(deps: CreateAppDeps): App {
       if (hostHeader === undefined || hostHeader.trim() === "") {
         throw new HttpError(400, "Ongeldig verzoek: de Host-header ontbreekt.");
       }
-      if (!isLoopbackHost(hostnameOf(hostHeader))) {
+      // Ongeldige Host-header (null) of een andere host dan loopback → weigeren.
+      const hostname = hostnameOf(hostHeader);
+      if (hostname === null || !isLoopbackHost(hostname)) {
         throw new HttpError(403, "Toegang geweigerd: onbekende Host-header.");
       }
     }

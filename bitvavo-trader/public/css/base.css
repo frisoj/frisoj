@@ -926,12 +926,19 @@ input[type="range"] {
   font-weight: 600;
   line-height: 1.45;
   border-bottom: 1px solid var(--border);
+  /* Lange bestandspaden (herstelmelding) breken af i.p.v. de pagina te verbreden */
+  overflow-wrap: anywhere;
 }
 .alert-banner .ab-main {
   display: inline-flex;
   align-items: flex-start;
   gap: 8px;
-  max-width: 1100px;
+  min-width: 0;
+  max-width: min(1100px, 100%);
+}
+.alert-banner .ab-main > span,
+.alert-banner .ab-sub {
+  min-width: 0;
 }
 .alert-banner svg {
   width: 16px;
@@ -1718,16 +1725,79 @@ body.live-armed {
 tr.is-unsellable > td {
   background: rgba(244, 182, 58, 0.05);
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Open posities: compacte kolommen (past op 1280 px) en een actiekolom die altijd
+   zichtbaar blijft (sticky rechts), ook als de tabel op een smal scherm scrolt. */
+.pos-table th,
+.pos-table td {
+  padding-left: 7px;
+  padding-right: 7px;
+}
+.pos-table .col-act {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  width: 1%;
+  background: var(--panel);
+}
+.pos-table th.col-act {
+  z-index: 2;
+}
+.pos-table tbody tr:hover > td.col-act {
+  background: linear-gradient(rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.022)), var(--panel);
+}
+.pos-table tbody tr.is-unsellable > td.col-act {
+  background: linear-gradient(rgba(244, 182, 58, 0.05), rgba(244, 182, 58, 0.05)), var(--panel);
+}
+.pos-wrap.is-scrollx .col-act {
+  box-shadow: -14px 0 12px -12px rgba(0, 0, 0, 0.9);
+  border-left: 1px solid var(--border);
+}
+.pos-table .pos-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.scroll-cue {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 9px;
+  background: var(--yellow-bg);
+  color: var(--yellow);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: help;
+}
 .rangebar {
   position: relative;
-  width: 120px;
-  height: 22px;
+  width: 124px;
+  height: 34px;
+}
+.rangebar.no-bar .lbl {
+  top: 2px;
+}
+.rangebar.no-bar {
+  height: 18px;
 }
 .rangebar .track {
   position: absolute;
   left: 0;
   right: 0;
-  top: 9px;
+  top: 8px;
   height: 4px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--red) 0%, rgba(242, 73, 92, 0.25) 35%, rgba(30, 197, 128, 0.25) 65%, var(--green) 100%);
@@ -1735,7 +1805,7 @@ tr.is-unsellable > td {
 }
 .rangebar .entry {
   position: absolute;
-  top: 5px;
+  top: 4px;
   width: 2px;
   height: 12px;
   margin-left: -1px;
@@ -1744,7 +1814,7 @@ tr.is-unsellable > td {
 }
 .rangebar .now {
   position: absolute;
-  top: 6px;
+  top: 5px;
   width: 10px;
   height: 10px;
   margin-left: -5px;
@@ -1762,9 +1832,18 @@ tr.is-unsellable > td {
 }
 .rangebar .lbl {
   position: absolute;
-  top: 15px;
-  font-size: 9.5px;
+  top: 18px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.2;
   color: var(--muted);
+  cursor: help;
+}
+.rangebar .lbl.neg {
+  color: var(--red);
+}
+.rangebar .lbl.pos {
+  color: var(--green);
 }
 .rangebar .lbl.l {
   left: 0;
@@ -1866,6 +1945,25 @@ tr.row-new td {
   }
   .rangebar {
     width: 100%;
+  }
+  .rangebar .lbl.l::before {
+    content: "stop ";
+  }
+  .rangebar .lbl.r::before {
+    content: "doel ";
+  }
+  /* Kaartweergave: geen sticky kolom, knoppen naast elkaar */
+  .pos-table .col-act,
+  .pos-wrap.is-scrollx .col-act {
+    position: static;
+    width: auto;
+    box-shadow: none;
+    border-left: 0;
+  }
+  .pos-table .pos-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 6px;
   }
   .tbl-scroll {
     max-height: none;
@@ -2244,6 +2342,10 @@ tr.row-new td {
 .modal-body ul {
   margin: 0 0 10px;
   padding-left: 18px;
+}
+.modal-body p,
+.modal-body li {
+  overflow-wrap: break-word;
 }
 .modal-body strong {
   color: var(--text);

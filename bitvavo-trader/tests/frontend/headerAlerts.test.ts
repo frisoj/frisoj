@@ -168,44 +168,60 @@ describe("banner: onbruikbare opgeslagen staat", () => {
 });
 
 describe("rendement na afromen (live)", () => {
-  // Echte engine-uitkomst: winst van €3,25 boven de limiet van €50 afgeroomd
+  // Echte engine-uitkomst (ronde 3): winst van €3,25 boven de limiet van €50 afgeroomd.
+  // startingEquity = ingelegd kapitaal (€50); de engine levert totalPnlQuote/dayPnlQuote.
+  // (Herschreven in ronde 3: de oude fixture had startingEquity €46,75 = verlaagd met het
+  // afgeroomde bedrag, en de UI telde dat er weer bij op. Dat doet de engine niet meer.)
   const skimmed = base({
     account: {
       equity: 50,
       cashQuote: 50,
-      startingEquity: 46.7540523690773,
-      dayStartEquity: 50.06452618453865,
+      startingEquity: 50,
+      dayStartEquity: 53.31047381546135,
+      totalPnlQuote: 3.2459476309227,
       totalReturnPct: 6.4918952618454,
+      dayPnlQuote: -0.06452618453865,
       dayReturnPct: -0.12103847503215366,
     },
     skimmedQuote: 3.2459476309227,
   });
 
-  it("accountReturns gebruikt de percentages van de engine en het oorspronkelijke startbedrag", async () => {
+  it("accountReturns gebruikt winst en rendement van de engine; kapitaal = startingEquity (niet + afgeroomd)", async () => {
     const { accountReturns } = await loadPublic("js/header.js");
     const r = accountReturns(skimmed);
     expect(r.totPct).toBeCloseTo(6.4919, 3);
     expect(r.dayPct).toBeCloseTo(-0.121, 3);
+    // equity − start = 0 en equity − dagstart = −3,31: de engine-bedragen winnen
     expect(r.totPnl).toBeCloseTo(3.2459, 3);
-    expect(r.origStart).toBeCloseTo(50, 9);
+    expect(r.dayPnl).toBeCloseTo(-0.0645, 3);
+    expect(r.capital).toBe(50);
     expect(r.skimmed).toBeCloseTo(3.2459, 3);
   });
 
-  it("zonder engine-percentages (oudere server) wordt zelf gerekend", async () => {
+  it("zonder engine-velden (oudere server) wordt zelf gerekend", async () => {
     const { accountReturns } = await loadPublic("js/header.js");
     const r = accountReturns(base({ mode: "paper", account: { equity: 55, startingEquity: 50, dayStartEquity: 52 } }));
+    expect(r.totPnl).toBeCloseTo(5, 9);
+    expect(r.dayPnl).toBeCloseTo(3, 9);
     expect(r.totPct).toBeCloseTo(10, 9);
     expect(r.dayPct).toBeCloseTo((3 / 52) * 100, 9);
-    expect(r.origStart).toBe(50);
+    expect(r.capital).toBe(50);
   });
 
-  it("de kaarten tonen +6,49% t.o.v. € 50,00 (niet +6,94% t.o.v. € 46,75)", async () => {
+  it("de kaarten tonen +€ 3,25 / +6,49% t.o.v. € 50,00 en vandaag -€ 0,06 / -0,12%", async () => {
     const h = await mount(skimmed, { info: { capitalLimitQuote: 50 } });
     expect(h.stat("total", "s")).toContain("+6,49%");
     expect(h.stat("total", "s")).toContain("t.o.v. € 50,00");
     expect(h.stat("total", "v")).toContain("+€ 3,25");
+    expect(h.stat("day", "v")).toContain("-€ 0,06");
     expect(h.stat("day", "s")).toContain("-0,12%");
     expect(h.stat("equity", "s")).toContain("afgeroomd € 3,25");
+  });
+
+  it("t.o.v. is altijd startingEquity: skimmedQuote komt er niet bij", async () => {
+    const h = await mount(base({ ...skimmed, skimmedQuote: 20 }), { info: { capitalLimitQuote: 50 } });
+    expect(h.stat("total", "s")).toContain("t.o.v. € 50,00");
+    expect(h.stat("total", "s")).not.toContain("€ 70,00");
   });
 });
 

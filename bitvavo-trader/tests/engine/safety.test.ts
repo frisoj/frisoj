@@ -250,10 +250,13 @@ describe("Kapitaallimiet (live)", () => {
     expect(s.account.cashQuote).toBeCloseTo(50, 9);
     expect(s.halted.halted).toBe(false);
     expect(s.skimmedQuote).toBeCloseTo(trade.proceedsQuote + 27.5 - 50, 9);
-    // afromen = opname: dag-start en start schuiven evenveel mee
-    expect(s.account.dayStartEquity).toBeCloseTo(dayStart - s.skimmedQuote!, 9);
-    expect(s.account.startingEquity).toBeCloseTo(50 - s.skimmedQuote!, 9);
-    expect(s.account.equity - s.account.startingEquity).toBeCloseTo(trade.pnlQuote, 9);
+    // Herschreven (ronde 3): afromen verlaagde start- en dag-startequity (dat liep vast
+    // zodra er meer afgeroomd was dan de limiet). Nu blijven ze staan en telt het
+    // afgeroomde bedrag als overboeking mee in het resultaat.
+    expect(s.account.dayStartEquity).toBeCloseTo(dayStart, 9);
+    expect(s.account.startingEquity).toBe(50);
+    expect(s.account.totalPnlQuote).toBeCloseTo(trade.pnlQuote, 9);
+    expect(s.account.dayPnlQuote).toBeCloseTo(s.account.equity + s.skimmedQuote! - dayStart, 9);
     // Rendementen tellen het afgeroomde bedrag mee (geen winst of verlies door afromen)
     expect(s.account.totalReturnPct).toBeCloseTo(((s.account.equity + s.skimmedQuote! - 50) / 50) * 100, 9);
     expect(s.account.dayReturnPct).toBeCloseTo(((s.account.equity + s.skimmedQuote!) / dayStart - 1) * 100, 9);
@@ -300,8 +303,11 @@ describe("Kapitaallimiet (live)", () => {
     expect(truePct).toBeGreaterThan(-5);
     expect(s.account.dayReturnPct).toBeCloseTo(truePct, 9);
     expect(s.account.totalReturnPct).toBeCloseTo(truePct, 9);
-    // EUR-dagresultaat (equity − dagstart) = wat vandaag echt gerealiseerd is
-    expect(s.account.equity - s.account.dayStartEquity).toBeCloseTo(s.account.realizedPnlToday, 9);
+    // EUR-dagresultaat = wat vandaag echt gerealiseerd is (herschreven in ronde 3: was
+    // equity − dagstart, toen de dagstart nog met het afgeroomde bedrag omlaag ging)
+    expect(s.account.dayPnlQuote).toBeCloseTo(s.account.realizedPnlToday, 9);
+    expect(s.account.dayStartEquity).toBe(50);
+    expect(s.account.totalPnlQuote).toBeCloseTo(s.account.realizedPnl, 9);
     // De limiet (5%) kijkt naar hetzelfde dag-% (naar rato schalen gaf ~-5,3% → onterechte pauze)
     expect(s.halted.halted).toBe(false);
     await h.engine.stop();
@@ -352,12 +358,23 @@ describe("Kapitaallimiet (live)", () => {
     realHalt(h2);
     let s = h2.engine.snapshot();
     expect(s.account.cashQuote).toBe(100);
+    // Ingelegd kapitaal = 20 + 80 verhoging
     expect(s.account.startingEquity).toBe(100);
-    expect(s.account.dayStartEquity).toBe(100);
-    expect(h2.logs().some((m) => m.startsWith("Kapitaallimiet €20,00 → €100,00"))).toBe(true);
+    // Herschreven (ronde 3): de dagstart ging mee omhoog; nu blijft hij de equity bij
+    // de dagwissel en telt de storting apart (resultaat vandaag 0, niet +400%).
+    expect(s.account.dayStartEquity).toBe(20);
+    expect(s.account.totalPnlQuote).toBeCloseTo(0, 9);
+    expect(s.account.totalReturnPct).toBeCloseTo(0, 9);
+    expect(s.account.dayPnlQuote).toBeCloseTo(0, 9);
+    expect(s.account.dayReturnPct).toBeCloseTo(0, 9);
+    expect(h2.logs().some((m) => m.startsWith("Kapitaallimiet €20,00 → €100,00: €80,00 extra kapitaal"))).toBe(true);
     await h2.engine.tick();
     s = h2.engine.snapshot();
     expect(s.halted.halted).toBe(false);
+    // Grafiek: equity + netto eruit (−80 verhoging) loopt door vanaf de oude €20
+    const last = s.equityHistory[s.equityHistory.length - 1];
+    expect(last.equity).toBeCloseTo(100, 9);
+    expect(last.skimmed).toBeCloseTo(-80, 9);
   });
 
   it("herstart met een LAGERE limiet telt open posities mee en pauzeert de handel niet", async () => {
@@ -369,22 +386,43 @@ describe("Kapitaallimiet (live)", () => {
     await h1.engine.stop();
 
     const before = h1.engine.snapshot().account;
-    const h2 = setup({ mode: "live", startingCapital: 20, clock: h1.clock, deps: { store: new StateStore(file) } });
+    const h2 = setup({ mode: "live", startingCapital: 20, clock: h1.clock, broker: h1.broker, deps: { store: new StateStore(file) } });
     realHalt(h2);
     await h2.engine.tick();
-    const s = h2.engine.snapshot();
+    let s = h2.engine.snapshot();
     expect(s.positions).toHaveLength(1);
     expect(s.account.cashQuote).toBe(0); // inleg 22,50 > limiet 20: geen cash meer
     expect(s.halted.halted).toBe(false);
-    // Herschreven (ronde 2): de opname van 27,50 is geen winst of verlies. Start en
-    // dag-start schalen mee (was: start − 27,50 = 22,50, wat het verlies-% opblies),
-    // zodat totaal- en dagrendement gelijk blijven.
-    const equity = s.account.equity;
-    expect(s.account.startingEquity).toBeCloseTo((50 * equity) / (equity + 27.5), 9);
+    // Herschreven (ronde 3): de opname van 27,50 is geen winst of verlies. Start en
+    // dag-start blijven staan (was in ronde 2: naar rato geschaald); de opname telt
+    // als overboeking, zodat totaal- en dagresultaat gelijk blijven.
+    expect(s.account.startingEquity).toBe(50);
+    expect(s.account.dayStartEquity).toBe(50);
+    expect(s.skimmedQuote).toBe(0); // kapitaal, geen afgeroomde winst
+    expect(s.account.totalPnlQuote).toBeCloseTo(before.totalPnlQuote!, 9);
+    expect(s.account.dayPnlQuote).toBeCloseTo(before.dayPnlQuote!, 9);
     expect(s.account.totalReturnPct).toBeCloseTo(before.totalReturnPct!, 9);
     expect(s.account.dayReturnPct).toBeCloseTo(before.dayReturnPct!, 9);
     expect(s.account.totalReturnPct).toBeLessThan(0); // alleen de instapfee
     expect(s.account.totalReturnPct).toBeGreaterThan(-0.2);
+    const logsBefore = h2.logs().length;
+
+    // De positie (inleg 22,50 > limiet 20) wordt met klein verlies verkocht: wat boven
+    // de limiet uitkomt is kapitaal dat alsnog teruggaat — GEEN winst.
+    h2.engine.arm();
+    const trade = (await h2.engine.closePosition(s.positions[0].id))!;
+    expect(trade.pnlQuote).toBeLessThan(0);
+    s = h2.engine.snapshot();
+    expect(s.account.cashQuote).toBeCloseTo(20, 9);
+    expect(s.skimmedQuote).toBe(0);
+    expect(s.account.totalPnlQuote).toBeCloseTo(trade.pnlQuote, 9);
+    expect(s.account.totalReturnPct).toBeCloseTo((trade.pnlQuote / 50) * 100, 9);
+    const newLogs = h2.logs().slice(0, h2.logs().length - logsBefore);
+    expect(newLogs.some((m) => m.includes("kapitaal gaat alsnog terug buiten het handelsbudget"))).toBe(true);
+    expect(h2.logs().some((m) => m.startsWith("Kapitaallimiet") && m.includes("winst"))).toBe(false);
+    // equity + netto eruit loopt door (geen sprong door de limietwijziging of de terugboeking)
+    const hist = s.equityHistory;
+    expect(hist[hist.length - 1].equity + (hist[hist.length - 1].skimmed ?? 0)).toBeCloseTo(50 + trade.pnlQuote, 9);
   });
 
   it("herstart met een lagere limiet NA verlies: budget = min(nieuwe limiet, wat de bot heeft), dag-% niet opgeblazen", async () => {
@@ -411,8 +449,15 @@ describe("Kapitaallimiet (live)", () => {
     expect(s.account.cashQuote).toBe(50);
     expect(s.account.dayReturnPct).toBeCloseTo(dayPct, 9);
     expect(s.account.totalReturnPct).toBeCloseTo(dayPct, 9);
-    expect(s.account.dayStartEquity).toBeCloseTo((100 * 50) / cash, 9);
+    // Herschreven (ronde 3): dagstart bleef niet staan maar werd geschaald (78,46); het
+    // EUR-resultaat is nu het echte verlies, de ~13,73 opname telt niet mee.
+    expect(s.account.dayStartEquity).toBe(100);
+    expect(s.account.startingEquity).toBe(100);
+    expect(s.account.totalPnlQuote).toBeCloseTo(cash - 100, 9);
+    expect(s.account.dayPnlQuote).toBeCloseTo(cash - 100, 9);
+    expect(s.skimmedQuote).toBe(0);
     expect(h2.logs().some((m) => m.startsWith("Kapitaallimiet €100,00 → €50,00"))).toBe(true);
+    expect(h2.logs().some((m) => m.includes("winst"))).toBe(false);
 
     // Kleine koers-/limietverlaging na een klein verlies triggert de 5%-limiet niet
     const file2 = join(dir, "state2.json");
@@ -442,7 +487,12 @@ describe("Kapitaallimiet (live)", () => {
     await h2.engine.tick();
     const s = h2.engine.snapshot();
     expect(s.account.cashQuote).toBe(30);
-    expect(s.account.dayStartEquity).toBe(30);
+    // Herschreven (ronde 3): was 30 (dagstart mee omlaag); nu blijft de dagstart 50 en
+    // telt de opname van 20 als overboeking: resultaat vandaag 0.
+    expect(s.account.dayStartEquity).toBe(50);
+    expect(s.account.dayPnlQuote).toBeCloseTo(0, 9);
+    expect(s.account.dayReturnPct).toBeCloseTo(0, 9);
+    expect(s.account.totalPnlQuote).toBeCloseTo(0, 9);
     expect(s.halted.halted).toBe(false);
   });
 });

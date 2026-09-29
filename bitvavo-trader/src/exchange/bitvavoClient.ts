@@ -24,6 +24,7 @@ import type {
   Ticker24h,
 } from "../core/types";
 import { BitvavoApiError, formatBitvavoHttpError } from "./errors";
+import { exchangeMinQuote } from "./minimums";
 import { formatDecimal } from "./precision";
 import { signRequest } from "./signing";
 
@@ -209,7 +210,8 @@ export function parseMarket(raw: Record<string, unknown>): MarketInfo | null {
     base: str(raw.base) ?? baseFromName ?? "",
     quote: str(raw.quote) ?? quoteFromName ?? "",
     status: str(raw.status) ?? "unknown",
-    minOrderQuote: Math.max(0, numOr(raw.minOrderInQuoteAsset, 0)),
+    // Ontbrekend / ongeldig / ≤ 0 = onbekend → het standaard beursminimum (€5), nooit "geen minimum".
+    minOrderQuote: exchangeMinQuote({ minOrderQuote: num(raw.minOrderInQuoteAsset) }),
     minOrderBase: Math.max(0, numOr(raw.minOrderInBaseAsset, 0)),
     pricePrecision: Math.max(1, Math.trunc(numOr(raw.pricePrecision, 5))),
     quantityDecimals: Math.max(0, Math.trunc(numOr(raw.quantityDecimals, 8))),

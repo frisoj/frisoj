@@ -143,8 +143,50 @@ describe("bescherming tegen andere websites", () => {
     expect(hostnameOf("localhost:4321")).toBe("localhost");
     expect(hostnameOf("[::1]:4321")).toBe("[::1]");
     expect(hostnameOf("[0:0:0:0:0:0:0:1]:4321")).toBe("[0:0:0:0:0:0:0:1]");
-    expect(hostnameOf("::1")).toBe("::1");
+    expect(hostnameOf("[::1]")).toBe("[::1]");
     expect(hostnameOf("127.0.0.1")).toBe("127.0.0.1");
+    expect(hostnameOf("LOCALHOST:4321")).toBe("localhost");
+    expect(hostnameOf(" localhost:4321 ")).toBe("localhost");
+    expect(hostnameOf("localhost:65535")).toBe("localhost");
+  });
+
+  it("hostnameOf parset strikt: alleen naam, naam:poort, [ipv6] of [ipv6]:poort", () => {
+    for (const h of [
+      // tekst na de host / niet-numerieke of lege poort
+      "localhost:4321x",
+      "localhost:abc",
+      "localhost:",
+      "localhost:4321:80",
+      "localhost:4321/pad",
+      "localhost:+80",
+      "localhost:65536",
+      "localhost:123456",
+      "localhost:4321 evil",
+      // "@" en spaties
+      "localhost@evil.example",
+      "evil.example@localhost",
+      "user@localhost:4321",
+      "local host",
+      "localhost :4321",
+      "localhost\t:4321",
+      // IPv6-varianten
+      "[::1].evil.example",
+      "[::1]evil:4321",
+      "[::1]:",
+      "[::1]:43a21",
+      "[::1]:4321x",
+      "[::1:4321",
+      "::1]:4321",
+      "[::1%25lo]:4321",
+      "[not-ipv6]:4321",
+      "[]:4321",
+      "::1", // IPv6 zonder haken: is geen geldige Host-header
+      "0:0:0:0:0:0:0:1",
+      "",
+      ":4321",
+    ]) {
+      expect(hostnameOf(h), JSON.stringify(h)).toBeNull();
+    }
   });
 
   it("weigert DNS-rebinding met een hostnaam die met 127. begint", async () => {
@@ -177,6 +219,45 @@ describe("bescherming tegen andere websites", () => {
       `[0:0:0:0:0:0:0:1]:${srv.port}`,
       `localhost:${srv.port}`,
       "127.0.0.1",
+    ]) {
+      const r = await rawGet(srv.port, "/api/info", { Host: host });
+      expect(r.status, host).toBe(200);
+    }
+  });
+
+  it("weigert Host-headers met rommel na de host, '@' of spaties (strikte parse)", async () => {
+    srv = await startTestServer();
+    const p = srv.port;
+    for (const host of [
+      `localhost:${p}x`,
+      `localhost:${p} evil.example`,
+      `127.0.0.1:${p}:80`,
+      `localhost:${p}/x`,
+      "localhost:",
+      `localhost@evil.example:${p}`,
+      `evil.example@localhost:${p}`,
+      `local host:${p}`,
+      `[::1].evil.example:${p}`,
+      `[::1].evil.example`,
+      `[::1]:${p}x`,
+      "::1",
+    ]) {
+      const r = await rawGet(srv.port, "/api/info", { Host: host });
+      expect(r.status, host).toBe(403);
+      const kill = await rawRequest(srv.port, "POST", "/api/engine/kill", { Host: host });
+      expect(kill.status, host).toBe(403);
+      const page = await rawGet(srv.port, "/", { Host: host });
+      expect(page.status, host).toBe(403);
+    }
+    expect(srv.engine.killed).toBe(0);
+    // Loopback-normalisatie blijft: andere schrijfwijzen van ::1 en 127.x.y.z mogen wel
+    for (const host of [
+      "localhost",
+      `LOCALHOST:${p}`,
+      "[::1]",
+      `[0000:0000:0000:0000:0000:0000:0000:0001]:${p}`,
+      `[::0:1]:${p}`,
+      `127.9.8.7:${p}`,
     ]) {
       const r = await rawGet(srv.port, "/api/info", { Host: host });
       expect(r.status, host).toBe(200);

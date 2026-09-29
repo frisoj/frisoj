@@ -544,7 +544,11 @@ describe("TradingEngine — start/stop, noodstop, events", () => {
     expect(s.running).toBe(false);
     expect(s.positions).toHaveLength(0);
     expect(s.trades.map((t) => t.exitReason)).toEqual(["kill-switch", "kill-switch"]);
-    expect(s.logs.some((l) => l.level === "error" && l.message.startsWith("NOODSTOP"))).toBe(true);
+    // Herschreven (ronde 3): een geslaagde noodstop werd als "error" gelogd; nu "warn"
+    // (alleen echte mislukkingen zijn "error").
+    expect(s.logs.find((l) => l.message.startsWith("NOODSTOP geactiveerd: 2 open positie(s)"))?.level).toBe("warn");
+    expect(s.logs.find((l) => l.message.startsWith("NOODSTOP voltooid: 2 positie(s) gesloten"))?.level).toBe("warn");
+    expect(s.logs.some((l) => l.level === "error")).toBe(false);
     const calls = h.feed.calls.length;
     await vi.advanceTimersByTimeAsync(120_000);
     expect(h.feed.calls.length).toBe(calls);

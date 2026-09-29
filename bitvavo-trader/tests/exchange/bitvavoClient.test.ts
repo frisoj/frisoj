@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { BitvavoClient } from "../../src/exchange/bitvavoClient";
 import { BitvavoApiError } from "../../src/exchange/errors";
+import { EXCHANGE_MIN_ORDER_QUOTE } from "../../src/core/defaults";
 
 const NOW = 1_700_000_000_000;
 const SECRET = "test-secret";
@@ -286,6 +287,36 @@ describe("BitvavoClient: publieke data", () => {
       notionalDecimals: 2,
     });
     expect(markets[1].tickSize).toBeUndefined();
+  });
+
+  it("markets: een ontbrekend/ongeldig/≤ 0 minOrderInQuoteAsset wordt het beursminimum van €5 (nooit 0 = geen minimum)", async () => {
+    const raws: Record<string, unknown>[] = [
+      { market: "A-EUR", minOrderInQuoteAsset: "0" },
+      { market: "B-EUR", minOrderInQuoteAsset: "-2" },
+      { market: "C-EUR", minOrderInQuoteAsset: "abc" },
+      { market: "D-EUR", minOrderInQuoteAsset: null },
+      { market: "E-EUR" },
+      { market: "F-EUR", minOrderInQuoteAsset: "" },
+      { market: "G-EUR", minOrderInQuoteAsset: 0 },
+      { market: "H-EUR", minOrderInQuoteAsset: "10" },
+      { market: "I-EUR", minOrderInQuoteAsset: "0.5" },
+    ];
+    const { fetchImpl } = mockFetch(() => ({ body: raws.map((r) => ({ status: "trading", ...r })) }));
+    const markets = await makeClient(fetchImpl).markets();
+    expect(EXCHANGE_MIN_ORDER_QUOTE).toBe(5);
+    expect(Object.fromEntries(markets.map((m) => [m.market, m.minOrderQuote]))).toEqual({
+      "A-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "B-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "C-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "D-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "E-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "F-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "G-EUR": EXCHANGE_MIN_ORDER_QUOTE,
+      "H-EUR": 10, // een geldig (ook hoger of lager) minimum van Bitvavo blijft gelden
+      "I-EUR": 0.5,
+    });
+    // Het minimum in base mag wel 0 zijn (onbekend = alleen het EUR-minimum telt).
+    for (const m of markets) expect(m.minOrderBase).toBe(0);
   });
 
   it("ticker24h: object en array, null-waarden veilig", async () => {

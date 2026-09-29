@@ -7,6 +7,9 @@
  * (standaard van het dashboard) of, voor een grotere N, de top 60. Elk verzoek
  * krijgt daar een stuk van. Zo kost een reeks oplopende `?limit=`-verzoeken
  * binnen één cachevenster hooguit twee scans in plaats van één per limit.
+ * Er loopt hooguit één scan tegelijk (ze gebruiken dezelfde Bitvavo-rate-limit
+ * als de stop-loss-orders): een verzoek dat de lopende scan niet kan delen,
+ * wacht tot die klaar is en kijkt dan eerst of het resultaat volstaat.
  */
 import type {
   Candle,
@@ -82,9 +85,15 @@ interface RankedRow {
 interface ScanResult {
   /** Voor hoeveel markten (top-N) deze scan is berekend */
   limit: number;
-  /** Er waren minder markten dan `limit`: de scan bevat ze allemaal (bedient dus ook een grotere N) */
+  /** De scan omvatte ALLE beschikbare markten (niet meer dan `limit`): bedient dus ook een grotere N */
   complete: boolean;
   rows: RankedRow[];
+}
+
+interface InflightScan {
+  key: string;
+  limit: number;
+  promise: Promise<ScanResult>;
 }
 
 function covers(result: ScanResult, size: number): boolean {
@@ -99,7 +108,8 @@ export class Scanner {
   // Sleutel zonder `limit`: een grotere scan bedient ook kleinere verzoeken, zodat
   // limit=1..60 niet 60 aparte scans (en Bitvavo-verzoeken) oplevert.
   private readonly cache = new Map<string, { at: number; result: ScanResult }>();
-  private readonly inflight = new Map<string, { limit: number; promise: Promise<ScanResult> }>();
+  /** De (enige) lopende scan; er worden nooit twee scans tegelijk gedaan. */
+  private inflight: InflightScan | null = null;
   private readonly now: () => number;
   private readonly cacheMs: number;
   private readonly candleCount: number;
@@ -123,28 +133,31 @@ export class Scanner {
     // Vaste scangrootte (30 of 60), niet `n`: anders start elke hogere limit een nieuwe scan.
     const size = scanSize(n);
     const key = `${interval}|${hashString(JSON.stringify(ensemble))}`;
-    const hit = this.cache.get(key);
-    if (hit && covers(hit.result, size) && this.now() - hit.at < this.cacheMs) return topN(hit.result, n);
-    const running = this.inflight.get(key);
-    if (running && running.limit >= size) return topN(await running.promise, n);
-    const entry = {
-      limit: size,
-      promise: this.compute(size, interval, ensemble).then((result) => {
+    for (;;) {
+      const hit = this.cache.get(key);
+      if (hit && covers(hit.result, size) && this.now() - hit.at < this.cacheMs) return topN(hit.result, n);
+      const running = this.inflight;
+      if (!running) break;
+      if (running.key === key && running.limit >= size) return topN(await running.promise, n);
+      // Te klein of andere instellingen: niet parallel scannen, maar wachten en
+      // daarna opnieuw kijken (een kleine scan kan alle markten al omvatten).
+      await running.promise.catch(() => undefined);
+    }
+    const promise: Promise<ScanResult> = this.compute(size, interval, ensemble)
+      .then((result) => {
         const prev = this.cache.get(key);
         // Een verse, grotere scan niet overschrijven met een kleinere
         if (!prev || covers(result, prev.result.limit) || this.now() - prev.at >= this.cacheMs) {
           this.cache.set(key, { at: this.now(), result });
         }
         return result;
-      }),
-    };
-    this.inflight.set(key, entry);
-    entry.promise
-      .finally(() => {
-        if (this.inflight.get(key) === entry) this.inflight.delete(key);
       })
-      .catch(() => undefined);
-    return topN(await entry.promise, n);
+      .finally(() => {
+        // Vóórdat wachtende verzoeken verder gaan: zij zien dan de cache en geen afgeronde scan meer.
+        if (this.inflight?.promise === promise) this.inflight = null;
+      });
+    this.inflight = { key, limit: size, promise };
+    return topN(await promise, n);
   }
 
   private async compute(limit: number, interval: Interval, ensemble: EnsembleConfig): Promise<ScanResult> {
@@ -152,10 +165,10 @@ export class Scanner {
     const markets = await feed.getMarkets();
     const tradable = new Set(markets.filter((m) => m.quote === "EUR" && m.status === "trading").map((m) => m.market));
     const tickers = await feed.getTickers24h();
-    const top = tickers
+    const candidates = tickers
       .filter((t) => tradable.has(t.market) && Number.isFinite(t.volumeQuote))
-      .sort((a, b) => b.volumeQuote - a.volumeQuote)
-      .slice(0, limit);
+      .sort((a, b) => b.volumeQuote - a.volumeQuote);
+    const top = candidates.slice(0, limit);
 
     let failures = 0;
     const rows = await mapLimit(top, this.concurrency, async (t, rank): Promise<RankedRow | null> => {
@@ -171,7 +184,8 @@ export class Scanner {
     if (ok.length === 0 && failures > 0) {
       throw new Error("De scanner kon geen enkele markt ophalen. Probeer het later opnieuw.");
     }
-    return { limit, complete: top.length < limit, rows: ok };
+    // Ook bij precies `limit` markten (bijv. 30 van 30) is er niets meer te scannen.
+    return { limit, complete: candidates.length <= limit, rows: ok };
   }
 
   private async row(t: Ticker24h, interval: Interval, ensemble: EnsembleConfig): Promise<ScannerRow> {

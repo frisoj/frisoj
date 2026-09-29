@@ -12,19 +12,23 @@
  *
  * De engine houdt in beide modi een eigen administratie (cash, posities). In
  * live mode blijft cash + inleg van open posities binnen de kapitaallimiet
- * (`startingCapital`; afgeroomde winst is een opname, geen verlies) en worden
- * er pas echte orders geplaatst na `arm()`.
+ * (`startingCapital`; afgeroomde winst en kapitaal dat terugging bij een lagere
+ * limiet zijn opnames, geen verlies: resultaat = equity + alles wat eruit ging −
+ * ingelegd kapitaal) en worden er pas echte orders geplaatst na `arm()`.
  *
  * Veiligheid:
  *  - Stop/noodstop hogen `stopGen` op: een lopende tick opent daarna geen posities meer.
+ *    Tijdens een noodstop is armen geblokkeerd; hij eindigt altijd ontwapend.
  *  - Een live koop met onbekende uitkomst pauzeert ALLE nieuwe entries (opgeslagen)
  *    tot `broker.lookupOrder` (optioneel) hem terugvindt, Bitvavo hem 3 ticks op rij
- *    niet kent, of de gebruiker `acknowledgeUnknownOrders()` aanroept.
+ *    niet kent én er genoeg tijd verstreken is (≥ max(60 s, 3 × pollMs)), of de
+ *    gebruiker `acknowledgeUnknownOrders()` aanroept.
  *  - Een live verkoop met onbekende uitkomst wordt ook onthouden (opgeslagen): voor
  *    die positie gaat er geen tweede verkooporder uit tot de uitkomst bekend is.
- *  - Een verkoop onder het beursminimum wordt niet verstuurd: de positie is dan
- *    "onverkoopbaar" (zichtbaar in de snapshot) tot de waarde herstelt, of de
- *    gebruiker hem afschrijft (`writeOffPosition`).
+ *  - Een verkoop onder het beursminimum wordt niet verstuurd (en na een weigering
+ *    "ONVERKOOPBAAR" van de broker niet elke tick opnieuw): de positie is dan
+ *    "onverkoopbaar" (zichtbaar in de snapshot, altijd bepaald tegen de actuele
+ *    koers) tot de waarde herstelt, of de gebruiker hem afschrijft (`writeOffPosition`).
  *  - Coins die niet meer op Bitvavo staan worden pas na twee waarnemingen (twee
  *    ticks, of bij handmatig sluiten twee saldo-opvragingen) als gesloten geboekt.
  *  - Per markt wordt dezelfde candle niet twee keer verhandeld (ook niet na een
@@ -69,6 +73,7 @@ import {
   type Trade,
   type TradingMode,
 } from "../core/types";
+import { EXCHANGE_MIN_ORDER_QUOTE } from "../core/defaults";
 import { closedCandles, dayKey, newId } from "../core/util";
 import { roundAmount } from "../exchange/precision";
 import { RiskManager } from "../risk/riskManager";
@@ -125,17 +130,38 @@ const MAX_FETCH_CANDLES = 1440;
 const GONE_FRACTION = 0.01;
 /** Zelfde marge als LiveBroker: tot 5% minder saldo = afronding/fee, verkoop wat er is */
 const MAX_SELL_SHORTFALL = 0.05;
-/** Beursminimum per order (EUR) als de marktinfo het niet vermeldt (Bitvavo: €5) */
-const DEFAULT_EXCHANGE_MIN_QUOTE = 5;
 /** Zo vaak op rij (in verschillende ticks) moet Bitvavo een order met onbekende uitkomst "niet kennen" */
 const NOT_FOUND_CONFIRMATIONS = 3;
+/**
+ * En minstens zo lang (ms) na het moment dat de uitkomst onbekend werd (of 3 × pollMs
+ * als dat langer is): snel Stop/Start of herstarten mag die conclusie niet versnellen.
+ */
+const NOT_FOUND_MIN_WAIT_MS = 60_000;
 /** Voorvoegsel waarmee de brokers een verkoop onder het beursminimum weigeren */
 const UNSELLABLE_PREFIX = "ONVERKOOPBAAR";
+/** Versie van de rendementsadministratie in het statusbestand (2 = startequity = ingelegd kapitaal) */
+const LEDGER_VERSION = 2;
 
-/** Kooporder met onbekende uitkomst (+ teller: zo vaak op rij "niet gevonden" bij Bitvavo) */
-type UnknownBuy = NonNullable<PersistedState["unknownOrders"]>[number] & { nullCount?: number };
+/** "Niet gevonden"-waarnemingen bij Bitvavo voor een order met onbekende uitkomst */
+interface NotFoundTrack {
+  /** Zo vaak op rij (in verschillende ticks) meldde Bitvavo dat de order niet bestaat */
+  nullCount?: number;
+  /** Tijdstip van de laatst meegetelde "niet gevonden" */
+  nullAt?: number;
+}
+/** Wat er van een (deels) gevulde order al geboekt is (cumulatief, zoals de beurs het meldt) */
+interface BookedFill {
+  /** Gevulde hoeveelheid base */
+  bookedAmount?: number;
+  /** Bruto EUR van dat deel (excl. fee) */
+  bookedQuote?: number;
+  /** Fee van dat deel */
+  bookedFee?: number;
+}
+/** Kooporder met onbekende uitkomst (+ engine-eigen velden) */
+type UnknownBuy = NonNullable<PersistedState["unknownOrders"]>[number] & NotFoundTrack & BookedFill;
 /** Verkooporder met onbekende uitkomst: voor deze positie gaat er geen tweede verkoop uit. */
-interface UnknownSell {
+interface UnknownSell extends NotFoundTrack, BookedFill {
   clientOrderId: string;
   positionId: string;
   market: string;
@@ -144,10 +170,18 @@ interface UnknownSell {
   /** Exit-reden waarmee een (alsnog) gevulde verkoop geboekt wordt */
   reason: ExitReason;
   at: number;
-  /** Deel dat al als exit geboekt is (bij een deels bekende vulling) */
-  bookedAmount?: number;
-  /** Zo vaak op rij (per tick) meldde Bitvavo dat de order niet bestaat */
-  nullCount?: number;
+}
+/** Het nieuwe (nog niet geboekte) deel van een order, plus de cumulatieve totalen */
+interface FillIncrement {
+  amount: number;
+  /** Bruto EUR van het nieuwe deel */
+  quote: number;
+  fee: number;
+  /** Prijs van het nieuwe deel (bruto / hoeveelheid) */
+  price: number;
+  totalAmount: number;
+  totalQuote: number;
+  totalFee: number;
 }
 /**
  * Opgeslagen staat met engine-eigen extra velden. types.ts blijft ongewijzigd;
@@ -157,6 +191,19 @@ type PersistedStateExt = PersistedState & {
   unknownSells?: UnknownSell[];
   /** Live: vandaag (account.dayKey) afgeroomde winst — voor het dagrendement */
   skimmedToday?: number;
+  /**
+   * {@link LEDGER_VERSION}. Ontbreekt bij oudere bestanden: die verlaagden
+   * start- en dag-startequity met het afgeroomde bedrag.
+   */
+  ledgerVersion?: number;
+  /** Live: kapitaal erbij door een hogere limiet (na de start), totaal en vandaag */
+  capitalAdded?: number;
+  addedToday?: number;
+  /** Live: kapitaal teruggegaan door een lagere limiet, totaal en vandaag */
+  capitalReturned?: number;
+  returnedToday?: number;
+  /** Live: kapitaal dat bij een lagere limiet nog in open posities vastzat */
+  capitalPending?: number;
 };
 type StateRecovery = NonNullable<PersistedState["stateRecovery"]>;
 /** Wat de laatste saldo-opvraging over één munt zegt */
@@ -310,6 +357,23 @@ function normalizePosition(raw: unknown): Position | null {
   };
 }
 
+/** Opgeslagen "al geboekt"-velden van een order met onbekende uitkomst (alleen geldige). */
+function bookedFill(raw: BookedFill): BookedFill {
+  return {
+    ...(isNum(raw.bookedAmount) ? { bookedAmount: raw.bookedAmount } : {}),
+    ...(isNum(raw.bookedQuote) ? { bookedQuote: raw.bookedQuote } : {}),
+    ...(isNum(raw.bookedFee) ? { bookedFee: raw.bookedFee } : {}),
+  };
+}
+
+/** Opgeslagen "niet gevonden"-telling van een order met onbekende uitkomst (alleen geldige). */
+function notFoundTrack(raw: NotFoundTrack): NotFoundTrack {
+  return {
+    ...(isNum(raw.nullCount) && raw.nullCount > 0 ? { nullCount: Math.floor(raw.nullCount) } : {}),
+    ...(isNum(raw.nullAt) ? { nullAt: raw.nullAt } : {}),
+  };
+}
+
 export class TradingEngine extends EventEmitter {
   readonly mode: TradingMode;
   private readonly feed: MarketDataFeed;
@@ -366,12 +430,19 @@ export class TradingEngine extends EventEmitter {
    */
   private unknownSells = new Map<string, UnknownSell>();
   /**
-   * positie-id → waarom een verkoop nu niet kan (onder het beursminimum). "engine" =
-   * eigen controle (verdwijnt zodra de waarde herstelt), "broker" = de broker
-   * weigerde met "ONVERKOOPBAAR" (verdwijnt bij de eerstvolgende gelukte verkoop).
-   * De melding wordt één keer per episode gelogd, niet elke tick.
+   * positie-id → laatst gemelde reden waarom een verkoop niet kon (onder het
+   * beursminimum), zodat de melding één keer per episode gelogd wordt, niet elke tick.
+   * "engine" = eigen controle, met de hoeveelheid die echt verkocht kon worden
+   * (`amount`: live kan het saldo op Bitvavo iets lager zijn dan de positie);
+   * "broker" = de broker weigerde met "ONVERKOOPBAAR" bij positiewaarde `value`
+   * (verdwijnt bij de eerstvolgende gelukte verkoop).
+   * Of een positie NU onverkoopbaar is, wordt altijd tegen de actuele koers bepaald
+   * ({@link unsellableNow}); een opgeslagen reden telt daarbij nooit mee.
    */
-  private unsellable = new Map<string, { kind: "engine" | "broker"; reason: string }>();
+  private unsellable = new Map<
+    string,
+    { kind: "engine" | "broker"; reason: string; amount?: number; value?: number }
+  >();
   /**
    * positie-id → tick waarin de coins voor het eerst (deels) weg leken. Pas bij
    * een tweede waarneming in een latere tick wordt er geboekt.
@@ -396,10 +467,29 @@ export class TradingEngine extends EventEmitter {
   private evaluatedBeforeRestart = new Map<string, number>();
   /** Dag waarop de dagelijkse verlieslimiet geraakt is: tot de dagwissel geen nieuwe trades */
   private haltedDayKey: string | null = null;
-  /** Live: cumulatief boven de kapitaallimiet gehouden winst */
+  /**
+   * Live: cumulatief boven de kapitaallimiet gehouden WINST ("afgeroomd"). Samen met
+   * `capitalReturned` = alles wat netto uit het handelsbudget is gegaan; ingelegd
+   * kapitaal = `account.startingEquity` (startkapitaal + verhogingen van de limiet).
+   */
   private skimmedQuote = 0;
   /** Live: deel van `skimmedQuote` dat vandaag (sinds de dagwissel) is afgeroomd */
   private skimmedToday = 0;
+  /** Live: kapitaal dat door een VERLAAGDE limiet uit het budget terugging (geen winst) */
+  private capitalReturned = 0;
+  /** Live: deel van `capitalReturned` van vandaag */
+  private returnedToday = 0;
+  /** Live: kapitaal dat na de start bij het budget kwam door een HOGERE limiet */
+  private capitalAdded = 0;
+  /** Live: deel van `capitalAdded` van vandaag */
+  private addedToday = 0;
+  /**
+   * Live: kapitaal dat bij een verlaagde limiet in open posities vastzat (inleg boven
+   * de nieuwe limiet) en bij de verkoop alsnog terug moet — als kapitaal, niet als winst.
+   */
+  private capitalPending = 0;
+  /** Aantal lopende noodstops: zolang > 0 is armen geblokkeerd */
+  private killsInProgress = 0;
   /** Reden waarom de laatste closePosition-aanroep de positie niet (volledig) sloot */
   private closeFailure: string | null = null;
   /** Opgeslagen staat was onbruikbaar: wacht op bevestiging (live: armen geblokkeerd) */
@@ -674,12 +764,14 @@ export class TradingEngine extends EventEmitter {
   /**
    * Noodstop: bot stilzetten, ontwapenen en alle posities verkopen. Geeft terug
    * hoeveel posities gesloten zijn en welke NIET (met Nederlandse reden, bijv.
-   * onverkoopbaar, afgewezen of uitkomst onbekend).
+   * onverkoopbaar, afgewezen of uitkomst onbekend). Zolang de noodstop loopt is
+   * armen geblokkeerd, en hij eindigt altijd ontwapend.
    */
   async killSwitch(): Promise<KillResult> {
     // Eerst de lus stilzetten zodat er geen nieuwe entries meer komen, ook niet
     // in een tick die nu nog loopt (stopGen) — en direct ontwapenen: de
     // noodstop-verkopen zelf zijn expliciet en gaan ook ontwapend door.
+    this.killsInProgress++;
     this.running = false;
     this.stopGen++;
     if (this.timer) {
@@ -690,45 +782,57 @@ export class TradingEngine extends EventEmitter {
     this.armed = false;
     const failed: KillResult["failed"] = [];
     let closed = 0;
-    await this.exclusive(async () => {
-      // Eerst ophelderen wat er met orders van onbekende uitkomst gebeurd is: een
-      // alsnog gevulde koop wordt zo een positie die hieronder verkocht wordt.
-      // ("Niet gevonden" telt hier niet mee voor de 3 waarnemingen.)
-      if (this.unknownBuys.size > 0) await this.resolveUnknownBuys(false);
-      if (this.unknownSells.size > 0) await this.resolveUnknownSells(false);
-      // Pas tellen als een lopende tick klaar is.
-      this.log(
-        "error",
-        `NOODSTOP geactiveerd: ${this.positions.length} open positie(s) worden gesloten en de bot stopt`,
-      );
-      for (const pos of [...this.positions]) {
-        if (!this.positions.includes(pos)) continue;
-        const price = await this.freshPrice(pos.market);
-        await this.exitPosition(pos, "kill-switch", price, true);
-        if (this.positions.includes(pos)) {
-          failed.push({
-            id: pos.id,
-            market: pos.market,
-            reason: this.exitFailure ?? "verkoop mislukt (zie het logboek)",
-          });
-        } else {
-          closed++;
-        }
-      }
-      for (const u of this.unknownBuys.values()) {
-        failed.push({
-          id: u.clientOrderId,
-          market: u.market,
-          reason:
-            "kooporder met onbekende uitkomst: als die toch is uitgevoerd, staan de gekochte coins nog op je Bitvavo-account (niet verkocht)",
+    try {
+      try {
+        await this.exclusive(async () => {
+          // Eerst ophelderen wat er met orders van onbekende uitkomst gebeurd is: een
+          // alsnog gevulde koop wordt zo een positie die hieronder verkocht wordt.
+          // ("Niet gevonden" telt hier niet mee voor de 3 waarnemingen.)
+          if (this.unknownBuys.size > 0) await this.resolveUnknownBuys(false);
+          if (this.unknownSells.size > 0) await this.resolveUnknownSells(false);
+          // Pas tellen als een lopende tick klaar is.
+          this.log(
+            "warn",
+            `NOODSTOP geactiveerd: ${this.positions.length} open positie(s) worden gesloten en de bot stopt`,
+          );
+          for (const pos of [...this.positions]) {
+            if (!this.positions.includes(pos)) continue;
+            try {
+              const price = await this.freshPrice(pos.market);
+              await this.exitPosition(pos, "kill-switch", price, true);
+            } catch (err) {
+              this.exitFailure = `verkoop mislukt: ${errorMessage(err)}`;
+              this.log("error", `NOODSTOP: verkoop ${pos.market} mislukt: ${errorMessage(err)}`);
+            }
+            if (this.positions.includes(pos)) {
+              failed.push({
+                id: pos.id,
+                market: pos.market,
+                reason: this.exitFailure ?? "verkoop mislukt (zie het logboek)",
+              });
+            } else {
+              closed++;
+            }
+          }
+          for (const u of this.unknownBuys.values()) {
+            failed.push({
+              id: u.clientOrderId,
+              market: u.market,
+              reason:
+                "kooporder met onbekende uitkomst: als die toch is uitgevoerd, staan de gekochte coins nog op je Bitvavo-account (niet verkocht)",
+            });
+          }
         });
+      } finally {
+        if (wasArmed) this.log("warn", "Live mode ontwapend na de noodstop");
+        await this.stop();
       }
-    });
-    // Nogmaals: iemand kan tijdens de noodstop opnieuw gearmd hebben.
-    const rearmed = this.mode === "live" && this.armed;
-    this.armed = false;
-    if (wasArmed || rearmed) this.log("warn", "Live mode ontwapend na de noodstop");
-    await this.stop();
+    } finally {
+      // Altijd ontwapend eindigen (ook als er tijdens de noodstop iets misging):
+      // opnieuw controleren NA de laatste stop().
+      this.armed = false;
+      this.killsInProgress--;
+    }
     if (failed.length) {
       this.log(
         "error",
@@ -737,7 +841,7 @@ export class TradingEngine extends EventEmitter {
           .join("; ")}) — controleer je account en sluit handmatig!`,
       );
     } else {
-      this.log("error", `NOODSTOP voltooid: ${closed} positie(s) gesloten, bot gestopt`);
+      this.log("warn", `NOODSTOP voltooid: ${closed} positie(s) gesloten, bot gestopt`);
     }
     this.emitSnapshot();
     return { closed, failed: failed.map((f) => ({ ...f })) };
@@ -746,7 +850,9 @@ export class TradingEngine extends EventEmitter {
   /**
    * Schrijft een ONVERKOOPBARE positie (waarde onder het beursminimum) af: de
    * bot beheert hem niet meer en boekt de volledige inleg als verlies. De coins
-   * blijven op het account staan; de cash verandert niet.
+   * blijven op het account staan; de cash verandert niet. Of de positie
+   * onverkoopbaar is, wordt tegen de actuele koers bepaald (niet op een eerdere
+   * melding): een positie die nu verkocht kan worden, wordt nooit afgeschreven.
    */
   writeOffPosition(id: string): Trade {
     const pos = this.positions.find((p) => p.id === id);
@@ -784,7 +890,7 @@ export class TradingEngine extends EventEmitter {
       pnlQuote: pnl,
       pnlPct: -100,
       rMultiple: initialRisk > 0 ? pnl / initialRisk : 0,
-      exitReason: "manual",
+      exitReason: "write-off",
       candlesHeld: pos.candlesHeld,
       entryReason: `${pos.entryReason} · afgeschreven (onverkoopbaar restant blijft op je account)`,
     };
@@ -794,6 +900,7 @@ export class TradingEngine extends EventEmitter {
     this.trades.push(trade);
     if (this.trades.length > MAX_TRADES_KEPT) this.trades.splice(0, this.trades.length - MAX_TRADES_KEPT);
     this.forgetPosition(pos);
+    this.settleCapitalPending();
     this.updateEquity();
     this.recordEquity(now, true);
     this.emitEvent("position-closed", { ...trade });
@@ -809,7 +916,13 @@ export class TradingEngine extends EventEmitter {
   }
 
   arm(): void {
-    if (this.mode !== "live" || this.armed) return;
+    if (this.mode !== "live") return;
+    if (this.killsInProgress > 0) {
+      throw new Error(
+        "Armen geblokkeerd: noodstop bezig. Wacht tot de noodstop klaar is (de bot eindigt ontwapend) en arm daarna opnieuw als je dat wilt.",
+      );
+    }
+    if (this.armed) return;
     if (this.stateRecovery) {
       throw new Error(
         `Armen geblokkeerd: de opgeslagen staat was bij het starten onbruikbaar (${this.stateRecovery.reason}) en de bot begon met een lege administratie. ` +
@@ -889,6 +1002,11 @@ export class TradingEngine extends EventEmitter {
     this.haltedDayKey = null;
     this.skimmedQuote = 0;
     this.skimmedToday = 0;
+    this.capitalReturned = 0;
+    this.returnedToday = 0;
+    this.capitalAdded = 0;
+    this.addedToday = 0;
+    this.capitalPending = 0;
     this.pendingExit.clear();
     this.posCursor.clear();
     this.rejectLogged.clear();
@@ -972,6 +1090,8 @@ export class TradingEngine extends EventEmitter {
     this.account.tradesToday = 0;
     this.account.realizedPnlToday = 0;
     this.skimmedToday = 0;
+    this.returnedToday = 0;
+    this.addedToday = 0;
     this.haltedDayKey = null;
     this.updateEquity();
     this.log("info", `Nieuwe handelsdag (${key}): dagtellers gereset, startequity ${fmtEur(this.account.equity)}`);
@@ -1352,7 +1472,13 @@ export class TradingEngine extends EventEmitter {
     if (this.isOpenOrUnknown(res)) {
       // Deels gevuld maar de order kan nog verder vullen: het gevulde deel is
       // geboekt (met stop), de rest blijft onbekend tot hij opgehelderd is.
-      this.unknownBuys.set(unknown.clientOrderId, { ...unknown, positionId: pos.id, bookedAmount: filledAmount });
+      this.unknownBuys.set(unknown.clientOrderId, {
+        ...unknown,
+        positionId: pos.id,
+        bookedAmount: filledAmount,
+        bookedQuote: filledQuote,
+        bookedFee: fee,
+      });
       this.log(
         "error",
         `UITKOMST ONBEKEND bij koop ${market} (clientOrderId ${unknown.clientOrderId}): alleen het bekende deel is geboekt; de order kan nog verder vullen. ` +
@@ -1367,9 +1493,10 @@ export class TradingEngine extends EventEmitter {
    * `broker.lookupOrder` (optioneel). Een antwoord ZONDER "UITKOMST ONBEKEND"
    * (en niet meer open) is definitief: het gevulde deel dat nog niet geboekt is
    * wordt alsnog een positie (met stop), daarna vervalt de blokkade. `null`
-   * (Bitvavo kent de order niet) pas na {@link NOT_FOUND_CONFIRMATIONS} ticks op
-   * rij als "niet geplaatst" beschouwen. Gooit het opzoeken: blijven wachten.
-   * `countNulls` = false (noodstop): "niet gevonden" telt niet als extra tick.
+   * (Bitvavo kent de order niet) pas als "niet geplaatst" beschouwen na
+   * {@link NOT_FOUND_CONFIRMATIONS} getelde waarnemingen op rij én genoeg tijd
+   * (zie {@link countNotFound}). Gooit het opzoeken: blijven wachten.
+   * `countNulls` = false (noodstop): "niet gevonden" telt niet mee.
    */
   private async resolveUnknownBuys(countNulls: boolean): Promise<void> {
     const lookup = this.lookupFn();
@@ -1380,10 +1507,7 @@ export class TradingEngine extends EventEmitter {
       try {
         res = await lookup(u.market, u.clientOrderId);
       } catch (err) {
-        if (this.unknownBuys.get(u.clientOrderId) === u && u.nullCount) {
-          u.nullCount = 0;
-          changed = true;
-        }
+        if (this.unknownBuys.get(u.clientOrderId) === u && this.resetNotFound(u)) changed = true;
         this.logThrottled(
           `unknown:${u.clientOrderId}`,
           "warn",
@@ -1395,15 +1519,16 @@ export class TradingEngine extends EventEmitter {
       if (this.unknownBuys.get(u.clientOrderId) !== u) continue;
       if (res === null) {
         if (!countNulls) continue;
-        u.nullCount = (u.nullCount ?? 0) + 1;
+        const seen = this.countNotFound(u);
+        if (seen === "uncounted") continue;
         changed = true;
-        if (u.nullCount < NOT_FOUND_CONFIRMATIONS) {
+        if (seen === "counted") {
           this.log(
             "info",
             `Kooporder ${u.market} met onbekende uitkomst (clientOrderId ${u.clientOrderId}) nog niet gevonden bij Bitvavo ` +
-              `(${u.nullCount}/${NOT_FOUND_CONFIRMATIONS}) — ` +
+              `(${this.notFoundProgress(u)}) — ` +
               (this.running
-                ? "de bot kijkt de volgende tick opnieuw; nieuwe entries blijven gepauzeerd"
+                ? "de bot kijkt bij een volgende tick opnieuw; nieuwe entries blijven gepauzeerd"
                 : "de bot staat stil: start hem opnieuw om verder te zoeken (nieuwe entries blijven gepauzeerd)"),
           );
           continue;
@@ -1420,10 +1545,7 @@ export class TradingEngine extends EventEmitter {
       if (!res || typeof res !== "object") continue;
       // Definitief = zonder "UITKOMST ONBEKEND" en niet (vangnet) status "new".
       if (this.isOpenOrUnknown(res)) {
-        if (u.nullCount) {
-          u.nullCount = 0;
-          changed = true;
-        }
+        if (this.resetNotFound(u)) changed = true;
         // Wat al zeker gevuld is meteen boeken (met stop): niet wachten tot de order klaar is.
         if (this.unbookedAmount(u.bookedAmount, res) > 0 && this.bookResolvedBuy(u, res, false)) changed = true;
         this.logThrottled(
@@ -1446,6 +1568,45 @@ export class TradingEngine extends EventEmitter {
     }
   }
 
+  /** Minimale tijd tussen een onbekende orderuitkomst en de conclusie "niet geplaatst". */
+  private notFoundMinWaitMs(): number {
+    return Math.max(NOT_FOUND_MIN_WAIT_MS, NOT_FOUND_CONFIRMATIONS * this.config.pollMs);
+  }
+
+  /**
+   * Verwerkt een "niet gevonden" (null) van Bitvavo voor een order met onbekende
+   * uitkomst. Een waarneming telt alleen mee als de vorige getelde minstens
+   * pollMs/2 geleden is (snel Stop/Start of herstarten telt dus niet extra).
+   * "confirmed" (= niet geplaatst) pas bij ≥ {@link NOT_FOUND_CONFIRMATIONS} getelde
+   * waarnemingen op rij (in verschillende ticks) én minstens max(60 s, 3 × pollMs)
+   * nadat de uitkomst onbekend werd (`u.at`).
+   */
+  private countNotFound(u: NotFoundTrack & { at: number }): "uncounted" | "counted" | "confirmed" {
+    const now = this.nowFn();
+    const count = u.nullCount ?? 0;
+    if (count > 0 && isNum(u.nullAt) && now - u.nullAt < this.config.pollMs / 2) return "uncounted";
+    u.nullCount = count + 1;
+    u.nullAt = now;
+    if (u.nullCount >= NOT_FOUND_CONFIRMATIONS && now - u.at >= this.notFoundMinWaitMs()) return "confirmed";
+    return "counted";
+  }
+
+  /** Teller "niet gevonden" terug naar 0 (alleen "op rij" telt). True als er iets veranderde. */
+  private resetNotFound(u: NotFoundTrack): boolean {
+    if (!u.nullCount && u.nullAt === undefined) return false;
+    u.nullCount = 0;
+    delete u.nullAt;
+    return true;
+  }
+
+  /** "1/3", of na 3 waarnemingen hoe lang de bot nog wacht (voor in de logregel). */
+  private notFoundProgress(u: NotFoundTrack & { at: number }): string {
+    const n = u.nullCount ?? 0;
+    if (n < NOT_FOUND_CONFIRMATIONS) return `${n}/${NOT_FOUND_CONFIRMATIONS}`;
+    const left = Math.max(1, Math.ceil((u.at + this.notFoundMinWaitMs() - this.nowFn()) / 1000));
+    return `${n}× op rij; de bot concludeert pas ${Math.round(this.notFoundMinWaitMs() / 1000)} s na de order dat hij niet is uitgevoerd, nog ~${left} s`;
+  }
+
   /**
    * Hoeveel base een (teruggevonden) order méér gevuld heeft dan al geboekt is
    * (0 als niets extra).
@@ -1458,16 +1619,55 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
+   * Het NIEUWE gevulde deel van een (teruggevonden) order t.o.v. wat al geboekt is:
+   * hoeveelheid, bruto EUR en fee van alleen dat deel, en de prijs ervan =
+   * (bruto totaal − al geboekt bruto) / (hoeveelheid totaal − al geboekt). Zo krijgt
+   * een late vulling tegen een andere koers zijn eigen prijs, niet het gemiddelde
+   * van de hele order. Oudere opgeslagen staat zonder geboekte bedragen: naar rato.
+   * `fallbackPrice` als de broker geen prijs meldt. null = niets nieuws / geen prijs.
+   */
+  private fillIncrement(res: OrderResult, booked: BookedFill, fallbackPrice?: number): FillIncrement | null {
+    const amount = this.unbookedAmount(booked.bookedAmount, res);
+    if (!(amount > 0)) return null;
+    const totalAmount = res.filledAmount;
+    const avg =
+      isNum(res.avgPrice) && res.avgPrice > 0
+        ? res.avgPrice
+        : isNum(res.filledQuote) && res.filledQuote > 0
+          ? res.filledQuote / totalAmount
+          : isNum(fallbackPrice) && fallbackPrice > 0
+            ? fallbackPrice
+            : 0;
+    if (!(isNum(avg) && avg > 0)) return null;
+    const totalQuote = isNum(res.filledQuote) && res.filledQuote > 0 ? res.filledQuote : totalAmount * avg;
+    const totalFee = isNum(res.feeQuote) && res.feeQuote > 0 ? res.feeQuote : 0;
+    const share = (totalAmount - amount) / totalAmount;
+    const prevQuote = isNum(booked.bookedQuote) && booked.bookedQuote >= 0 ? booked.bookedQuote : totalQuote * share;
+    const prevFee = isNum(booked.bookedFee) && booked.bookedFee >= 0 ? booked.bookedFee : totalFee * share;
+    let quote = totalQuote - prevQuote;
+    let price = quote / amount;
+    // Vangnet tegen afrondingsruis in de totalen (bijv. een heel klein nieuw deel):
+    // een marketorder vult niet op minder dan de helft of meer dan het dubbele van
+    // zijn eigen gemiddelde; dan het gemiddelde gebruiken.
+    if (!(isNum(price) && price >= avg / 2 && price <= avg * 2)) {
+      price = avg;
+      quote = amount * avg;
+    }
+    const fee = Math.max(0, totalFee - prevFee);
+    return { amount, quote, fee, price, totalAmount, totalQuote, totalFee };
+  }
+
+  /**
    * Boekt een teruggevonden kooporder (voor zover nog niet geboekt) als positie
-   * met stop, en onthoudt in `u` wat er geboekt is. `final` = de order is klaar
-   * (anders kan hij nog verder vullen en blijft `u` bestaan). Geeft false als de
-   * vulling onbruikbaar is (dan blijft de blokkade staan).
+   * met stop, en onthoudt in `u` wat er geboekt is. Alleen het NIEUWE deel wordt
+   * geboekt, tegen zijn eigen prijs en fee ({@link fillIncrement}); stop en doel
+   * liggen ten opzichte van die prijs. `final` = de order is klaar (anders kan hij
+   * nog verder vullen en blijft `u` bestaan). Geeft false als de vulling
+   * onbruikbaar is (dan blijft de blokkade staan).
    */
   private bookResolvedBuy(u: UnknownBuy, res: OrderResult, final: boolean): boolean {
-    const filledAmount = isNum(res.filledAmount) && res.filledAmount > 0 ? res.filledAmount : 0;
     const booked = isNum(u.bookedAmount) && u.bookedAmount > 0 ? u.bookedAmount : 0;
-    const extra = this.unbookedAmount(u.bookedAmount, res);
-    if (!(extra > 0)) {
+    if (!(this.unbookedAmount(u.bookedAmount, res) > 0)) {
       if (final) {
         this.log(
           "info",
@@ -1477,14 +1677,8 @@ export class TradingEngine extends EventEmitter {
       }
       return true;
     }
-    const filledQuote =
-      isNum(res.filledQuote) && res.filledQuote > 0
-        ? res.filledQuote
-        : isNum(res.avgPrice) && res.avgPrice > 0
-          ? filledAmount * res.avgPrice
-          : 0;
-    const avg = isNum(res.avgPrice) && res.avgPrice > 0 ? res.avgPrice : filledQuote / filledAmount;
-    if (!isNum(avg) || avg <= 0 || !(filledQuote > 0)) {
+    const inc = this.fillIncrement(res, u);
+    if (!inc || !(inc.quote > 0)) {
       this.logThrottled(
         `unknown:${u.clientOrderId}`,
         "error",
@@ -1492,37 +1686,35 @@ export class TradingEngine extends EventEmitter {
       );
       return false;
     }
-    const share = extra / filledAmount;
-    const extraQuote = filledQuote * share;
-    const fee = (isNum(res.feeQuote) && res.feeQuote > 0 ? res.feeQuote : 0) * share;
-    const cost = extraQuote + fee;
+    const { amount: extra, price, fee } = inc;
+    const cost = inc.quote + fee;
     const existing = u.positionId ? this.positions.find((p) => p.id === u.positionId) : undefined;
     let pos: Position;
     if (existing) {
       const amount = existing.amount + extra;
-      existing.entryPrice = (existing.entryPrice * existing.amount + avg * extra) / amount;
+      existing.entryPrice = (existing.entryPrice * existing.amount + price * extra) / amount;
       existing.amount = amount;
       existing.costQuote += cost;
       existing.entryFeeQuote += fee;
       pos = existing;
     } else {
-      let stop = u.stopDist > 0 ? avg - u.stopDist : avg * 0.97;
-      if (!isNum(stop) || stop <= 0 || stop >= avg) stop = avg * 0.97;
-      let tp = u.tpDist > 0 ? avg + u.tpDist : avg + 2 * (avg - stop);
-      if (!isNum(tp) || tp <= avg) tp = avg + 2 * (avg - stop);
+      let stop = u.stopDist > 0 ? price - u.stopDist : price * 0.97;
+      if (!isNum(stop) || stop <= 0 || stop >= price) stop = price * 0.97;
+      let tp = u.tpDist > 0 ? price + u.tpDist : price + 2 * (price - stop);
+      if (!isNum(tp) || tp <= price) tp = price + 2 * (price - stop);
       pos = {
         id: newId("pos"),
         market: u.market,
         side: "long",
         entryTime: u.at > 0 ? u.at : this.nowFn(),
-        entryPrice: avg,
+        entryPrice: price,
         amount: extra,
         costQuote: cost,
         entryFeeQuote: fee,
         stopPrice: stop,
         initialStopPrice: stop,
         takeProfitPrice: tp,
-        highestPrice: avg,
+        highestPrice: price,
         candlesHeld: 0,
         entryReason: u.entryReason,
         ...(res.orderId ? { orderId: res.orderId } : {}),
@@ -1533,14 +1725,16 @@ export class TradingEngine extends EventEmitter {
     this.account.cashQuote -= cost;
     this.account.feesPaid += fee;
     u.positionId = pos.id;
-    u.bookedAmount = filledAmount;
+    u.bookedAmount = inc.totalAmount;
+    u.bookedQuote = inc.totalQuote;
+    u.bookedFee = inc.totalFee;
     this.updateEquity();
     this.recordEquity(this.nowFn(), true);
     if (!existing) this.emitEvent("position-opened", { ...pos });
     this.log(
       "trade",
       `KOOP ${u.market} alsnog ${final ? "" : "deels "}uitgevoerd (order met onbekende uitkomst teruggevonden${final ? "" : ", nog niet afgerond"}): ` +
-        `${fmtEur(cost)} @ ${fmtPrice(avg)} · stop ${fmtPrice(pos.stopPrice)} · doel ${fmtPrice(pos.takeProfitPrice)}` +
+        `${fmtEur(cost)} @ ${fmtPrice(price)} · stop ${fmtPrice(pos.stopPrice)} · doel ${fmtPrice(pos.takeProfitPrice)}` +
         (existing ? ` — bijgeboekt bij de open positie (${fmtAmount(pos.amount)} totaal)` : ""),
     );
     if (this.account.cashQuote < -1e-6) {
@@ -1588,10 +1782,10 @@ export class TradingEngine extends EventEmitter {
    * Definitief (geen "UITKOMST ONBEKEND", niet status "new") → het (extra)
    * gevulde deel als exit boeken en de blokkade opheffen (de rest wordt daarna
    * gewoon verkocht). Nog niet afgerond → wat al zeker verkocht is boeken, blijven
-   * wachten. {@link NOT_FOUND_CONFIRMATIONS} ticks op rij niet gevonden → niet
-   * uitgevoerd, opnieuw verkopen mag; gooit → blijven wachten.
+   * wachten. Niet gevonden (genoeg keer op rij én lang genoeg, zie
+   * {@link countNotFound}) → niet uitgevoerd, opnieuw verkopen mag; gooit → blijven wachten.
    * `countNulls` = false (noodstop / handmatig sluiten): "niet gevonden" telt niet
-   * als extra tick. Geeft de hierbij geboekte trades terug.
+   * mee. Geeft de hierbij geboekte trades terug.
    */
   private async resolveUnknownSells(countNulls: boolean): Promise<Trade[]> {
     const lookup = this.lookupFn();
@@ -1604,10 +1798,7 @@ export class TradingEngine extends EventEmitter {
       try {
         res = await lookup(u.market, u.clientOrderId);
       } catch (err) {
-        if (this.unknownSells.get(u.clientOrderId) === u && u.nullCount) {
-          u.nullCount = 0;
-          changed = true;
-        }
+        if (this.unknownSells.get(u.clientOrderId) === u && this.resetNotFound(u)) changed = true;
         this.logThrottled(
           key,
           "warn",
@@ -1619,15 +1810,16 @@ export class TradingEngine extends EventEmitter {
       if (this.unknownSells.get(u.clientOrderId) !== u) continue;
       if (res === null) {
         if (!countNulls) continue;
-        u.nullCount = (u.nullCount ?? 0) + 1;
+        const seen = this.countNotFound(u);
+        if (seen === "uncounted") continue;
         changed = true;
-        if (u.nullCount < NOT_FOUND_CONFIRMATIONS) {
+        if (seen === "counted") {
           this.log(
             "info",
             `Verkooporder ${u.market} met onbekende uitkomst (clientOrderId ${u.clientOrderId}) nog niet gevonden bij Bitvavo ` +
-              `(${u.nullCount}/${NOT_FOUND_CONFIRMATIONS}) — ` +
+              `(${this.notFoundProgress(u)}) — ` +
               (this.running
-                ? "de bot kijkt de volgende tick opnieuw en verkoopt tot dan niet opnieuw"
+                ? "de bot kijkt bij een volgende tick opnieuw en verkoopt tot dan niet opnieuw"
                 : "de bot staat stil — start de bot opnieuw of sluit de positie zelf op Bitvavo"),
           );
           continue;
@@ -1644,10 +1836,7 @@ export class TradingEngine extends EventEmitter {
       if (!res || typeof res !== "object") continue;
       const pos = this.positions.find((p) => p.id === u.positionId);
       if (this.isOpenOrUnknown(res)) {
-        if (u.nullCount) {
-          u.nullCount = 0;
-          changed = true;
-        }
+        if (this.resetNotFound(u)) changed = true;
         // Wat al zeker verkocht is meteen boeken; de rest blijft onbekend.
         if (pos && this.unbookedAmount(u.bookedAmount, res) > 0) {
           const trade = await this.bookUnknownSellFill(u, res, pos, false);
@@ -1695,27 +1884,23 @@ export class TradingEngine extends EventEmitter {
 
   /**
    * Boekt het nog niet geboekte, gevulde deel van een verkooporder met
-   * onbekende uitkomst als exit. `final` = de order is klaar ("filled" sluit dan
+   * onbekende uitkomst als exit, tegen de prijs en fee van alleen dat deel
+   * ({@link fillIncrement}). `final` = de order is klaar ("filled" sluit dan
    * de hele positie, net als bij een gewone verkoop); anders blijft de rest van de
    * positie altijd staan (de order kan nog verder vullen).
    */
   private async bookUnknownSellFill(u: UnknownSell, res: OrderResult, pos: Position, final: boolean): Promise<Trade | null> {
-    const extra = this.unbookedAmount(u.bookedAmount, res);
-    if (!(extra > 0)) return null;
-    const filledAmount = res.filledAmount;
-    const rawGross =
-      isNum(res.filledQuote) && res.filledQuote > 0
-        ? res.filledQuote
-        : isNum(res.avgPrice) && res.avgPrice > 0
-          ? filledAmount * res.avgPrice
-          : 0;
-    const exitPrice =
-      isNum(res.avgPrice) && res.avgPrice > 0 ? res.avgPrice : rawGross > 0 ? rawGross / filledAmount : this.priceFor(pos);
-    const filled = Math.min(extra, pos.amount);
-    const share = filled / filledAmount;
-    const gross = rawGross > 0 ? rawGross * share : filled * exitPrice;
-    const fee = isNum(res.feeQuote) && res.feeQuote > 0 ? res.feeQuote * share : 0;
-    u.bookedAmount = filledAmount;
+    const inc = this.fillIncrement(res, u, this.priceFor(pos));
+    if (!inc) return null;
+    // Meer verkocht dan de positie (zou niet mogen): alleen het deel van de positie telt.
+    const filled = Math.min(inc.amount, pos.amount);
+    const part = filled / inc.amount;
+    const exitPrice = inc.price;
+    const gross = inc.quote * part;
+    const fee = inc.fee * part;
+    u.bookedAmount = inc.totalAmount;
+    u.bookedQuote = inc.totalQuote;
+    u.bookedFee = inc.totalFee;
     this.log(
       "info",
       `Verkooporder ${u.market} met onbekende uitkomst teruggevonden (status ${res.status}${final ? "" : ", nog niet afgerond"}): ` +
@@ -1768,7 +1953,7 @@ export class TradingEngine extends EventEmitter {
     let afterUnknownSell = false;
     const unknownSell = this.unknownSellFor(pos.id);
     if (unknownSell) {
-      const waiting = await this.unknownSellWait(pos, unknownSell, label);
+      const waiting = await this.unknownSellWait(pos, unknownSell, label, explicit);
       if (!this.positions.includes(pos)) return null;
       if (waiting) {
         this.pendingExit.set(pos.id, reason);
@@ -1855,13 +2040,12 @@ export class TradingEngine extends EventEmitter {
           // verkopen (dat wordt afgewezen) en zeker niet de hele positie afboeken.
           this.pendingExit.set(pos.id, reason);
           this.exitFailure = `${fmtAmount(h.inOrder)} ${base} zit in een openstaande order op Bitvavo`;
-          this.logThrottled(
+          this.logSellProblem(
             `sellfail:${pos.id}`,
             "error",
             `${pos.market} (${label}): ${fmtAmount(h.inOrder)} ${base} zit in een openstaande order op Bitvavo; ` +
               "annuleer die order of sluit de positie handmatig — positie blijft open",
-            SELL_ERROR_THROTTLE_MS,
-            true,
+            explicit,
           );
           return null;
         } else {
@@ -1894,7 +2078,16 @@ export class TradingEngine extends EventEmitter {
     if (dust) {
       this.pendingExit.set(pos.id, reason);
       this.exitFailure = `onverkoopbaar: ${dust}`;
-      this.noteUnsellable(pos, "engine", dust, explicit);
+      this.noteUnsellable(pos, "engine", dust, explicit, { amount });
+      return null;
+    }
+    // De broker weigerde deze verkoop al ("ONVERKOOPBAAR") bij deze of een hogere
+    // waarde: niet elke tick opnieuw versturen, pas weer als de positie nu meer waard
+    // is. Een expliciete actie van de gebruiker (sluiten / noodstop) probeert het wel.
+    const refused = explicit ? null : this.brokerRefusal(pos, price);
+    if (refused) {
+      this.pendingExit.set(pos.id, reason);
+      this.exitFailure = `onverkoopbaar: ${refused}`;
       return null;
     }
     if (this.unsellable.get(pos.id)?.kind === "engine") {
@@ -1947,16 +2140,15 @@ export class TradingEngine extends EventEmitter {
         // De broker weigert de verkoop omdat hij onder het beursminimum valt.
         const text = res.error.trim().replace(/^ONVERKOOPBAAR:?\s*/i, "") || why;
         this.exitFailure = `onverkoopbaar: ${text}`;
-        this.noteUnsellable(pos, "broker", text, explicit);
+        this.noteUnsellable(pos, "broker", text, explicit, { value: pos.amount * price });
         return null;
       }
       this.exitFailure = `verkoop afgewezen: ${why}`;
-      this.logThrottled(
+      this.logSellProblem(
         `sellfail:${pos.id}`,
         "error",
         `Verkoop ${pos.market} (${label}) mislukt: ${why} — positie blijft open, ${this.retryHint()}`,
-        SELL_ERROR_THROTTLE_MS,
-        true,
+        explicit,
       );
       return null;
     }
@@ -1984,6 +2176,8 @@ export class TradingEngine extends EventEmitter {
         reason,
         at: this.nowFn(),
         bookedAmount: filled,
+        bookedQuote: gross,
+        bookedFee: fee,
         nullCount: 0,
       });
       this.exitFailure = "deels verkocht; de rest van de verkooporder heeft een onbekende uitkomst — controleer je Bitvavo-account";
@@ -2110,38 +2304,62 @@ export class TradingEngine extends EventEmitter {
 
   /**
    * Live: cash + inleg van open posities blijft binnen de kapitaallimiet. Wat
-   * erboven komt (winst) blijft buiten het handelsbudget. Dat is een overboeking
-   * uit het budget, geen winst of verlies:
-   *  - start- en dag-startequity gaan evenveel omlaag, zodat "equity − start"
-   *    (in EUR) de echte winst blijft;
-   *  - het afgeroomde bedrag telt voor de rendementen weer mee
-   *    (`skimmedQuote` / `skimmedToday`, zie {@link updateEquity}):
-   *    totaal = (equity + afgeroomd − oorspronkelijke start) / oorspronkelijke start,
-   *    en de dagelijkse verlieslimiet kijkt naar hetzelfde dag-% (zie
-   *    {@link riskDayStartEquity}) — een winnende trade raakt de limiet dus nooit,
-   *    en een verliesdag wordt er niet groter door.
+   * erboven komt, gaat uit het handelsbudget. Dat is een overboeking, geen winst
+   * of verlies (zie {@link updateEquity}: resultaat = equity + alles wat eruit ging −
+   * ingelegd kapitaal). Is de limiet verlaagd terwijl er meer dan de nieuwe limiet
+   * in open posities zat (`capitalPending`), dan is het eerste deel kapitaal dat
+   * alsnog teruggaat (`capitalReturned`) — dat heet nooit "winst". De rest is
+   * afgeroomde winst (`skimmedQuote`).
    */
   private enforceCapitalLimit(): void {
     if (this.mode !== "live") return;
     const openCost = this.positions.reduce((s, p) => s + (isNum(p.costQuote) ? p.costQuote : 0), 0);
     const cap = Math.max(0, this.startingCapital - openCost);
-    if (!(this.account.cashQuote > cap + 1e-9)) return;
+    if (!(this.account.cashQuote > cap + 1e-9)) {
+      this.settleCapitalPending();
+      return;
+    }
     const excess = this.account.cashQuote - cap;
+    let capital = Math.min(excess, this.capitalPending);
+    if (capital <= 1e-9) capital = 0;
+    if (excess - capital <= 1e-9) capital = excess;
+    const profit = excess - capital;
+    this.capitalPending = Math.max(0, this.capitalPending - capital);
     this.account.cashQuote = cap;
-    this.account.dayStartEquity = Math.max(this.account.dayStartEquity - excess, 1e-9);
-    this.account.startingEquity = Math.max(this.account.startingEquity - excess, 1e-9);
-    this.skimmedQuote += excess;
-    this.skimmedToday += excess;
-    this.log(
-      "info",
-      `Kapitaallimiet ${fmtEur(this.startingCapital)}: ${fmtEur(excess)} winst blijft buiten het handelsbudget van de bot`,
-    );
+    if (profit > 0) {
+      this.skimmedQuote += profit;
+      this.skimmedToday += profit;
+      this.log(
+        "info",
+        `Kapitaallimiet ${fmtEur(this.startingCapital)}: ${fmtEur(profit)} winst blijft buiten het handelsbudget van de bot`,
+      );
+    }
+    if (capital > 0) {
+      this.capitalReturned += capital;
+      this.returnedToday += capital;
+      this.log(
+        "info",
+        `Kapitaallimiet ${fmtEur(this.startingCapital)}: ${fmtEur(capital)} kapitaal gaat alsnog terug buiten het handelsbudget ` +
+          "(de limiet was verlaagd terwijl dat geld in een positie zat; opname, telt niet mee in het resultaat)",
+      );
+    }
+    this.settleCapitalPending();
+  }
+
+  /**
+   * Geen open posities meer: er zit geen kapitaal van vóór de limietverlaging meer
+   * vast. Wat daarvan niet terugkwam, was verlies (net als bij de verlaging zelf:
+   * het budget wordt min(limiet, wat de bot heeft)).
+   */
+  private settleCapitalPending(): void {
+    if (this.positions.length === 0) this.capitalPending = 0;
   }
 
   /** Beursminima (EUR en base) voor één order in deze markt — NIET de risico-instelling. */
   private exchangeMinimums(market: string): { quote: number; base: number } {
     const info = this.marketInfo.get(market);
-    const quote = info && isNum(info.minOrderQuote) && info.minOrderQuote >= 0 ? info.minOrderQuote : DEFAULT_EXCHANGE_MIN_QUOTE;
+    // Ontbrekend, ongeldig of ≤ 0 = onbekend: dan het Bitvavo-minimum.
+    const quote = info && isNum(info.minOrderQuote) && info.minOrderQuote > 0 ? info.minOrderQuote : EXCHANGE_MIN_ORDER_QUOTE;
     const base = info && isNum(info.minOrderBase) && info.minOrderBase > 0 ? info.minOrderBase : 0;
     return { quote, base };
   }
@@ -2167,18 +2385,55 @@ export class TradingEngine extends EventEmitter {
     return null;
   }
 
-  /** Is deze positie nu onverkoopbaar? Reden of null (op basis van de laatst bekende koers). */
+  /**
+   * Is deze positie NU onverkoopbaar, tegen `price` (de actuele koers)? Reden of
+   * null. Altijd de eigen minimumcontrole tegen deze koers, plus een weigering van
+   * de broker die bij deze koers nog geldt ({@link brokerRefusal}). Een eerder
+   * opgeslagen reden telt nooit als de positie nu wel verkocht kan worden.
+   */
   private unsellableNow(pos: Position, price: number): string | null {
-    return this.dustReason(pos.market, pos.amount, price) ?? (this.unsellable.get(pos.id)?.reason || null);
+    // Verkoopbare hoeveelheid: de positie, of minder als er bij de laatste poging
+    // minder op Bitvavo beschikbaar was (bijv. fee in de munt zelf).
+    const rec = this.unsellable.get(pos.id);
+    const amount =
+      rec?.kind === "engine" && isNum(rec.amount) && rec.amount > 0 ? Math.min(pos.amount, rec.amount) : pos.amount;
+    return this.dustReason(pos.market, amount, price) ?? this.brokerRefusal(pos, price);
+  }
+
+  /**
+   * De broker weigerde een verkoop van deze positie met "ONVERKOOPBAAR" bij
+   * positiewaarde `value`: die weigering geldt zolang de positie nu (tegen `price`)
+   * niet meer waard is. Reden of null.
+   */
+  private brokerRefusal(pos: Position, price: number): string | null {
+    const rec = this.unsellable.get(pos.id);
+    if (!rec || rec.kind !== "broker" || !isNum(rec.value)) return null;
+    if (!(isNum(price) && price > 0)) return null;
+    return pos.amount * price <= rec.value * (1 + 1e-9) ? rec.reason : null;
   }
 
   /**
    * Markeert een positie als onverkoopbaar en logt dat één keer per episode
    * (niet elke tick); bij een expliciete actie van de gebruiker altijd.
+   * `amount` (engine): hoeveelheid die verkocht zou worden; `value` (broker):
+   * positiewaarde waarbij de broker de verkoop weigerde.
    */
-  private noteUnsellable(pos: Position, kind: "engine" | "broker", reason: string, explicit: boolean): void {
-    const first = !this.unsellable.has(pos.id);
-    this.unsellable.set(pos.id, { kind, reason });
+  private noteUnsellable(
+    pos: Position,
+    kind: "engine" | "broker",
+    reason: string,
+    explicit: boolean,
+    extra: { amount?: number; value?: number } = {},
+  ): void {
+    const prev = this.unsellable.get(pos.id);
+    const first = !prev;
+    if (kind === "broker" && isNum(extra.value)) {
+      // Geweigerd bij deze waarde; een eerdere weigering bij een hogere waarde blijft gelden.
+      const prevValue = prev?.kind === "broker" && isNum(prev.value) ? prev.value : 0;
+      this.unsellable.set(pos.id, { kind, reason, value: Math.max(extra.value, prevValue) });
+    } else {
+      this.unsellable.set(pos.id, { kind, reason, ...(isNum(extra.amount) ? { amount: extra.amount } : {}) });
+    }
     if (!first && !explicit) return;
     const min = fmtEur(this.exchangeMinimums(pos.market).quote);
     this.log(
@@ -2221,13 +2476,13 @@ export class TradingEngine extends EventEmitter {
    * zolang er coins van deze munt in een openstaande order zitten (ook als het
    * beschikbare saldo groot genoeg is: dat kunnen eigen coins van de gebruiker zijn).
    */
-  private async unknownSellWait(pos: Position, u: UnknownSell, label: string): Promise<string | null> {
+  private async unknownSellWait(pos: Position, u: UnknownSell, label: string, explicit: boolean): Promise<string | null> {
     const stillHint = this.running
       ? "de bot verkoopt niet opnieuw tot die is opgehelderd"
       : "de bot staat stil — start de bot opnieuw of sluit de positie zelf op Bitvavo";
     if (this.lookupFn()) {
       const why = `er loopt nog een verkooporder met onbekende uitkomst (clientOrderId ${u.clientOrderId})`;
-      this.logThrottled(`sellwait:${pos.id}`, "warn", `${pos.market} (${label}): ${why} — ${stillHint}`, SELL_ERROR_THROTTLE_MS, true);
+      this.logSellProblem(`sellwait:${pos.id}`, "warn", `${pos.market} (${label}): ${why} — ${stillHint}`, explicit);
       return why;
     }
     const { base } = splitMarket(pos.market, this.marketInfo.get(pos.market));
@@ -2240,7 +2495,7 @@ export class TradingEngine extends EventEmitter {
       why = `${fmtAmount(h.inOrder)} ${base} zit nog in een openstaande order op Bitvavo (verkoop met onbekende uitkomst)`;
     }
     if (why) {
-      this.logThrottled(`sellwait:${pos.id}`, "warn", `${pos.market} (${label}): ${why} — ${stillHint}`, SELL_ERROR_THROTTLE_MS, true);
+      this.logSellProblem(`sellwait:${pos.id}`, "warn", `${pos.market} (${label}): ${why} — ${stillHint}`, explicit);
       return why;
     }
     this.unknownSells.delete(u.clientOrderId);
@@ -2251,6 +2506,16 @@ export class TradingEngine extends EventEmitter {
     );
     await this.persist(true);
     return null;
+  }
+
+  /**
+   * Meldt waarom een verkoop niet lukte. Automatisch (tick): hooguit één keer per
+   * minuut per positie (`key`). Expliciet (handmatig sluiten / noodstop): altijd —
+   * zo'n melding deelt de throttle niet met de automatische pogingen.
+   */
+  private logSellProblem(key: string, level: LogLevel, message: string, explicit: boolean): void {
+    if (explicit) this.log(level, message);
+    else this.logThrottled(key, level, message, SELL_ERROR_THROTTLE_MS, true);
   }
 
   /** Vervolg na een verkoop met onbekende uitkomst (voor in de logregel). */
@@ -2363,30 +2628,47 @@ export class TradingEngine extends EventEmitter {
       value += pos.amount * px;
       unrealized += pos.amount * px * (1 - fee) - pos.costQuote;
     }
-    this.account.equity = this.account.cashQuote + value;
-    this.account.unrealizedPnl = unrealized;
-    // Rendement, correct ook na afromen (live): afgeroomde winst is een overboeking
-    // uit het handelsbudget, geen winst of verlies. Start- en dag-startequity zijn
-    // met het afgeroomde bedrag verlaagd, dus het oorspronkelijke startbedrag is
-    // start + afgeroomd en rendement = (equity + afgeroomd − origineel) / origineel.
-    const base = this.account.startingEquity + this.skimmedQuote;
-    this.account.totalReturnPct =
-      isNum(base) && base > 0 ? ((this.account.equity - this.account.startingEquity) / base) * 100 : 0;
-    const dayBase = this.account.dayStartEquity + this.skimmedToday;
-    this.account.dayReturnPct =
-      isNum(dayBase) && dayBase > 0 ? ((this.account.equity - this.account.dayStartEquity) / dayBase) * 100 : 0;
+    const a = this.account;
+    a.equity = a.cashQuote + value;
+    a.unrealizedPnl = unrealized;
+    // Resultaat, correct ook na afromen en na een gewijzigde kapitaallimiet (live):
+    // geld dat uit het handelsbudget gaat (afgeroomde winst, kapitaal terug bij een
+    // lagere limiet) of erbij komt (hogere limiet) is een overboeking, geen winst
+    // of verlies. startingEquity = ingelegd kapitaal (start + verhogingen).
+    const capitalIn = a.startingEquity;
+    const totalPnl = a.equity + this.skimmedQuote + this.capitalReturned - capitalIn;
+    a.totalPnlQuote = totalPnl;
+    a.totalReturnPct = isNum(capitalIn) && capitalIn > 0 ? (totalPnl / capitalIn) * 100 : 0;
+    // Vandaag: dayStartEquity = equity van het budget bij de dagwissel.
+    const dayBase = a.dayStartEquity + this.addedToday;
+    const dayPnl = a.equity + this.skimmedToday + this.returnedToday - this.addedToday - a.dayStartEquity;
+    a.dayPnlQuote = dayPnl;
+    a.dayReturnPct = isNum(dayBase) && dayBase > 0 ? (dayPnl / dayBase) * 100 : 0;
+  }
+
+  /**
+   * Live: cumulatief bedrag dat netto uit het handelsbudget is gegaan (afgeroomd +
+   * kapitaal terug − kapitaal erbij na de start). equity + dit bedrag loopt door bij
+   * afromen of een gewijzigde limiet (voor `EquityPoint.skimmed`).
+   */
+  private netTransfersOut(): number {
+    return this.skimmedQuote + this.capitalReturned - this.capitalAdded;
   }
 
   /**
    * Dag-startequity voor de risk manager: zo gekozen dat zijn dag-% (equity −
-   * dagstart) / dagstart gelijk is aan `dayReturnPct`, dus mét de vandaag
-   * afgeroomde winst. Zonder afromen gewoon `account.dayStartEquity`.
+   * dagstart) / dagstart precies `dayReturnPct` is (dus mét wat er vandaag uit het
+   * budget ging of erbij kwam). Zonder overboekingen vandaag gewoon `dayStartEquity`.
    */
   private riskDayStartEquity(): number {
     const { equity, dayStartEquity } = this.account;
-    const s = this.skimmedToday;
-    if (!(s > 0) || !isNum(equity) || equity <= 0 || !isNum(dayStartEquity)) return dayStartEquity;
-    return (equity * (dayStartEquity + s)) / (equity + s);
+    const out = this.skimmedToday + this.returnedToday;
+    const added = this.addedToday;
+    if (!(out > 0) && !(added > 0)) return dayStartEquity;
+    const base = dayStartEquity + added;
+    if (!isNum(equity) || equity <= 0 || !isNum(base) || !(equity + out > 0)) return base;
+    // (equity − E) / E = (equity + out − base) / base  ⇔  E = equity × base / (equity + out)
+    return (equity * base) / (equity + out);
   }
 
   private positionView(pos: Position): OpenPositionView {
@@ -2430,9 +2712,9 @@ export class TradingEngine extends EventEmitter {
     const equity = this.account.equity;
     if (!isNum(equity)) return;
     const last = this.equityHistory[this.equityHistory.length - 1];
-    // Live: cumulatief afgeroomde winst per punt, zodat de grafiek equity + afgeroomd
-    // kan tonen zonder een nep-daling op het moment van afromen.
-    const skimmed = this.mode === "live" ? { skimmed: this.skimmedQuote } : {};
+    // Live: cumulatief netto uit het budget gehaald bedrag per punt, zodat de grafiek
+    // equity + skimmed kan tonen zonder sprong bij afromen of een gewijzigde limiet.
+    const skimmed = this.mode === "live" ? { skimmed: this.netTransfersOut() } : {};
     if (last && time <= last.time) {
       if (force) Object.assign(last, { equity, ...skimmed });
       return;
@@ -2606,29 +2888,43 @@ export class TradingEngine extends EventEmitter {
     }
     const positions = state.positions.map(normalizePosition).filter((p): p is Position => p !== null);
     const account = sanitizeAccount(state.account, freshAccount(this.startingCapital, this.nowFn()));
-    this.skimmedQuote = isNum(state.skimmedQuote) && state.skimmedQuote > 0 ? state.skimmedQuote : 0;
-    // Hoort bij account.dayKey (de dagwissel zet hem later op 0); nooit meer dan het totaal.
-    const skimmedToday = (state as PersistedStateExt).skimmedToday;
-    this.skimmedToday = isNum(skimmedToday) && skimmedToday > 0 ? Math.min(skimmedToday, this.skimmedQuote) : 0;
-    if (this.mode === "live") this.rebaseCapitalLimit(account, positions, state);
+    const ext = state as PersistedStateExt;
+    const pos0 = (v: unknown): number => (isNum(v) && v > 0 ? v : 0);
+    this.skimmedQuote = pos0(state.skimmedQuote);
+    // "Vandaag"-bedragen horen bij account.dayKey (de dagwissel zet ze later op 0);
+    // nooit meer dan het totaal.
+    this.skimmedToday = Math.min(pos0(ext.skimmedToday), this.skimmedQuote);
+    this.capitalReturned = pos0(ext.capitalReturned);
+    this.returnedToday = Math.min(pos0(ext.returnedToday), this.capitalReturned);
+    this.capitalAdded = pos0(ext.capitalAdded);
+    this.addedToday = Math.min(pos0(ext.addedToday), this.capitalAdded);
+    this.capitalPending = positions.length > 0 ? pos0(ext.capitalPending) : 0;
+    if (ext.ledgerVersion !== LEDGER_VERSION) {
+      // Oudere bestanden verlaagden start- en dag-startequity met de afgeroomde winst;
+      // nu is startequity het ingelegde kapitaal en blijft de dagstart staan.
+      account.startingEquity += this.skimmedQuote;
+      account.dayStartEquity += this.skimmedToday;
+    }
+    const rebased = this.mode === "live" && this.rebaseCapitalLimit(account, positions, state);
     this.account = account;
     this.positions = positions;
     this.haltedDayKey =
       typeof state.haltedDayKey === "string" && state.haltedDayKey === account.dayKey ? state.haltedDayKey : null;
     if (this.mode === "live" && Array.isArray(state.unknownOrders)) {
-      for (const u of state.unknownOrders) {
+      for (const u of state.unknownOrders as UnknownBuy[]) {
         if (!u || typeof u.market !== "string" || typeof u.clientOrderId !== "string" || !u.clientOrderId) continue;
         this.unknownBuys.set(u.clientOrderId, {
           market: u.market,
           clientOrderId: u.clientOrderId,
           quoteAmount: isNum(u.quoteAmount) ? u.quoteAmount : 0,
-          at: isNum(u.at) ? u.at : 0,
+          // Zonder tijdstip: vanaf nu (de wachttijd vóór "niet geplaatst" begint dan nu).
+          at: isNum(u.at) && u.at > 0 ? u.at : this.nowFn(),
           stopDist: isNum(u.stopDist) ? u.stopDist : 0,
           tpDist: isNum(u.tpDist) ? u.tpDist : 0,
           entryReason: typeof u.entryReason === "string" ? u.entryReason : "",
           ...(typeof u.positionId === "string" ? { positionId: u.positionId } : {}),
-          ...(isNum(u.bookedAmount) ? { bookedAmount: u.bookedAmount } : {}),
-          ...(isNum((u as UnknownBuy).nullCount) ? { nullCount: (u as UnknownBuy).nullCount } : {}),
+          ...bookedFill(u),
+          ...notFoundTrack(u),
         });
       }
     }
@@ -2651,9 +2947,9 @@ export class TradingEngine extends EventEmitter {
           market: u.market,
           amount: isNum(u.amount) ? u.amount : 0,
           reason,
-          at: isNum(u.at) ? u.at : 0,
-          ...(isNum(u.bookedAmount) ? { bookedAmount: u.bookedAmount } : {}),
-          ...(isNum(u.nullCount) ? { nullCount: u.nullCount } : {}),
+          at: isNum(u.at) && u.at > 0 ? u.at : this.nowFn(),
+          ...bookedFill(u),
+          ...notFoundTrack(u),
         });
         // De bot was deze positie aan het verkopen: na de herstart gaat de exit
         // gewoon door zodra de uitkomst van die order vaststaat.
@@ -2686,6 +2982,13 @@ export class TradingEngine extends EventEmitter {
       if (typeof b.restore === "function") b.restore(state.paperBalances);
     }
     this.updateEquity();
+    if (rebased) {
+      // Nieuw punt direct na de gewijzigde limiet (met het nieuwe netto-eruit-bedrag),
+      // zodat equity + skimmed doorloopt. Oude punten blijven ongewijzigd.
+      const now = this.nowFn();
+      const last = this.equityHistory[this.equityHistory.length - 1];
+      if (!last || now > last.time) this.recordEquity(now, true);
+    }
     this.log(
       "info",
       `Opgeslagen staat hersteld: ${positions.length} open positie(s), ${this.trades.length} trade(s), cash ${fmtEur(account.cashQuote)}`,
@@ -2705,15 +3008,17 @@ export class TradingEngine extends EventEmitter {
   /**
    * Live: de kapitaallimiet kan tussen twee runs veranderd zijn. Cash + inleg
    * van open posities moet binnen de (nieuwe) limiet blijven.
-   *  - Verhoging: het verschil komt als extra budget bij de cash.
+   *  - Verhoging: het verschil komt als extra budget bij de cash; dat is ingelegd
+   *    kapitaal (startequity omhoog, `capitalAdded`).
    *  - Verlaging: het budget wordt min(nieuwe limiet, wat de bot nu heeft) —
    *    heeft de bot al verlies gemaakt, dan gaat er minder (of niets) af, niet
-   *    het volledige verschil.
-   * Het verschil is een storting/opname, geen winst of verlies: start- en
-   * dag-startequity schuiven naar rato mee, zodat het totaal- en dagrendement
-   * (en dus de dagelijkse verlieslimiet) er niet door veranderen.
+   *    het volledige verschil. Wat eraf gaat is kapitaal dat terugging
+   *    (`capitalReturned`), geen winst.
+   * Het verschil is een storting/opname, geen resultaat: totaal- en dagresultaat
+   * (en dus de dagelijkse verlieslimiet) veranderen er niet door, en
+   * `EquityPoint.skimmed` (netto eruit) schuift mee zodat de grafiek doorloopt.
    */
-  private rebaseCapitalLimit(account: AccountState, positions: Position[], state: PersistedState): void {
+  private rebaseCapitalLimit(account: AccountState, positions: Position[], state: PersistedState): boolean {
     const oldLimit =
       isNum(state.capitalLimitQuote) && state.capitalLimitQuote > 0 ? state.capitalLimitQuote : account.startingEquity;
     const openCost = positions.reduce((s, p) => s + p.costQuote, 0);
@@ -2721,26 +3026,30 @@ export class TradingEngine extends EventEmitter {
     const raised = isNum(oldLimit) ? this.startingCapital - oldLimit : 0;
     const target = Math.max(0, Math.min(room, account.cashQuote + Math.max(0, raised)));
     const delta = target - account.cashQuote;
-    if (Math.abs(delta) <= 1e-9) return;
+    // Zit er meer dan de (nieuwe) limiet in open posities, dan gaat dat deel bij de
+    // verkoop alsnog terug als kapitaal (zie enforceCapitalLimit).
+    if (Math.abs(raised) > 1e-9) this.capitalPending = Math.max(0, openCost - this.startingCapital);
+    if (Math.abs(delta) <= 1e-9) return false;
     const equity = isNum(account.equity) && account.equity > 0 ? account.equity : account.cashQuote + openCost;
-    const after = equity + delta;
-    // Rendementen (zie updateEquity: (equity − start) / (start + afgeroomd)) blijven
-    // gelijk: het oorspronkelijke startbedrag schaalt mee met wat er in het budget
-    // bijkomt of afgaat. Zo telt een lagere limiet na verlies niet als extra verlies.
-    const rebase = (start: number, skimmed: number): number => {
-      const total = equity + skimmed;
-      if (!(equity > 0 && after > 0 && total > 0)) return Math.max(start + delta, 1e-9);
-      return Math.max(((start + skimmed) * (total + delta)) / total - skimmed, 1e-9);
-    };
-    account.startingEquity = rebase(account.startingEquity, this.skimmedQuote);
-    account.dayStartEquity = rebase(account.dayStartEquity, this.skimmedToday);
+    if (delta > 0) {
+      account.startingEquity += delta;
+      this.capitalAdded += delta;
+      this.addedToday += delta;
+    } else {
+      this.capitalReturned -= delta;
+      this.returnedToday -= delta;
+    }
     account.cashQuote = target;
-    account.equity = after;
+    account.equity = equity + delta;
     this.log(
       "info",
       `Kapitaallimiet ${fmtEur(isNum(oldLimit) ? oldLimit : this.startingCapital)} → ${fmtEur(this.startingCapital)}: ` +
-        `handelsbudget ${delta > 0 ? "+" : ""}${fmtEur(delta)} (cash nu ${fmtEur(target)}, inleg open posities ${fmtEur(openCost)})`,
+        (delta > 0
+          ? `${fmtEur(delta)} extra kapitaal in het handelsbudget (storting)`
+          : `${fmtEur(-delta)} kapitaal terug buiten het handelsbudget (opname)`) +
+        ` — cash nu ${fmtEur(target)}, inleg open posities ${fmtEur(openCost)}; telt niet mee in het resultaat`,
     );
+    return true;
   }
 
   private persistedState(): PersistedState {
@@ -2761,8 +3070,14 @@ export class TradingEngine extends EventEmitter {
       lastEvaluated: { interval: this.config.interval, candles: evaluated },
       ...(this.unknownBuys.size > 0 ? { unknownOrders: [...this.unknownBuys.values()].map((u) => ({ ...u })) } : {}),
       ...(this.haltedDayKey ? { haltedDayKey: this.haltedDayKey } : {}),
+      ledgerVersion: LEDGER_VERSION,
       ...(this.skimmedQuote > 0 ? { skimmedQuote: this.skimmedQuote } : {}),
       ...(this.skimmedToday > 0 ? { skimmedToday: this.skimmedToday } : {}),
+      ...(this.capitalReturned > 0 ? { capitalReturned: this.capitalReturned } : {}),
+      ...(this.returnedToday > 0 ? { returnedToday: this.returnedToday } : {}),
+      ...(this.capitalAdded > 0 ? { capitalAdded: this.capitalAdded } : {}),
+      ...(this.addedToday > 0 ? { addedToday: this.addedToday } : {}),
+      ...(this.capitalPending > 0 ? { capitalPending: this.capitalPending } : {}),
       ...(this.stateRecovery ? { stateRecovery: { ...this.stateRecovery } } : {}),
       ...(this.unknownSells.size > 0 ? { unknownSells: [...this.unknownSells.values()].map((u) => ({ ...u })) } : {}),
     };

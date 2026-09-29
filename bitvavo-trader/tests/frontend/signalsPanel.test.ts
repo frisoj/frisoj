@@ -104,6 +104,40 @@ describe("signaalpaneel: verouderde en vervallen beslissingen", () => {
   });
 });
 
+describe("signaalpaneel: markt die niet in de bot zit", () => {
+  const votesHtml = (p: Awaited<ReturnType<typeof mount>>) => String(p.q(".sig-votes").innerHTML);
+
+  it("zegt dat de markt niet in de bot zit (i.p.v. 'wacht op de volgende candle')", async () => {
+    const p = await mount({ config: config15, decisions: { "BTC-EUR": dec } });
+    p.bus.emit("market-selected", { market: "DOGE-EUR" });
+    env.flushRaf();
+    expect(p.action()).toBe("GEEN DATA");
+    expect(votesHtml(p)).toContain("Deze markt zit niet in de bot — voeg hem toe via Scanner of Instellingen");
+    expect(votesHtml(p)).not.toContain("wacht op de volgende candle");
+  });
+
+  it("een markt in de bot zonder beslissing wacht nog wel op de volgende candle", async () => {
+    const p = await mount({ config: { ...config15, markets: ["BTC-EUR", "ETH-EUR"] }, decisions: {} });
+    p.bus.emit("market-selected", { market: "ETH-EUR" });
+    env.flushRaf();
+    expect(votesHtml(p)).toContain("wacht op de volgende candle");
+    expect(votesHtml(p)).not.toContain("zit niet in de bot");
+  });
+
+  it("na toevoegen aan de bot (config-changed) verdwijnt de melding", async () => {
+    const p = await mount({ config: config15, decisions: {} });
+    p.bus.emit("market-selected", { market: "ETH-EUR" });
+    env.flushRaf();
+    expect(votesHtml(p)).toContain("zit niet in de bot");
+    p.bus.emit("config-changed", { ...config15, markets: ["BTC-EUR", "ETH-EUR"] });
+    env.flushRaf();
+    expect(votesHtml(p)).not.toContain("zit niet in de bot");
+    p.bus.emit("decision", { ...dec, market: "ETH-EUR", action: "sell", score: -0.5 });
+    env.flushRaf();
+    expect(p.action()).toBe("VERKOOP");
+  });
+});
+
 describe("signaalpaneel: exit-score", () => {
   it("toont de exit-score als tweede markering op de meter en als waarde", async () => {
     // score dicht bij 0 (veel WACHT), maar de strategieën met een mening zeggen samen VERKOOP

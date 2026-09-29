@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { EngineSnapshot, KillResult, Trade } from "../../src/core/types";
+import type { EngineSnapshot, ExitReason, KillResult, Trade } from "../../src/core/types";
+import { openBtcPosition, setup } from "../engine/helpers";
 import { FakeEngine, NOW, json, makePosition, startTestServer, type TestServer } from "./helpers";
 
 /**
@@ -218,6 +219,96 @@ describe("POST /api/positions/:id/writeoff", () => {
     const r = await json(srv.base, "POST", "/api/positions/pos_z/writeoff");
     expect(r.status).toBe(501);
     expect(srv.engine.positions).toHaveLength(1);
+  });
+});
+
+/** Fake waarvan closePosition mislukt met een reden, zoals de echte engine (lastCloseFailure). */
+class CloseFailEngine extends FakeEngine {
+  /** Als gezet: de volgende closePosition mislukt en lastCloseFailure wordt deze waarde */
+  failWith: string | null | undefined = undefined;
+  lastCloseFailure: string | null = null;
+
+  override async closePosition(id: string, reason?: ExitReason): Promise<Trade | null> {
+    this.lastCloseFailure = null;
+    if (this.failWith !== undefined) {
+      this.lastCloseFailure = this.failWith;
+      return null;
+    }
+    return super.closePosition(id, reason);
+  }
+}
+
+/** Oude fake zonder lastCloseFailure waarvan sluiten mislukt. */
+class CloseFailNoReasonEngine extends FakeEngine {
+  override async closePosition(): Promise<Trade | null> {
+    return null;
+  }
+}
+
+const GENERIC_CLOSE_ERROR = "Positie kon niet worden gesloten. Bekijk het logboek voor details.";
+
+describe("POST /api/positions/:id/close", () => {
+  it("409 met precies de reden van de engine (lastCloseFailure)", async () => {
+    const engine = new CloseFailEngine();
+    engine.positions = [makePosition("pos_dust")];
+    engine.failWith = "onverkoopbaar: waarde €4,78 < minimum €5,00";
+    srv = await startTestServer({ engine });
+    const r = await json(srv.base, "POST", "/api/positions/pos_dust/close");
+    expect(r.status).toBe(409);
+    expect(r.data.error).toBe("onverkoopbaar: waarde €4,78 < minimum €5,00");
+    expect(engine.positions).toHaveLength(1);
+
+    engine.failWith = "uitkomst van de verkooporder onbekend (time-out) — controleer je Bitvavo-account";
+    const unknown = await json(srv.base, "POST", "/api/positions/pos_dust/close");
+    expect(unknown.status).toBe(409);
+    expect(unknown.data.error).toBe(engine.failWith);
+  });
+
+  it("zonder (bruikbare) reden van de engine: de algemene 409-melding", async () => {
+    const engine = new CloseFailEngine();
+    engine.positions = [makePosition("pos_a")];
+    srv = await startTestServer({ engine });
+    for (const failWith of [null, "", "   "]) {
+      engine.failWith = failWith;
+      const r = await json(srv.base, "POST", "/api/positions/pos_a/close");
+      expect(r.status, String(failWith)).toBe(409);
+      expect(r.data.error).toBe(GENERIC_CLOSE_ERROR);
+    }
+    await srv.close();
+
+    // Oudere engine zonder lastCloseFailure
+    const old = new CloseFailNoReasonEngine();
+    old.positions = [makePosition("pos_b")];
+    srv = await startTestServer({ engine: old });
+    const r = await json(srv.base, "POST", "/api/positions/pos_b/close");
+    expect(r.status).toBe(409);
+    expect(r.data.error).toBe(GENERIC_CLOSE_ERROR);
+  });
+
+  it("gelukt sluiten blijft 200 met de trade", async () => {
+    const engine = new CloseFailEngine();
+    engine.positions = [makePosition("pos_ok")];
+    srv = await startTestServer({ engine });
+    const r = await json(srv.base, "POST", "/api/positions/pos_ok/close");
+    expect(r.status).toBe(200);
+    expect(r.data.exitReason).toBe("manual");
+    expect(engine.closed).toEqual([{ id: "pos_ok", reason: "manual" }]);
+  });
+
+  it("echte TradingEngine: onverkoopbare positie → 409 met de reden, zonder verkooporder", async () => {
+    const h = setup();
+    h.risk.quote = 6;
+    h.risk.stopDist = 20_000; // geen automatische exit
+    const pos = await openBtcPosition(h);
+    h.feed.setLast("BTC-EUR", 40_000); // waarde < €5 (beursminimum)
+    srv = await startTestServer({ deps: { engine: h.engine } });
+    const r = await json(srv.base, "POST", `/api/positions/${pos.id}/close`);
+    expect(r.status).toBe(409);
+    expect(r.data.error).toMatch(/^onverkoopbaar: waarde €\d+,\d\d < minimum €5,00$/);
+    expect(r.data.error).toBe(h.engine.lastCloseFailure);
+    expect(h.broker.sells()).toHaveLength(0);
+    expect(h.engine.snapshot().positions.map((p) => p.id)).toEqual([pos.id]);
+    await h.engine.stop();
   });
 });
 

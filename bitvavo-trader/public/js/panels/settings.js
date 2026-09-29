@@ -1,5 +1,5 @@
-// Instellingen: markten & interval, risicobeheer, strategieën, live trading
-// (armen/ontwapenen) en het dashboard-token. Opslaan via PUT /api/config.
+// Instellingen: markten & interval, risicobeheer, strategieën, live handel
+// (inschakelen/uitschakelen) en het dashboard-token. Opslaan via PUT /api/config.
 
 import { setToken } from "../api.js";
 import {
@@ -405,7 +405,7 @@ export function mountSettings(ctx, el) {
       ["Modus", mode === "live" ? '<span class="pn-mode is-live">LIVE — echt geld</span>' : '<span class="pn-mode">PAPER — oefengeld</span>'],
       ["Marktdata", esc(info?.dataSource === "simulated" || snap?.dataSource === "simulated" ? "Gesimuleerd (nep-koersen)" : "Bitvavo (echte koersen)")],
       ["API-sleutels", info ? (info.hasApiKeys ? '<span class="pos">✓ ingesteld</span>' : '<span class="muted">niet ingesteld</span>') : "–"],
-      ["Live gewapend", mode === "live" ? (armed ? '<span class="neg"><b>JA — plaatst echte orders</b></span>' : '<span class="pos">Nee — alleen simulatie</span>') : '<span class="muted">n.v.t.</span>'],
+      ["Live handel ingeschakeld", mode === "live" ? (armed ? '<span class="neg"><b>JA — plaatst echte orders</b></span>' : '<span class="pos">Nee — alleen signalen</span>') : '<span class="muted">n.v.t.</span>'],
       ["Kapitaallimiet", info ? `<span class="mono">${esc(fmt.eur(info.capitalLimitQuote))}</span>` : "–"],
       ["Versie", esc(info?.version || "–")],
     ];
@@ -414,15 +414,15 @@ BITVAVO_API_KEY=jouw-api-key
 BITVAVO_API_SECRET=jouw-api-secret
 CAPITAL_LIMIT_EUR=50`;
     box.innerHTML = `
-      <div class="pn-head"><div class="panel-title">Live trading</div></div>
+      <div class="pn-head"><div class="panel-title">Live handel</div></div>
       <div class="st-kv">${rows.map(([k, v]) => `<div><span class="muted">${esc(k)}</span><span>${v}</span></div>`).join("")}</div>
       ${
         mode === "live"
           ? armed
-            ? `<div class="pn-banner pn-banner-bad"><b>Live trading staat AAN.</b> De bot plaatst echte orders met maximaal ${esc(fmt.eur(info?.capitalLimitQuote))} van je saldo.</div>
-               <button type="button" class="btn btn-primary st-disarm">Ontwapenen (stop echte orders)</button>`
-            : `<div class="pn-banner pn-banner-warn">De bot draait in live mode maar is <b>niet gewapend</b>: hij rekent alles door en logt "zou kopen…", maar plaatst geen echte orders.</div>
-               <button type="button" class="btn btn-danger st-arm" ${info && !info.hasApiKeys ? "disabled" : ""}>Arm live trading…</button>
+            ? `<div class="pn-banner pn-banner-bad"><b>Live handel staat AAN.</b> De bot plaatst echte orders met maximaal ${esc(fmt.eur(info?.capitalLimitQuote))} van je saldo.</div>
+               <button type="button" class="btn btn-primary st-disarm">Uitschakelen (stop echte orders)</button>`
+            : `<div class="pn-banner pn-banner-warn">De bot draait in live mode maar live handel is <b>niet ingeschakeld</b>: hij rekent alles door en logt "zou kopen…", maar plaatst geen echte orders.</div>
+               <button type="button" class="btn btn-danger st-arm" ${info && !info.hasApiKeys ? "disabled" : ""}>Live handel inschakelen…</button>
                ${info && !info.hasApiKeys ? '<p class="st-help neg">Geen API-sleutel ingesteld in .env.</p>' : ""}`
           : `<div class="st-paper-info">
               <p><b>Je oefent nu met nep-geld.</b> Dat is precies goed: paper trade eerst minstens <b>enkele weken</b>. Zo zie je zonder risico of de bot
@@ -434,7 +434,7 @@ CAPITAL_LIMIT_EUR=50`;
               </ol>
               <pre class="st-code mono">${esc(env)}</pre>
               <ol start="3">
-                <li>Herstart de bot. In live mode start hij nooit vanzelf en plaatst hij pas echte orders nadat je hier op <b>Arm live trading</b> klikt.</li>
+                <li>Herstart de bot. In live mode start hij nooit vanzelf en plaatst hij pas echte orders nadat je hier (of bovenaan) op <b>Live handel inschakelen…</b> klikt.</li>
               </ol>
               <p class="st-help">Zet nooit meer geld in dan je kunt missen. De kapitaallimiet zorgt dat de bot nooit meer dan dat bedrag gebruikt.</p>
             </div>`
@@ -446,18 +446,18 @@ CAPITAL_LIMIT_EUR=50`;
   function openArm() {
     const limit = state.info?.capitalLimitQuote;
     ctx.openModal({
-      title: "Live trading armen",
+      title: "Live handel inschakelen",
       danger: true,
       requireText: ARM_TEXT,
-      confirmText: "Arm live trading",
+      confirmText: "Inschakelen",
       cancelText: "Annuleren",
-      bodyHtml: `<p>Na het armen plaatst de bot <strong>echte orders met echt geld</strong> op Bitvavo${
+      bodyHtml: `<p>Na inschakelen plaatst de bot <strong>echte orders met echt geld</strong> op Bitvavo${
         Number.isFinite(limit) ? `, met maximaal <strong>${esc(fmt.eur(limit))}</strong> van je saldo` : ""
       }.</p>
         <ul>
           <li>Je kunt je hele inzet verliezen. Backtests en paper trading zijn geen garantie.</li>
           <li>Fees (0,25% per kant) en slippage gaan van je saldo af.</li>
-          <li>Je kunt altijd ontwapenen of de noodstop gebruiken.</li>
+          <li>Je kunt live handel altijd weer uitschakelen of de noodstop gebruiken.</li>
         </ul>
         <p>Typ hieronder exact <strong>${esc(ARM_TEXT)}</strong> om te bevestigen.</p>`,
       onConfirm: async (value) => {
@@ -467,7 +467,7 @@ CAPITAL_LIMIT_EUR=50`;
         state.info = info;
         renderLive();
         bus.emit("app-info", info);
-        ctx.toast("Live trading is gewapend: de bot plaatst nu echte orders.", "warn");
+        ctx.toast("Live handel ingeschakeld — de bot handelt nu met echt geld", "warn");
       },
     });
   }
@@ -478,9 +478,9 @@ CAPITAL_LIMIT_EUR=50`;
       state.info = info;
       renderLive();
       bus.emit("app-info", info);
-      ctx.toast("Ontwapend: er worden geen echte orders meer geplaatst.", "success");
+      ctx.toast("Live handel uitgeschakeld — alleen signalen", "success");
     } catch (err) {
-      ctx.toast(`Ontwapenen mislukt: ${err?.message || err}`, "error");
+      ctx.toast(`Uitschakelen mislukt: ${err?.message || err}`, "error");
     }
   }
 

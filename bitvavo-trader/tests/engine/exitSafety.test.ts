@@ -202,7 +202,9 @@ describe("Onverkoopbare posities (waarde onder het beursminimum)", () => {
     expect(h.engine.snapshot().positions[0].unsellable).toBe(true);
   });
 
-  it("broker weigert met ONVERKOOPBAAR: positie gemarkeerd, één melding, handmatig sluiten meldt de reden", async () => {
+  it("broker weigert met ONVERKOOPBAAR: positie gemarkeerd, één melding, niet elke tick opnieuw; handmatig sluiten probeert het wel", async () => {
+    // Herschreven (ronde 3): de tweede tick verstuurde de verkoop opnieuw (en werd weer
+    // geweigerd); nu gaat er bij dezelfde koers geen tweede order uit.
     const h = setup();
     const pos = await openBtcPosition(h);
     const refuse = (req: MarketOrderRequest) =>
@@ -212,18 +214,32 @@ describe("Onverkoopbare posities (waarde onder het beursminimum)", () => {
     h.feed.setLast("BTC-EUR", 48_900);
     await h.engine.tick();
     let s = h.engine.snapshot();
+    expect(h.broker.sells()).toHaveLength(1);
     expect(s.positions[0].unsellable).toBe(true);
     expect(s.positions[0].unsellableReason).toContain("orderwaarde ca. €4,99");
     expect(count(h, (m) => m.startsWith("BTC-EUR positie is onverkoopbaar: orderwaarde ca. €4,99"))).toBe(1);
-    h.clock.advance(15_000);
-    await h.engine.tick(); // tweede weigering: geen nieuwe melding
+    for (let i = 0; i < 3; i++) {
+      h.clock.advance(15_000);
+      await h.engine.tick(); // zelfde koers: niet opnieuw versturen, geen nieuwe melding
+    }
+    expect(h.broker.sells()).toHaveLength(1);
     expect(count(h, (m) => m.startsWith("BTC-EUR positie is onverkoopbaar"))).toBe(1);
-    // Nu lukt het wel
-    const t = await h.engine.closePosition(pos.id);
-    expect(t).not.toBeNull();
+    expect(h.engine.snapshot().positions[0].unsellable).toBe(true);
+    // Handmatig sluiten verstuurt hem wel (tweede weigering) en meldt de reden
+    expect(await h.engine.closePosition(pos.id)).toBeNull();
+    expect(h.broker.sells()).toHaveLength(2);
+    expect(h.engine.lastCloseFailure).toBe(
+      "onverkoopbaar: orderwaarde ca. €4,99 is lager dan het beursminimum van €5,00 voor BTC-EUR",
+    );
+    expect(count(h, (m) => m.startsWith("BTC-EUR positie is onverkoopbaar"))).toBe(2);
+    // Koers hoger dan bij de weigering: de volgende tick probeert het opnieuw (en het lukt)
+    h.feed.setLast("BTC-EUR", 49_000);
+    h.clock.advance(15_000);
+    await h.engine.tick();
     s = h.engine.snapshot();
+    expect(h.broker.sells()).toHaveLength(3);
     expect(s.positions).toHaveLength(0);
-    expect(h.engine.lastCloseFailure).toBeNull();
+    expect(s.trades[0].exitReason).toBe("manual"); // de laatst gevraagde exit (handmatig sluiten)
   });
 });
 
@@ -252,7 +268,8 @@ describe("writeOffPosition", () => {
       feesQuote: pos.entryFeeQuote,
       pnlQuote: -pos.costQuote,
       pnlPct: -100,
-      exitReason: "manual",
+      // Herschreven (ronde 3): was "manual"; afschrijven heeft nu een eigen exit-reden.
+      exitReason: "write-off",
       entryReason: `${pos.entryReason} · afgeschreven (onverkoopbaar restant blijft op je account)`,
     });
     const s = h.engine.snapshot();
@@ -418,7 +435,9 @@ describe("Verkooporders met onbekende uitkomst", () => {
     expect(seen.every((id) => id === cid)).toBe(true);
   });
 
-  it("met lookupOrder: 3 ticks op rij 'niet gevonden' → niet uitgevoerd, pas dan opnieuw verkopen", async () => {
+  it("met lookupOrder: 3 ticks op rij 'niet gevonden' én minstens 60 s → niet uitgevoerd, pas dan opnieuw verkopen", async () => {
+    // Herschreven (ronde 3): 3 ticks op rij was genoeg; nu ook minstens max(60 s, 3 × pollMs)
+    // na de verkoop (pollMs = 15 s hier, dus 60 s).
     const h = setup({ mode: "live", startingCapital: 50 });
     await unknownSell(h);
     h.broker.lookupOrder = async () => null;
@@ -429,10 +448,37 @@ describe("Verkooporders met onbekende uitkomst", () => {
       expect(h.logs().some((m) => m.includes(`nog niet gevonden bij Bitvavo (${i}/3)`))).toBe(true);
     }
     h.clock.advance(15_000);
-    await h.engine.tick();
+    await h.engine.tick(); // 3× op rij, maar pas 45 s na de verkoop
+    expect(h.broker.sells()).toHaveLength(1);
+    expect(h.logs().some((m) => m.includes("nog niet gevonden bij Bitvavo (3× op rij; de bot concludeert pas 60 s na de order"))).toBe(true);
+    h.clock.advance(15_000);
+    await h.engine.tick(); // 60 s na de verkoop
     expect(h.broker.sells()).toHaveLength(2);
     expect(h.engine.snapshot().positions).toHaveLength(0);
     expect(h.logs().some((m) => m.startsWith("Verkooporder BTC-EUR met onbekende uitkomst bestaat volgens Bitvavo niet"))).toBe(true);
+  });
+
+  it("met lookupOrder: snel Stop/Start (ticks vlak na elkaar) telt 'niet gevonden' niet extra — geen tweede verkoop binnen seconden", async () => {
+    const h = setup({ mode: "live", startingCapital: 50 });
+    const { cid } = await unknownSell(h);
+    const looked: string[] = [];
+    h.broker.lookupOrder = async (_m, id) => {
+      looked.push(id);
+      return null;
+    };
+    for (let i = 0; i < 6; i++) {
+      await h.engine.stop();
+      h.clock.advance(500);
+      h.engine.arm();
+      await h.engine.start();
+    }
+    await h.engine.stop();
+    expect(looked.length).toBeGreaterThanOrEqual(6);
+    expect(looked.every((id) => id === cid)).toBe(true);
+    expect(h.broker.sells()).toHaveLength(1);
+    expect(h.engine.snapshot().positions).toHaveLength(1);
+    // Alleen de eerste telde (pollMs/2 = 7,5 s tussen getelde waarnemingen)
+    expect(h.logs().filter((m) => m.includes("nog niet gevonden bij Bitvavo ("))).toHaveLength(1);
   });
 
   it("zonder lookupOrder: wacht zolang er coins in een order staan, ook als er genoeg beschikbaar is (eigen coins)", async () => {
@@ -474,14 +520,16 @@ describe("Verkooporders met onbekende uitkomst", () => {
     expect(h2.logs().some((m) => m.startsWith("Verkooporder(s) met onbekende uitkomst: BTC-EUR"))).toBe(true);
     h2.engine.arm();
     h2.feed.setLast("BTC-EUR", 50_000); // koers hersteld: alleen de lopende exit kan nog verkopen
-    for (let i = 0; i < 2; i++) {
+    // Herschreven (ronde 3): 3 ticks van 15 s waren genoeg; nu ook ≥ 60 s na de verkoop
+    // (de herstart zelf telt niet: het tijdstip van de order is opgeslagen).
+    for (let i = 0; i < 3; i++) {
       h2.clock.advance(15_000);
       await h2.engine.tick();
       expect(broker2.sells()).toHaveLength(0);
     }
     h2.clock.advance(15_000);
     await h2.engine.tick();
-    expect(looked).toEqual([cid, cid, cid]);
+    expect(looked).toEqual([cid, cid, cid, cid]);
     expect(broker2.sells()).toHaveLength(1);
     const s = h2.engine.snapshot();
     expect(s.positions).toHaveLength(0);
@@ -575,7 +623,8 @@ describe("Meldingen en noodstop als de bot stilstaat", () => {
       (req) => result(req, { status: "rejected", error: "Bitvavo-fout: markt gepauzeerd" }), // ETH
       (req) => result(req, { status: "new", error: "UITKOMST ONBEKEND: time-out" }), // SOL
     );
-    // Tijdens de noodstop opnieuw armen: aan het eind toch ontwapend
+    // Herschreven (ronde 3): opnieuw armen tijdens de noodstop werd eerst toegestaan
+    // (en aan het eind teruggedraaid); nu weigert arm() zolang de noodstop loopt.
     const gate = new Deferred();
     const origPrice = h.feed.getPrice.bind(h.feed);
     let priceCalls = 0;
@@ -586,12 +635,14 @@ describe("Meldingen en noodstop als de bot stilstaat", () => {
     const killing = h.engine.killSwitch();
     expect(h.engine.liveArmed).toBe(false);
     await new Promise((r) => setImmediate(r));
-    h.engine.arm();
-    expect(h.engine.liveArmed).toBe(true);
+    expect(() => h.engine.arm()).toThrow(/^Armen geblokkeerd: noodstop bezig/);
+    expect(h.engine.liveArmed).toBe(false);
     gate.resolve();
     const res = await killing;
     expect(h.engine.liveArmed).toBe(false);
     expect(h.logs().some((m) => m === "Live mode ontwapend na de noodstop")).toBe(true);
+    expect(h.logs().some((m) => m.startsWith("LIVE GEARMD"))).toBe(true); // alleen de arm() van vóór de noodstop
+    expect(h.logs().filter((m) => m.startsWith("LIVE GEARMD"))).toHaveLength(1);
 
     expect(res.closed).toBe(0);
     expect(res.failed.map((f) => f.market)).toEqual(["BTC-EUR", "ETH-EUR", "SOL-EUR"]);

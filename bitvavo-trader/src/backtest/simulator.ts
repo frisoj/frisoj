@@ -16,7 +16,7 @@
  *   like the engine, which books intrabar exits after the candle opened;
  * - stop and take-profit in one candle → the risk manager assumes the stop;
  * - an exit is only booked when the position is worth at least the EXCHANGE
- *   minimum order (MarketInfo, default €5 — never `risk.minOrderQuote`, which
+ *   minimum order (MarketInfo when valid and > 0, otherwise €5 — never `risk.minOrderQuote`, which
  *   is a user setting for entries): Bitvavo and the brokers reject smaller
  *   sells. Otherwise the sell stays pending, exactly like the engine: no
  *   stops / signals any more, just a new attempt as soon as
@@ -42,8 +42,10 @@ import type {
   Ticker24h,
   Trade,
 } from "../core/types";
+import { EXCHANGE_MIN_ORDER_QUOTE } from "../core/defaults";
 import { INTERVAL_MS } from "../core/types";
 import { dayKey } from "../core/util";
+import { exchangeMinQuote } from "../exchange/minimums";
 import { buyHoldFactor, computeMetrics, emptyMetrics } from "./metrics";
 
 export interface BacktestInput {
@@ -94,18 +96,22 @@ export function spreadFromTicker(t: Pick<Ticker24h, "bid" | "ask"> | undefined |
   return Number.isFinite(s) ? s : undefined;
 }
 
-/** Bitvavo's minimum order value in EUR when there is no MarketInfo (same default as the brokers and the engine). */
-export const DEFAULT_EXCHANGE_MIN_QUOTE = 5;
+/**
+ * Bitvavo's minimum order value in EUR when MarketInfo has no valid one.
+ * Alias of `EXCHANGE_MIN_ORDER_QUOTE` (src/core/defaults.ts), kept for importers.
+ */
+export const DEFAULT_EXCHANGE_MIN_QUOTE = EXCHANGE_MIN_ORDER_QUOTE;
 
 /**
  * The EXCHANGE minimum order value (EUR) for buys and sells: MarketInfo's
- * value, or Bitvavo's default of €5. Never `risk.minOrderQuote`: that is a
- * user setting (the risk manager uses it as an extra floor for entries); the
+ * value when it is finite and > 0, otherwise (missing, NaN, 0, negative =
+ * unknown) Bitvavo's default of €5 — the same rule as the brokers and the risk
+ * manager (`exchangeMinQuote`). Never `risk.minOrderQuote`: that is a user
+ * setting (the risk manager uses it as an extra floor for entries); the
  * brokers refuse exactly what Bitvavo refuses, not more and not less.
  */
 export function exchangeMinOrderQuote(marketInfo?: Pick<MarketInfo, "minOrderQuote"> | null): number {
-  const v = marketInfo?.minOrderQuote;
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : DEFAULT_EXCHANGE_MIN_QUOTE;
+  return exchangeMinQuote(marketInfo);
 }
 
 export interface BacktestDeps {
@@ -330,8 +336,7 @@ export function simulate(
   if (evalStart < loopStart) eqValues[0] = initialCapital; // candle 0 cannot trade (no prior decision)
 
   /** Would the brokers accept a sell of the whole position at this (pre-slippage) price? */
-  const sellable = (p: Position, rawPrice: number): boolean =>
-    !(minOrder > 0) || p.amount * rawPrice >= minOrder - MIN_ORDER_EPS;
+  const sellable = (p: Position, rawPrice: number): boolean => p.amount * rawPrice >= minOrder - MIN_ORDER_EPS;
 
   /**
    * Book the exit. `exitAt` = moment of the exit for the loss cooldown: the

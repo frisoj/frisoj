@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-async function mount(initial: Fake, killResult: Fake) {
+async function mount(initial: Fake, killResult: Fake, apiOver: Fake = {}) {
   const { mountHeader } = await loadPublic("js/header.js");
   const { fmt, esc } = await loadPublic("js/format.js");
   const bus = makeBus();
@@ -42,6 +42,7 @@ async function mount(initial: Fake, killResult: Fake) {
       return killResult;
     }),
     getState: vi.fn(async () => state),
+    ...apiOver,
   };
   const ctx = {
     fmt,
@@ -183,5 +184,115 @@ describe("killOutcome met killResult van de server", () => {
     const modal = h.pressKill();
     expect(modal.bodyHtml).toContain("niet verkocht");
     expect(modal.bodyHtml).toContain("BTC-EUR");
+  });
+});
+
+/** Nep-modal zoals openModal hem als tweede argument aan onConfirm geeft */
+function fakeModal() {
+  const nodes: Record<string, Fake> = {};
+  const removed: string[] = [];
+  const modal = fakeNode({ querySelector: (sel: string) => (nodes[sel] ||= fakeNode({ remove: () => removed.push(sel) })) });
+  return { modal, nodes, removed };
+}
+
+describe("Noodstop: uitkomst en modal (ronde 3)", () => {
+  const withKill = (positions: Fake[], failed: Fake[], closed = 0) => ({ ...snapshot(positions, false), killResult: { closed, failed } });
+
+  it("0 open posities → precies één neutrale info-toast", async () => {
+    const h = await mount(snapshot([]), withKill([], [], 0));
+    const modal = h.pressKill();
+    expect(modal.bodyHtml).toContain("Er zijn geen open posities");
+    await expect(modal.onConfirm("", fakeModal().modal)).resolves.toBeUndefined();
+    expect(h.toasts).toEqual(["info: Noodstop uitgevoerd — er stonden geen posities open; de bot is gestopt"]);
+  });
+
+  it("0 open posities zonder killResult (oudere server) → ook één info-toast", async () => {
+    const h = await mount(snapshot([]), snapshot([], false));
+    const modal = h.pressKill();
+    await modal.onConfirm("", fakeModal().modal);
+    expect(h.toasts).toEqual(["info: Noodstop uitgevoerd — er stonden geen posities open; de bot is gestopt"]);
+  });
+
+  it("killOutcome: niets gesloten en niets mislukt → info, niet 'alles verkocht'", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    expect(killOutcome(withKill([], [], 0), fmt)).toEqual(["Noodstop uitgevoerd — er stonden geen posities open; de bot is gestopt", "info"]);
+    // er stond wél iets open en alles is verkocht → nog steeds de waarschuwing 'alles verkocht'
+    expect(killOutcome(snapshot([], false), fmt, 5, 2)[1]).toBe("warn");
+  });
+
+  it("deels mislukt → de modal toont het resultaat i.p.v. de oude tekst, zonder knop 'Noodstop uitvoeren'", async () => {
+    const reason = "onverkoopbaar: waarde € 4,89 is onder het minimum van € 5,00";
+    const h = await mount(snapshot([dust, big]), withKill([dust], [{ id: "p1", market: "SOL-EUR", reason }], 1));
+    const modal = h.pressKill();
+    expect(norm(modal.bodyHtml)).toContain("Alle <strong>2 open posities worden</strong>");
+    const fm = fakeModal();
+    await expect(modal.onConfirm("", fm.modal)).resolves.toBe(false); // modal blijft open
+    const body = norm(fm.nodes[".modal-body"].innerHTML);
+    expect(body).not.toContain("posities worden");
+    expect(body).toContain("1 positie is NIET verkocht");
+    expect(body).toContain("<strong>SOL-EUR</strong> ≈ <span class=\"mono\">€ 4,89</span> — " + reason);
+    expect(body).toContain("schrijf hem af (knop Afschrijven bij Open posities)");
+    expect(body).toContain("de bot staat stil");
+    expect(fm.nodes[".modal-head h3"].textContent).toBe("Noodstop: niet alles verkocht");
+    expect(fm.removed).toContain('[data-m="ok"]');
+    expect(fm.nodes['[data-m="cancel"]'].textContent).toBe("Sluiten");
+    expect(fm.nodes[".modal-error"].hidden).toBe(true);
+    expect(h.toasts).toEqual([]); // het resultaat staat in de modal, geen extra toast
+    expect(h.api.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it("noemt config.risk.minOrderQuote NOOIT 'het Bitvavo-minimum' (instelling €20, positie €10 is gewoon verkoopbaar)", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const ten = { id: "p3", market: "BTC-EUR", amount: 0.0002, currentPrice: 50000, entryPrice: 50000 };
+    const snap = { ...snapshot([ten]), config: { pollMs: 15000, risk: { minOrderQuote: 20, maxOpenPositions: 2 } } };
+    const h = await mount(snap, { ...snap, running: false });
+    const modal = h.pressKill();
+    expect(modal.bodyHtml).not.toContain("niet verkocht");
+    expect(modal.bodyHtml).not.toContain("€ 20,00");
+    const [msg] = killOutcome({ ...snap, running: false }, fmt);
+    expect(norm(msg)).not.toContain("Bitvavo-minimum");
+    expect(norm(msg)).not.toContain("€ 20,00");
+  });
+
+  it("een lage instelling (€1) verbergt het beursminimum van € 5 niet", async () => {
+    const snap = { ...snapshot([dust]), config: { pollMs: 15000, risk: { minOrderQuote: 1, maxOpenPositions: 2 } } };
+    const h = await mount(snap, { ...snap, running: false });
+    const body = norm(h.pressKill().bodyHtml);
+    expect(body).toContain("niet verkocht");
+    expect(body).toContain("minder waard dan het Bitvavo-minimum van € 5,00 per order");
+    expect(body).not.toContain("€ 1,00");
+  });
+
+  it("beursminimum per markt uit /api/markets (MarketInfo.minOrderQuote > 0), anders € 5", async () => {
+    const ten = { id: "p3", market: "BTC-EUR", amount: 0.0002, currentPrice: 50000, entryPrice: 50000 };
+    const getMarkets = vi.fn(async () => [
+      { market: "BTC-EUR", minOrderQuote: 12 },
+      { market: "SOL-EUR", minOrderQuote: 0 },
+    ]);
+    const h = await mount(snapshot([ten, dust]), snapshot([], false), { getMarkets });
+    await settle();
+    expect(getMarkets).toHaveBeenCalled();
+    const body = norm(h.pressKill().bodyHtml);
+    expect(body).toContain("<strong>BTC-EUR</strong> ≈ <span class=\"mono\">€ 10,00</span> — minder waard dan het Bitvavo-minimum van € 12,00 per order");
+    expect(body).toContain("<strong>SOL-EUR</strong> ≈ <span class=\"mono\">€ 4,89</span> — minder waard dan het Bitvavo-minimum van € 5,00 per order");
+  });
+
+  it("de modal toont de reden van de engine (unsellableReason) per positie", async () => {
+    const why = "Onverkoopbaar: hoeveelheid onder het minimum van 0,0001 BTC.";
+    const flagged = { ...big, unsellable: true, unsellableReason: why };
+    const h = await mount(snapshot([flagged]), snapshot([], false));
+    expect(norm(h.pressKill().bodyHtml)).toContain(`<strong>BTC-EUR</strong> ≈ <span class="mono">€ 30,00</span> — ${why}`);
+  });
+
+  it("zonder killResult: engine-reden in de melding; algemene hint met het beursminimum", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const why = "Onverkoopbaar: waarde €4,89 < minimum €5,00.";
+    const [raw, kind] = killOutcome(snapshot([{ ...dust, unsellable: true, unsellableReason: why }], false), fmt, () => 5);
+    expect(kind).toBe("error");
+    expect(norm(raw)).toContain(`NIET verkocht (SOL-EUR ≈ € 4,89: ${why})`);
+    expect(norm(raw)).toContain("onder het Bitvavo-minimum van € 5,00 per order");
   });
 });

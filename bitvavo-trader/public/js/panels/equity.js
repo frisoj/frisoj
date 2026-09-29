@@ -49,17 +49,24 @@ function tickFormatter(time, type) {
   return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Waarde die de curve toont: equity + (live) cumulatief afgeroomde winst */
+/**
+ * Waarde die de curve toont: equity + (live) cumulatief bedrag dat netto uit het
+ * handelsbudget is gehaald (`EquityPoint.skimmed`), zodat afromen of een
+ * gewijzigde kapitaallimiet geen nep-sprong geeft.
+ */
 export function curveValue(p) {
   return Number(p && p.equity) + (Number(p && p.skimmed) || 0);
 }
 
+const isNum = (n) => typeof n === "number" && Number.isFinite(n);
+
 /**
- * Kerncijfers voor het paneel. Live wordt winst boven de kapitaallimiet
- * afgeroomd: de engine verlaagt dan `startingEquity` met dat bedrag, dus de
- * baseline (oorspronkelijke start) is `startingEquity + skimmedQuote` en de
- * curve toont `equity + skimmed`. Rendement: `account.totalReturnPct` als de
- * server die meestuurt.
+ * Kerncijfers voor het paneel.
+ *  - baseline (stippellijn) = `account.startingEquity`: het kapitaal dat de bot kreeg;
+ *  - curve = equity + skimmed per punt;
+ *  - winst/rendement = `account.totalPnlQuote` / `totalReturnPct` van de engine
+ *    (correct na afromen); zelf rekenen alleen bij een oudere server;
+ *  - `skimmed` = `snapshot.skimmedQuote` (regel "Afgeroomd boven limiet").
  */
 export function equityFigures(s) {
   const a = (s && s.account) || {};
@@ -67,10 +74,13 @@ export function equityFigures(s) {
   const skimmed = Number(s && s.skimmedQuote) > 0 ? Number(s.skimmedQuote) : 0;
   const equity = Number(a.equity);
   const rawStart = Number(a.startingEquity);
-  const start = rawStart > 0 ? rawStart + skimmed : hist.length ? curveValue(hist[0]) : 0;
-  const pnl = Number.isFinite(rawStart) && rawStart > 0 ? equity - rawStart : equity + skimmed - start;
-  const ret = Number.isFinite(a.totalReturnPct) ? a.totalReturnPct : start > 0 ? ((equity + skimmed) / start - 1) * 100 : NaN;
-  const now = { equity: equity + skimmed };
+  const start = rawStart > 0 ? rawStart : hist.length ? curveValue(hist[0]) : 0;
+  // "Nu" op dezelfde schaal als de curve: equity + wat er (volgens het laatste punt) netto uit is
+  const last = hist.length ? hist[hist.length - 1] : null;
+  const nowCurve = equity + (last ? Number(last.skimmed) || 0 : 0);
+  const pnl = isNum(a.totalPnlQuote) ? a.totalPnlQuote : rawStart > 0 ? equity - rawStart : nowCurve - start;
+  const ret = isNum(a.totalReturnPct) ? a.totalReturnPct : start > 0 ? (pnl / start) * 100 : NaN;
+  const now = { equity: nowCurve };
   const dd = maxDrawdownPct(hist.length ? hist.map((p) => ({ equity: curveValue(p) })).concat([now]) : [now]);
   return { equity, skimmed, start, pnl, ret, dd };
 }

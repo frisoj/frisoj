@@ -74,6 +74,7 @@ async function mount(snap: Fake, apiOver: Fake = {}) {
   bus.on("snapshot", (s: Fake) => (state = s));
   mountTables(ctx, { positionsEl, tradesEl });
   const body = () => norm(String(nodes["p[data-pbody]"].innerHTML));
+  const tbody = () => norm(String(nodes["t[data-tbody]"].innerHTML));
   const click = (attr: "close" | "writeoff", id: string) => {
     const target = {
       closest: (sel: string) => (sel === `[data-${attr}]` ? { dataset: { [attr]: id }, disabled: false } : null),
@@ -81,7 +82,7 @@ async function mount(snap: Fake, apiOver: Fake = {}) {
     positionsEl.fire("click", { target });
     return modals[modals.length - 1];
   };
-  return { api, bus, toasts, modals, body, click, state: () => state };
+  return { api, bus, ctx: ctx as Fake, toasts, modals, body, tbody, click, state: () => state };
 }
 
 describe("onverkoopbare positie", () => {
@@ -150,5 +151,134 @@ describe("onverkoopbare positie", () => {
     const modal = h.click("writeoff", "pos_1");
     await expect(modal.onConfirm()).rejects.toThrow("Afschrijven kan nu even niet");
     expect(h.body()).not.toContain("disabled");
+  });
+});
+
+describe("open posities: compacte tabel (ronde 3)", () => {
+  it("7 kolommen: koers+entry, inzet+hoeveelheid en stop/doel onder de balk samengevoegd; actiekolom sticky", async () => {
+    const h = await mount({ mode: "live", running: true, positions: [pos({ unsellable: true, unsellableReason: REASON })], trades: [] });
+    const html = h.body();
+    const ths = html.match(/<th[\s>]/g) || [];
+    expect(ths).toHaveLength(7);
+    expect(html).toContain('class="table responsive pos-table"');
+    expect(html).toContain(">Koers / entry</th>");
+    expect(html).toContain(">Inzet / aantal</th>");
+    // koers (live bijgewerkt via data-price) met entry eronder
+    expect(html).toMatch(/<span class="price-cell" data-price="pos_1">138,70<\/span><small[^>]*>in 150,00<\/small>/);
+    // inzet met hoeveelheid + munt eronder
+    expect(html).toMatch(/<span>€ 5,02<\/span><small[^>]*>0,0333 SOL<\/small>/);
+    // stop (rood) en doel (groen) als getal onder de balk
+    expect(html).toMatch(/<span class="lbl l neg"[^>]*>140,00<\/span><span class="lbl r pos"[^>]*>170,00<\/span>/);
+    // knoppen in de sticky actiekolom
+    expect(html).toMatch(/<td class="full col-act" data-label=""><div class="pos-actions"><button[^>]*data-close="pos_1"/);
+    expect(html).toContain('<th class="col-act">');
+    expect(html).toContain("data-since");
+  });
+
+  it("een meegeschoven stop krijgt ↑ in het stop-label", async () => {
+    const h = await mount({ mode: "paper", running: true, positions: [pos({ stopPrice: 152, currentPrice: 160, unrealizedPnl: 0.3 })], trades: [] });
+    expect(h.body()).toMatch(/<span class="lbl l neg" title="Stop is meegeschoven \(trailing\/break-even\)">152,00 ↑<\/span>/);
+  });
+});
+
+describe("afgeschreven trade in 'Laatste trades'", () => {
+  const writeOff = {
+    id: "trd_wo",
+    market: "SOL-EUR",
+    entryTime: Date.UTC(2026, 8, 29, 8, 0),
+    exitTime: Date.UTC(2026, 8, 29, 12, 0),
+    entryPrice: 150,
+    exitPrice: 138.7,
+    amount: 0.0333,
+    costQuote: 5.02,
+    proceedsQuote: 0,
+    feesQuote: 0.0125,
+    pnlQuote: -5.02,
+    pnlPct: -100,
+    rMultiple: -5,
+    exitReason: "write-off",
+    candlesHeld: 16,
+    entryReason: "test · afgeschreven (onverkoopbaar restant blijft op je account)",
+  };
+  const tradesHtml = (h: Awaited<ReturnType<typeof mount>>) => h.tbody();
+
+  it("toont 'Afgeschreven' en '—' in plaats van een exitprijs", async () => {
+    const h = await mount({ mode: "live", running: true, positions: [], trades: [writeOff] });
+    const html = tradesHtml(h);
+    expect(html).toContain(">Afgeschreven</span>");
+    expect(html).toMatch(/150,00 <span class="muted">→<\/span> <span class="muted" title="[^"]*niets verkocht[^"]*">—<\/span>/);
+    expect(html).not.toContain("138,70");
+    expect(html).toContain('class="reason-pill neg"');
+  });
+
+  it("een gewone trade houdt zijn exitprijs", async () => {
+    const h = await mount({ mode: "live", running: true, positions: [], trades: [{ ...writeOff, exitReason: "stop-loss", pnlPct: -7.5, pnlQuote: -0.38 }] });
+    expect(tradesHtml(h)).toContain("150,00 <span class=\"muted\">→</span> 138,70");
+    expect(tradesHtml(h)).toContain(">Stop-loss</span>");
+  });
+});
+
+describe("één toast per gesloten trade (gedeelde notifier met het SSE-event)", () => {
+  const trade = { id: "trd_9", market: "SOL-EUR", pnlQuote: 0.12, pnlPct: 2.4, exitReason: "manual" };
+
+  async function withNotifier(apiOver: Fake, mode = "paper") {
+    const { createTradeNotifier } = await loadPublic("js/tradeNotify.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const h = await mount({ mode, running: true, positions: [pos({ currentPrice: 160, unrealizedPnl: 0.3 })], trades: [] }, apiOver);
+    return { h, createTradeNotifier, fmt };
+  }
+
+  it("SSE-event eerst, daarna het API-antwoord → één toast", async () => {
+    let bus: Fake;
+    const { h, createTradeNotifier, fmt } = await withNotifier({
+      closePosition: vi.fn(async () => {
+        bus.emit("position-closed", { ...trade }); // server stuurt het event vóór het HTTP-antwoord
+        return { ...trade };
+      }),
+    });
+    bus = h.bus;
+    const shown: string[] = [];
+    const notify = createTradeNotifier((m: string, k: string) => shown.push(norm(`${k}: ${m}`)), fmt, () => "paper");
+    h.bus.on("position-closed", notify); // zoals main.js
+    h.ctx.notifyTradeClosed = notify;
+    const modal = h.click("close", "pos_1");
+    await modal.onConfirm();
+    expect(shown).toEqual(["success: Oefen-verkoop: SOL-EUR +€ 0,12 (+2,40%) · Handmatig"]);
+    expect(h.toasts).toEqual([]);
+  });
+
+  it("API-antwoord eerst, daarna het SSE-event → één toast", async () => {
+    const { h, createTradeNotifier, fmt } = await withNotifier({ closePosition: vi.fn(async () => ({ ...trade })) });
+    const shown: string[] = [];
+    const notify = createTradeNotifier((m: string, k: string) => shown.push(norm(`${k}: ${m}`)), fmt, () => "paper");
+    h.bus.on("position-closed", notify);
+    h.ctx.notifyTradeClosed = notify;
+    await h.click("close", "pos_1").onConfirm();
+    h.bus.emit("position-closed", { ...trade });
+    expect(shown).toHaveLength(1);
+    expect(h.toasts).toEqual([]);
+  });
+
+  it("afschrijven → één toast 'Afgeschreven: <markt> …'", async () => {
+    const wo = { id: "trd_wo", market: "SOL-EUR", pnlQuote: -5.02, pnlPct: -100, exitReason: "write-off" };
+    const { createTradeNotifier, fmt } = await withNotifier({});
+    let bus: Fake;
+    const h = await mount(
+      { mode: "live", running: true, positions: [pos({ unsellable: true, unsellableReason: REASON })], trades: [] },
+      {
+        writeOffPosition: vi.fn(async () => {
+          bus.emit("position-closed", { ...wo }); // SSE-event vóór het HTTP-antwoord
+          return { ...wo };
+        }),
+      },
+    );
+    bus = h.bus;
+    const shown: string[] = [];
+    const notify = createTradeNotifier((m: string, k: string) => shown.push(norm(`${k}: ${m}`)), fmt, () => "live");
+    h.bus.on("position-closed", notify);
+    h.ctx.notifyTradeClosed = notify;
+    await h.click("writeoff", "pos_1").onConfirm();
+    expect(shown).toEqual(["warn: Afgeschreven: SOL-EUR -€ 5,02 als verlies geboekt — de coins blijven op je Bitvavo-account"]);
+    expect(h.toasts).toEqual([]);
   });
 });

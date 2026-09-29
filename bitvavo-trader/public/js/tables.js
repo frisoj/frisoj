@@ -34,16 +34,22 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
 
   positionsEl.innerHTML = `
     <div class="panel-title">Open posities <span class="count" data-pc>0</span>
+      <span class="scroll-cue" data-pcue hidden title="De tabel is breder dan het scherm: schuif opzij voor alle kolommen. De knoppen blijven rechts staan.">⇆ schuif opzij voor meer kolommen</span>
       <span class="panel-actions panel-sub" data-psum></span></div>
-    <div class="table-wrap" data-pbody></div>`;
+    <div class="table-wrap pos-wrap" data-pbody></div>`;
   const pBody = positionsEl.querySelector("[data-pbody]");
   const pCount = positionsEl.querySelector("[data-pc]");
   const pSum = positionsEl.querySelector("[data-psum]");
+  const pCue = positionsEl.querySelector("[data-pcue]");
 
-  function rangeBar(p) {
+  /** Balk stop ↔ doel met de koers erop; stop (links) en doel (rechts) als getal eronder */
+  function rangeBar(p, trailing) {
     const stop = p.stopPrice;
     const tp = p.takeProfitPrice;
-    if (!isNum(stop) || !isNum(tp) || tp <= stop) return `<span class="muted">–</span>`;
+    const labels = `<span class="lbl l neg" title="${trailing ? "Stop is meegeschoven (trailing/break-even)" : "Stop-loss"}">${esc(
+      fmt.price(stop),
+    )}${trailing ? " ↑" : ""}</span><span class="lbl r pos" title="Doel (take-profit)">${esc(fmt.price(tp))}</span>`;
+    if (!isNum(stop) || !isNum(tp) || tp <= stop) return `<div class="rangebar no-bar">${labels}</div>`;
     const span = tp - stop;
     const clamp = (x) => Math.max(0, Math.min(100, x));
     const now = clamp(((p.currentPrice - stop) / span) * 100);
@@ -53,8 +59,17 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
       <div class="track"></div>
       <div class="entry" style="left:${entry.toFixed(1)}%" title="Entry"></div>
       <div class="now ${cls}" style="left:${now.toFixed(1)}%"></div>
+      ${labels}
     </div>`;
   }
+
+  /** Scroll-hint als de tabel toch breder is dan het paneel (actiekolom blijft zichtbaar: sticky) */
+  function updateScrollCue() {
+    const over = Number(pBody.scrollWidth) > Number(pBody.clientWidth) + 1;
+    pBody.classList.toggle("is-scrollx", over);
+    if (pCue) pCue.hidden = !over;
+  }
+  if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("resize", updateScrollCue);
 
   function renderPositions() {
     const snap = ctx.getState();
@@ -64,6 +79,7 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
       pSum.innerHTML = "";
       pBody.innerHTML = `<div class="empty">${EMPTY_POS}<b>Geen open posities</b>
         <span>${snap && snap.running ? "De bot zoekt naar een koopkans…" : "Start de bot om te beginnen met (oefen)handelen."}</span></div>`;
+      updateScrollCue();
       return;
     }
     const totalPnl = positions.reduce((s, p) => s + (Number(p.unrealizedPnl) || 0), 0);
@@ -79,24 +95,24 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
         const stuck = !!p.unsellable;
         const why = unsellableWhy(p);
         const busy = closing.has(p.id) || writingOff.has(p.id);
+        const base = String(p.market || "").split("-")[0];
+        // Compact (past op 1280 px): koers + entry, inzet + hoeveelheid en stop/doel onder de balk samengevoegd
         return `<tr data-id="${esc(p.id)}"${stuck ? ' class="is-unsellable"' : ""}>
           <td class="first" data-label="Markt"><div class="pos-market">${marketCell(p.market)}${
             stuck ? `<span class="badge badge-yellow" title="${esc(why)}">Onverkoopbaar</span>` : ""
           }</div></td>
-          <td data-label="Sinds" title="${esc(fmt.dateTime(p.entryTime))}">${esc(fmt.duration(now - p.entryTime))}</td>
-          <td class="num" data-label="Entry">${esc(fmt.price(p.entryPrice))}</td>
-          <td class="num" data-label="Koers"><span class="price-cell" data-price="${esc(p.id)}">${esc(fmt.price(p.currentPrice))}</span></td>
-          <td class="num neg" data-label="Stop" title="${trailing ? "Stop is meegeschoven (trailing/break-even)" : "Stop-loss"}">${esc(
-            fmt.price(p.stopPrice),
-          )}${trailing ? " ↑" : ""}</td>
-          <td class="num pos" data-label="Doel">${esc(fmt.price(p.takeProfitPrice))}</td>
-          <td class="num" data-label="Hoeveelheid">${esc(fmt.amount(p.amount))}</td>
-          <td class="num" data-label="Inzet">${esc(fmt.eur(p.costQuote))}</td>
+          <td data-label="Sinds" data-since title="${esc(fmt.dateTime(p.entryTime))}">${esc(fmt.duration(now - p.entryTime))}</td>
+          <td class="num" data-label="Koers / entry"><div class="cell-stack"><span class="price-cell" data-price="${esc(p.id)}">${esc(
+            fmt.price(p.currentPrice),
+          )}</span><small class="muted" title="Entry: gemiddelde aankoopprijs">in ${esc(fmt.price(p.entryPrice))}</small></div></td>
+          <td class="num" data-label="Inzet / aantal"><div class="cell-stack"><span>${esc(fmt.eur(p.costQuote))}</span><small class="muted" title="Hoeveelheid">${esc(
+            fmt.amount(p.amount),
+          )} ${esc(base)}</small></div></td>
           <td class="num ${cls}" data-label="P&amp;L"><div class="cell-stack"><span>${esc(fmt.eurSigned(p.unrealizedPnl))}</span><small>${esc(
             fmt.pct(p.unrealizedPct),
           )}</small></div></td>
-          <td class="full" data-label="Stop ↔ doel">${rangeBar(p)}</td>
-          <td class="full" data-label=""><div class="pos-actions"><button type="button" class="btn btn-sm btn-danger" data-close="${esc(
+          <td class="full" data-label="Stop ↔ doel">${rangeBar(p, trailing)}</td>
+          <td class="full col-act" data-label=""><div class="pos-actions"><button type="button" class="btn btn-sm btn-danger" data-close="${esc(
             p.id,
           )}" ${busy ? "disabled" : ""} title="${esc(
             stuck ? `Verkopen lukt nu niet — ${why}` : "Verkoop deze positie nu tegen marktprijs",
@@ -110,12 +126,13 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
         </tr>`;
       })
       .join("");
-    pBody.innerHTML = `<table class="table responsive">
+    pBody.innerHTML = `<table class="table responsive pos-table">
       <thead><tr>
-        <th>Markt</th><th>Sinds</th><th class="num">Entry</th><th class="num">Koers</th><th class="num">Stop</th>
-        <th class="num">Doel</th><th class="num">Hoeveelheid</th><th class="num">Inzet</th><th class="num">P&amp;L</th>
-        <th>Stop ↔ doel</th><th></th>
+        <th>Markt</th><th>Sinds</th><th class="num" title="Huidige koers, met daaronder je gemiddelde aankoopprijs (entry)">Koers / entry</th>
+        <th class="num" title="Ingelegd bedrag (incl. fee), met daaronder de hoeveelheid">Inzet / aantal</th><th class="num">P&amp;L</th>
+        <th title="Waar de koers staat tussen de stop-loss (links) en het doel (rechts)">Stop ↔ doel</th><th class="col-act"><span class="sr-only">Acties</span></th>
       </tr></thead><tbody>${rows}</tbody></table>`;
+    updateScrollCue();
     for (const p of positions) {
       const el = pBody.querySelector(`[data-price="${CSS.escape(p.id)}"]`);
       const prev = shownPrice.get(p.id);
@@ -165,6 +182,19 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
     }
   }
 
+  /**
+   * Melding na sluiten/afschrijven. Via de gedeelde notifier van het dashboard
+   * (`ctx.notifyTradeClosed`, ook gebruikt voor het SSE-event "position-closed")
+   * geeft dezelfde trade maar één toast, ongeacht wat het eerst binnenkomt.
+   */
+  function tradeToast(trade, [fallbackMsg, fallbackKind]) {
+    if (typeof ctx.notifyTradeClosed === "function" && trade && typeof trade === "object" && trade.id != null) {
+      ctx.notifyTradeClosed(trade);
+      return;
+    }
+    ctx.toast(fallbackMsg, fallbackKind);
+  }
+
   function confirmClose(id) {
     const snap = ctx.getState();
     const p = ((snap && snap.positions) || []).find((x) => x.id === id);
@@ -190,11 +220,12 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
         renderPositions();
         try {
           const trade = await api.closePosition(id);
-          if (trade && isNum(trade.pnlQuote)) {
-            ctx.toast(`${p.market} gesloten: ${fmt.eurSigned(trade.pnlQuote)} (${fmt.pct(trade.pnlPct)})`, trade.pnlQuote >= 0 ? "success" : "warn");
-          } else {
-            ctx.toast(`${p.market} gesloten`, "success");
-          }
+          tradeToast(
+            trade,
+            trade && isNum(trade.pnlQuote)
+              ? [`${p.market} gesloten: ${fmt.eurSigned(trade.pnlQuote)} (${fmt.pct(trade.pnlPct)})`, trade.pnlQuote >= 0 ? "success" : "warn"]
+              : [`${p.market} gesloten`, "success"],
+          );
           await refreshState();
         } finally {
           closing.delete(id);
@@ -231,7 +262,7 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
         try {
           const trade = await api.writeOffPosition(id);
           const loss = trade && isNum(trade.pnlQuote) ? trade.pnlQuote : -(Number(p.costQuote) || 0);
-          ctx.toast(`${p.market} afgeschreven: ${fmt.eurSigned(loss)} als verlies geboekt; de coins blijven op je account`, "warn");
+          tradeToast(trade, [`${p.market} afgeschreven: ${fmt.eurSigned(loss)} als verlies geboekt; de coins blijven op je account`, "warn"]);
           await refreshState();
         } finally {
           writingOff.delete(id);
@@ -279,12 +310,21 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
         const cls = fmt.pnlClass(t.pnlQuote);
         const isNew = !firstTrades && !seenTrades.has(t.id);
         seenTrades.add(t.id);
+        const writtenOff = t.exitReason === "write-off";
         const reasonCls =
-          t.exitReason === "take-profit" ? "pos" : t.exitReason === "stop-loss" || t.exitReason === "kill-switch" ? "neg" : "";
+          t.exitReason === "take-profit"
+            ? "pos"
+            : t.exitReason === "stop-loss" || t.exitReason === "kill-switch" || writtenOff
+              ? "neg"
+              : "";
+        // Afgeschreven: er is niets verkocht, dus geen exitprijs (de coins staan nog op het account)
+        const exitCell = writtenOff
+          ? `<span class="muted" title="Afgeschreven: niets verkocht, de coins staan nog op je account">—</span>`
+          : esc(fmt.price(t.exitPrice));
         return `<tr class="${isNew ? "row-new" : ""}" title="${esc(t.entryReason ? `Gekocht omdat: ${t.entryReason}` : "")}">
           <td class="first" data-label="Tijd"><span class="mono" title="${esc(fmt.dateTime(t.exitTime))}">${esc(fmt.dateTime(t.exitTime))}</span></td>
           <td data-label="Markt">${marketCell(t.market)}</td>
-          <td class="num" data-label="Entry → exit">${esc(fmt.price(t.entryPrice))} <span class="muted">→</span> ${esc(fmt.price(t.exitPrice))}</td>
+          <td class="num" data-label="Entry → exit">${esc(fmt.price(t.entryPrice))} <span class="muted">→</span> ${exitCell}</td>
           <td class="num ${cls}" data-label="P&amp;L">${esc(fmt.eurSigned(t.pnlQuote))}</td>
           <td class="num ${cls}" data-label="%">${esc(fmt.pct(t.pnlPct))}</td>
           <td class="num ${fmt.pnlClass(t.rMultiple)}" data-label="R" title="Winst/verlies in veelvouden van het risico">${
@@ -325,7 +365,7 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
       const now = Date.now();
       pBody.querySelectorAll("tr[data-id]").forEach((tr) => {
         const p = snap.positions.find((x) => x.id === tr.dataset.id);
-        const cell = tr.children[1];
+        const cell = tr.querySelector("[data-since]");
         if (p && cell) cell.textContent = fmt.duration(now - p.entryTime);
       });
     }

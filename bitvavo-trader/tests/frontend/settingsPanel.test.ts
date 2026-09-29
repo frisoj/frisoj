@@ -59,8 +59,14 @@ async function mount() {
   const server = fakeServer();
   const bus = makeBus();
   const toasts: string[] = [];
-  // Alleen de meldingsvakken bestaan in de nep-DOM; de rest van het formulier niet
-  const boxes: Record<string, Fake> = { ".st-errors": fakeNode(), ".st-notice": fakeNode() };
+  const modals: Fake[] = [];
+  // Alleen de meldingsvakken en het live-vak bestaan in de nep-DOM; de rest van het formulier niet
+  const liveNodes: Record<string, Fake> = {};
+  const boxes: Record<string, Fake> = {
+    ".st-errors": fakeNode(),
+    ".st-notice": fakeNode(),
+    ".st-sec-live": fakeNode({ querySelector: (sel: string) => (liveNodes[sel] ||= fakeNode()) }),
+  };
   const el = fakeNode({ querySelector: (sel: string) => boxes[sel] ?? null });
   const ctx = {
     fmt,
@@ -70,7 +76,10 @@ async function mount() {
     toast: (m: string, k: string) => toasts.push(`${k}: ${m}`),
     getInfo: () => null,
     getState: () => null,
-    openModal() {},
+    openModal(o: Fake) {
+      modals.push(o);
+      return () => {};
+    },
   };
   mountSettings(ctx, el);
   await settle();
@@ -86,7 +95,19 @@ async function mount() {
       },
     });
   const click = (act: string) => el.fire("click", { target: { closest: () => ({ dataset: { act } }) } });
-  return { server, bus, toasts, el, input, click, errorsBox: boxes[".st-errors"], noticeBox: boxes[".st-notice"] };
+  return {
+    server,
+    bus,
+    toasts,
+    modals,
+    el,
+    input,
+    click,
+    errorsBox: boxes[".st-errors"],
+    noticeBox: boxes[".st-notice"],
+    liveBox: boxes[".st-sec-live"],
+    liveNodes,
+  };
 }
 
 describe("Instellingen opslaan draait wijzigingen van elders niet terug", () => {
@@ -165,6 +186,44 @@ describe("Instellingen opslaan draait wijzigingen van elders niet terug", () => 
     expect(errorsBox.hidden).toBe(false);
     expect(errorsBox.innerHTML).toContain("Taker fee moet tussen 0% en 1% liggen.");
     expect(errorsBox.innerHTML).not.toContain("0,01");
+  });
+});
+
+describe("Instellingen: live handel in dezelfde (Nederlandse) woorden als de header", () => {
+  const liveInfo = { mode: "live", liveArmed: false, hasApiKeys: true, capitalLimitQuote: 50, dataSource: "bitvavo", version: "0.1.0" };
+
+  it("niet ingeschakeld: knop 'Live handel inschakelen…', nergens 'Arm live trading'/'gewapend'", async () => {
+    const { bus, liveBox } = await mount();
+    bus.emit("app-info", liveInfo);
+    const html = String(liveBox.innerHTML).replace(/\s+/g, " ");
+    expect(html).toContain(">Live handel inschakelen…</button>");
+    expect(html).toContain('<div class="panel-title">Live handel</div>');
+    expect(html).toContain("Live handel ingeschakeld");
+    expect(html).not.toMatch(/Arm live trading|gewapend|armen|Live trading/i);
+  });
+
+  it("de bevestiging heet 'Live handel inschakelen' met knop 'Inschakelen' (zoals in de header)", async () => {
+    const { bus, modals, liveNodes, toasts, server } = await mount();
+    server.api.arm = async () => ({ ...liveInfo, liveArmed: true });
+    bus.emit("app-info", liveInfo);
+    liveNodes[".st-arm"].fire("click", {});
+    const m = modals[modals.length - 1];
+    expect(m.title).toBe("Live handel inschakelen");
+    expect(m.confirmText).toBe("Inschakelen");
+    expect(String(m.bodyHtml)).not.toMatch(/armen|ontwapenen/i);
+    await m.onConfirm("IK BEGRIJP HET RISICO");
+    expect(toasts).toContain("warn: Live handel ingeschakeld — de bot handelt nu met echt geld");
+  });
+
+  it("ingeschakeld: knop 'Uitschakelen (stop echte orders)'; oefenmodus-uitleg noemt 'Live handel inschakelen…'", async () => {
+    const { bus, liveBox } = await mount();
+    bus.emit("app-info", { ...liveInfo, liveArmed: true });
+    expect(String(liveBox.innerHTML)).toContain(">Uitschakelen (stop echte orders)</button>");
+    expect(String(liveBox.innerHTML)).toContain("Live handel staat AAN.");
+    bus.emit("app-info", { ...liveInfo, mode: "paper" });
+    const paper = String(liveBox.innerHTML).replace(/\s+/g, " ");
+    expect(paper).toContain("<b>Live handel inschakelen…</b> klikt");
+    expect(paper).not.toContain("Arm live trading");
   });
 });
 

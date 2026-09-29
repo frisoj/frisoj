@@ -4,10 +4,12 @@
  * Veiligheidsprincipes:
  * - Gooit nooit bij een afwijzing: geeft status "rejected" + Nederlandse `error`.
  * - Rondt bedragen altijd naar BENEDEN af (nooit meer uitgeven dan gevraagd).
- * - Controleert minimale ordergroottes lokaal vóór verzending. Een verkoop onder
- *   het beursminimum (ook na het verlagen naar het beschikbare saldo) wordt
- *   niet verstuurd: status "rejected" met een `error` die begint met
- *   "ONVERKOOPBAAR:".
+ * - Controleert minimale ordergroottes lokaal vóór verzending (MarketInfo; een
+ *   ontbrekend/ongeldig/≤ 0 minimum = onbekend → €5). Een verkoop onder het
+ *   beursminimum (ook na het verlagen naar het beschikbare saldo) wordt niet
+ *   verstuurd: status "rejected" met een `error` die begint met
+ *   "ONVERKOOPBAAR:". Weigert Bitvavo zelf een verkoop omdat hij onder het
+ *   minimum ligt (code 217/212 of een melding over het minimum), dan ook.
  * - Herhaalt POST /order NOOIT. Bij een netwerkfout/timeout (uitkomst onbekend)
  *   wordt de order eerst opgezocht via clientOrderId.
  * - Laat nooit een order open staan: staat een market order na het pollen nog
@@ -31,6 +33,7 @@ import type {
 } from "../core/types";
 import { BitvavoApiError } from "../exchange/errors";
 import type { BitvavoClient, BitvavoOrder } from "../exchange/bitvavoClient";
+import { exchangeMinBase, exchangeMinQuote } from "../exchange/minimums";
 import { roundAmount, roundQuote } from "../exchange/precision";
 
 export interface LiveBrokerOptions {
@@ -68,11 +71,16 @@ const DEFAULT_TAKER_FEE = 0.0025;
 /** Annuleer-fouten waarbij de order al niet meer open is (niet gevonden / niet meer actief). */
 const CANCEL_NOT_OPEN_CODES = new Set([233, 240]);
 /**
- * Voorvoegsel van `error` als een verkoop lokaal geweigerd is omdat hij onder
- * het beursminimum zou uitkomen (niets verstuurd; opnieuw proberen bij deze
- * koers heeft geen zin).
+ * Voorvoegsel van `error` als een verkoop geweigerd is omdat hij onder het
+ * beursminimum zou uitkomen (lokaal: niets verstuurd; of door Bitvavo zelf
+ * geweigerd). Opnieuw proberen bij deze koers heeft geen zin.
  */
 export const UNSELLABLE_PREFIX = "ONVERKOOPBAAR:";
+/**
+ * Bitvavo-foutcodes voor een order onder het minimum: 217 = orderwaarde onder
+ * het minimum (in quote), 212 = hoeveelheid onder het minimum voor deze munt.
+ */
+const BELOW_MINIMUM_CODES = new Set([212, 217]);
 
 /**
  * Eindstatus: de order kan niet meer (verder) vullen. Alles wat niet
@@ -301,15 +309,17 @@ export class LiveBroker implements Broker {
         return reject("Order geweigerd: kooporder zonder geldig bedrag in EUR (amountQuote)");
       }
       amountQuote = roundQuote(req.amountQuote, info);
-      if (info.minOrderQuote > 0 && amountQuote < info.minOrderQuote) {
+      const minQuote = exchangeMinQuote(info);
+      const minBase = exchangeMinBase(info);
+      if (amountQuote < minQuote) {
         return reject(
-          `Order geweigerd: orderwaarde ${eur(amountQuote)} is lager dan het minimum van ${eur(info.minOrderQuote)} voor ${market}`,
+          `Order geweigerd: orderwaarde ${eur(amountQuote)} is lager dan het minimum van ${eur(minQuote)} voor ${market}`,
         );
       }
       if (amountQuote <= 0) return reject("Order geweigerd: bedrag is na afronden 0");
-      if (ref > 0 && info.minOrderBase > 0 && amountQuote / ref < info.minOrderBase) {
+      if (ref > 0 && minBase > 0 && amountQuote / ref < minBase) {
         return reject(
-          `Order geweigerd: geschatte hoeveelheid ${fmtNum(amountQuote / ref)} ${info.base} is lager dan het minimum van ${fmtNum(info.minOrderBase)} ${info.base}`,
+          `Order geweigerd: geschatte hoeveelheid ${fmtNum(amountQuote / ref)} ${info.base} is lager dan het minimum van ${fmtNum(minBase)} ${info.base}`,
         );
       }
     } else {
@@ -366,6 +376,12 @@ export class LiveBroker implements Broker {
             "new",
           );
         }
+      } else if (side === "sell" && amount !== undefined && isBelowMinimumRejection(err)) {
+        // Bitvavo weigert de verkoop definitief omdat hij onder het minimum ligt (bijv. omdat
+        // Bitvavo de waarde tegen een iets lagere koers berekent dan onze referentiekoers).
+        // Er is niets uitgevoerd; elke tick opnieuw sturen heeft geen zin → ONVERKOOPBAAR,
+        // zodat de engine de positie markeert in plaats van de order te blijven herhalen.
+        return reject(belowMinimumSellText(err, amount, info, ref));
       } else {
         return reject(err instanceof BitvavoApiError ? err.message : `Order geweigerd: ${errorText(err)}`);
       }
@@ -638,16 +654,46 @@ export class LiveBroker implements Broker {
  */
 function sellProblem(amount: number, requested: number, info: MarketInfo, ref: number): string | null {
   const advice = "er is niets naar Bitvavo gestuurd. Wacht tot de waarde boven het minimum komt of schrijf de positie af";
+  const minQuote = exchangeMinQuote(info);
+  const minBase = exchangeMinBase(info);
   if (amount <= 0) {
     return `${UNSELLABLE_PREFIX} hoeveelheid ${SIG_FMT.format(requested)} ${info.base} is na afronden op ${info.quantityDecimals} decimalen 0 (te klein om te verkopen); ${advice}`;
   }
-  if (info.minOrderBase > 0 && amount < info.minOrderBase) {
-    return `${UNSELLABLE_PREFIX} hoeveelheid ${fmtNum(amount)} ${info.base} is lager dan het beursminimum van ${fmtNum(info.minOrderBase)} ${info.base} voor ${info.market}; ${advice}`;
+  if (minBase > 0 && amount < minBase) {
+    return `${UNSELLABLE_PREFIX} hoeveelheid ${fmtNum(amount)} ${info.base} is lager dan het beursminimum van ${fmtNum(minBase)} ${info.base} voor ${info.market}; ${advice}`;
   }
-  if (ref > 0 && info.minOrderQuote > 0 && amount * ref < info.minOrderQuote) {
-    return `${UNSELLABLE_PREFIX} orderwaarde ca. ${eurFloor(amount * ref)} is lager dan het beursminimum van ${eur(info.minOrderQuote)} voor ${info.market}; ${advice}`;
+  if (ref > 0 && amount * ref < minQuote) {
+    return `${UNSELLABLE_PREFIX} orderwaarde ca. ${eurFloor(amount * ref)} is lager dan het beursminimum van ${eur(minQuote)} voor ${info.market}; ${advice}`;
   }
   return null;
+}
+
+/**
+ * Heeft Bitvavo de order DEFINITIEF geweigerd omdat hij onder het minimum ligt?
+ * Code 217 (orderwaarde) of 212 (hoeveelheid), of — zonder bekende code — een
+ * Bitvavo-melding over het minimum (niet over een prijs). Alleen bij een echt
+ * antwoord van Bitvavo; een onbekende uitkomst (timeout, 5xx, ...) nooit.
+ */
+function isBelowMinimumRejection(err: unknown): err is BitvavoApiError {
+  if (!(err instanceof BitvavoApiError) || err.kind !== "http" || err.outcomeUnknown) return false;
+  if (err.errorCode !== null && BELOW_MINIMUM_CODES.has(err.errorCode)) return true;
+  const text = err.bitvavoMessage ?? "";
+  return /\bminimum\b/i.test(text) && /\b(order|amount|size|value)\b/i.test(text) && !/\bprice\b/i.test(text);
+}
+
+/** Nederlandse ONVERKOOPBAAR-melding voor een verkoop die Bitvavo onder het minimum vond. */
+function belowMinimumSellText(err: BitvavoApiError, amount: number, info: MarketInfo, ref: number): string {
+  const what =
+    err.errorCode === 212
+      ? `de hoeveelheid ${fmtNum(amount)} ${info.base} is volgens Bitvavo lager dan het beursminimum voor ${info.market}`
+      : `de orderwaarde is volgens Bitvavo lager dan het beursminimum van ${eur(exchangeMinQuote(info))} voor ${info.market}`;
+  const code = err.errorCode !== null ? `code ${err.errorCode}` : `HTTP ${err.status}`;
+  const original = err.bitvavoMessage ? `: "${err.bitvavoMessage.replace(/\s+/g, " ").trim().slice(0, 200)}"` : "";
+  const estimate = ref > 0 ? `; geschatte waarde ca. ${eurFloor(amount * ref)}` : "";
+  return (
+    `${UNSELLABLE_PREFIX} Bitvavo weigert de verkoop: ${what} (${code}${original}${estimate}); er is niets verkocht. ` +
+    "Wacht tot de waarde boven het minimum komt of schrijf de positie af"
+  );
 }
 
 function errorText(err: unknown): string {

@@ -13,10 +13,13 @@
  * Minimale ordergrootte = het BEURSminimum (Bitvavo: €5, of de per-markt
  * waarden uit `getMarketInfo`), NOOIT de instelling `risk.minOrderQuote` van
  * de gebruiker: paper moet dezelfde orders weigeren als Bitvavo, niet meer en
- * niet minder.
+ * niet minder. Een ontbrekend/ongeldig/≤ 0 minimum in de marktinfo is
+ * onbekend: dan geldt het standaard beursminimum (€5).
  */
+import { EXCHANGE_MIN_ORDER_QUOTE } from "../core/defaults";
 import type { Balance, Broker, MarketInfo, MarketOrderRequest, OrderResult, TradingMode } from "../core/types";
 import { newId } from "../core/util";
+import { exchangeMinBase } from "../exchange/minimums";
 
 export interface PaperBrokerOptions {
   startingQuote: number;
@@ -26,13 +29,15 @@ export interface PaperBrokerOptions {
   /** Quote-valuta (standaard "EUR") */
   quote?: string;
   /**
-   * Beursminimum per order in quote als er geen marktinfo is (standaard 5, zoals
-   * Bitvavo). Niet vullen met `risk.minOrderQuote` (dat is een risico-instelling).
+   * Beursminimum per order in quote als er geen (bruikbare) marktinfo is
+   * (standaard EXCHANGE_MIN_ORDER_QUOTE = 5, zoals Bitvavo; ongeldig of ≤ 0 →
+   * ook 5). Niet vullen met `risk.minOrderQuote` (dat is een risico-instelling).
    */
   minOrderQuote?: number;
   /**
    * Optioneel: marktinfo van de beurs (per-markt `minOrderQuote`/`minOrderBase`).
-   * Ontbreekt de info (of faalt het ophalen), dan geldt `minOrderQuote`.
+   * Ontbreekt de info, faalt het ophalen of is het minimum ongeldig/≤ 0, dan
+   * geldt `minOrderQuote`.
    */
   getMarketInfo?: (market: string) => MarketInfo | undefined | Promise<MarketInfo | undefined>;
 }
@@ -40,7 +45,6 @@ export interface PaperBrokerOptions {
 /** Zelfde voorvoegsel als LiveBroker: verkoop onder het beursminimum, opnieuw proberen heeft geen zin. */
 const UNSELLABLE_PREFIX = "ONVERKOOPBAAR:";
 const DEFAULT_TAKER_FEE = 0.0025;
-const DEFAULT_MIN_ORDER_QUOTE = 5;
 
 /** Absolute tolerantie voor afrondingsruis bij EUR-bedragen. */
 const QUOTE_EPS = 1e-8;
@@ -81,10 +85,8 @@ export class PaperBroker implements Broker {
     this.quote = (opts.quote ?? "EUR").toUpperCase();
     this.takerFee = validCostFraction(opts.takerFee) ? opts.takerFee : DEFAULT_TAKER_FEE;
     this.slippagePct = validCostFraction(opts.slippagePct) ? opts.slippagePct : 0;
-    this.minOrderQuote =
-      opts.minOrderQuote !== undefined && Number.isFinite(opts.minOrderQuote) && opts.minOrderQuote >= 0
-        ? opts.minOrderQuote
-        : DEFAULT_MIN_ORDER_QUOTE;
+    // Ongeldig of ≤ 0 = onbekend → het standaard beursminimum, nooit "geen minimum".
+    this.minOrderQuote = isPosNum(opts.minOrderQuote) ? opts.minOrderQuote : EXCHANGE_MIN_ORDER_QUOTE;
     this.getMarketInfo = typeof opts.getMarketInfo === "function" ? opts.getMarketInfo : undefined;
     this.nowFn = opts.now ?? (() => Date.now());
     this.reset(opts.startingQuote);
@@ -179,7 +181,7 @@ export class PaperBroker implements Broker {
     if (!info || typeof info !== "object") return fallback;
     return {
       quote: isPosNum(info.minOrderQuote) ? info.minOrderQuote : this.minOrderQuote,
-      base: isPosNum(info.minOrderBase) ? info.minOrderBase : 0,
+      base: exchangeMinBase(info),
     };
   }
 

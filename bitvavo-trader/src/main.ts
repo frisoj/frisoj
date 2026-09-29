@@ -9,7 +9,6 @@ import type {
   BacktestResult,
   Broker,
   EngineConfig,
-  LogEntry,
   MarketDataFeed,
   OptimizationResult,
   WalkForwardResult,
@@ -31,6 +30,7 @@ import { createApp, startHttpServer, isLoopbackHost, type RunningServer } from "
 import { HeavyRunner } from "./server/heavyRunner";
 import { createShutdown } from "./server/shutdown";
 import { syncAccountFees } from "./server/accountFees";
+import { attachTerminalLog } from "./server/terminalLog";
 import type { Services } from "./server/routes";
 
 class StartupError extends Error {}
@@ -126,14 +126,6 @@ function printBanner(config: AppConfig, feed: MarketDataFeed, engineCfg: EngineC
   console.log(out.join("\n"));
 }
 
-function printLogEntry(entry: LogEntry): void {
-  if (!entry || typeof entry.message !== "string") return;
-  const time = new Date(entry.time ?? Date.now()).toLocaleTimeString("nl-NL");
-  if (entry.level === "error") console.error(`[${time}] ✖ ${entry.message}`);
-  else if (entry.level === "warn") console.warn(`[${time}] ⚠ ${entry.message}`);
-  else if (entry.level === "trade") console.log(`[${time}] € ${entry.message}`);
-}
-
 /**
  * Tijdelijke blokkade: de code-review vond bevestigde kritieke problemen in
  * het live-orderpad (zie docs/REVIEW-STATUS.md). Weghalen zodra die zijn opgelost.
@@ -201,7 +193,9 @@ async function main(): Promise<void> {
     store,
     startingCapital: config.mode === "paper" ? config.paperStartingCapital : config.capitalLimitQuote,
   });
-  engine.on("log", (entry: LogEntry) => printLogEntry(entry));
+  // Ook wat de engine al tijdens het bouwen logde (bijv. "Opgeslagen staat onbruikbaar …"),
+  // daarna elke nieuwe regel.
+  attachTerminalLog(engine);
 
   // Backtests/optimalisaties in een worker-thread: de engine en de noodstop blijven reageren.
   const heavyRunner = new HeavyRunner({ log: (m) => console.warn(m) });

@@ -29,6 +29,7 @@ import {
   type OrderBook,
   type Ticker24h,
 } from "../core/types";
+import { EXCHANGE_MIN_ORDER_QUOTE } from "../core/defaults";
 import { hashString, mulberry32 } from "../core/util";
 
 // ─────────────────────────────── Constanten ───────────────────────────────
@@ -635,7 +636,7 @@ export class SimulatedFeed implements MarketDataFeed {
       base: st.base,
       quote: st.quote,
       status: "trading",
-      minOrderQuote: 5,
+      minOrderQuote: EXCHANGE_MIN_ORDER_QUOTE, // €5, zoals Bitvavo
       minOrderBase: minBase,
       pricePrecision: 5,
       quantityDecimals: p.quantityDecimals,

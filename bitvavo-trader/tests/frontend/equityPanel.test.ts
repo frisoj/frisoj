@@ -1,6 +1,7 @@
 /**
- * Equity-paneel (public/js/panels/equity.js): de curve toont equity + afgeroomde
- * winst, de baseline is het oorspronkelijke startbedrag en het rendement komt
+ * Equity-paneel (public/js/panels/equity.js): de curve toont equity + wat er netto
+ * uit het handelsbudget is gehaald (EquityPoint.skimmed), de baseline is
+ * account.startingEquity (het kapitaal dat de bot kreeg) en winst/rendement komen
  * van de engine. Echte module, nep-DOM en een nep-grafiekbibliotheek.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,19 +10,24 @@ import { fakeNode, installBrowserGlobals, loadPublic, makeBus, type Fake } from 
 const norm = (s: string) => s.replace(/\s+/g, " ");
 const T = Date.UTC(2026, 0, 5, 22, 0);
 
-// Echte engine-uitkomst (live, limiet €50): +€3,25 winst afgeroomd bij het sluiten
+// Echte engine-uitkomst (ronde 3, live, limiet €50): +€3,25 winst afgeroomd bij het sluiten.
+// startingEquity blijft het ingelegde kapitaal (€50); totalPnlQuote/dayPnlQuote komen van de engine.
+// (Herschreven in ronde 3: de oude fixture had de oude engine-semantiek, waarin startingEquity
+// met het afgeroomde bedrag verlaagd werd en de UI het er weer bij optelde.)
 const liveSkimmed = {
   mode: "live",
   account: {
     equity: 50,
     cashQuote: 50,
-    startingEquity: 46.7540523690773,
-    dayStartEquity: 50.06452618453865,
+    startingEquity: 50,
+    dayStartEquity: 53.31047381546135,
+    totalPnlQuote: 3.2459476309227,
     totalReturnPct: 6.4918952618454,
+    dayPnlQuote: -0.06452618453865,
     dayReturnPct: -0.12103847503215366,
   },
   skimmedQuote: 3.2459476309227,
-  trades: [{ pnlQuote: 3.25 }],
+  trades: [{ pnlQuote: 3.2459476309226964 }],
   equityHistory: [
     { time: T, equity: 49.943890274314214, skimmed: 0 },
     { time: T + 90_000, equity: 53.31047381546135, skimmed: 0 },
@@ -32,16 +38,30 @@ const liveSkimmed = {
 };
 
 describe("equityFigures", () => {
-  it("baseline = oorspronkelijke start (start + afgeroomd), rendement van de engine, geen nep-drawdown", async () => {
+  it("baseline = startingEquity (kapitaal van de bot), winst en rendement van de engine, geen nep-drawdown", async () => {
     const { equityFigures, curveValue } = await loadPublic("js/panels/equity.js");
     const f = equityFigures(liveSkimmed);
-    expect(f.start).toBeCloseTo(50, 9);
+    expect(f.start).toBe(50);
     expect(f.ret).toBeCloseTo(6.4919, 3);
+    // equity − start = 0, maar de engine zegt +€3,25 (afgeroomde winst telt mee)
     expect(f.pnl).toBeCloseTo(3.2459, 3);
     expect(f.skimmed).toBeCloseTo(3.2459, 3);
     // De curve daalt niet bij het afromen: 53,31 → 53,25 (alleen de exit-fee)
     expect(curveValue(liveSkimmed.equityHistory[3])).toBeCloseTo(53.2459, 3);
     expect(f.dd).toBeGreaterThan(-0.2);
+  });
+
+  it("telt skimmedQuote NIET meer bij de baseline op", async () => {
+    const { equityFigures } = await loadPublic("js/panels/equity.js");
+    const f = equityFigures({ ...liveSkimmed, skimmedQuote: 20 });
+    expect(f.start).toBe(50);
+    expect(f.skimmed).toBe(20);
+  });
+
+  it("curve gebruikt point.skimmed per punt (ook negatief: netto kapitaal erbij), ontbrekend = 0", async () => {
+    const { curveValue } = await loadPublic("js/panels/equity.js");
+    expect(curveValue({ equity: 60, skimmed: -10 })).toBe(50);
+    expect(curveValue({ equity: 48 })).toBe(48);
   });
 
   it("paper / oudere server: zelf rekenen op startingEquity", async () => {
@@ -104,7 +124,7 @@ async function mount(snap: Fake) {
 }
 
 describe("equity-paneel", () => {
-  it("live met afromen: curve = equity + afgeroomd, baseline € 50, regel 'Afgeroomd boven limiet'", async () => {
+  it("live met afromen: curve = equity + skimmed, baseline € 50 (startingEquity), regel 'Afgeroomd boven limiet'", async () => {
     const p = await mount(liveSkimmed);
     expect(p.series.data.map((d: Fake) => Number(d.value.toFixed(2)))).toEqual([49.94, 53.31, 53.31, 53.25, 53.25]);
     const base = p.series.options.find((o: Fake) => o.baseValue)?.baseValue.price;

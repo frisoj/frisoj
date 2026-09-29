@@ -22,6 +22,7 @@ import {
   type RiskConfig,
   type RiskManagerLike,
 } from "../core/types";
+import { exchangeMinBase, exchangeMinQuote } from "../exchange/minimums";
 
 // ─────────────────────────────── Helpers ───────────────────────────────
 
@@ -47,12 +48,6 @@ const MAX_BUMP_RISK_MULTIPLE = 1;
 const SELL_MIN_BUFFER = 1.03;
 /** Relatieve tolerantie voor het herkennen van stop-niveaus (initieel / break-even). */
 const LEVEL_REL_EPS = 1e-6;
-/**
- * Beursminimum per order (EUR) als er geen MarketInfo is: Bitvavo weigert koop-
- * én verkooporders onder €5 (zelfde standaard als PaperBroker en de engine).
- */
-const DEFAULT_EXCHANGE_MIN_QUOTE = 5;
-
 function isNum(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x);
 }
@@ -329,25 +324,24 @@ export class RiskManager implements RiskManagerLike {
 
         // Minimale orderwaarde. Het beursminimum geldt voor kopen ÉN verkopen:
         // Bitvavo weigert ook verkopen onder €5. Het komt uit MarketInfo; zonder
-        // MarketInfo is het het standaardminimum van €5, of de instelling als
-        // die hoger is. Een verlaagde instelling (< €5) verlaagt het
-        // beursminimum NIET: de brokers weigeren kleinere orders toch. De
-        // instelling minOrderQuote is daarnaast een eigen ondergrens voor
-        // instappen; het strengste van de twee telt.
+        // (geldig, > 0) minimum in MarketInfo is het het standaardminimum van €5
+        // (EXCHANGE_MIN_ORDER_QUOTE) — zelfde regel als de brokers en de
+        // backtest. De instelling minOrderQuote vervangt het beursminimum NOOIT
+        // (een lagere verlaagt het niet, een hogere telt niet voor verkopen):
+        // het is alleen een extra ondergrens voor instappen; het strengste van
+        // de twee telt voor de koop.
         const cfgMin = isNum(cfg.minOrderQuote) && cfg.minOrderQuote >= 0 ? cfg.minOrderQuote : 0;
-        const marketMin = market?.minOrderQuote;
-        const hasMarketMin = isNum(marketMin) && marketMin >= 0;
-        const exchangeMin = hasMarketMin ? marketMin : Math.max(cfgMin, DEFAULT_EXCHANGE_MIN_QUOTE);
+        const hasMarketMin = isNum(market?.minOrderQuote) && market.minOrderQuote > 0;
+        const exchangeMin = exchangeMinQuote(market);
         const minOrder = Math.max(exchangeMin, cfgMin);
 
         // De positie moet bij de stop-loss nog boven het beursminimum verkocht
         // kunnen worden, anders werken stop-loss, handmatig sluiten en noodstop
         // nooit. Hoeveelheid = q / (1 + fee) / entry, waarde bij de stop =
         // hoeveelheid × stop. Ook het minimum in base (hoeveelheid) telt mee.
-        const minBase = market?.minOrderBase;
+        const minBase = exchangeMinBase(market);
         const sellMinByQuote = exchangeMin * (1 + cfg.takerFee) * (entry / stop) * SELL_MIN_BUFFER;
-        const sellMinByBase =
-          isNum(minBase) && minBase > 0 ? minBase * entry * (1 + cfg.takerFee) * SELL_MIN_BUFFER : 0;
+        const sellMinByBase = minBase > 0 ? minBase * entry * (1 + cfg.takerFee) * SELL_MIN_BUFFER : 0;
         const sellMin = ceilCents(Math.max(sellMinByQuote, sellMinByBase));
         const required = Math.max(ceilCents(minOrder), sellMin, 0.01);
 
@@ -365,7 +359,7 @@ export class RiskManager implements RiskManagerLike {
           } else {
             const baseBinds = sellMinByBase > sellMinByQuote;
             const exchLabel = `${hasMarketMin ? "beursminimum" : "minimum"} van ${eur(exchangeMin)}`;
-            const baseMin = `${qty(isNum(minBase) ? minBase : 0)} ${market?.base ?? ""}`.trimEnd();
+            const baseMin = `${qty(minBase)} ${market?.base ?? ""}`.trimEnd();
             if (q > 0 && q >= minOrder - 1e-9) {
               // Groot genoeg om te kopen, maar (bij de stop) niet meer verkoopbaar.
               reasons.push(

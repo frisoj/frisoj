@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PaperBroker } from "../../src/broker/paperBroker";
+import { EXCHANGE_MIN_ORDER_QUOTE } from "../../src/core/defaults";
 import type { Balance, MarketInfo, OrderResult } from "../../src/core/types";
 
 const NOW = Date.UTC(2026, 8, 28, 12, 0, 0);
@@ -181,6 +182,40 @@ describe("PaperBroker", () => {
     });
     expect((await failing.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 5 }, 50_000)).status).toBe("filled");
     expectRejected(await failing.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 4.5 }, 50_000), /minimum van €5,00/);
+  });
+
+  it("een ontbrekend/ongeldig/≤ 0 minimum is ONBEKEND → €5 (EXCHANGE_MIN_ORDER_QUOTE), ook voor verkopen", async () => {
+    expect(EXCHANGE_MIN_ORDER_QUOTE).toBe(5);
+    const base: MarketInfo = {
+      market: "XRP-EUR",
+      base: "XRP",
+      quote: "EUR",
+      status: "trading",
+      minOrderQuote: 5,
+      minOrderBase: 0,
+      pricePrecision: 5,
+      quantityDecimals: 6,
+      notionalDecimals: 2,
+    };
+    const bad: Array<number | undefined> = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, undefined];
+    for (const minOrderQuote of bad) {
+      const info = { ...base, minOrderQuote } as MarketInfo;
+      const b = new PaperBroker({ startingQuote: 100, takerFee: FEE, slippagePct: SLIP, now: () => NOW, getMarketInfo: () => info });
+      expectRejected(await b.placeMarketOrder({ market: "XRP-EUR", side: "buy", amountQuote: 4 }, 2), /minimum van €5,00/);
+      expect((await b.placeMarketOrder({ market: "XRP-EUR", side: "buy", amountQuote: 20 }, 2)).status).toBe("filled");
+      // Verkoop van ~€4: geweigerd als onverkoopbaar (geen "geen minimum").
+      const sell = await b.placeMarketOrder({ market: "XRP-EUR", side: "sell", amount: 2 }, 2);
+      expectRejected(sell, /beursminimum van €5,00/);
+      expect(sell.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    }
+    // Zelfde regel voor de constructor-optie: 0 / negatief / NaN schakelt het minimum niet uit.
+    for (const minOrderQuote of [0, -5, Number.NaN]) {
+      const b = new PaperBroker({ startingQuote: 100, takerFee: FEE, slippagePct: SLIP, now: () => NOW, minOrderQuote });
+      expectRejected(await b.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 4.99 }, 50_000), /minimum van €5,00/);
+      expect((await b.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50_000)).status).toBe("filled");
+      const sell = await b.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.00009 }, 50_000); // €4,50
+      expect(sell.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    }
   });
 
   it("precies het hele saldo kopen/verkopen laat geen negatief stof achter", async () => {

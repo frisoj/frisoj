@@ -9,6 +9,7 @@ import { mountHeader } from "./header.js";
 import { mountLiveChart } from "./liveChart.js";
 import { mountTables } from "./tables.js";
 import { mountLog } from "./log.js";
+import { createTradeNotifier } from "./tradeNotify.js";
 
 const TABS = ["live", "backtest", "scanner", "settings"];
 const TAB_TITLES = { live: "Live", backtest: "Backtest-lab", scanner: "Scanner", settings: "Instellingen" };
@@ -422,13 +423,12 @@ bus.on("position-opened", (p) => {
     "success",
   );
 });
+// Eén toast per gesloten trade: het SSE-event en het antwoord op een handmatige
+// sluiting/afschrijving (tables.js via ctx.notifyTradeClosed) delen deze notifier.
+const notifyTradeClosed = createTradeNotifier(toast, fmt, () => (lastSnapshot ? lastSnapshot.mode : undefined));
+ctx.notifyTradeClosed = notifyTradeClosed;
 bus.on("position-closed", (t) => {
-  if (!t) return;
-  const paper = lastSnapshot && lastSnapshot.mode === "paper";
-  toast(
-    `${paper ? "Oefen-verkoop" : "Verkocht"}: ${t.market} ${fmt.eurSigned(t.pnlQuote)} (${fmt.pct(t.pnlPct)}) · ${fmt.exitReason(t.exitReason)}`,
-    t.pnlQuote >= 0 ? "success" : "warn",
-  );
+  if (t) notifyTradeClosed(t);
 });
 let lastErrToast = { msg: "", at: 0 };
 bus.on("log", (entry) => {

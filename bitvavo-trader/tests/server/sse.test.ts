@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { formatSse, SseHub } from "../../src/server/sse";
-import { startTestServer, type TestServer } from "./helpers";
+import { rawRequest, startTestServer, type TestServer } from "./helpers";
 
 let srv: TestServer | null = null;
 afterEach(async () => {
@@ -89,6 +89,33 @@ describe("SSE /api/events", () => {
     ac.abort();
     for (let i = 0; i < 100 && srv.server.app.hub.size > 0; i++) await new Promise((res) => setTimeout(res, 10));
     expect(srv.server.app.hub.size).toBe(0);
+  });
+
+  it("HEAD /api/events → 405 (Allow: GET), zonder SSE-client te registreren", async () => {
+    srv = await startTestServer();
+    let snapshots = 0;
+    const snapshot = srv.engine.snapshot.bind(srv.engine);
+    srv.engine.snapshot = () => {
+      snapshots++;
+      return snapshot();
+    };
+    // Vóór de fix bleef dit antwoord eeuwig open (time-out) en telde de hub een client.
+    const res = await fetch(`${srv.base}/api/events`, { method: "HEAD", signal: AbortSignal.timeout(3_000) });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET");
+    expect(res.headers.get("content-type")).not.toMatch(/event-stream/);
+    expect(srv.server.app.hub.size).toBe(0);
+    expect(snapshots).toBe(0);
+    // Ook met een token-queryparameter en via een ruwe socket
+    const raw = await rawRequest(srv.port, "HEAD", "/api/events?token=x");
+    expect(raw.status).toBe(405);
+    expect(srv.server.app.hub.size).toBe(0);
+    // GET werkt gewoon
+    const ac = new AbortController();
+    const get = await fetch(`${srv.base}/api/events`, { signal: ac.signal });
+    expect(get.status).toBe(200);
+    expect(srv.server.app.hub.size).toBe(1);
+    ac.abort();
   });
 
   it("throttlet snapshots tot ~2 per seconde per client, laatste wint", async () => {

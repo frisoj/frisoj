@@ -17,71 +17,136 @@ const I = {
 
 let sparkSeq = 0;
 
-/** Bitvavo weigert orders (ook verkopen) onder dit bedrag */
-const MIN_ORDER_EUR = 5;
+/**
+ * Beursminimum per order (EUR) als /api/markets geen geldige `minOrderQuote` geeft
+ * (EXCHANGE_MIN_ORDER_QUOTE). Geldt voor kopen én verkopen. De instelling
+ * `risk.minOrderQuote` is iets anders (extra ondergrens voor instappen) en wordt
+ * hier nooit als "het Bitvavo-minimum" gebruikt.
+ */
+const EXCHANGE_MIN_EUR = 5;
 
 const posValue = (p) => (Number(p && p.amount) || 0) * (Number(p && p.currentPrice) || 0);
 const isNum = (n) => typeof n === "number" && Number.isFinite(n);
-/** Positie die nu niet verkocht kan worden (engine-vlag, of waarde onder het minimum) */
-const isDust = (p, minOrder) => !!(p && (p.unsellable || posValue(p) < minOrder));
+
+/**
+ * Maakt `market → beursminimum` van een getal (voor alle markten), een Map of een
+ * functie; ongeldig/ontbrekend (≤ 0) → € 5.
+ */
+function minResolver(minFor) {
+  const valid = (v) => (isNum(v) && v > 0 ? v : EXCHANGE_MIN_EUR);
+  if (typeof minFor === "function") return (m) => valid(minFor(m));
+  if (minFor instanceof Map) return (m) => valid(minFor.get(m));
+  return () => valid(minFor);
+}
+/** Positie die nu niet verkocht kan worden: de engine-vlag, of waarde onder het beursminimum van die markt */
+const isDust = (p, minOf) => !!(p && (p.unsellable || posValue(p) < minOf(p.market)));
+/** Waarom een positie niet verkocht kan worden: de reden van de engine, anders het beursminimum */
+function dustWhy(p, minOf, fmt) {
+  const r = p && typeof p.unsellableReason === "string" ? p.unsellableReason.trim() : "";
+  return r || `minder waard dan het Bitvavo-minimum van ${fmt.eur(minOf(p && p.market))} per order`;
+}
 
 const STILL = "Let op: de bot staat stil, stop-loss en take-profit worden NIET bewaakt.";
 
 /**
- * Uitkomst van een noodstop op basis van het antwoord van POST /api/engine/kill
- * (EngineSnapshot, met `killResult` als de server die meestuurt). De engine stopt
- * de bot óók als verkopen mislukken. Met `killResult.failed` tonen we precies welke
- * posities (of orders met onbekende uitkomst) NIET verkocht zijn en waarom; zonder
- * `killResult` gelden de posities die nog in `res.positions` staan als niet verkocht.
- * @returns {[string, "warn" | "error"]}
+ * Uitkomst van een noodstop, gestructureerd (voor de toast én het resultaat in de modal).
+ * `res` = antwoord van POST /api/engine/kill (EngineSnapshot, met `killResult` als de
+ * server die meestuurt). De engine stopt de bot óók als verkopen mislukken. Met
+ * `killResult.failed` tonen we precies welke posities (of orders met onbekende uitkomst)
+ * NIET verkocht zijn en waarom; zonder `killResult` gelden de posities die nog in
+ * `res.positions` staan als niet verkocht.
+ * @param {number|Map|Function} [minFor]  beursminimum (per markt), zie minResolver
+ * @param {number|null} [openBefore]      aantal open posities vóór de noodstop (null = onbekend)
+ * @returns {{ kind: "none" | "ok" | "failed", items: { market: string, value: number | null, reason: string, note?: string }[], dust: boolean, hint: string, fromKillResult?: boolean }}
  */
-export function killOutcome(res, fmt, minOrder = MIN_ORDER_EUR) {
+export function killReport(res, fmt, minFor = EXCHANGE_MIN_EUR, openBefore = null) {
+  const minOf = minResolver(minFor);
   const left = res && Array.isArray(res.positions) ? res.positions : [];
-  const failed = res && res.killResult && Array.isArray(res.killResult.failed) ? res.killResult.failed : null;
+  const kr = res && res.killResult && typeof res.killResult === "object" ? res.killResult : null;
+  const failed = kr && Array.isArray(kr.failed) ? kr.failed : null;
   // Vangnet: "niets mislukt" terwijl er nog posities openstaan → die tellen toch als niet verkocht
-  if (failed && (failed.length || !left.length)) {
-    if (!failed.length) return ["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"];
-    const byId = new Map(left.map((p) => [p.id, p]));
-    const n = failed.length;
-    const list = failed
-      .map((f) => {
-        const p = byId.get(f && f.id);
-        const market = (f && f.market) || (p && p.market) || (f && f.id) || "?";
-        const value = p ? ` ≈ ${fmt.eur(posValue(p))}` : "";
-        return `${market}${value}: ${(f && f.reason) || "reden onbekend (zie het logboek)"}`;
-      })
-      .join("; ");
-    const dust = failed.some((f) => isDust(byId.get(f && f.id), minOrder));
-    return [
-      `Noodstop: bot gestopt, maar ${n} ${n === 1 ? "positie" : "posities"} NIET verkocht — ${list}. ` +
-        (dust
-          ? `Een positie onder het Bitvavo-minimum van ${fmt.eur(minOrder)} kan niet verkocht worden: wacht tot de waarde weer boven ${fmt.eur(minOrder)} is of schrijf hem af (knop Afschrijven bij Open posities). `
-          : "Controleer je account en sluit handmatig (of probeer de noodstop opnieuw). ") +
-        STILL,
-      "error",
-    ];
+  const useFailed = !!failed && (failed.length > 0 || !left.length);
+  if ((useFailed && !failed.length) || (!failed && !left.length)) {
+    const closed = kr && isNum(kr.closed) ? kr.closed : null;
+    const none = !(openBefore > 0) && (closed === 0 || (closed === null && openBefore === 0));
+    return { kind: none ? "none" : "ok", items: [], dust: false, hint: "" };
   }
-  if (!left.length) return ["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"];
-  const list = left.map((p) => `${p.market} ≈ ${fmt.eur(posValue(p))}`).join(", ");
-  const dust = left.some((p) => isDust(p, minOrder));
-  const n = left.length;
-  return [
-    `Noodstop: bot gestopt, maar ${n} ${n === 1 ? "positie" : "posities"} NIET verkocht (${list}). ` +
-      (dust
-        ? `Waarde onder het Bitvavo-minimum van ${fmt.eur(minOrder)}: die kan niet verkocht worden. Sluit handmatig of wacht tot de waarde weer boven ${fmt.eur(minOrder)} is. `
-        : "Controleer je account en sluit handmatig (of probeer de noodstop opnieuw). ") +
-      STILL,
-    "error",
-  ];
+  let items;
+  let dustPos;
+  if (useFailed) {
+    const byId = new Map(left.map((p) => [p.id, p]));
+    dustPos = [];
+    items = failed.map((f) => {
+      const p = byId.get(f && f.id);
+      if (isDust(p, minOf)) dustPos.push(p);
+      return {
+        market: (f && f.market) || (p && p.market) || (f && f.id) || "?",
+        value: p ? posValue(p) : null,
+        reason: (f && f.reason) || "reden onbekend (zie het logboek)",
+      };
+    });
+  } else {
+    dustPos = left.filter((p) => isDust(p, minOf));
+    items = left.map((p) => {
+      const engineWhy = typeof p.unsellableReason === "string" ? p.unsellableReason.trim() : "";
+      return {
+        market: p.market,
+        value: posValue(p),
+        // reden van de engine (ook in de melding); `note` alleen in de modal (de melding heeft de algemene hint)
+        reason: p.unsellable ? engineWhy : "",
+        note: isDust(p, minOf) && !(p.unsellable && engineWhy) ? dustWhy(p, minOf, fmt) : "",
+      };
+    });
+  }
+  const mins = [...new Set(dustPos.map((p) => minOf(p.market)))];
+  const hint = dustPos.length
+    ? `Een onverkoopbare positie (onder het Bitvavo-minimum${mins.length === 1 ? ` van ${fmt.eur(mins[0])} per order` : " per order"}) kan niet verkocht worden: wacht tot de waarde weer boven het minimum is of schrijf hem af (knop Afschrijven bij Open posities).`
+    : "Controleer je account en sluit handmatig (of probeer de noodstop opnieuw).";
+  return { kind: "failed", items, dust: dustPos.length > 0, hint, fromKillResult: useFailed };
 }
 
 /**
- * Rendement in % voor de statistiekkaarten: de engine rekent dit zelf uit
- * (`account.totalReturnPct` / `dayReturnPct`, correct ook na het afromen van
- * winst boven de kapitaallimiet); alleen bij een oudere server zelf berekenen.
- * Het oorspronkelijke startbedrag is `startingEquity + skimmedQuote` (de engine
- * verlaagt de start met wat er afgeroomd is).
- * @returns {{ dayPnl: number, dayPct: number, totPnl: number, totPct: number, origStart: number, skimmed: number }}
+ * Uitkomst van een noodstop als één melding (zie killReport).
+ * @returns {[string, "info" | "warn" | "error"]}
+ */
+export function killOutcome(res, fmt, minFor = EXCHANGE_MIN_EUR, openBefore = null) {
+  return killMessage(killReport(res, fmt, minFor, openBefore), fmt);
+}
+
+function killMessage(r, fmt) {
+  if (r.kind === "none") return ["Noodstop uitgevoerd — er stonden geen posities open; de bot is gestopt", "info"];
+  if (r.kind === "ok") return ["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"];
+  const n = r.items.length;
+  const what = `${n} ${n === 1 ? "positie" : "posities"} NIET verkocht`;
+  const list = r.fromKillResult
+    ? ` — ${r.items.map((i) => `${i.market}${i.value !== null ? ` ≈ ${fmt.eur(i.value)}` : ""}: ${i.reason}`).join("; ")}.`
+    : ` (${r.items.map((i) => `${i.market} ≈ ${fmt.eur(i.value)}${i.reason ? `: ${i.reason}` : ""}`).join(", ")}).`;
+  return [`Noodstop: bot gestopt, maar ${what}${list} ${r.hint} ${STILL}`, "error"];
+}
+
+/** Resultaat van een deels mislukte noodstop als HTML voor in de modal */
+function killResultHtml(r, fmt, esc) {
+  const n = r.items.length;
+  return `<p class="neg"><strong>De bot is gestopt, maar ${n} ${n === 1 ? "positie is" : "posities zijn"} NIET verkocht:</strong></p>
+    <ul class="kill-failed">${r.items
+      .map(
+        (i) =>
+          `<li><strong>${esc(i.market)}</strong>${i.value !== null ? ` ≈ <span class="mono">${esc(fmt.eur(i.value))}</span>` : ""}${
+            i.reason || i.note ? ` — ${esc(i.reason || i.note)}` : ""
+          }</li>`,
+      )
+      .join("")}</ul>
+    <p>${esc(r.hint)}</p>
+    <p class="neg"><strong>${esc(STILL)}</strong></p>`;
+}
+
+/**
+ * Resultaat voor de statistiekkaarten. De engine rekent het zelf uit
+ * (`account.totalPnlQuote` / `dayPnlQuote` / `totalReturnPct` / `dayReturnPct`,
+ * correct ook na het afromen van winst boven de kapitaallimiet en na een
+ * gewijzigde limiet); alleen bij een oudere server rekent de UI zelf.
+ * `startingEquity` = het kapitaal dat de bot kreeg (daar komt niets meer bij).
+ * @returns {{ dayPnl: number, dayPct: number, totPnl: number, totPct: number, capital: number, skimmed: number }}
  */
 export function accountReturns(snap) {
   const a = (snap && snap.account) || {};
@@ -89,12 +154,11 @@ export function accountReturns(snap) {
   const start = a.startingEquity;
   const dayStart = a.dayStartEquity;
   const skimmed = isNum(snap && snap.skimmedQuote) && snap.skimmedQuote > 0 ? snap.skimmedQuote : 0;
-  // equity − start is ook met afromen de juiste winst in euro's: (equity + afgeroomd) − (start + afgeroomd)
-  const dayPnl = isNum(eq) && isNum(dayStart) ? eq - dayStart : NaN;
-  const totPnl = isNum(eq) && isNum(start) ? eq - start : NaN;
+  const dayPnl = isNum(a.dayPnlQuote) ? a.dayPnlQuote : isNum(eq) && isNum(dayStart) ? eq - dayStart : NaN;
+  const totPnl = isNum(a.totalPnlQuote) ? a.totalPnlQuote : isNum(eq) && isNum(start) ? eq - start : NaN;
   const dayPct = isNum(a.dayReturnPct) ? a.dayReturnPct : dayStart ? (dayPnl / dayStart) * 100 : NaN;
   const totPct = isNum(a.totalReturnPct) ? a.totalReturnPct : start ? (totPnl / start) * 100 : NaN;
-  return { dayPnl, dayPct, totPnl, totPct, origStart: isNum(start) ? start + skimmed : start, skimmed };
+  return { dayPnl, dayPct, totPnl, totPct, capital: start, skimmed };
 }
 
 export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
@@ -199,14 +263,14 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     const eq = a.equity;
     const start = a.startingEquity;
     const paper = snap.mode === "paper";
-    const { dayPnl, dayPct, totPnl, totPct, origStart, skimmed } = accountReturns(snap);
+    const { dayPnl, dayPct, totPnl, totPct, capital, skimmed } = accountReturns(snap);
 
     setStat(
       "equity",
       esc(fmt.eur(eq)),
       paper
         ? `start ${esc(fmt.eur(start))}`
-        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : origStart))}` +
+        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : capital))}` +
             (skimmed > 0
               ? ` · <span title="Winst boven je kapitaallimiet: blijft op je Bitvavo-account, buiten het handelsbudget van de bot">afgeroomd ${esc(
                   fmt.eur(skimmed),
@@ -230,7 +294,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     setStat(
       "total",
       esc(fmt.eurSigned(totPnl)),
-      `<span class="${fmt.pnlClass(totPct)}">${esc(fmt.pct(totPct))}</span> t.o.v. ${esc(fmt.eur(origStart))}`,
+      `<span class="${fmt.pnlClass(totPct)}">${esc(fmt.pct(totPct))}</span> t.o.v. ${esc(fmt.eur(capital))}`,
       fmt.pnlClass(totPnl),
       totPnl,
     );
@@ -351,7 +415,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
       html = `<span class="mb-main">${I.flask}<span><b>OEFENMODUS</b> · Oefenmodus met nep-geld — er wordt niets echt gekocht</span></span>`;
     } else if (!armed) {
       cls = "live-safe";
-      html = `<span class="mb-main">${I.eye}<span>Live modus — <b>NIET gearmd</b> (alleen signalen)</span></span>
+      html = `<span class="mb-main">${I.eye}<span>Live modus — live handel <b>NIET ingeschakeld</b> (alleen signalen)</span></span>
         ${limit != null ? `<span class="mb-chip limit">${I.lock} limiet ${esc(fmt.eur(limit))}</span>` : ""}
         ${noKeys ? `<span class="mb-chip limit">${I.key} geen API-sleutels</span>` : ""}
         <button type="button" class="btn btn-danger" data-banner="arm">Live handel inschakelen…</button>`;
@@ -590,6 +654,88 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     }
   }
 
+  // ───────────── Beursminimum per markt (/api/markets) ─────────────
+  // Voor de noodstop-waarschuwing: MarketInfo.minOrderQuote (> 0), anders € 5.
+
+  const exchangeMins = new Map();
+  let minsLoaded = false;
+  let minsLoading = null;
+  function loadExchangeMins() {
+    if (minsLoaded || minsLoading || !api || typeof api.getMarkets !== "function") return minsLoading;
+    minsLoading = Promise.resolve()
+      .then(() => api.getMarkets())
+      .then((list) => {
+        for (const m of Array.isArray(list) ? list : []) {
+          if (m && typeof m.market === "string" && isNum(m.minOrderQuote) && m.minOrderQuote > 0) exchangeMins.set(m.market, m.minOrderQuote);
+        }
+        minsLoaded = true;
+      })
+      .catch(() => {
+        /* later opnieuw; tot die tijd € 5 */
+      })
+      .finally(() => {
+        minsLoading = null;
+      });
+    return minsLoading;
+  }
+  const exchangeMin = (market) => {
+    const v = exchangeMins.get(market);
+    return isNum(v) && v > 0 ? v : EXCHANGE_MIN_EUR;
+  };
+
+  /**
+   * Noodstop uitvoeren vanuit de modal. Mislukt de verkoop deels, dan vervangt het
+   * resultaat de inhoud van de modal (geen verouderde tekst, geen knop "Noodstop
+   * uitvoeren" meer) en blijft de modal open; anders sluit hij met één toast.
+   */
+  async function runKill(button, modalEl, openBefore) {
+    busy = true;
+    button && button.classList.add("busy");
+    renderControls();
+    try {
+      let res;
+      try {
+        res = await api.kill();
+      } catch (err) {
+        // De noodstop kan deels gelukt zijn: toon de echte staat; fout in de modal (opnieuw proberen kan)
+        await refreshState();
+        throw err;
+      }
+      if (res && typeof res === "object" && res.account) bus.emit("snapshot", res);
+      else await refreshState();
+      // Antwoord = EngineSnapshot; is het iets anders, dan telt de ververste staat (`snap`)
+      const report = killReport(res && Array.isArray(res.positions) ? res : snap, fmt, exchangeMin, openBefore);
+      const [msg, kind] = killMessage(report, fmt);
+      if (report.kind !== "failed") {
+        ctx.toast(msg, kind);
+        return undefined;
+      }
+      if (!modalEl || typeof modalEl.querySelector !== "function") throw new Error(msg);
+      showKillResult(modalEl, report);
+      return false;
+    } finally {
+      busy = false;
+      button && button.classList.remove("busy");
+      renderControls();
+    }
+  }
+
+  function showKillResult(modalEl, report) {
+    const title = modalEl.querySelector(".modal-head h3");
+    if (title) title.textContent = "Noodstop: niet alles verkocht";
+    const body = modalEl.querySelector(".modal-body");
+    if (body) body.innerHTML = killResultHtml(report, fmt, esc);
+    const err = modalEl.querySelector(".modal-error");
+    if (err) err.hidden = true;
+    const ok = modalEl.querySelector('[data-m="ok"]');
+    if (ok) ok.remove();
+    const cancel = modalEl.querySelector('[data-m="cancel"]');
+    if (cancel) {
+      cancel.textContent = "Sluiten";
+      if (typeof cancel.focus === "function") cancel.focus();
+    }
+  }
+
   function onAction(act, button) {
     const positions = (snap && snap.positions) || [];
     const live = snap && snap.mode === "live";
@@ -620,9 +766,10 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
       }
       run(button, api.stop, "Bot gestopt", "info");
     } else if (act === "kill") {
+      loadExchangeMins();
       const total = positions.reduce((s, p) => s + posValue(p), 0);
-      const minOrder = Number(snap && snap.config && snap.config.risk && snap.config.risk.minOrderQuote) || MIN_ORDER_EUR;
-      const dust = positions.filter((p) => isDust(p, minOrder));
+      const dust = positions.filter((p) => isDust(p, exchangeMin));
+      const openBefore = positions.length;
       ctx.openModal({
         title: "Noodstop",
         danger: true,
@@ -631,20 +778,25 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
               fmt.eur(total),
             )}</strong>) en de bot stopt.</p><p class="muted">Bij een snelle markt kan de verkoopprijs afwijken.</p>${
               dust.length
-                ? `<p class="neg"><strong>Let op:</strong> ${esc(
-                    dust.map((p) => `${p.market} ≈ ${fmt.eur(posValue(p))}`).join(", "),
-                  )} ${dust.length === 1 ? "is" : "zijn"} minder waard dan het Bitvavo-minimum van ${esc(
-                    fmt.eur(minOrder),
-                  )} en ${dust.length === 1 ? "kan" : "kunnen"} waarschijnlijk <strong>niet verkocht</strong> worden. Die ${
+                ? `<p class="neg"><strong>Let op:</strong> ${
+                    dust.length === 1 ? "deze positie kan" : "deze posities kunnen"
+                  } waarschijnlijk <strong>niet verkocht</strong> worden:</p>
+                  <ul class="kill-dust">${dust
+                    .map(
+                      (p) =>
+                        `<li><strong>${esc(p.market)}</strong> ≈ <span class="mono">${esc(fmt.eur(posValue(p)))}</span> — ${esc(
+                          dustWhy(p, exchangeMin, fmt),
+                        )}</li>`,
+                    )
+                    .join("")}</ul>
+                  <p class="neg">Die ${
                     dust.length === 1 ? "positie blijft" : "posities blijven"
                   } dan open terwijl de bot stopt (zonder stop-loss).</p>`
                 : ""
             }`
           : `<p>Er zijn geen open posities. De bot wordt direct gestopt.</p>`,
         confirmText: "Noodstop uitvoeren",
-        // Antwoord = EngineSnapshot; is het iets anders, dan telt de ververste staat (`snap`)
-        onConfirm: () =>
-          run(button, api.kill, (res) => killOutcome(res && Array.isArray(res.positions) ? res : snap, fmt, minOrder), "warn", true),
+        onConfirm: (_value, modalEl) => runKill(button, modalEl, openBefore),
       });
     } else if (act === "reset") {
       // De server reset naar het startkapitaal uit de configuratie (PAPER_STARTING_CAPITAL),
@@ -665,6 +817,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
 
   function onSnapshot(s) {
     snap = s;
+    if (s && Array.isArray(s.positions) && s.positions.length) loadExchangeMins();
     renderStats();
     renderBanner();
     renderAlerts();

@@ -222,8 +222,13 @@ export function mountSignals(ctx, el) {
     raf = 0;
     renderGaugeStatic();
     q.market.textContent = market ? `· ${market}` : "";
-    const d = market ? decisions[market] : null;
     if (!market) return renderEmpty("Nog geen markt geselecteerd.");
+    // Een markt die de bot niet volgt (bijv. geopend vanuit de Scanner) krijgt nooit een beslissing
+    if (Array.isArray(config?.markets) && !config.markets.includes(market)) {
+      lastSig = "";
+      return renderEmpty("Deze markt zit niet in de bot — voeg hem toe via Scanner of Instellingen.");
+    }
+    const d = decisions[market];
     if (!d) {
       lastSig = "";
       return renderEmpty(

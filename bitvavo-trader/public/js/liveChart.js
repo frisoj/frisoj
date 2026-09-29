@@ -726,9 +726,13 @@ export function mountLiveChart(ctx, els) {
           });
           info.set(
             id,
-            `Verkocht @ ${fmtP(tr.exitPrice)} · ${fmt.eurSigned(tr.pnlQuote)} (${fmt.pct(tr.pnlPct)}) · ${fmt.exitReason(
-              tr.exitReason,
-            )}`,
+            tr.exitReason === "write-off"
+              ? `${fmt.exitReason(tr.exitReason)} (niets verkocht, de coins staan nog op je account) · ${fmt.eurSigned(tr.pnlQuote)} (${fmt.pct(
+                  tr.pnlPct,
+                )})`
+              : `Verkocht @ ${fmtP(tr.exitPrice)} · ${fmt.eurSigned(tr.pnlQuote)} (${fmt.pct(tr.pnlPct)}) · ${fmt.exitReason(
+                  tr.exitReason,
+                )}`,
           );
         }
       }

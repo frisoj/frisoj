@@ -74,6 +74,11 @@ export interface EngineLike {
   acknowledgeStateRecovery?(): void;
   /** Onverkoopbare positie afschrijven; gooit "Afschrijven kan …" als dat (nu) niet mag. */
   writeOffPosition?(id: string): Trade | Promise<Trade>;
+  /**
+   * Nederlandse reden waarom de laatste `closePosition` de positie niet sloot
+   * (bijv. "onverkoopbaar: waarde €4,78 < minimum €5,00"), of null.
+   */
+  readonly lastCloseFailure?: string | null;
 }
 
 /** Zelfde vorm als BacktestInput in src/backtest/backtester.ts */
@@ -321,6 +326,11 @@ export function buildApiRouter(deps: ApiDeps): Router {
   router.get("/api/state", () => engine.snapshot());
 
   router.get("/api/events", ({ req, res }: RequestContext) => {
+    // HEAD zou een SSE-client registreren waarvan het antwoord nooit eindigt.
+    if ((req.method ?? "GET").toUpperCase() === "HEAD") {
+      res.setHeader("Allow", "GET");
+      throw new HttpError(405, "Methode HEAD niet toegestaan voor /api/events (de eventstream werkt alleen met GET).");
+    }
     hub.addClient(req, res, [{ type: "snapshot", data: engine.snapshot() }]);
     return undefined;
   });
@@ -374,7 +384,16 @@ export function buildApiRouter(deps: ApiDeps): Router {
     const exists = engine.snapshot().positions.some((p) => p.id === id);
     if (!exists) throw new HttpError(404, "Positie niet gevonden (misschien al gesloten).");
     const trade = await engine.closePosition(id, "manual");
-    if (!trade) throw new HttpError(409, "Positie kon niet worden gesloten. Bekijk het logboek voor details.");
+    if (!trade) {
+      // Direct na de await lezen: een volgende closePosition zet hem weer terug.
+      const reason = engine.lastCloseFailure;
+      throw new HttpError(
+        409,
+        typeof reason === "string" && reason.trim() !== ""
+          ? reason
+          : "Positie kon niet worden gesloten. Bekijk het logboek voor details.",
+      );
+    }
     return trade;
   });
 
