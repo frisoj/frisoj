@@ -224,6 +224,11 @@ export interface EnsembleDecision {
   /** ATR(14) op deze candle (in prijs-eenheden), NaN tijdens warmup */
   atr: number;
   votes: StrategySignal[];
+  /**
+   * Exit-score: gewogen score over alleen de strategieën die een mening hebben
+   * (niet-"hold"). Verkopen gebeurt op deze score (zie classify).
+   */
+  exitScore?: number;
 }
 
 // ─────────────────────────────── Risico ───────────────────────────────
@@ -360,6 +365,8 @@ export interface PositionUpdate {
 export interface HaltStatus {
   halted: boolean;
   reason?: string;
+  /** True als de stop komt door de dagelijkse verlieslimiet (blijft de hele dag gelden) */
+  dailyLimit?: boolean;
 }
 
 export interface RiskManagerLike {
@@ -428,6 +435,23 @@ export interface Broker {
    * Gooit NIET bij een afwijzing maar geeft status "rejected" + error terug.
    */
   placeMarketOrder(req: MarketOrderRequest, referencePrice: number): Promise<OrderResult>;
+  /**
+   * Optioneel (live): zoek een eerder geplaatste order op via clientOrderId.
+   * `null` = Bitvavo kent de order niet (code 240, één poging); gooit als de
+   * uitkomst nog onbekend is (netwerk/rate limit). Een nog openstaande order
+   * wordt geannuleerd en de bevestigde eindtoestand teruggegeven.
+   */
+  lookupOrder?(market: string, clientOrderId: string): Promise<OrderResult | null>;
+  /** Optioneel: houd fee/slippage-schattingen gelijk aan de risico-instellingen */
+  setCosts?(takerFee: number, slippagePct: number): void;
+}
+
+/** Resultaat van de noodstop */
+export interface KillResult {
+  /** Aantal posities dat verkocht is */
+  closed: number;
+  /** Posities die NIET gesloten konden worden, met Nederlandse reden */
+  failed: { id: string; market: string; reason: string }[];
 }
 
 // ─────────────────────────────── Engine ───────────────────────────────
@@ -456,6 +480,13 @@ export interface AccountState {
   feesPaid: number;
   tradesToday: number;
   lastLossAt: Record<string, number>;
+  /**
+   * Rendement sinds de start in % (door de engine berekend, correct ook na het
+   * afromen van winst boven de kapitaallimiet). UI gebruikt dit als het er is.
+   */
+  totalReturnPct?: number;
+  /** Rendement vandaag in % (idem) */
+  dayReturnPct?: number;
 }
 
 export interface OpenPositionView extends Position {
@@ -463,11 +494,21 @@ export interface OpenPositionView extends Position {
   /** Netto (na geschatte exit-fee) */
   unrealizedPnl: number;
   unrealizedPct: number;
+  /**
+   * True als de positie op dit moment NIET verkocht kan worden (waarde onder
+   * het beursminimum). De bot probeert het niet elke tick opnieuw; de gebruiker
+   * kan wachten of de positie afschrijven.
+   */
+  unsellable?: boolean;
+  /** Nederlandse uitleg bij `unsellable` */
+  unsellableReason?: string;
 }
 
 export interface EquityPoint {
   time: number;
   equity: number;
+  /** Live: cumulatief afgeroomde winst op dit moment (grafiek toont equity + skimmed) */
+  skimmed?: number;
 }
 
 export type LogLevel = "info" | "warn" | "error" | "trade";
@@ -691,6 +732,10 @@ export interface BacktestResult {
   candles: Candle[];
   markers: SignalMarker[];
   durationMs: number;
+  /** Uitleg als de periode is aangepast (bijv. ingekort omdat er minder historie is) */
+  note?: string;
+  /** Trades waarvan de verkoop eerst geweigerd werd (waarde onder het beursminimum) */
+  stuckTrades?: number;
 }
 
 export type OptimizeObjective = "sharpe" | "return" | "profitFactor" | "calmar";
@@ -714,8 +759,19 @@ export interface Heatmap {
   yParam: string;
   xValues: number[];
   yValues: number[];
-  /** values[yIndex][xIndex] = beste score voor die combinatie (null = niet getest) */
+  /**
+   * values[yIndex][xIndex] = mediaan van de scores (met genoeg trades) over de
+   * overige parameters (null = niet getest of te weinig trades)
+   */
   values: (number | null)[][];
+  /** Optioneel: beste score per cel */
+  best?: (number | null)[][];
+  /** Optioneel: aantal geteste combinaties per cel */
+  tested?: number[][];
+  /** Optioneel: aantal combinaties met genoeg trades per cel */
+  scored?: number[][];
+  /** Optioneel: aantal winstgevende combinaties per cel */
+  positive?: number[][];
 }
 
 export interface OptimizationResult {
@@ -764,4 +820,6 @@ export interface AppInfo {
   liveArmed: boolean;
   capitalLimitQuote: number;
   version: string;
+  /** Startkapitaal van de oefenmodus (paper) */
+  paperStartingCapital?: number;
 }
