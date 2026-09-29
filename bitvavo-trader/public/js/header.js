@@ -145,7 +145,7 @@ function killResultHtml(r, fmt, esc) {
  * (`account.totalPnlQuote` / `dayPnlQuote` / `totalReturnPct` / `dayReturnPct`,
  * correct ook na het afromen van winst boven de kapitaallimiet en na een
  * gewijzigde limiet); alleen bij een oudere server rekent de UI zelf.
- * `startingEquity` = het kapitaal dat de bot kreeg (daar komt niets meer bij).
+ * `startingEquity` = het kapitaal dat de bot kreeg (start + verhogingen van de limiet; afromen verlaagt het niet).
  * @returns {{ dayPnl: number, dayPct: number, totPnl: number, totPct: number, capital: number, skimmed: number }}
  */
 export function accountReturns(snap) {
@@ -470,7 +470,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
             live
               ? ": posities van vóór de herstart worden NIET bewaakt. Live handel inschakelen is geblokkeerd tot je dit bevestigt."
               : " (oefengeld)."
-          }${rec.quarantinedTo ? ` <span class="ab-sub">Het oude bestand is bewaard als <span class="mono">${esc(rec.quarantinedTo)}</span>.</span>` : ""}</span></span>
+          }${rec.quarantinedTo ? ` <span class="ab-sub ab-path">Het oude bestand is bewaard als <span class="mono">${esc(rec.quarantinedTo)}</span>.</span>` : ""}</span></span>
         <button type="button" class="btn" data-alert-act="ack-recovery">Ik heb het gecontroleerd</button>
       </div>`;
     }

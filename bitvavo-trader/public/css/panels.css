@@ -1001,6 +1001,16 @@
 .eq-skim[hidden] {
   display: none;
 }
+.eq-skim.is-note {
+  border-color: var(--border);
+  background: var(--panel-2);
+}
+.eq-skim-note {
+  margin-top: 4px;
+}
+.eq-skim.is-note .eq-skim-note {
+  margin-top: 0;
+}
 
 /* ─────────────────────────────── Backtest-lab ─────────────────────────────── */
 

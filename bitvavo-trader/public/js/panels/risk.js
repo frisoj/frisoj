@@ -62,8 +62,13 @@ export function mountRisk(ctx, el) {
     const positions = Array.isArray(s.positions) ? s.positions : [];
     const equity = Number(a.equity) || 0;
     const dayStart = Number(a.dayStartEquity) || equity;
-    const dayPnl = equity - dayStart;
-    const dayLossPct = dayStart > 0 ? Math.max(0, (-dayPnl / dayStart) * 100) : 0;
+    // Dagresultaat van de engine (live correct na afromen of een gewijzigde limiet: dat
+    // is een overboeking, geen verlies; dezelfde % als de dagelijkse verlieslimiet
+    // gebruikt). Alleen bij een oudere server zelf rekenen.
+    const isNum = (n) => typeof n === "number" && Number.isFinite(n);
+    const dayPnl = isNum(a.dayPnlQuote) ? a.dayPnlQuote : equity - dayStart;
+    const dayRet = isNum(a.dayReturnPct) ? a.dayReturnPct : dayStart > 0 ? (dayPnl / dayStart) * 100 : 0;
+    const dayLossPct = Math.max(0, -dayRet);
     const exposure = positions.reduce(
       (sum, p) => sum + (Number(p.amount) || 0) * (Number(p.currentPrice) || Number(p.entryPrice) || 0),
       0,
@@ -73,7 +78,7 @@ export function mountRisk(ctx, el) {
     const openCount = positions.length;
 
     const sig = JSON.stringify([
-      dayLossPct.toFixed(2), exposurePct.toFixed(1), tradesToday, openCount, s.halted, a.feesPaid,
+      dayLossPct.toFixed(2), dayPnl.toFixed(2), exposurePct.toFixed(1), tradesToday, openCount, s.halted, a.feesPaid,
       rc.dailyLossLimitPct, rc.maxTotalExposurePct, rc.maxTradesPerDay, rc.maxOpenPositions, rc.riskPerTradePct,
       equity.toFixed(2), s.mode, s.liveArmed,
     ]);

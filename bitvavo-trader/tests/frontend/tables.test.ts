@@ -82,7 +82,7 @@ async function mount(snap: Fake, apiOver: Fake = {}) {
     positionsEl.fire("click", { target });
     return modals[modals.length - 1];
   };
-  return { api, bus, ctx: ctx as Fake, toasts, modals, body, tbody, click, state: () => state };
+  return { api, bus, ctx: ctx as Fake, toasts, modals, body, tbody, click, nodes, state: () => state };
 }
 
 describe("onverkoopbare positie", () => {
@@ -280,5 +280,45 @@ describe("één toast per gesloten trade (gedeelde notifier met het SSE-event)",
     await h.click("writeoff", "pos_1").onConfirm();
     expect(shown).toEqual(["warn: Afgeschreven: SOL-EUR -€ 5,02 als verlies geboekt — de coins blijven op je Bitvavo-account"]);
     expect(h.toasts).toEqual([]);
+  });
+});
+
+describe("open posities: scroll-hint (ronde 3)", () => {
+  it("tabel breder dan het paneel → zichtbare hint en schaduw op de actiekolom; past hij, dan weg", async () => {
+    const h = await mount({ mode: "paper", running: true, positions: [pos()], trades: [] });
+    const wrap = h.nodes["p[data-pbody]"];
+    const cue = h.nodes["p[data-pcue]"];
+    wrap.scrollWidth = 820;
+    wrap.clientWidth = 600;
+    h.bus.emit("snapshot", h.state());
+    expect(cue.hidden).toBe(false);
+    expect(wrap.classList.contains("is-scrollx")).toBe(true);
+    wrap.scrollWidth = 600;
+    h.bus.emit("snapshot", h.state());
+    expect(cue.hidden).toBe(true);
+    expect(wrap.classList.contains("is-scrollx")).toBe(false);
+  });
+
+  it("ook zonder nieuwe snapshot: bij een andere paneelbreedte (ResizeObserver) wordt de hint bijgewerkt", async () => {
+    const observed: { cb: () => void; el: unknown }[] = [];
+    const g = globalThis as Record<string, unknown>;
+    g.ResizeObserver = class {
+      constructor(private cb: () => void) {}
+      observe(el: unknown) {
+        observed.push({ cb: this.cb, el });
+      }
+    };
+    try {
+      const h = await mount({ mode: "paper", running: true, positions: [pos()], trades: [] });
+      const wrap = h.nodes["p[data-pbody]"];
+      expect(observed.map((o) => o.el)).toContain(wrap);
+      expect(h.nodes["p[data-pcue]"].hidden).toBe(true);
+      wrap.scrollWidth = 900;
+      wrap.clientWidth = 500;
+      observed.forEach((o) => o.cb());
+      expect(h.nodes["p[data-pcue]"].hidden).toBe(false);
+    } finally {
+      delete g.ResizeObserver;
+    }
   });
 });

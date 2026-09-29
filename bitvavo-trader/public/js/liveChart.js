@@ -715,13 +715,15 @@ export function mountLiveChart(ctx, els) {
         }
         if (tx !== null) {
           const id = `trx-${tr.id}`;
+          // Afgeschreven: er is niets verkocht → geen verkooppijl maar een rondje (uitleg in de tooltip)
+          const writtenOff = tr.exitReason === "write-off";
           out.push({
             id,
             time: tx,
             position: "aboveBar",
-            shape: "arrowDown",
+            shape: writtenOff ? "circle" : "arrowDown",
             color: win ? green : red,
-            text: fmt.pct(tr.pnlPct, 1),
+            text: fmt.pct(tr.pnlPct, writtenOff ? 0 : 1),
             size: 1,
           });
           info.set(

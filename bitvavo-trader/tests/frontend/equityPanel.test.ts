@@ -151,3 +151,95 @@ describe("equity-paneel", () => {
     expect(p.series.data.map((d: Fake) => d.value)).toEqual([50, 52]);
   });
 });
+
+// Echte engine-uitkomst (ronde 3, live): limiet €50, +€3,25 afgeroomd, daarna herstart met limiet €100.
+// De storting van €50 telt mee in startingEquity (ingelegd kapitaal) en maakt skimmed (netto eruit) −46,75.
+const liveRaised = {
+  mode: "live",
+  account: {
+    startingEquity: 100,
+    cashQuote: 100,
+    equity: 100,
+    dayStartEquity: 50,
+    totalPnlQuote: 3.2459476309227,
+    totalReturnPct: 3.2459476309227,
+    dayPnlQuote: 3.2459476309227,
+    dayReturnPct: 3.2459476309227,
+  },
+  skimmedQuote: 3.2459476309227,
+  trades: [{ pnlQuote: 3.2459476309226964 }],
+  equityHistory: [
+    { time: T, equity: 49.943890274314214, skimmed: 0 },
+    { time: T + 90_000, equity: 53.31047381546135, skimmed: 0 },
+    { time: T + 180_000, equity: 50, skimmed: 3.2459476309227 },
+    { time: T + 270_000, equity: 50, skimmed: 3.2459476309227 },
+    { time: T + 390_000, equity: 100, skimmed: -46.7540523690773 },
+  ],
+};
+
+describe("equity na een gewijzigde kapitaallimiet (ronde 3)", () => {
+  it("verhoogde limiet: de storting is geen verlies — baseline = beginkapitaal, curve − baseline = resultaat van de engine", async () => {
+    const { equityFigures, curveValue } = await loadPublic("js/panels/equity.js");
+    const f = equityFigures(liveRaised);
+    // rendement blijft t.o.v. het ingelegde kapitaal (startingEquity, incl. storting)
+    expect(f.start).toBe(100);
+    expect(f.ret).toBeCloseTo(3.2459, 3);
+    expect(f.pnl).toBeCloseTo(3.2459, 3);
+    // met baseline = startingEquity (€100) zou de curve (€53,25) €46,75 "verlies" tonen
+    expect(f.base).toBe(50);
+    const last = liveRaised.equityHistory[liveRaised.equityHistory.length - 1];
+    expect(curveValue(last) - f.base).toBeCloseTo(liveRaised.account.totalPnlQuote, 2);
+    expect(f.netOut).toBeCloseTo(-46.754, 3);
+    // de storting geeft geen nep-drawdown
+    expect(f.dd).toBeGreaterThan(-0.2);
+  });
+
+  it("paneel: stippellijn op € 50, curve loopt door, uitleg over de gewijzigde limiet", async () => {
+    const p = await mount(liveRaised);
+    expect(p.series.data.map((d: Fake) => Number(d.value.toFixed(2)))).toEqual([49.94, 53.31, 53.25, 53.25, 53.25]);
+    expect(p.series.options.find((o: Fake) => o.baseValue)?.baseValue.price).toBe(50);
+    expect(p.series.priceLines).toHaveLength(1);
+    expect(p.series.priceLines[0].price).toBe(50);
+    expect(p.nodes[".eq-ret"].textContent).toBe("+3,25%");
+    expect(norm(p.nodes[".eq-s-ret"].title)).toBe("+€ 3,25 t.o.v. start € 100,00");
+    const skim = norm(p.nodes[".eq-skim"].innerHTML);
+    expect(p.nodes[".eq-skim"].hidden).toBe(false);
+    expect(skim).toContain("Afgeroomd boven limiet: <b class=\"mono pos\">€ 3,25</b>");
+    expect(skim).toContain("Kapitaallimiet gewijzigd");
+    expect(p.nodes[".eq-skim"].classList.contains("is-note")).toBe(false);
+  });
+
+  it("verlaagde limiet zonder afromen: baseline blijft startingEquity, wel uitleg, geen afroom-regel", async () => {
+    const { equityFigures } = await loadPublic("js/panels/equity.js");
+    // €20 kapitaal terug buiten het budget (opname): equity 50 → 30, skimmed (netto eruit) 0 → 20
+    const lowered = {
+      mode: "live",
+      account: { startingEquity: 50, equity: 30, cashQuote: 30, dayStartEquity: 50, totalPnlQuote: 0, totalReturnPct: 0 },
+      trades: [],
+      equityHistory: [
+        { time: T, equity: 50, skimmed: 0 },
+        { time: T + 60_000, equity: 30, skimmed: 20 },
+      ],
+    };
+    const f = equityFigures(lowered);
+    expect(f.base).toBe(50);
+    expect(f.dd).toBe(0);
+    const p = await mount(lowered);
+    expect(p.series.priceLines[0].price).toBe(50);
+    expect(p.series.data.map((d: Fake) => d.value)).toEqual([50, 50]);
+    const skim = norm(p.nodes[".eq-skim"].innerHTML);
+    expect(skim).toContain("Kapitaallimiet gewijzigd");
+    expect(skim).not.toContain("Afgeroomd boven limiet");
+    // neutrale uitleg (geen groene "winst"-melding)
+    expect(p.nodes[".eq-skim"].classList.contains("is-note")).toBe(true);
+  });
+
+  it("zonder gewijzigde limiet blijft de baseline precies startingEquity (geen afrondingsruis)", async () => {
+    const { equityFigures } = await loadPublic("js/panels/equity.js");
+    const f = equityFigures({ ...liveSkimmed, account: { ...liveSkimmed.account, totalPnlQuote: liveSkimmed.account.totalPnlQuote + 1e-9 } });
+    expect(f.base).toBe(50);
+    // alleen afgeroomd (netto eruit = afgeroomde winst): geen uitleg over een gewijzigde limiet
+    const p = await mount(liveSkimmed);
+    expect(p.nodes[".eq-skim"].innerHTML).not.toContain("Kapitaallimiet gewijzigd");
+  });
+});

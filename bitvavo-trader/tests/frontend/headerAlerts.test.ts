@@ -160,6 +160,14 @@ describe("banner: onbruikbare opgeslagen staat", () => {
     expect(h.alertEl.innerHTML).toContain('data-alert="unknown-orders"');
   });
 
+  it("het pad van het oude bestand staat als lopende tekst in .ab-path (breekt af op een smal scherm)", async () => {
+    const long = `/home/gebruiker/${"heel-lange-map/".repeat(8)}state-live.json.corrupt-1790694935764`;
+    const h = await mount(base({ stateRecovery: { ...rec, quarantinedTo: long } }));
+    expect(norm(h.alertEl.innerHTML)).toContain(
+      `<span class="ab-sub ab-path">Het oude bestand is bewaard als <span class="mono">${long}</span>.</span>`,
+    );
+  });
+
   it("oefenmodus: geen tekst over live armen", async () => {
     const h = await mount(base({ mode: "paper", liveArmed: false, stateRecovery: { reason: "onleesbaar", at: 1 } }));
     expect(h.alertEl.innerHTML).toContain("onleesbaar");

@@ -954,6 +954,15 @@ input[type="range"] {
   font-weight: 500;
   opacity: 0.9;
 }
+/* Herstelmelding: pad als lopende tekst (geen losse flex-items), breekt overal af */
+.alert-banner .ab-sub.ab-path {
+  display: block;
+  margin: 2px 0 0;
+}
+.alert-banner .ab-path .mono {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
 .alert-banner .ab-chip {
   display: inline-flex;
   align-items: center;
@@ -1157,6 +1166,20 @@ body.live-armed {
     position: sticky;
     top: calc(var(--header-h) + 12px);
     height: calc(100vh - var(--header-h) - 24px);
+  }
+}
+
+/* Kopbalk compacter tot 1440 px: past dan ook op 1280 px mét een verticale schuifbalk */
+@media (max-width: 1440px) {
+  .app-header {
+    gap: 12px;
+    padding: 0 14px;
+  }
+  .nav-tabs button {
+    padding: 0 9px;
+  }
+  .header-right {
+    gap: 10px;
   }
 }
 
@@ -1964,6 +1987,16 @@ tr.row-new td {
     flex-direction: row;
     justify-content: flex-end;
     gap: 6px;
+  }
+  /* Tint van een onverkoopbare positie op de hele kaart, niet per cel (geen losse vlakken) */
+  .table.responsive tr.is-unsellable {
+    background: rgba(244, 182, 58, 0.05);
+  }
+  .table.responsive tr.is-unsellable > td,
+  .pos-table tbody tr > td.col-act,
+  .pos-table tbody tr:hover > td.col-act,
+  .pos-table tbody tr.is-unsellable > td.col-act {
+    background: transparent;
   }
   .tbl-scroll {
     max-height: none;

@@ -62,11 +62,18 @@ const isNum = (n) => typeof n === "number" && Number.isFinite(n);
 
 /**
  * Kerncijfers voor het paneel.
- *  - baseline (stippellijn) = `account.startingEquity`: het kapitaal dat de bot kreeg;
+ *  - `start` = `account.startingEquity`: het kapitaal dat de bot kreeg (start +
+ *    verhogingen van de limiet); rendement is daartegen;
  *  - curve = equity + skimmed per punt;
+ *  - `base` (stippellijn/baseline van de curve) = `startingEquity`. Alleen na een
+ *    verhoogde limiet wijkt hij af: de storting telt dan mee in `startingEquity`,
+ *    maar maakt `skimmed` (netto eruit) juist negatief, zodat de curve er niet door
+ *    stijgt. De baseline is dan het beginkapitaal = curve nu − resultaat van de
+ *    engine; anders zou de grafiek de storting als verlies tonen;
  *  - winst/rendement = `account.totalPnlQuote` / `totalReturnPct` van de engine
  *    (correct na afromen); zelf rekenen alleen bij een oudere server;
- *  - `skimmed` = `snapshot.skimmedQuote` (regel "Afgeroomd boven limiet").
+ *  - `skimmed` = `snapshot.skimmedQuote` (regel "Afgeroomd boven limiet");
+ *  - `netOut` = netto uit het budget volgens het laatste punt (afgeroomd + terug − erbij).
  */
 export function equityFigures(s) {
   const a = (s && s.account) || {};
@@ -77,12 +84,20 @@ export function equityFigures(s) {
   const start = rawStart > 0 ? rawStart : hist.length ? curveValue(hist[0]) : 0;
   // "Nu" op dezelfde schaal als de curve: equity + wat er (volgens het laatste punt) netto uit is
   const last = hist.length ? hist[hist.length - 1] : null;
-  const nowCurve = equity + (last ? Number(last.skimmed) || 0 : 0);
+  const netOut = last ? Number(last.skimmed) || 0 : 0;
+  const nowCurve = equity + netOut;
   const pnl = isNum(a.totalPnlQuote) ? a.totalPnlQuote : rawStart > 0 ? equity - rawStart : nowCurve - start;
   const ret = isNum(a.totalReturnPct) ? a.totalReturnPct : start > 0 ? (pnl / start) * 100 : NaN;
+  let base = start;
+  if (isNum(a.totalPnlQuote) && last && isNum(nowCurve)) {
+    const derived = nowCurve - a.totalPnlQuote;
+    // Zonder storting is dit (op afronding na) gewoon startingEquity. Op centen afgerond,
+    // zodat de stippellijn niet bij elke snapshot opnieuw getekend wordt.
+    if (derived > 0 && Math.abs(derived - start) > 0.005) base = Math.round(derived * 100) / 100;
+  }
   const now = { equity: nowCurve };
   const dd = maxDrawdownPct(hist.length ? hist.map((p) => ({ equity: curveValue(p) })).concat([now]) : [now]);
-  return { equity, skimmed, start, pnl, ret, dd };
+  return { equity, skimmed, start, base, netOut, pnl, ret, dd };
 }
 
 function maxDrawdownPct(points) {
@@ -183,7 +198,7 @@ export function mountEquity(ctx, el) {
   function update(s) {
     if (!s || !s.account) return;
     const hist = Array.isArray(s.equityHistory) ? s.equityHistory : [];
-    const { equity, skimmed, start, pnl, ret, dd } = equityFigures(s);
+    const { equity, skimmed, start, base, netOut, pnl, ret, dd } = equityFigures(s);
     const trades = Array.isArray(s.trades) ? s.trades : [];
     const wins = trades.filter((x) => x.pnlQuote > 0).length;
 
@@ -202,11 +217,21 @@ export function mountEquity(ctx, el) {
     $(".eq-s-win").textContent = trades.length ? fmt.pct((wins / trades.length) * 100, 0, false) : "–";
     // Live: winst boven de kapitaallimiet wordt buiten het handelsbudget gehouden
     const skimEl = $(".eq-skim");
-    const showSkim = s.mode === "live" && skimmed > 0;
+    const live = s.mode === "live";
+    // Gewijzigde limiet: netto eruit (laatste punt) ≠ afgeroomde winst → er ging kapitaal bij of af
+    const limitMoved = live && Math.abs(netOut - skimmed) > 0.005;
+    const showSkim = live && (skimmed > 0 || limitMoved);
     skimEl.hidden = !showSkim;
+    // Alleen een gewijzigde limiet (geen afgeroomde winst): neutrale uitleg, geen groene melding
+    skimEl.classList.toggle("is-note", showSkim && !(skimmed > 0));
     skimEl.innerHTML = showSkim
-      ? `Afgeroomd boven limiet: <b class="mono pos">${esc(fmt.eur(skimmed))}</b>
-         <span class="muted">— blijft op je Bitvavo-account, buiten het handelsbudget. De curve telt het mee (equity + afgeroomd).</span>`
+      ? (skimmed > 0
+          ? `<div>Afgeroomd boven limiet: <b class="mono pos">${esc(fmt.eur(skimmed))}</b>
+         <span class="muted">— blijft op je Bitvavo-account, buiten het handelsbudget. De curve telt het mee (equity + afgeroomd).</span></div>`
+          : "") +
+        (limitMoved
+          ? `<div class="eq-skim-note muted">Kapitaallimiet gewijzigd: wat er bij kwam of terugging is een storting/opname, geen winst of verlies — de curve en de stippellijn (je beginkapitaal) tellen het niet mee.</div>`
+          : "")
       : "";
 
     if (!series) return;
@@ -217,12 +242,12 @@ export function mountEquity(ctx, el) {
     } else {
       emptyEl.hidden = true;
     }
-    if (start !== baseValue && start > 0) {
-      baseValue = start;
-      series.applyOptions({ baseValue: { type: "price", price: start } });
+    if (base !== baseValue && base > 0) {
+      baseValue = base;
+      series.applyOptions({ baseValue: { type: "price", price: base } });
       if (startLine) series.removePriceLine(startLine);
       startLine = series.createPriceLine({
-        price: start,
+        price: base,
         color: alpha(t.muted, 0.7),
         lineWidth: 1,
         lineStyle: 2,

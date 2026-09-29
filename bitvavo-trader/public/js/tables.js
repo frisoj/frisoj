@@ -69,7 +69,9 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
     pBody.classList.toggle("is-scrollx", over);
     if (pCue) pCue.hidden = !over;
   }
-  if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("resize", updateScrollCue);
+  // Ook bij een andere paneelbreedte zonder resize van het venster (tab weer zichtbaar, zijbalk)
+  if (typeof ResizeObserver === "function") new ResizeObserver(() => updateScrollCue()).observe(pBody);
+  else if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("resize", updateScrollCue);
 
   function renderPositions() {
     const snap = ctx.getState();
