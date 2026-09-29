@@ -79,6 +79,25 @@ gebruik het tabblad **Instellingen** in het dashboard.
 > (let op: dan vervallen ook je andere opgeslagen instellingen, zoals risico en
 > strategieën).
 
+### Op je telefoon bekijken
+
+De bot draait op je computer; je telefoon is het scherm en de afstandsbediening.
+Computer en telefoon moeten op **dezelfde wifi** zitten, en de computer moet aan
+blijven staan.
+
+1. Zet in `.env`:
+   ```env
+   HOST=0.0.0.0
+   DASHBOARD_TOKEN=verzin-een-code-van-minstens-8-tekens
+   ```
+2. Start met `npm start`. In het startscherm staat nu een regel als
+   `➜ Op je telefoon (zelfde wifi): http://192.168.1.23:4321`.
+3. Open dat adres in de browser op je telefoon en vul je code in als daarom
+   gevraagd wordt. Tip: zet de pagina op je beginscherm ("Zet op beginscherm").
+
+Zet het dashboard **niet** open op internet (geen port forwarding in je router):
+buiten je eigen wifi is het niet bedoeld om te bedienen.
+
 ## Wat zit erin
 
 ### Dashboard

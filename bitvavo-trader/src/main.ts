@@ -2,6 +2,7 @@
  * Startpunt: `npm start`. Leest de configuratie, kiest de databron en broker,
  * start de trading-engine en het dashboard (HTTP + SSE).
  */
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { ConfigError, loadConfig, repairRiskConfig, type AppConfig } from "./config";
 import { APP_VERSION, DEFAULT_ENGINE_CONFIG } from "./core/defaults";
@@ -122,8 +123,28 @@ function printBanner(config: AppConfig, feed: MarketDataFeed, engineCfg: EngineC
   out.push(`  Interval:   ${engineCfg.interval}`);
   out.push(`  Bot:        ${running ? "draait" : "gestopt (start hem in het dashboard)"}`);
   if (config.dashboardToken) out.push("  Token:      dashboard vraagt om DASHBOARD_TOKEN uit .env");
-  out.push("", `  ➜ Open het dashboard:  ${url}`, "", "  Stoppen: druk op Ctrl+C", LINE, "");
+  const phoneUrls = lanUrls(config);
+  if (phoneUrls.length > 0) {
+    out.push("", `  ➜ Op deze computer:     http://127.0.0.1:${config.port}`);
+    for (const u of phoneUrls) out.push(`  ➜ Op je telefoon (zelfde wifi): ${u}`);
+    if (!config.dashboardToken) out.push("  ⚠ Zet een DASHBOARD_TOKEN in .env: nu kan iedereen op je wifi de bot bedienen.");
+    out.push("", "  Stoppen: druk op Ctrl+C", LINE, "");
+  } else {
+    out.push("", `  ➜ Open het dashboard:  ${url}`, "", "  Stoppen: druk op Ctrl+C", LINE, "");
+  }
   console.log(out.join("\n"));
+}
+
+/** Bij HOST=0.0.0.0 (of ::): de adressen waarop een telefoon in hetzelfde netwerk het dashboard vindt. */
+function lanUrls(config: AppConfig): string[] {
+  if (config.host !== "0.0.0.0" && config.host !== "::" && config.host !== "[::]") return [];
+  const urls: string[] = [];
+  for (const addrs of Object.values(networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family === "IPv4" && !a.internal) urls.push(`http://${a.address}:${config.port}`);
+    }
+  }
+  return urls;
 }
 
 async function main(): Promise<void> {
