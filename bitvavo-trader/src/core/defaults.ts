@@ -49,5 +49,11 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
 };
 
 export const DEFAULT_PAPER_CAPITAL = 50;
+/**
+ * Minimale orderwaarde (EUR) op Bitvavo, voor kopen EN verkopen. Gebruikt als
+ * MarketInfo geen (geldige, > 0) minOrderQuote heeft. Nooit vervangen door de
+ * instelling risk.minOrderQuote: die is alleen een extra ondergrens voor instappen.
+ */
+export const EXCHANGE_MIN_ORDER_QUOTE = 5;
 export const APP_VERSION = "0.1.0";
 export const QUOTE_CURRENCY = "EUR";

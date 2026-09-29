@@ -300,7 +300,9 @@ export type ExitReason =
   | "time-stop"
   | "manual"
   | "kill-switch"
-  | "end-of-backtest";
+  | "end-of-backtest"
+  /** Onverkoopbare positie door de gebruiker afgeschreven (er is niets verkocht) */
+  | "write-off";
 
 export interface Trade {
   id: string;
@@ -487,6 +489,13 @@ export interface AccountState {
   totalReturnPct?: number;
   /** Rendement vandaag in % (idem) */
   dayReturnPct?: number;
+  /**
+   * Totale winst/verlies in EUR sinds de start (door de engine berekend: incl.
+   * afgeroomde winst, en niet vertekend door wijzigingen van de kapitaallimiet)
+   */
+  totalPnlQuote?: number;
+  /** Winst/verlies vandaag in EUR (idem) */
+  dayPnlQuote?: number;
 }
 
 export interface OpenPositionView extends Position {
@@ -507,7 +516,12 @@ export interface OpenPositionView extends Position {
 export interface EquityPoint {
   time: number;
   equity: number;
-  /** Live: cumulatief afgeroomde winst op dit moment (grafiek toont equity + skimmed) */
+  /**
+   * Live: cumulatief bedrag dat op dit moment netto uit het handelsbudget is
+   * gehaald (afgeroomde winst boven de limiet, en kapitaal dat terugging bij het
+   * verlagen van de limiet). De grafiek toont equity + skimmed, zodat zo'n
+   * overboeking geen nep-daling geeft.
+   */
   skimmed?: number;
 }
 

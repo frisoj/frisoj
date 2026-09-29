@@ -82,6 +82,7 @@ export const EXIT_REASON_LABELS: Record<ExitReason, string> = {
   manual: "handmatig",
   "kill-switch": "noodstop",
   "end-of-backtest": "einde backtest",
+  "write-off": "afgeschreven",
 };
 
 export function exitReasonLabel(r: ExitReason): string {

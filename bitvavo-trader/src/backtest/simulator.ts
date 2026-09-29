@@ -173,6 +173,7 @@ const EXIT_LABEL: Record<ExitReason, string> = {
   manual: "HAND",
   "kill-switch": "KILL",
   "end-of-backtest": "EINDE",
+  "write-off": "AFGESCHREVEN",
 };
 
 export function exitMarkerLabel(reason: ExitReason, pnlPct: number): string {
@@ -192,6 +193,7 @@ const EXIT_NL: Record<ExitReason, string> = {
   manual: "handmatig",
   "kill-switch": "noodstop",
   "end-of-backtest": "einde test",
+  "write-off": "afgeschreven",
 };
 
 function eurNl(x: number): string {

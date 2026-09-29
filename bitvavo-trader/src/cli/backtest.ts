@@ -118,6 +118,7 @@ const EXIT_NL: Record<ExitReason, string> = {
   manual: "Handmatig",
   "kill-switch": "Noodstop",
   "end-of-backtest": "Einde test",
+  "write-off": "Afgeschreven",
 };
 
 function banner(lines: string[], color: (s: string) => string): string {

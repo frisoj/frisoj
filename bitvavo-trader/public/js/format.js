@@ -108,6 +108,7 @@ export const fmt = {
         manual: "Handmatig",
         "kill-switch": "Noodstop",
         "end-of-backtest": "Einde backtest",
+        "write-off": "Afgeschreven",
       }[r] || r
     );
   },
