@@ -228,3 +228,42 @@ describe("heatmap: mediaan, beste combinatie en telling per cel", () => {
     expect(L.bestHeatmapCell(hm, { ...bestRow, params: { "ensemble.buyThreshold": 0.5, "risk.stopAtrMult": 3 } })).toBeNull();
   });
 });
+
+describe("grafiek 'Koers & trades': korte markers en ruimte aan de randen (ronde 4)", () => {
+  it("shortMarkerText: koop = alleen de pijl, verkoop = alleen het resultaat", async () => {
+    const { shortMarkerText } = await loadPublic("js/panels/backtestLogic.js");
+    expect(shortMarkerText({ action: "buy", label: "KOOP" })).toBe("");
+    expect(shortMarkerText({ action: "sell", label: "TRAIL -0,8%" })).toBe("-0,8%");
+    expect(shortMarkerText({ action: "sell", label: "SIGNAAL -1,2%" })).toBe("-1,2%");
+    expect(shortMarkerText({ action: "sell", label: "TP +3,0%" })).toBe("+3,0%");
+    expect(shortMarkerText({ action: "sell", label: "AFGESCHREVEN -100,0%" })).toBe("-100,0%");
+    expect(shortMarkerText({ action: "sell", label: "+1,5%" })).toBe("+1,5%");
+    // zonder percentage: het label zelf
+    expect(shortMarkerText({ action: "sell", label: "VERKOOP" })).toBe("VERKOOP");
+    expect(shortMarkerText(null)).toBe("");
+  });
+
+  it("paddedRange: alle candles in beeld met precies padPx ruimte links en rechts", async () => {
+    const { paddedRange } = await loadPublic("js/panels/backtestLogic.js");
+    const n = 1500;
+    const w = 900;
+    const r = paddedRange(n, w, 32);
+    const barPx = w / (r.to - r.from);
+    // de eerste candle (index 0) staat 32 px van de linkerrand, de laatste 32 px van de rechterrand
+    expect((0 - r.from) * barPx).toBeCloseTo(32, 6);
+    expect((r.to - (n - 1)) * barPx).toBeCloseTo(32, 6);
+    expect(paddedRange(0, 900)).toBeNull();
+    expect(paddedRange(10, 50, 32)).toBeNull(); // te smal: dan gewoon fitContent
+  });
+});
+
+describe("zijbalk sticky alleen als hij in beeld past (ronde 4)", () => {
+  it("sideFitsViewport: 1440×900 met een zijbalk van 953 px → niet sticky; korte zijbalk wel", async () => {
+    const { sideFitsViewport } = await loadPublic("js/panels/backtestLogic.js");
+    expect(sideFitsViewport(953, 900, 66)).toBe(false);
+    expect(sideFitsViewport(700, 900, 66)).toBe(true);
+    expect(sideFitsViewport(822, 900, 66)).toBe(true); // 822 + 66 + 12 = 900
+    expect(sideFitsViewport(823, 900, 66)).toBe(false);
+    expect(sideFitsViewport(0, 900, 66)).toBe(false);
+  });
+});

@@ -346,6 +346,34 @@ function tabFromHash() {
   return TABS.includes(h) ? h : "live";
 }
 
+// Smal scherm: past de menubalk (of de marktbalk) niet, dan kan hij opzij schuiven. Een
+// vervaagde rand (klassen can-left / can-right) laat zien dat er aan die kant nog tabs staan;
+// de actieve hoofdtab wordt in beeld geschoven.
+function scrollCue(el) {
+  if (!el) return () => {};
+  const update = () => {
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle("can-left", max > 1 && el.scrollLeft > 1);
+    el.classList.toggle("can-right", max > 1 && el.scrollLeft < max - 1);
+  };
+  el.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  if (typeof ResizeObserver === "function") new ResizeObserver(update).observe(el);
+  // tabs die later getekend worden (marktbalk)
+  if (typeof MutationObserver === "function") new MutationObserver(update).observe(el, { childList: true });
+  return update;
+}
+const navEl = document.querySelector(".nav-tabs");
+const updateNavCue = scrollCue(navEl);
+scrollCue($("market-tabs"));
+function revealNavTab(btn) {
+  if (!navEl || !btn || navEl.scrollWidth <= navEl.clientWidth + 1) return;
+  const n = navEl.getBoundingClientRect();
+  const b = btn.getBoundingClientRect();
+  if (b.left < n.left) navEl.scrollLeft -= n.left - b.left + 24;
+  else if (b.right > n.right) navEl.scrollLeft += b.right - n.right + 24;
+}
+
 function applyTab(tab) {
   if (!TABS.includes(tab)) return;
   activeTab = tab;
@@ -357,7 +385,9 @@ function applyTab(tab) {
     const on = btn.dataset.tab === tab;
     btn.classList.toggle("active", on);
     btn.setAttribute("aria-selected", on ? "true" : "false");
+    if (on && navEl && navEl.contains(btn)) revealNavTab(btn);
   });
+  updateNavCue();
   if (location.hash !== `#${tab}`) history.replaceState(null, "", `#${tab}`);
   document.title = tab === "live" ? "Bitvavo Trader" : `${TAB_TITLES[tab]} · Bitvavo Trader`;
 }

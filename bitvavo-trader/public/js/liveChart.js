@@ -463,6 +463,40 @@ export function mountLiveChart(ctx, els) {
     }
   }
 
+  // Legendes nooit over de prijsschaal (die is op een telefoon breder dan de CSS-marge):
+  // rechterrand = actuele breedte van de prijsschaal + marge. De tijdas krimpt/groeit mee
+  // als de prijsschaal breder/smaller wordt, dus dat event dekt ook een andere markt.
+  const legendCharts = [
+    [main, legMain],
+    [rsiChart, legRsi],
+    [macdChart, legMacd],
+  ];
+  function syncLegendInsets() {
+    for (const [c, l] of legendCharts) {
+      try {
+        const w = c.priceScale("right").width();
+        if (isNum(w) && w > 0) l.style.right = `${Math.ceil(w) + 8}px`;
+      } catch {
+        /* grafiek nog niet getekend */
+      }
+    }
+  }
+  let insetFrame = 0;
+  const scheduleLegendInsets = () => {
+    if (insetFrame) return;
+    insetFrame = requestAnimationFrame(() => {
+      insetFrame = 0;
+      syncLegendInsets();
+    });
+  };
+  for (const c of charts) {
+    try {
+      c.timeScale().subscribeSizeChange(scheduleLegendInsets);
+    } catch {
+      /* oudere lightweight-charts: CSS-marge blijft */
+    }
+  }
+
   let activeChart = null;
   [mainEl, rsiEl, macdEl].forEach((el, i) => {
     el.addEventListener("pointerenter", () => (activeChart = charts[i]));
@@ -630,6 +664,7 @@ export function mountLiveChart(ctx, els) {
     }
     renderToolbar();
     updateLegend(st.hoverIdx);
+    scheduleLegendInsets();
   }
 
   function applyToggles() {

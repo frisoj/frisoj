@@ -322,3 +322,197 @@ describe("open posities: scroll-hint (ronde 3)", () => {
     }
   });
 });
+
+/** Nep-modal zoals openModal hem als tweede argument aan onConfirm geeft */
+function fakeModal() {
+  const nodes: Record<string, Fake> = {};
+  const removed: string[] = [];
+  const appended: Fake[] = [];
+  const modal = fakeNode({
+    querySelector: (sel: string) =>
+      (nodes[sel] ||= fakeNode({ remove: () => removed.push(sel), appendChild: (c: Fake) => appended.push(c) })),
+  });
+  return { modal, nodes, removed, appended };
+}
+const apiErr = (message: string, status = 409) => Object.assign(new Error(message), { status });
+const text = (html: string) => norm(String(html)).replace(/<[^>]+>/g, "");
+
+describe("afschrijven: gevolgen voor vandaag (ronde 4)", () => {
+  it("de modal zegt dat het als gerealiseerd verlies van vandaag telt: dagelijkse verlieslimiet en afkoelperiode", async () => {
+    const h = await mount({
+      mode: "live",
+      running: true,
+      config: { interval: "15m", risk: { dailyLossLimitPct: 5, cooldownCandlesAfterLoss: 4 } },
+      positions: [pos({ unsellable: true, unsellableReason: REASON })],
+      trades: [],
+    });
+    const b = text(h.click("writeoff", "pos_1").bodyHtml);
+    expect(b).toContain("telt als gerealiseerd verlies van vandaag");
+    expect(b).toContain("dagelijkse verlieslimiet (5%) laten afgaan: dan opent de bot vandaag geen nieuwe trades meer");
+    expect(b).toContain("afkoelperiode na verlies voor SOL-EUR: de bot koopt die markt de komende 4 candles van 15m (≈ 1u 0m) niet");
+  });
+
+  it("zonder afkoelperiode (0 candles) geen zin over afkoelen; zonder config een algemene tekst", async () => {
+    const h0 = await mount({
+      mode: "paper",
+      running: true,
+      config: { interval: "1h", risk: { dailyLossLimitPct: 3, cooldownCandlesAfterLoss: 0 } },
+      positions: [pos({ unsellable: true })],
+      trades: [],
+    });
+    const b0 = text(h0.click("writeoff", "pos_1").bodyHtml);
+    expect(b0).toContain("dagelijkse verlieslimiet (3%)");
+    expect(b0).not.toContain("afkoelperiode");
+    const h1 = await mount({ mode: "paper", running: true, positions: [pos({ unsellable: true })], trades: [] });
+    const b1 = text(h1.click("writeoff", "pos_1").bodyHtml);
+    expect(b1).toContain("dagelijkse verlieslimiet laten afgaan");
+    expect(b1).toContain("afkoelperiode na verlies voor SOL-EUR: de bot koopt die markt een tijdje niet");
+  });
+});
+
+describe("'Toch proberen te verkopen' op een onverkoopbare positie (ronde 4)", () => {
+  const refusal = apiErr("onverkoopbaar: waarde €4,62 < minimum €5,00");
+  const setup = (over: Fake) =>
+    mount(
+      { mode: "paper", running: true, positions: [pos({ unsellable: true, unsellableReason: REASON })], trades: [], ...over },
+      { closePosition: vi.fn(async () => Promise.reject(refusal)) },
+    );
+
+  it("oefenmodus, bot draait: duidelijke uitleg in de modal, verkoopt automatisch zodra ≥ € 5; geen ruwe engine-reden", async () => {
+    const h = await setup({});
+    const modal = h.click("close", "pos_1");
+    const fm = fakeModal();
+    await expect(modal.onConfirm("", fm.modal)).resolves.toBe(false); // venster blijft open
+    expect(fm.nodes[".modal-head h3"].textContent).toBe("Verkoop geweigerd: onder het Bitvavo-minimum");
+    const body = text(fm.nodes[".modal-body"].innerHTML);
+    expect(body).toContain("Er is niets verkocht: Bitvavo accepteert geen verkooporder onder € 5,00, en deze positie is nu ongeveer € 4,62 waard.");
+    expect(body).toContain("De bot onthoudt je verkoopopdracht en verkoopt de positie automatisch zodra die weer minstens € 5,00 waard is.");
+    expect(body).toContain("schrijf hem dan af (knop Afschrijven)");
+    expect(body).not.toMatch(/onverkoopbaar:/i);
+    expect(fm.removed).toContain('[data-m="ok"]');
+    expect(fm.nodes['[data-m="cancel"]'].textContent).toBe("Sluiten");
+    // verse staat opgehaald, knoppen weer vrij
+    expect(h.api.getState).toHaveBeenCalled();
+    expect(h.body()).not.toContain("disabled");
+  });
+
+  it("live, bot draait maar live handel is uit: 'Schakel live handel in, of schrijf de positie af'", async () => {
+    const h = await setup({ mode: "live", liveArmed: false });
+    const fm = fakeModal();
+    await h.click("close", "pos_1").onConfirm("", fm.modal);
+    const body = text(fm.nodes[".modal-body"].innerHTML);
+    expect(body).toContain("gebeurt alleen als live handel is ingeschakeld. Schakel live handel in, of schrijf de positie af");
+    expect(body).not.toContain("onthoudt");
+  });
+
+  it("live, bot gestopt: 'Start de bot en schakel live handel in'; oefenmodus gestopt: 'Start de bot'", async () => {
+    const live = await setup({ mode: "live", running: false, liveArmed: false });
+    const fm = fakeModal();
+    await live.click("close", "pos_1").onConfirm("", fm.modal);
+    expect(text(fm.nodes[".modal-body"].innerHTML)).toContain(
+      "gebeurt alleen als de bot draait én live handel is ingeschakeld. Start de bot en schakel live handel in, of schrijf de positie af",
+    );
+    const paper = await setup({ running: false });
+    const fp = fakeModal();
+    await paper.click("close", "pos_1").onConfirm("", fp.modal);
+    expect(text(fp.nodes[".modal-body"].innerHTML)).toContain("gebeurt alleen als de bot draait. Start de bot, of schrijf de positie af");
+  });
+
+  it("live en gearmd, bot draait: automatisch verkopen", async () => {
+    const h = await setup({ mode: "live", liveArmed: true });
+    const fm = fakeModal();
+    await h.click("close", "pos_1").onConfirm("", fm.modal);
+    expect(text(fm.nodes[".modal-body"].innerHTML)).toContain("verkoopt de positie automatisch zodra die weer minstens € 5,00 waard is");
+  });
+
+  it("minimum in munten (hoeveelheid): een hogere koers helpt niet → afschrijven", async () => {
+    const { closeRefusalInfo } = await loadPublic("js/tables.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const info = closeRefusalInfo(apiErr("onverkoopbaar: hoeveelheid 0,00001 BTC < minimum 0,0001 BTC"), pos({ market: "BTC-EUR" }), { mode: "paper", running: true }, fmt);
+    expect(info.why).toContain("zo'n kleine hoeveelheid BTC");
+    expect(info.next).toContain("Schrijf hem af");
+  });
+
+  it("zonder modal: dezelfde uitleg als fout; een andere fout blijft ongewijzigd", async () => {
+    const h = await setup({});
+    await expect(h.click("close", "pos_1").onConfirm()).rejects.toThrow("De bot onthoudt je verkoopopdracht");
+    const { closeRefusalInfo } = await loadPublic("js/tables.js");
+    const { fmt } = await loadPublic("js/format.js");
+    expect(closeRefusalInfo(apiErr("verkoop afgewezen: rate limit"), pos(), { mode: "paper" }, fmt)).toBeNull();
+    expect(closeRefusalInfo(apiErr("onverkoopbaar: x", 500), pos(), { mode: "paper" }, fmt)).toBeNull();
+  });
+});
+
+describe("afschrijven: bezig-status en weigering omdat de positie weer verkoopbaar is (ronde 4)", () => {
+  it("bezig: knop Afschrijven met spinner (busy) en uitgeschakeld, melding in de modal; daarna weg", async () => {
+    let release!: (v: unknown) => void;
+    const h = await mount(
+      { mode: "live", running: true, positions: [pos({ unsellable: true, unsellableReason: REASON })], trades: [] },
+      {
+        writeOffPosition: vi.fn(
+          () => new Promise((r) => (release = r)),
+        ),
+      },
+    );
+    const created: Fake[] = [];
+    (globalThis as Fake).document.createElement = () => {
+      const n = fakeNode({ remove: vi.fn() });
+      created.push(n);
+      return n;
+    };
+    const fm = fakeModal();
+    const done = h.click("writeoff", "pos_1").onConfirm("", fm.modal);
+    expect(h.body()).toMatch(/class="btn btn-sm busy" data-writeoff="pos_1" disabled/);
+    expect(h.body()).toMatch(/data-close="pos_1" disabled/);
+    expect(fm.appended).toHaveLength(1);
+    expect(fm.appended[0].innerHTML).toContain("Actuele koers controleren en afschrijven…");
+    release({ id: "trd_1", market: "SOL-EUR", pnlQuote: -5.02, pnlPct: -100 });
+    await done;
+    expect(created[0].remove).toHaveBeenCalled();
+  });
+
+  it("409 'inmiddels wel verkoopbaar' → niets afgeschreven, uitleg in de modal, verse staat, geen knop Afschrijven meer", async () => {
+    const sellable = pos({ currentPrice: 156, unrealizedPnl: 0.1 }); // ≈ € 5,19 en niet meer onverkoopbaar
+    const h = await mount(
+      { mode: "live", running: true, positions: [pos({ unsellable: true, unsellableReason: REASON })], trades: [] },
+      {
+        writeOffPosition: vi.fn(async () => Promise.reject(apiErr("Afschrijven kan niet: de positie is inmiddels wel verkoopbaar."))),
+        getState: vi.fn(async () => ({ mode: "live", running: true, positions: [sellable], trades: [] })),
+      },
+    );
+    const fm = fakeModal();
+    await expect(h.click("writeoff", "pos_1").onConfirm("", fm.modal)).resolves.toBe(false);
+    expect(fm.nodes[".modal-head h3"].textContent).toBe("Niet afgeschreven: de positie is weer verkoopbaar");
+    const body = text(fm.nodes[".modal-body"].innerHTML);
+    expect(body).toContain("Er is niets afgeschreven.");
+    expect(body).toContain("SOL-EUR is nu ongeveer € 5,19 waard");
+    expect(body).toContain("verkoop hem dan met de knop Sluit");
+    expect(fm.removed).toContain('[data-m="ok"]');
+    expect(h.api.getState).toHaveBeenCalled();
+    expect(h.body()).not.toContain("data-writeoff");
+    expect(h.body()).not.toContain("disabled");
+    expect(h.toasts).toEqual([]);
+  });
+
+  it("ook de engine-tekst 'kan gewoon verkocht worden' (met ~€-waarde) wordt zo getoond", async () => {
+    const { writeOffRefusalInfo } = await loadPublic("js/tables.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const info = writeOffRefusalInfo(
+      apiErr("Afschrijven kan alleen voor een onverkoopbare positie (waarde onder het beursminimum). SOL-EUR is nu ~€5,20 waard en kan gewoon verkocht worden: sluit de positie in plaats daarvan."),
+      pos(),
+      fmt,
+    );
+    expect(norm(info.text)).toContain("SOL-EUR is nu ongeveer € 5,20 waard");
+  });
+
+  it("een andere 409 (order loopt nog) blijft een fout in de modal: opnieuw proberen kan", async () => {
+    const h = await mount(
+      { mode: "live", running: true, positions: [pos({ unsellable: true, unsellableReason: REASON })], trades: [] },
+      { writeOffPosition: vi.fn(async () => Promise.reject(apiErr("Afschrijven kan nu even niet: er loopt nog een order bij de broker."))) },
+    );
+    const fm = fakeModal();
+    await expect(h.click("writeoff", "pos_1").onConfirm("", fm.modal)).rejects.toThrow("er loopt nog een order");
+    expect(fm.removed).not.toContain('[data-m="ok"]');
+    expect(h.body()).not.toContain("disabled");
+  });
+});

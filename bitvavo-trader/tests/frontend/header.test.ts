@@ -296,3 +296,21 @@ describe("Noodstop: uitkomst en modal (ronde 3)", () => {
     expect(norm(raw)).toContain("onder het Bitvavo-minimum van € 5,00 per order");
   });
 });
+
+describe("Noodstop-modal: grammatica (ronde 4)", () => {
+  const text = (html: string) => norm(html).replace(/<[^>]+>/g, "");
+
+  it("één positie → 'De open positie wordt direct tegen marktprijs verkocht' (niet 'Alle 1 open positie')", async () => {
+    const h = await mount(snapshot([big]), snapshot([], false));
+    const body = text(h.pressKill().bodyHtml);
+    expect(body).toContain("De open positie wordt direct tegen marktprijs verkocht");
+    expect(body).not.toContain("Alle 1");
+  });
+
+  it("meer posities → 'Alle N open posities worden direct tegen marktprijs verkocht'", async () => {
+    const third = { ...big, id: "p3", market: "ETH-EUR" };
+    const h = await mount(snapshot([big, dust, third]), snapshot([], false));
+    const body = text(h.pressKill().bodyHtml);
+    expect(body).toContain("Alle 3 open posities worden direct tegen marktprijs verkocht");
+  });
+});

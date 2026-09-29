@@ -1062,19 +1062,32 @@ body.live-armed {
 .stat-bot .bot-state {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 24px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-height: 24px;
   font-size: 15px;
   font-weight: 700;
 }
 .stat-bot .bot-state .badge {
   cursor: help;
 }
+/* Subregels mogen afbreken (op 1280 px twee regels) i.p.v. bedragen/percentages af te kappen;
+   een bedrag of percentage zelf breekt nooit (harde spatie in "€ 50,00", .nowrap-spans) */
+.stats-bar .stat-sub {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+}
+.stats-bar .stat-sub > span {
+  white-space: nowrap;
+}
 .stat-bot .stat-sub.warn {
   color: var(--yellow);
 }
 .stat-bot .stat-sub.halt {
   color: var(--red);
+  overflow-wrap: break-word;
 }
 .stat-skeleton {
   display: block;
@@ -1166,6 +1179,14 @@ body.live-armed {
     position: sticky;
     top: calc(var(--header-h) + 12px);
     height: calc(100vh - var(--header-h) - 24px);
+  }
+}
+
+/* Vaste kopbalk (> 900 px): iets dat in beeld gescrold wordt (focus met Tab, #anker)
+   komt eronder uit, niet erachter */
+@media (min-width: 901px) {
+  html {
+    scroll-padding-top: calc(var(--header-h) + 12px);
   }
 }
 
@@ -1323,6 +1344,42 @@ body.live-armed {
   }
 }
 
+/* Telefoon: alle vier hoofdtabs zichtbaar (geen iconen, minder ruimte) */
+@media (max-width: 480px) {
+  .nav-tabs {
+    gap: 0;
+    padding: 0 2px;
+  }
+  .nav-tabs button {
+    gap: 0;
+    padding: 0 10px;
+  }
+  .nav-tabs button svg {
+    display: none;
+  }
+  .nav-tabs button::after {
+    left: 6px;
+    right: 6px;
+  }
+}
+/* Past de menu- of marktbalk niet (smal scherm): vervaagde rand aan de kant waar nog tabs staan
+   (klassen gezet door main.js) */
+.nav-tabs.can-right,
+.market-tabs.can-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.nav-tabs.can-left,
+.market-tabs.can-left {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+}
+.nav-tabs.can-left.can-right,
+.market-tabs.can-left.can-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+
 /* ─────────────────────────────── Marktbalk ─────────────────────────────── */
 
 .market-tabs {
@@ -1337,6 +1394,8 @@ body.live-armed {
 }
 .mkt-tab {
   position: relative;
+  /* nooit smaller dan de inhoud (anders valt het 24u-label rechts weg op 390 px) */
+  flex: none;
   display: grid;
   grid-template-columns: auto auto 1fr;
   grid-template-rows: auto auto;
@@ -1676,7 +1735,8 @@ body.live-armed {
     height: 100px;
   }
   .chart-legend {
-    right: 70px;
+    /* rechterkant = breedte van de prijsschaal (min. 82 px) + marge; liveChart.js houdt hem exact bij */
+    right: 90px;
     font-size: 10.5px;
   }
   .chart-legend .row.ind-row {
@@ -2271,6 +2331,9 @@ tr.row-new td {
   inset: 0;
   z-index: 150;
   display: grid;
+  /* Eén kolom zo breed als het scherm (min. 0): anders wordt de kolom 460px
+     breed en past de modal niet op een telefoon */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 16px;
   background: rgba(3, 5, 9, 0.66);
@@ -2287,8 +2350,9 @@ tr.row-new td {
   }
 }
 .modal {
-  width: 460px;
+  width: min(460px, 100%);
   max-width: 100%;
+  justify-self: center;
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
@@ -2299,7 +2363,7 @@ tr.row-new td {
   animation: modal-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }
 .modal.wide {
-  width: 720px;
+  width: min(720px, 100%);
 }
 .modal.danger {
   border-color: rgba(242, 73, 92, 0.55);
@@ -2394,6 +2458,13 @@ tr.row-new td {
 }
 .modal-input {
   margin-top: 6px;
+}
+/* Bezig-melding in een modal (bijv. afschrijven: de bot haalt eerst een verse koers op) */
+.modal-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
 }
 .modal-error {
   margin: 0 16px 10px;

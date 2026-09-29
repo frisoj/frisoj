@@ -402,7 +402,10 @@ describe("Kapitaallimiet (live)", () => {
     expect(s.account.totalPnlQuote).toBeCloseTo(before.totalPnlQuote!, 9);
     expect(s.account.dayPnlQuote).toBeCloseTo(before.dayPnlQuote!, 9);
     expect(s.account.totalReturnPct).toBeCloseTo(before.totalReturnPct!, 9);
-    expect(s.account.dayReturnPct).toBeCloseTo(before.dayReturnPct!, 9);
+    // Herschreven (ronde 4): het dag-% bleef hier t.o.v. €50; nu t.o.v. het kapitaal dat
+    // vandaag echt handelt (dagstart − vandaag teruggegaan kapitaal = 50 − 27,50).
+    expect(s.account.dayReturnPct).toBeCloseTo((before.dayPnlQuote! / (50 - before.cashQuote)) * 100, 9);
+    expect(s.account.dayReturnPct).toBeGreaterThan(-1);
     expect(s.account.totalReturnPct).toBeLessThan(0); // alleen de instapfee
     expect(s.account.totalReturnPct).toBeGreaterThan(-0.2);
     const logsBefore = h2.logs().length;
@@ -447,7 +450,9 @@ describe("Kapitaallimiet (live)", () => {
     s = h2.engine.snapshot();
     // Niet het volledige verschil (50) eraf: de bot houdt min(50, ~63,7) = 50
     expect(s.account.cashQuote).toBe(50);
-    expect(s.account.dayReturnPct).toBeCloseTo(dayPct, 9);
+    // Herschreven (ronde 4): het dag-% bleef hier gelijk (t.o.v. €100); nu is de basis het
+    // kapitaal dat vandaag echt handelt: dagstart 100 − vandaag teruggegaan (~13,73).
+    expect(s.account.dayReturnPct).toBeCloseTo(((cash - 100) / (100 - (cash - 50))) * 100, 9);
     expect(s.account.totalReturnPct).toBeCloseTo(dayPct, 9);
     // Herschreven (ronde 3): dagstart bleef niet staan maar werd geschaald (78,46); het
     // EUR-resultaat is nu het echte verlies, de ~13,73 opname telt niet mee.
@@ -459,7 +464,10 @@ describe("Kapitaallimiet (live)", () => {
     expect(h2.logs().some((m) => m.startsWith("Kapitaallimiet €100,00 → €50,00"))).toBe(true);
     expect(h2.logs().some((m) => m.includes("winst"))).toBe(false);
 
-    // Kleine koers-/limietverlaging na een klein verlies triggert de 5%-limiet niet
+    // Herschreven (ronde 4): "kleine limietverlaging na een klein verlies triggert de
+    // 5%-limiet niet" gold toen het dag-% t.o.v. de oude dagstart (€50) bleef. Nu is de
+    // basis het kapitaal dat vandaag echt handelt (dagstart − vandaag teruggegaan
+    // kapitaal): ~€1,80 verlies op ~€26,80 = ~-6,7% → de dagelijkse verlieslimiet geldt.
     const file2 = join(dir, "state2.json");
     const h3 = setup({ mode: "live", startingCapital: 50, deps: { store: new StateStore(file2) } });
     h3.engine.arm();
@@ -471,11 +479,16 @@ describe("Kapitaallimiet (live)", () => {
     await h3.engine.stop();
     const h4 = setup({ mode: "live", startingCapital: 25, clock: h3.clock, feed: h3.feed, deps: { store: new StateStore(file2) } });
     realHalt(h4);
+    const h3cash = h3.engine.snapshot().account.cashQuote; // ~48,2
     await h4.engine.tick();
     s = h4.engine.snapshot();
     expect(s.account.cashQuote).toBe(25);
-    expect(s.account.dayReturnPct).toBeGreaterThan(-5);
-    expect(s.halted.halted).toBe(false);
+    const returned = h3cash - 25;
+    expect(s.account.dayPnlQuote).toBeCloseTo(h3cash - 50, 9); // alleen het echte verlies
+    expect(s.account.dayReturnPct).toBeCloseTo(((h3cash - 50) / (50 - returned)) * 100, 9);
+    expect(s.account.dayReturnPct).toBeLessThan(-5);
+    expect(s.halted.halted).toBe(true);
+    expect(s.halted.dailyLimit).toBe(true);
   });
 
   it("herstart op dezelfde dag met een lagere limiet zonder posities: geen halt", async () => {

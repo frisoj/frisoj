@@ -277,3 +277,40 @@ export function describeApply(partial, row, cfg, strategies) {
   }
   return { enabled, rows };
 }
+
+// ── Grafiek "Koers & trades" ──
+
+/**
+ * Korte tekst bij een trade-marker (minder overlap): een koop krijgt alleen de pijl
+ * (geen "KOOP"), een verkoop alleen het resultaat ("TRAIL -0,8%" → "-0,8%"). Zonder
+ * percentage in het label: het label zelf (bijv. "VERKOOP").
+ */
+export function shortMarkerText(m) {
+  if (!m || m.action === "buy") return "";
+  const lbl = String(m.label || "").trim();
+  const pct = /[+\-−]?\d+(?:[.,]\d+)?\s*%/.exec(lbl);
+  return pct ? pct[0].replace(/\s+/g, "") : lbl;
+}
+
+/**
+ * Zichtbaar bereik (logische indexen) zodat alle `n` candles passen met `padPx` pixels
+ * ruimte links en rechts, zodat markers (pijl + tekst) op de eerste en laatste candle
+ * niet afgesneden worden. `widthPx` = breedte van de tijdas. Null als dat niet kan.
+ */
+export function paddedRange(n, widthPx, padPx = 32) {
+  if (!(n > 0) || !(widthPx > 2 * padPx)) return null;
+  // pad (in candles) × candlebreedte = padPx, met candlebreedte = breedte / (n − 1 + 2·pad)
+  const pad = (padPx * Math.max(1, n - 1)) / (widthPx - 2 * padPx);
+  return { from: -pad, to: n - 1 + pad };
+}
+
+// ── Zijbalk ──
+
+/**
+ * Mag de zijbalk "sticky" (meeschuiven)? Alleen als hij helemaal in beeld past onder de
+ * vaste kopbalk; anders scrolt hij gewoon mee met de pagina (geen aparte scrollbalk
+ * waarin knoppen als Walk-forward verstopt zitten).
+ */
+export function sideFitsViewport(sideHeight, viewportHeight, topOffset, bottomGap = 12) {
+  return sideHeight > 0 && viewportHeight > 0 && sideHeight + topOffset + bottomGap <= viewportHeight;
+}

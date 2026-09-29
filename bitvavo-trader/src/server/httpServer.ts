@@ -85,6 +85,14 @@ export function hostnameOf(hostHeader: string): string | null {
   return m[1];
 }
 
+/** Hoe vaak een header (hoofdletterongevoelig) letterlijk in het verzoek stond. */
+function countRawHeader(req: IncomingMessage, name: string): number {
+  const raw = req.rawHeaders ?? [];
+  let n = 0;
+  for (let i = 0; i < raw.length; i += 2) if (String(raw[i]).toLowerCase() === name) n++;
+  return n;
+}
+
 const CROSS_SITE_ERROR = "Verzoek van een andere website geweigerd.";
 
 /**
@@ -164,6 +172,12 @@ export function createApp(deps: CreateAppDeps): App {
     }
     const pathname = url.pathname;
     const isApi = pathname === "/api" || pathname.startsWith("/api/");
+
+    // Meer dan één Host-header is een ongeldig verzoek (RFC 9112). Node houdt stilletjes de
+    // eerste, dus "Host: localhost" + "Host: evil.example" zou anders door de Host-check glippen.
+    if (countRawHeader(req, "host") > 1) {
+      throw new HttpError(400, "Ongeldig verzoek: meer dan één Host-header.");
+    }
 
     // Bescherming tegen DNS-rebinding: bij binden op loopback alleen lokale Host-headers.
     // Zonder Host-header (HTTP/1.0) valt er niets te controleren → weigeren.

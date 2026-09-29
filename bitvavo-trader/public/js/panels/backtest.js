@@ -18,6 +18,9 @@ import {
   heatmapCell,
   bestHeatmapCell,
   heatmapCellTip,
+  shortMarkerText,
+  paddedRange,
+  sideFitsViewport,
 } from "./backtestLogic.js";
 
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
@@ -299,6 +302,37 @@ export function mountBacktest(ctx, el) {
   const busyEl = $(".bt-busy");
   const rtabs = $(".bt-rtabs");
   const F = (name) => form.elements.namedItem(name);
+
+  // ── Zijbalk: alleen sticky als hij helemaal in beeld past (onder de vaste kopbalk) ──
+  // Anders scrolt hij gewoon mee met de pagina: geen eigen scrollbalk waarin knoppen als
+  // Walk-forward verstopt zitten, en hij schuift nooit onder de kopbalk.
+  const side = $(".bt-side");
+  function updateSideSticky() {
+    if (!side || !side.classList) return;
+    const header = document.querySelector(".app-header");
+    const headerSticky =
+      !!header && typeof getComputedStyle === "function" && getComputedStyle(header).position === "sticky";
+    const top = (headerSticky ? Number(header.offsetHeight) || 0 : 0) + 12;
+    const fits = headerSticky && sideFitsViewport(Number(side.offsetHeight) || 0, Number(window.innerHeight) || 0, top);
+    const was = side.classList.contains("is-sticky");
+    if (was === fits) return;
+    side.classList.toggle("is-sticky", fits);
+    // Van sticky naar gewoon (bijv. "Geavanceerd" uitgeklapt terwijl je omlaag gescrold bent):
+    // de pagina zo verschuiven dat de bovenkant van de zijbalk net onder de kopbalk blijft
+    // (waar hij als sticky stond), zodat hij niet uit beeld springt.
+    if (was && typeof side.getBoundingClientRect === "function" && typeof window.scrollBy === "function") {
+      const after = side.getBoundingClientRect().top;
+      if (after < top - 1) window.scrollBy(0, after - top);
+    }
+  }
+  if (side) {
+    if (typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(() => updateSideSticky());
+      ro.observe(side);
+    }
+    if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("resize", updateSideSticky);
+    updateSideSticky();
+  }
 
   // ── Formulier ──
   function saveForm() {
@@ -776,14 +810,29 @@ export function mountBacktest(ctx, el) {
             position: buy ? "belowBar" : "aboveBar",
             shape: buy ? "arrowUp" : "arrowDown",
             color: buy ? T.accent : pos ? T.green : neg ? T.red : T.yellow,
-            text: showText ? lbl : "",
+            // Kort (minder overlap): koop = alleen de pijl, verkoop = alleen het resultaat
+            text: showText ? shortMarkerText(m) : "",
             size: 1,
           };
         })
         .sort((a, b) => a.time - b.time);
       LC.createSeriesMarkers(s, mk);
     }
-    chart.timeScale().fitContent();
+    // Alles in beeld mét ruimte links en rechts, zodat markers op de eerste/laatste candle
+    // niet half buiten de grafiek vallen. Opnieuw bij een andere breedte (tab zichtbaar, venster).
+    const ts = chart.timeScale();
+    const fit = () => {
+      const r = paddedRange(data.length, ts.width(), 32);
+      if (r) ts.setVisibleLogicalRange(r);
+      else ts.fitContent();
+    };
+    fit();
+    let fitW = ts.width();
+    ts.subscribeSizeChange((w) => {
+      if (Math.abs(w - fitW) < 1) return;
+      fitW = w;
+      fit();
+    });
   }
 
   function equityChart(container, curve, initial) {

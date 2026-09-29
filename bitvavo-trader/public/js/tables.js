@@ -12,6 +12,106 @@ export function unsellableWhy(p) {
   );
 }
 
+/** Beursminimum per order als de server geen bedrag noemt (EXCHANGE_MIN_ORDER_QUOTE) */
+const EXCHANGE_MIN_EUR = 5;
+
+const posValue = (p) => (Number(p && p.amount) || 0) * (Number(p && p.currentPrice) || 0);
+
+/** Minimumbedrag uit een engine-tekst ("minimum €5,00", "minimum van € 5,00") of null */
+function minimumFrom(text) {
+  const m = /minimum(?:\s+van)?\s*€\s*(\d[\d.]*(?:,\d+)?)/i.exec(String(text || ""));
+  if (!m) return null;
+  const v = Number(m[1].replace(/\./g, "").replace(",", "."));
+  return v > 0 ? v : null;
+}
+
+/** "15m" → 900000 (ms), onbekend → null */
+function intervalMs(iv) {
+  const m = /^(\d+)([mhdw])$/.exec(String(iv || ""));
+  return m ? Number(m[1]) * { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }[m[2]] : null;
+}
+
+/**
+ * "Toch proberen te verkopen" op een onverkoopbare positie: de engine stuurt geen order
+ * en antwoordt 409 "onverkoopbaar: …". Geeft een begrijpelijke uitleg (i.p.v. die ruwe
+ * reden) en wat er nu gebeurt: automatisch verkopen zodra het weer kan gebeurt alleen
+ * als de bot draait (en in live: live handel is ingeschakeld). Null bij een andere fout.
+ * @returns {{ title: string, why: string, next: string } | null}
+ */
+export function closeRefusalInfo(err, p, snap, fmt) {
+  const msg = String((err && err.message) || "").trim();
+  if (!/^onverkoopbaar\b/i.test(msg)) return null;
+  if (err && err.status !== undefined && err.status !== 409) return null;
+  const min = minimumFrom(msg) ?? minimumFrom(p && p.unsellableReason) ?? EXCHANGE_MIN_EUR;
+  const base = String((p && p.market) || "").split("-")[0] || "munt";
+  const live = !!snap && snap.mode === "live";
+  const running = !!snap && !!snap.running;
+  const armed = live && !!snap.liveArmed;
+  const title = "Verkoop geweigerd: onder het Bitvavo-minimum";
+  if (/hoeveelheid/i.test(msg)) {
+    // Minimum in munten: een hogere koers helpt niet, deze hoeveelheid blijft te klein
+    return {
+      title,
+      why: `Er is niets verkocht: Bitvavo accepteert geen verkooporder voor zo'n kleine hoeveelheid ${base} (onder het minimum per order).`,
+      next: "Een hogere koers verandert daar niets aan, dus ook de bot kan deze positie niet verkopen. Schrijf hem af (knop Afschrijven) — de coins blijven op je account staan.",
+    };
+  }
+  const why = `Er is niets verkocht: Bitvavo accepteert geen verkooporder onder ${fmt.eur(min)}, en deze positie is nu ongeveer ${fmt.eur(
+    posValue(p),
+  )} waard.`;
+  let next;
+  if (running && (!live || armed)) {
+    next = `De bot onthoudt je verkoopopdracht en verkoopt de positie automatisch zodra die weer minstens ${fmt.eur(
+      min,
+    )} waard is. Wil je niet wachten, schrijf hem dan af (knop Afschrijven).`;
+  } else {
+    const need = !running && live ? "de bot draait én live handel is ingeschakeld" : !running ? "de bot draait" : "live handel is ingeschakeld";
+    const todo = !running && live ? "Start de bot en schakel live handel in" : !running ? "Start de bot" : "Schakel live handel in";
+    next = `Automatisch verkopen zodra de positie weer minstens ${fmt.eur(min)} waard is, gebeurt alleen als ${need}. ${todo}, of schrijf de positie af (knop Afschrijven).`;
+  }
+  return { title, why, next };
+}
+
+/**
+ * Afschrijven geweigerd omdat de positie inmiddels wél verkoopbaar is (de server
+ * controleert eerst de actuele koers en antwoordt dan 409). Null bij een andere fout.
+ * `p` = de positie (bij voorkeur uit de verse staat, voor de actuele waarde).
+ * @returns {{ title: string, text: string } | null}
+ */
+export function writeOffRefusalInfo(err, p, fmt) {
+  const msg = String((err && err.message) || "").trim();
+  if (err && err.status !== undefined && err.status !== 409) return null;
+  if (!/\b(?:inmiddels|weer|wel)\s+(?:(?:wel|weer)\s+)?verkoopbaar|gewoon verkocht worden/i.test(msg)) return null;
+  // Waarde volgens de server (verse koers), anders volgens de (verse) staat
+  const said = /~\s*€\s*(\d[\d.]*(?:,\d+)?)/.exec(msg);
+  const value = said ? Number(said[1].replace(/\./g, "").replace(",", ".")) : posValue(p);
+  return {
+    title: "Niet afgeschreven: de positie is weer verkoopbaar",
+    text: `Er is niets afgeschreven. De koers is intussen gestegen${
+      value > 0 ? `: ${(p && p.market) || "de positie"} is nu ongeveer ${fmt.eur(value)} waard` : ""
+    }, dus de positie kan gewoon verkocht worden. Wil je hem kwijt, verkoop hem dan met de knop Sluit bij Open posities.`,
+  };
+}
+
+/** Vervangt de inhoud van een open modal door een uitkomst (geen bevestigknop meer). False zonder modal. */
+function showModalResult(modalEl, title, bodyHtml) {
+  if (!modalEl || typeof modalEl.querySelector !== "function") return false;
+  const h = modalEl.querySelector(".modal-head h3");
+  if (h) h.textContent = title;
+  const body = modalEl.querySelector(".modal-body");
+  if (body) body.innerHTML = bodyHtml;
+  const err = modalEl.querySelector(".modal-error");
+  if (err) err.hidden = true;
+  const ok = modalEl.querySelector('[data-m="ok"]');
+  if (ok) ok.remove();
+  const cancel = modalEl.querySelector('[data-m="cancel"]');
+  if (cancel) {
+    cancel.textContent = "Sluiten";
+    if (typeof cancel.focus === "function") cancel.focus();
+  }
+  return true;
+}
+
 const EMPTY_POS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
 const EMPTY_TRD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>`;
 
@@ -114,14 +214,18 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
             fmt.pct(p.unrealizedPct),
           )}</small></div></td>
           <td class="full" data-label="Stop ↔ doel">${rangeBar(p, trailing)}</td>
-          <td class="full col-act" data-label=""><div class="pos-actions"><button type="button" class="btn btn-sm btn-danger" data-close="${esc(
-            p.id,
-          )}" ${busy ? "disabled" : ""} title="${esc(
-            stuck ? `Verkopen lukt nu niet — ${why}` : "Verkoop deze positie nu tegen marktprijs",
+          <td class="full col-act" data-label=""><div class="pos-actions"><button type="button" class="btn btn-sm btn-danger${
+            closing.has(p.id) ? " busy" : ""
+          }" data-close="${esc(p.id)}" ${busy ? "disabled" : ""} title="${esc(
+            closing.has(p.id) ? "Bezig met verkopen…" : stuck ? `Verkopen lukt nu niet — ${why}` : "Verkoop deze positie nu tegen marktprijs",
           )}">Sluit</button>${
             stuck
-              ? `<button type="button" class="btn btn-sm" data-writeoff="${esc(p.id)}" ${busy ? "disabled" : ""} title="${esc(
-                  "Bot stopt met beheren; de coins blijven op je account; de inleg wordt als verlies geboekt",
+              ? `<button type="button" class="btn btn-sm${writingOff.has(p.id) ? " busy" : ""}" data-writeoff="${esc(p.id)}" ${
+                  busy ? "disabled" : ""
+                } title="${esc(
+                  writingOff.has(p.id)
+                    ? "Bezig met afschrijven (actuele koers controleren)…"
+                    : "Bot stopt met beheren; de coins blijven op je account; de inleg wordt als verlies geboekt",
                 )}">Afschrijven</button>`
               : ""
           }</div></td>
@@ -197,6 +301,38 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
     ctx.toast(fallbackMsg, fallbackKind);
   }
 
+  /** Bezig-melding onderaan een open modal (null zonder modal) */
+  function busyNote(modalEl, text) {
+    const body = modalEl && typeof modalEl.querySelector === "function" ? modalEl.querySelector(".modal-body") : null;
+    if (!body || typeof body.appendChild !== "function" || typeof document === "undefined") return null;
+    const el = document.createElement("p");
+    el.className = "modal-busy muted";
+    el.setAttribute("role", "status");
+    el.innerHTML = `<span class="spinner"></span> ${esc(text)}`;
+    body.appendChild(el);
+    return el;
+  }
+
+  /**
+   * Afschrijven telt als gerealiseerd verlies van vandaag: het kan de dagelijkse
+   * verlieslimiet raken (dan vandaag geen nieuwe trades) en start de afkoelperiode
+   * na verlies voor deze markt. Getallen uit de risico-instellingen als die er zijn.
+   */
+  function writeOffRiskHtml(snap, p) {
+    const risk = (snap && snap.config && snap.config.risk) || {};
+    const limit = isNum(risk.dailyLossLimitPct) && risk.dailyLossLimitPct > 0 ? ` (${esc(fmt.num(risk.dailyLossLimitPct, 1))}%)` : "";
+    const n = isNum(risk.cooldownCandlesAfterLoss) ? risk.cooldownCandlesAfterLoss : null;
+    const iv = snap && snap.config ? snap.config.interval : null;
+    const ms = intervalMs(iv);
+    const cool =
+      n === 0
+        ? ""
+        : ` Ook start de <strong>afkoelperiode na verlies</strong> voor ${esc(p.market)}: de bot koopt die markt ${
+            n ? `de komende ${esc(n)} ${n === 1 ? "candle" : "candles"}${iv ? ` van ${esc(iv)}` : ""}${ms ? ` (≈ ${esc(fmt.duration(n * ms))})` : ""}` : "een tijdje"
+          } niet.`;
+    return `Dat verlies telt als <strong>gerealiseerd verlies van vandaag</strong>. Het kan de <strong>dagelijkse verlieslimiet</strong>${limit} laten afgaan: dan opent de bot vandaag <strong>geen nieuwe trades</strong> meer.${cool}`;
+  }
+
   function confirmClose(id) {
     const snap = ctx.getState();
     const p = ((snap && snap.positions) || []).find((x) => x.id === id);
@@ -217,7 +353,7 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
           fmt.pct(p.unrealizedPct),
         )})</strong></p>`,
       confirmText: p.unsellable ? "Toch proberen te verkopen" : "Nu verkopen",
-      onConfirm: async () => {
+      onConfirm: async (_value, modalEl) => {
         closing.add(id);
         renderPositions();
         try {
@@ -229,6 +365,16 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
               : [`${p.market} gesloten`, "success"],
           );
           await refreshState();
+        } catch (err) {
+          // Onder het beursminimum: geen ruwe engine-reden, maar uitleg + wat er nu gebeurt
+          const info = closeRefusalInfo(err, p, ctx.getState() || snap, fmt);
+          if (!info) throw err;
+          await refreshState();
+          const now = ctx.getState() || snap;
+          const fresh = closeRefusalInfo(err, ((now && now.positions) || []).find((x) => x.id === id) || p, now, fmt) || info;
+          const html = `<p class="neg"><strong>${esc(fresh.why)}</strong></p><p>${esc(fresh.next)}</p>`;
+          if (!showModalResult(modalEl, fresh.title, html)) throw new Error(`${fresh.why} ${fresh.next}`);
+          return false; // venster blijft open met de uitleg (knop Sluiten)
         } finally {
           closing.delete(id);
           renderPositions();
@@ -255,18 +401,31 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
               live ? " — je kunt ze later zelf op Bitvavo verkopen (of bijkopen tot boven het minimum)" : ""
             }.</li>
           <li>De inleg van <strong class="mono">${esc(fmt.eur(p.costQuote))}</strong> wordt als <strong>verlies</strong> geboekt (−100%) in je P&amp;L en trades.</li>
+          <li>${writeOffRiskHtml(snap, p)}</li>
         </ul>
-        <p class="muted">Dit kan niet ongedaan worden gemaakt.</p>`,
+        <p class="muted">Dit kan niet ongedaan worden gemaakt. De bot controleert eerst de actuele koers: is de positie inmiddels weer verkoopbaar, dan wordt er niets afgeschreven.</p>`,
       confirmText: "Afschrijven",
-      onConfirm: async () => {
+      onConfirm: async (_value, modalEl) => {
         writingOff.add(id);
         renderPositions();
+        // De server haalt eerst een verse koers op (live ook het saldo): dat kan even duren
+        const note = busyNote(modalEl, "Actuele koers controleren en afschrijven…");
         try {
           const trade = await api.writeOffPosition(id);
           const loss = trade && isNum(trade.pnlQuote) ? trade.pnlQuote : -(Number(p.costQuote) || 0);
           tradeToast(trade, [`${p.market} afgeschreven: ${fmt.eurSigned(loss)} als verlies geboekt; de coins blijven op je account`, "warn"]);
           await refreshState();
+        } catch (err) {
+          // Geweigerd: de staat kan veranderd zijn (koers gestegen, positie al gesloten)
+          await refreshState();
+          const now = ctx.getState();
+          const fresh = ((now && now.positions) || []).find((x) => x.id === id);
+          const info = writeOffRefusalInfo(err, fresh || p, fmt);
+          if (!info) throw err;
+          if (!showModalResult(modalEl, info.title, `<p>${esc(info.text)}</p>`)) throw new Error(info.text);
+          return false; // venster blijft open met de uitleg (knop Sluiten)
         } finally {
+          if (note) note.remove();
           writingOff.delete(id);
           renderPositions();
         }

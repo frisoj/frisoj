@@ -20,7 +20,9 @@ User-facing text (UI, log messages, reasons, errors shown in the dashboard) is
 Shared helpers already written (do not modify, just use): `src/core/util.ts` —
 `dayKey(ms)` (YYYY-MM-DD Europe/Amsterdam, for daily limits), `newId(prefix)`,
 `clamp`, `isClosedCandle(candle, interval, now)`, `closedCandles(candles, interval, now)`,
-`sleep`, `mulberry32(seed)` (deterministic PRNG), `hashString(s)`.
+`sleep`, `mulberry32(seed)` (deterministic PRNG), `hashString(s)`. The exchange
+minimum has exactly one rule, in `src/exchange/minimums.ts` (see
+[Exchange minimum and pending exits](#exchange-minimum-and-pending-exits)).
 
 Commands: `npx tsc --noEmit -p .` (typecheck), `npx vitest run [path]` (tests,
 Node environment, `tests/**/*.test.ts`).
@@ -40,6 +42,8 @@ Node environment, `tests/**/*.test.ts`).
  In the app, backtest / optimize / walk-forward run in a worker thread
  (src/server/heavyRunner.ts) so the engine, stop-losses, order polling, SSE
  and the kill switch keep responding while they compute.
+ While the engine is NOT running, a light price monitor (startPriceMonitor)
+ only refreshes prices + equity and emits "price" / "snapshot" events.
 ```
 
 ## Signal timing (no lookahead — everyone must respect this)
@@ -106,6 +110,9 @@ Node environment, `tests/**/*.test.ts`).
 * The same candle is never traded twice per market, also not after a restart
   or a changed market list (`lastEvaluated` is persisted; an entry at or after
   the close of the signal candle blocks a repeat).
+* While stopped (before the first Start, after Stop, after the kill switch) there
+  are no ticks; the price monitor refreshes prices only (see A7). Stops and
+  take-profits are NOT evaluated then.
 
 ### `candlesHeld`
 
@@ -158,11 +165,23 @@ entries in that market while `now − lastLossAt < cooldownCandlesAfterLoss × i
 
 ### Exchange minimum and pending exits
 
-* The **exchange** minimum (`MarketInfo.minOrderQuote` / `minOrderBase`,
-  default €5 when there is no MarketInfo) applies to buys **and** sells.
-  `risk.minOrderQuote` is a user setting that only adds an extra floor for
-  entries; it never lowers or replaces the exchange minimum in brokers,
-  engine or backtest (`exchangeMinOrderQuote()` in the simulator).
+* **One rule for the exchange minimum** (`src/exchange/minimums.ts`, used by
+  `PaperBroker`, `LiveBroker`, the backtest simulator, the `RiskManager` and
+  `BitvavoClient.markets()`; the engine's `exchangeMinimums()` applies the same
+  rule inline):
+  * `exchangeMinQuote(info)` = `MarketInfo.minOrderQuote` when it is finite and
+    `> 0`, otherwise `EXCHANGE_MIN_ORDER_QUOTE` (€5, `src/core/defaults.ts`). A
+    missing MarketInfo or a missing, NaN, 0 or negative value means **unknown**,
+    never "no minimum";
+  * `exchangeMinBase(info)` = `MarketInfo.minOrderBase` when finite and `> 0`,
+    otherwise 0 (then only the EUR minimum counts).
+* The exchange minimum applies to buys **and** sells. `risk.minOrderQuote` is a
+  user setting that only adds an extra floor for entries
+  (`minOrder = max(exchangeMin, risk.minOrderQuote)` in `planEntry`); it never
+  lowers or replaces the exchange minimum in brokers, engine or backtest.
+  `exchangeMinOrderQuote()` / `DEFAULT_EXCHANGE_MIN_QUOTE` in the simulator are
+  aliases of the same rule. The dashboard mirrors it (`EXCHANGE_MIN_EUR` = 5 in
+  `header.js` / `tables.js`; per-market values from `/api/markets` when valid).
 * Backtest: an exit is only booked when `amount × price >= minimum` (price
   before slippage). Otherwise the sell is **pending**: no more stops,
   take-profit or signals; `candlesHeld` keeps counting; the sell is retried
@@ -174,13 +193,31 @@ entries in that market while `now − lastLossAt < cooldownCandlesAfterLoss × i
 * Engine: `exitPosition` sends **no order** when the sell would fall below the
   minimum (`dustReason`: live rounds the amount down first; value below the
   quote minimum or amount below the base minimum). The exit reason is kept in
-  `pendingExit` and the position is marked unsellable ("engine"); a broker
-  rejection whose `error` starts with `"ONVERKOOPBAAR:"` marks it unsellable
-  too ("broker"). With a pending exit the engine evaluates no stops, targets or
-  signals for that position and retries the sell every tick; it sells as soon
-  as `amount × price >= minimum`. The snapshot shows
-  `OpenPositionView.unsellable` / `unsellableReason`; the user can
-  `writeOffPosition(id)`. The message is logged once per episode, not every tick.
+  `pendingExit` and the position gets an unsellable record of kind `"engine"`.
+  A broker rejection whose `error` starts with `"ONVERKOOPBAAR:"` (the brokers'
+  own minimum check, or Bitvavo code 217/212 / a "minimum" message relayed by
+  the `LiveBroker`) gives a record of kind `"broker"` with the refused position
+  value. With a pending exit the engine evaluates no stops, targets or signals
+  for that position and retries the sell on every tick.
+* **Hysteresis** (`UNSELLABLE_HYSTERESIS` = 1.01, `REFUSAL_RETRY_MS` = 5 min), so a
+  price wobbling around €5 cannot cause a stream of orders or log lines:
+  * own check: the sell is sent as soon as `amount × price >= minimum`, but the
+    "onverkoopbaar" episode (and the "weer verkoopbaar" log line) only ends at
+    ≥ 1% above the minimum;
+  * after a broker refusal the engine re-sends **automatically** only when
+    `amount × price >= max(highest refused value, minimum) × 1.01`, and at most
+    once per 5 minutes per position. A `"broker"` record is never replaced by an
+    `"engine"` record (a dip below the minimum keeps the highest refused value);
+    it is only cleared by a successful (partial) sale;
+  * explicit user actions (`closePosition`, `killSwitch`) always try at once;
+  * the "onverkoopbaar" message is logged once per episode (and for every
+    explicit action), not every tick.
+* The snapshot shows `OpenPositionView.unsellable` / `unsellableReason`,
+  evaluated against the **current** price (`unsellableNow`: own check plus a
+  broker refusal still in force). The reason only promises an automatic sale
+  when the bot is running and (live) armed; otherwise it says what the user can
+  do (start/arm the bot, close manually or write off). The user can
+  `writeOffPosition(id)` (see A7).
 * Any other failed sell (rejected, live not armed, unknown outcome, coins in
   an open order, balance still being checked) also leaves the position open
   with a pending exit that is retried on the next tick.
@@ -196,14 +233,19 @@ producers should fill them, consumers must work without them.
 | `HaltStatus` | `dailyLimit?` | `true` when the halt is the daily loss limit; the engine then keeps it until the day rollover. |
 | `Broker` | `lookupOrder?(market, clientOrderId)` | Look up an earlier order: `null` = Bitvavo does not know it (code 240, one attempt); **throws** while the outcome is still unknown (network / rate limit); a still-open order is cancelled first and the confirmed final state is returned. |
 | `Broker` | `setCosts?(takerFee, slippagePct)` | Keep the broker's fee (and paper slippage) equal to `config.risk`. The engine calls it on construction, `start()` and every `updateConfig`. |
-| `KillResult` | `{ closed, failed[] }` | Result of the kill switch: number of positions sold and every position (or unknown buy order) that was NOT closed, with a Dutch reason. |
-| `AccountState` | `totalReturnPct?`, `dayReturnPct?` | Returns in % computed by the engine, correct after skimming; the UI prefers them. |
-| `OpenPositionView` | `unsellable?`, `unsellableReason?` | The position cannot be sold right now (below the exchange minimum), with a Dutch explanation. |
-| `EquityPoint` | `skimmed?` | Live: cumulative skimmed profit at that point; charts show `equity + skimmed`. |
+| `KillResult` | `{ closed, failed[] }` | Result of the kill switch: number of positions sold and every position (or unknown buy order) that was NOT closed, with a Dutch reason (a position written off meanwhile is listed as failed, "afgeschreven: …"). |
+| `AccountState` | `totalPnlQuote?`, `dayPnlQuote?`, `totalReturnPct?`, `dayReturnPct?` | Result in EUR and % computed by the engine (see [Ledger, capital limit & returns](#ledger-capital-limit--returns)): correct after skimming and after a changed capital limit. The UI always prefers them. |
+| `OpenPositionView` | `unsellable?`, `unsellableReason?` | The position cannot be sold right now (below the exchange minimum, or a broker refusal still in force), with a Dutch explanation. |
+| `EquityPoint` | `skimmed?` | Live: **net transfers out** of the trading budget at that point (skimmed profit + capital returned by a lower limit − capital added by a higher limit). Charts show `equity + skimmed`, so a transfer is never a jump or a dip. |
 | `BacktestResult` | `note?` | Dutch explanation when the period was shortened (short history). |
 | `BacktestResult` | `stuckTrades?` | Trades whose sell was first refused because the position was worth less than the minimum. |
 | `Heatmap` | `best?`, `tested?`, `scored?`, `positive?` | Per cell: best score, sampled combinations, combinations with enough trades, profitable ones. `values` itself is the **median** of the scored combinations (null = not tested or too few trades). |
 | `AppInfo` | `paperStartingCapital?` | Starting capital of paper mode (what `POST /api/paper/reset` resets to). |
+
+`ExitReason` also has the member `"write-off"` (an unsellable position written off by
+the user; nothing was sold). Consumers that map exit reasons must handle it
+(`EXIT_REASON_LABELS` in `src/engine/format.ts`: "afgeschreven"; `public/js/format.js`:
+"Afgeschreven").
 
 Optional fields from earlier (round 1), still part of the contract:
 `EngineSnapshot.unknownOrders?` (live buy orders with unknown outcome — while
@@ -223,6 +265,9 @@ acknowledged), `EngineSnapshot.skimmedQuote?`, and the optional
 * `src/exchange/precision.ts` — `roundPrice(price: number, m: MarketInfo, mode?: "down"|"up"|"nearest"): number`,
   `roundAmount(amount: number, m: MarketInfo): number` (floors), `roundQuote(q: number, m: MarketInfo): number` (floors),
   `toSignificant(value: number, digits: number, mode?): number`, `formatDecimal(value: number, decimals: number): string` (no exponent notation — Bitvavo rejects `1e-7`).
+* `src/exchange/minimums.ts` — `exchangeMinQuote(info?): number` (valid `minOrderQuote` > 0, else `EXCHANGE_MIN_ORDER_QUOTE` = 5),
+  `exchangeMinBase(info?): number` (valid `minOrderBase` > 0, else 0). The single exchange-minimum rule; see
+  [Exchange minimum and pending exits](#exchange-minimum-and-pending-exits).
 * `src/exchange/bitvavoClient.ts` — `export class BitvavoClient`:
   ```ts
   constructor(opts?: { apiKey?: string; apiSecret?: string; baseUrl?: string; accessWindow?: number;
@@ -232,7 +277,7 @@ acknowledged), `EngineSnapshot.skimmedQuote?`, and the optional
   rateLimitRemaining: number | null
   rateLimitFor(scope: "public" | "private"): RateLimitStatus
   time(): Promise<number>; syncTime(): Promise<number>
-  markets(): Promise<MarketInfo[]>
+  markets(): Promise<MarketInfo[]>   // minOrderQuote via exchangeMinQuote: missing / ≤ 0 → 5
   candles(market: string, interval: Interval, opts?: { limit?: number; start?: number; end?: number }): Promise<Candle[]> // ASCENDING
   ticker24h(market?: string): Promise<Ticker24h[]>
   tickerPrice(market?: string): Promise<{ market: string; price: number }[]>
@@ -272,7 +317,10 @@ acknowledged), `EngineSnapshot.skimmedQuote?`, and the optional
   * `error` starting with **`"UITKOMST ONBEKEND"`** (status `"new"`, or `"partiallyFilled"` if something filled)
     = the order may still (further) execute. The engine keys on this prefix;
   * a sell below the exchange minimum (also after clamping to the available balance, which it does only for a
-    shortfall ≤ 5%) is **not sent**: `"rejected"` with `error` starting with **`"ONVERKOOPBAAR:"`**;
+    shortfall ≤ 5%) is **not sent**: `"rejected"` with `error` starting with **`"ONVERKOOPBAAR:"`**. When Bitvavo
+    itself refuses a sell as below the minimum (code 217 / 212, or — without a known code — a message about the
+    minimum; never on an unknown outcome), the result is the same `"ONVERKOOPBAAR:"` rejection (the engine then
+    applies its hysteresis). A buy below the minimum is a plain `"rejected"`;
   * `lookupOrder` keeps a partially filled, then ended order's final status (`"cancelled"`/`"expired"` with
     `filledAmount > 0`), where `placeMarketOrder` reports `"partiallyFilled"`;
   * a fill price more than `maxSlippagePct` from the reference price adds a warning to `error`.
@@ -325,11 +373,14 @@ acknowledged), `EngineSnapshot.skimmedQuote?`, and the optional
   * the position must still be **sellable at its stop**: required size =
     `max(ceilCents(minOrder), ceilCents(exchangeMin × (1 + takerFee) × entry / stop × 1.03), minOrderBase × entry × (1 + takerFee) × 1.03)`
     (1.03 = buffer for a gap through the stop, a different fill and amount rounding).
-    `exchangeMin` = `MarketInfo.minOrderQuote`, or `max(risk.minOrderQuote, 5)` without MarketInfo; `minOrder = max(exchangeMin, risk.minOrderQuote)`;
+    `exchangeMin` = `exchangeMinQuote(market)` (valid `MarketInfo.minOrderQuote` > 0, otherwise €5 — never `risk.minOrderQuote`),
+    `minOrderBase` = `exchangeMinBase(market)`; `minOrder = max(exchangeMin, risk.minOrderQuote)` (the setting can only raise the entry floor);
   * a smaller risk-sized position is raised to that size ("opgehoogd naar minimum") **only** if it fits the position,
     exposure and cash caps **and** its risk stays ≤ 1× the risk budget (`MAX_BUMP_RISK_MULTIPLE = 1`); otherwise the entry is rejected.
     The risk per trade is never exceeded to reach the minimum.
 * `haltStatus` returns `dailyLimit: true` for the daily loss limit (the engine then keeps the halt until the day rollover).
+  It compares `account.equity` with `account.dayStartEquity`; the engine passes a day-start value chosen so that this
+  percentage equals its own `dayReturnPct` (see [Ledger, capital limit & returns](#ledger-capital-limit--returns)).
 * `updatePosition`: see [Stop raises](#stop-raises-riskmanagerupdateposition).
 * Tests: `tests/risk/*.test.ts`.
 
@@ -339,7 +390,8 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
 * `src/backtest/metrics.ts` — `export function computeMetrics(args: { trades: Trade[]; equityCurve: EquityCurvePoint[]; initialCapital: number; interval: Interval; candles: Candle[]; takerFee: number; exposureCandles: number }): BacktestMetrics`.
 * `src/backtest/simulator.ts` (core) — `BacktestInput`, `BacktestDeps`, `simulate(input, decisions, risk, opts?)`,
   `runBacktestWith(input, resolvedDeps, opts?)`, `effectiveSlippagePct`, `withSpreadCosts`, `spreadFromTicker`,
-  `exchangeMinOrderQuote`, `DEFAULT_EXCHANGE_MIN_QUOTE` (5), `aggregateCandles`, `MAX_CHART_CANDLES` (1500).
+  `exchangeMinOrderQuote` (= `exchangeMinQuote`), `DEFAULT_EXCHANGE_MIN_QUOTE` (alias of `EXCHANGE_MIN_ORDER_QUOTE`, 5),
+  `aggregateCandles`, `MAX_CHART_CANDLES` (1500).
 * `src/backtest/backtester.ts` (public) —
   ```ts
   export interface BacktestInput { market: string; interval: Interval; candles: Candle[]; initialCapital: number;
@@ -375,7 +427,9 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
 * `src/data/reachability.ts` — `export async function isBitvavoReachable(client: BitvavoClient, timeoutMs?: number): Promise<boolean>`.
 * `src/broker/paperBroker.ts` — `export class PaperBroker implements Broker` (`mode = "paper"`):
   `constructor(opts: { startingQuote: number; takerFee: number; slippagePct: number; now?: () => number; quote?: string;
-  minOrderQuote?: number /* exchange minimum, default 5 — never risk.minOrderQuote */; getMarketInfo?: (market) => MarketInfo | undefined | Promise<…> })`,
+  minOrderQuote?: number /* exchange minimum, default EXCHANGE_MIN_ORDER_QUOTE (5); invalid or ≤ 0 → 5 — never risk.minOrderQuote */;
+  getMarketInfo?: (market) => MarketInfo | undefined | Promise<…> /* per-market minimums, same rule */ })` (main.ts passes no
+  `getMarketInfo`: paper uses a flat €5),
   `getBalances()`, `placeMarketOrder()`, `setCosts(takerFee, slippagePct)`, `restore(balances: Balance[]): void`, `reset(startingQuote: number): void`.
   Buy with `amountQuote = Q`: total spent is Q; `fee = Q - Q/(1+takerFee)`; fill price = ref × (1 + slippage); `amount = (Q - fee) / fillPrice`.
   Sell with `amount`: fill price = ref × (1 − slippage); gross = amount × fillPrice; fee = gross × takerFee.
@@ -402,15 +456,18 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
   export class TradingEngine extends EventEmitter {
     constructor(deps: EngineDeps)
     readonly mode: TradingMode
-    start(): Promise<void>; stop(): Promise<void>; tick(): Promise<void>
+    start(): Promise<void>                    // throws "Starten geblokkeerd: noodstop bezig …" while a kill runs
+    stop(): Promise<void>; tick(): Promise<void>
+    startPriceMonitor(): Promise<void>        // price refresh while stopped; refreshes once immediately (main.ts)
+    stopPriceMonitor(): void                  // shutdown
     snapshot(): EngineSnapshot
     updateConfig(partial: Partial<EngineConfig>): EngineConfig
     closePosition(id: string, reason?: ExitReason): Promise<Trade | null>   // null → Dutch reason in lastCloseFailure
     killSwitch(): Promise<KillResult>
-    writeOffPosition(id: string): Trade       // throws "Afschrijven kan …" when not allowed (now)
+    writeOffPosition(id: string): Promise<Trade>  // async (fresh price / balance); rejects "Afschrijven kan …" when not allowed (now)
     acknowledgeUnknownOrders(): void          // user checked Bitvavo: lift the entry block
     acknowledgeStateRecovery(): void          // user checked balances after an unusable state file
-    arm(): void                               // throws "Armen geblokkeerd: …" while stateRecovery is unacknowledged
+    arm(): void                               // throws "Armen geblokkeerd: …" while stateRecovery is unacknowledged or a kill runs
     disarm(): void
     resetPaper(startingCapital: number): void
     readonly liveArmed: boolean
@@ -425,41 +482,121 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
   * **Live, not armed**: evaluates everything but places NO orders ("zou kopen …" / "zou verkopen …"). That includes
     automatic exits (stop-loss!) on existing positions — they stay pending until armed. Explicit user actions
     (`closePosition`, `killSwitch`) do sell while disarmed. Arming is not persisted: after a restart live is disarmed.
-  * **Ledger & capital limit**: the engine keeps its own ledger (cash, positions) in both modes. Live: cash + cost of
-    open positions stays within `startingCapital`; profit above it is **skimmed** (`skimmedQuote`, `skimmedToday`):
-    start and day-start equity are lowered by the excess and returns are computed with it
-    (`totalReturnPct`, `dayReturnPct`, `EquityPoint.skimmed`), so skimming is never a loss and never trips the daily
-    limit. A changed `CAPITAL_LIMIT_EUR` between runs is rebased on restore (persisted `capitalLimitQuote`).
+  * **Ledger, capital limit & returns**: see [below](#ledger-capital-limit--returns).
   * **Stop / kill**: `stop()` and `killSwitch()` bump a stop generation synchronously; a tick requested before that
     opens no new positions any more, even halfway through.
+  * **Price monitor while stopped** (`startPriceMonitor()`, called once by main.ts; `stopPriceMonitor()` on shutdown):
+    while the engine is not running (before the first Start, after Stop, after the kill switch) it runs every
+    `pollMs` and ONLY fetches `feed.getPrice` for the configured markets and the markets with open positions,
+    updates equity / unrealised P&L, records an equity point (throttled) and emits `price` + `snapshot`. No
+    decisions, no orders, no balance calls. The first refresh runs immediately, so positions restored from disk
+    are not valued at entry price for long. It pauses while the engine runs (the tick does this) and skips a round
+    while a tick is in flight.
+  * **Equity points** (`recordEquity`): at most one per minute (forced on every booked trade), at most 2000
+    (thinned, the newest kept), and **never** while an open position has no fetched price yet — such a point would
+    value it at entry price forever (it is skipped; the point after a limit rebase is deferred until prices are known).
   * **Unknown buy outcome** (live): no retry and no position; ALL new entries pause (persisted `unknownOrders`)
     until `broker.lookupOrder` finds the order (the filled part is booked as a position with a stop; a partial,
-    still-open fill is booked right away), Bitvavo reports it unknown on 3 ticks in a row (= not placed), or the user
-    calls `acknowledgeUnknownOrders()` (coins bought by such an order are then NOT managed).
+    still-open fill is booked right away), Bitvavo reports it as not found (see the rule below, = not placed), or
+    the user calls `acknowledgeUnknownOrders()` (coins bought by such an order are then NOT managed).
   * **Unknown sell outcome** (live): never a second sell for that position until resolved (persisted `unknownSells`),
-    via `lookupOrder`, or — without it — once no coins of that asset sit in an open order.
+    via `lookupOrder` (same "not found" rule), or — without it — once no coins of that asset sit in an open order.
+  * **"Not found" rule** (buys and sells, time-based): a `null` from `lookupOrder` is only **counted** when the
+    previous counted one is at least `pollMs / 2` ago (so a quick Stop/Start or a restart adds nothing; `nullCount`
+    and `nullAt` are persisted). The order counts as not placed after ≥ `NOT_FOUND_CONFIRMATIONS` (3) counted
+    observations in a row **and** at least `max(60 s, 3 × pollMs)` after the outcome became unknown (`at`). A
+    lookup that throws, or an answer that is still open/unknown, resets the count. The kill switch and
+    `closePosition` look orders up without counting nulls.
   * **Coins missing on Bitvavo**: only booked as sold after two observations (two ticks, or two balance reads for an
     explicit close); a missing part is booked separately; coins stuck in an open order are not sold (the exit
     stays pending) and are never booked as gone.
   * **Unsellable positions**: see [Exchange minimum and pending exits](#exchange-minimum-and-pending-exits).
-    `writeOffPosition(id)` is only allowed for an unsellable position and not while an order is in flight or an
-    unknown-outcome sell for it is pending: the position is no longer managed, the full cost is booked as a loss
-    (`pnlPct −100`, exit reason `"manual"`), cash is unchanged and the coins stay on the account.
-  * **Kill switch**: synchronously stops and disarms; then (under the lock) resolves unknown buys/sells ("not found"
-    does not count towards the 3 ticks), sells every position explicitly and returns a `KillResult` with every
-    position still open plus every still-unknown buy order in `failed` (Dutch reasons: unsellable, rejected, unknown
-    outcome, coins in an open order, …). The bot stops even when sells fail.
+  * **Write-off** (`writeOffPosition(id): Promise<Trade>`, async):
+    * refused (rejects `"Afschrijven kan …"`, route → 409) while a kill runs, while a `closePosition` for that
+      position is requested or running, while any broker order is in flight, or while an unknown-outcome sell for it
+      is pending — checked before and again after the awaits below;
+    * right before deciding it fetches a **fresh price** (`feed.getPrice`; none → refused, "probeer het zo
+      opnieuw") and, live, a **fresh balance** (`broker.getBalances`; unreadable → refused; less than 95% of the
+      amount available → refused with "sluit de positie in plaats daarvan", because closing updates the ledger);
+    * only allowed when the position is unsellable on that fresh data (own minimum check on
+      `min(amount, available)`, or a broker refusal still in force); otherwise refused with the current value
+      ("… kan gewoon verkocht worden: sluit de positie");
+    * books a `Trade` with `exitReason: "write-off"`, `proceedsQuote` 0, `pnlQuote = −costQuote`, `pnlPct −100`,
+      `feesQuote` = entry fee, `exitPrice` = the fresh price. It is a **realised loss**: `realizedPnl` and
+      `realizedPnlToday` drop by the cost and `lastLossAt[market]` is set (cool-down). Cash is unchanged and the
+      coins stay on the account; equity loses the position's value, so the write-off can trip the **daily loss
+      limit** (on the next halt check). `tradesToday` is not changed;
+    * the id is remembered (`writtenOff`): a racing `closePosition` / `killSwitch` never reports it as sold
+      (`lastCloseFailure` / `KillResult.failed`: "afgeschreven: er is niets verkocht, de coins staan nog op je account").
+  * **Kill switch**: synchronously increments `killsInProgress`, stops (stop generation, timer) and disarms. While a
+    kill runs, `arm()` throws "Armen geblokkeerd: noodstop bezig …", `start()` throws "Starten geblokkeerd: noodstop
+    bezig …" and `writeOffPosition` is refused. Under the lock it resolves unknown buys/sells ("not found" is not
+    counted), sells every position explicitly at a fresh price (fallback: last known price) and returns a `KillResult` with every position still
+    open, every position written off meanwhile and every still-unknown buy order in `failed` (Dutch reasons:
+    unsellable, rejected, unknown outcome, coins in an open order, afgeschreven, …). In `finally` it calls `stop()`
+    and then sets `armed = false` again: **a kill always ends stopped and disarmed**, also when a sell fails or
+    something throws. The error log only says "sluit handmatig" when something other than unsellable/written-off
+    positions failed. After the kill the price monitor resumes.
   * **Daily loss limit** stays in force until the day rollover (persisted `haltedDayKey`), even if positions recover.
     The rollover waits for a current price of every open position.
   * **Unusable state file**: the engine starts with an empty ledger, sets `stateRecovery` (persisted) and blocks
-    `arm()` until `acknowledgeStateRecovery()`, which also unblocks the store's writes.
+    `arm()` until `acknowledgeStateRecovery()`, which also unblocks the store's writes. The paper-mode message does
+    not mention Bitvavo balances.
   * Broker costs follow the risk settings (`broker.setCosts`) on construction, `start()` and every `updateConfig`.
-* Persisted state (`PersistedState`, `version: 1`): the required fields plus the optional `capitalLimitQuote`,
-  `lastEvaluated` (per interval), `unknownOrders` (with `stopDist`, `tpDist`, `entryReason`, `positionId`, `bookedAmount`),
-  `haltedDayKey`, `skimmedQuote`, `stateRecovery`; engine-only extras (not in `types.ts`, older files load fine):
-  `unknownSells`, `skimmedToday`, and a `nullCount` per unknown order. Paper mode also stores `paperBalances`.
-  File: `<DATA_DIR>/state-<mode>.json`.
-* Tests: `tests/engine/*.test.ts` (use PaperBroker/SimulatedFeed if present, otherwise inline fakes; inject `decide` for deterministic behaviour).
+
+#### Ledger, capital limit & returns
+
+The engine keeps its own ledger (cash, positions) in both modes. Money moved into or out of the trading budget is a
+**deposit / withdrawal, never profit or loss**.
+
+* `account.startingEquity` = **capital given to the bot**: the paper start capital or the live `CAPITAL_LIMIT_EUR`,
+  plus the fresh part of later limit raises. Skimming never lowers it.
+* Live: cash + cost of open positions stays within the limit. After every booked exit, `enforceCapitalLimit` moves
+  the cash above `limit − openCost` out of the budget: first as **capital returned** (`capitalReturned`,
+  `returnedToday`) up to `capitalPending` (capital that was in open positions above a lowered limit), the rest as
+  **skimmed profit** (`skimmedQuote`, `skimmedToday`; the dashboard's "afgeroomd"). `capitalPending` is dropped once
+  no positions remain (what did not come back was a loss). Paper mode has no limit and no transfers.
+* **Limit changed between runs** (`rebaseCapitalLimit` on restore, persisted `capitalLimitQuote`):
+  * raise → cash grows by `delta = min(raise, max(0, room − cash))` (room = `limit − openCost`). The delta first
+    re-deposits capital that went back by earlier lowerings (`capitalReturned −= min(delta, capitalReturned)`); only
+    the rest is new capital (`capitalAdded +=`, `startingEquity +=`). For the day, it first cancels `returnedToday`;
+    the rest is added to `addedToday`;
+  * lower → the budget becomes min(new limit, what the bot has): cash drops to at most `room`, the difference is
+    `capitalReturned` / `returnedToday`; cost in open positions above the new limit becomes `capitalPending`;
+  * same limit → no-op (also with negative cash from a late-filled buy: that is never a deposit);
+  * a lower → raise round trip therefore never dilutes the daily or total %.
+* **Returns** (`updateEquity`):
+  * `totalPnlQuote = equity + skimmedQuote + capitalReturned − startingEquity`;
+    `totalReturnPct = totalPnlQuote / startingEquity × 100`;
+  * `dayPnlQuote = equity + skimmedToday + returnedToday − addedToday − dayStartEquity`;
+    `dayReturnPct = dayPnlQuote / dayBase × 100` with `dayBase = dayStartEquity + addedToday − returnedToday`
+    (the capital actually traded today: a mid-day lowering shrinks the base);
+  * the risk manager gets `AccountSnapshot.dayStartEquity = riskDayStartEquity()`, chosen so that its
+    `(equity − E) / E` equals `dayReturnPct`: the halt uses the same % as the dashboard, and a transfer is never
+    counted as a loss (skimming never trips the daily limit; a lower limit only makes an existing loss a larger %
+    of the smaller budget that is actually traded);
+  * `EquityPoint.skimmed` (live) = net transfers out = `skimmedQuote + capitalReturned − capitalAdded`; charts show
+    `equity + skimmed`. After a rebase a new point is recorded once every open position has a real price.
+  * Paper: `totalPnlQuote = equity − startingEquity`, `dayPnlQuote = equity − dayStartEquity`.
+
+#### Persisted state
+
+* `PersistedState` (`version: 1`): the required fields plus the optional `capitalLimitQuote`, `lastEvaluated`
+  (per interval), `unknownOrders` (with `stopDist`, `tpDist`, `entryReason`, `positionId`, `bookedAmount`),
+  `haltedDayKey`, `skimmedQuote`, `stateRecovery`. Engine-only extras (not in `types.ts`, older files load fine):
+  `unknownSells`, `skimmedToday`, `ledgerVersion` (2 = `startingEquity` is the capital given to the bot),
+  `capitalAdded` / `addedToday`, `capitalReturned` / `returnedToday`, `capitalPending`, and per unknown order
+  `nullCount` / `nullAt` (not-found observations) and `bookedQuote` / `bookedFee` (part already booked). Paper mode
+  also stores `paperBalances`. File: `<DATA_DIR>/state-<mode>.json`.
+* A file without `ledgerVersion` (older rounds lowered start and day-start equity by the skimmed profit) is
+  converted on load: `startingEquity += skimmedQuote`, `dayStartEquity += skimmedToday`. When the old value was
+  clamped (≤ 1e-6, round 2), the persisted `capitalLimitQuote` (fallback: the configured limit) is used instead and
+  a warning says the total return is an estimate.
+
+#### Engine tests
+
+* `tests/engine/*.test.ts` (use PaperBroker/SimulatedFeed if present, otherwise inline fakes; inject `decide` for deterministic behaviour;
+  `round3Safety` / `round4Safety` hold the review repro scenarios as regression tests).
 
 ### A8 — Config, HTTP server, SSE, scanner, worker, main entry
 * `src/config.ts` — `export interface AppConfig { mode: TradingMode; dataSource: "auto" | DataSource; host: string; port: number;
@@ -473,11 +610,12 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
   Precedence: defaults → `.env` (`MARKETS`, `INTERVAL`) → **settings saved in the dashboard**. When saved settings
   override `MARKETS`/`INTERVAL` from `.env`, `loadConfig` warns at startup. Live mode requires API keys, a non-simulated
   data source and a `DASHBOARD_TOKEN` on a non-loopback `HOST`; live never autostarts.
-* `src/main.ts` — builds feed, broker (PaperBroker after `repairRiskConfig`; LiveBroker + `syncAccountFees`, which
-  copies the account's real fees into the risk config and the broker), `StateStore`, `TradingEngine`, the heavy-job
-  runner and the HTTP server; graceful shutdown via `src/server/shutdown.ts` (live: waits up to 90 s while
-  `engine.orderInFlight`). **Temporary:** `refuseLiveUntilReviewed()` refuses `TRADING_MODE=live` until the review
-  is closed (see `docs/REVIEW-STATUS.md`); update this line when it is removed.
+* `src/main.ts` — builds feed, broker (PaperBroker after `repairRiskConfig`, without `getMarketInfo`; LiveBroker +
+  `syncAccountFees`, which copies the account's real fees into the risk config and the broker), `StateStore`,
+  `TradingEngine` (+ `attachTerminalLog`), starts the price monitor (`engine.startPriceMonitor()`, one refresh right
+  away), the heavy-job runner and the HTTP server; graceful shutdown via `src/server/shutdown.ts` (stops the monitor,
+  the worker and the engine; live: waits up to 90 s while `engine.orderInFlight`). The temporary live-mode block
+  used during the code review has been removed after the review closed (see `docs/REVIEW-STATUS.md`).
 * `src/server/heavyRunner.ts` + `heavyWorker.mjs` + `heavyWorkerImpl.ts` — backtest, optimize and walk-forward run in
   a `worker_threads` worker (the `.mjs` entry registers `tsx` in the worker, then loads the TypeScript implementation).
   One reused worker; hard timeout `HEAVY_TIMEOUT_MS` = 120 s (worker terminated, HTTP 503), heap limit 1024 MB,
@@ -488,11 +626,12 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
 * `Services` (injected into the routes): `runBacktest`, `optimize` and `walkForward` may return a **Promise** (main.ts
   wires them to the worker; tests may pass the synchronous functions), plus `listStrategies`, `chartIndicators`,
   `runEnsemble`, `decisionsToMarkers`, `detectRegimes`, `validateRiskConfig`. `EngineLike` makes
-  `acknowledgeUnknownOrders`, `acknowledgeStateRecovery` and `writeOffPosition` optional (missing → 501) and accepts a
-  `killSwitch()` that returns nothing (older fakes).
+  `acknowledgeUnknownOrders`, `acknowledgeStateRecovery` and `writeOffPosition` optional (missing → 501), accepts a
+  `writeOffPosition` that returns a `Trade` or a `Promise<Trade>` and a `killSwitch()` that returns nothing (older fakes).
 * Serves `public/` statically and `/vendor/lightweight-charts.js` from
   `node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js`. Non-API paths accept only GET/HEAD.
 * Security (`httpServer.ts`):
+  * More than one `Host` header → 400 (counted in `req.rawHeaders`; Node would silently keep the first).
   * Binds to `127.0.0.1` by default. When bound to loopback, the `Host` header must be an exact loopback name
     (DNS-rebinding protection; missing `Host` → 400, other → 403).
   * For **every** `/api/*` request, whatever the method (GET and SSE included — the scanner and candles share the
@@ -500,7 +639,7 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
     `Origin` of `"null"` or with a host different from the `Host` header → 403. Requests without these headers
     (curl, scripts) are allowed.
   * If `DASHBOARD_TOKEN` is set, every `/api/*` request needs header `x-dashboard-token` (or `?token=` for
-    `/api/events` only), compared in constant time.
+    `/api/events` only), compared in constant time (missing or wrong → 401).
   * Security headers (CSP `default-src 'self'`, `frame-ancestors 'none'`, nosniff, no-referrer, …),
     `Cache-Control: no-store` on the API, JSON bodies max 1 MB (413), non-finite numbers serialized as `null`.
 * API (all JSON; errors → `{ error: string }` with proper status):
@@ -509,21 +648,22 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
   |---|---|---|---|
   | GET | `/api/info` | | `AppInfo` |
   | GET | `/api/state` | | `EngineSnapshot` |
-  | GET | `/api/events` | SSE | `ServerEvent` stream (`event: <type>`, `data: <json>`), sends a `snapshot` immediately, heartbeat comment every 15s |
+  | GET | `/api/events` | SSE | `ServerEvent` stream (`event: <type>`, `data: <json>`), sends a `snapshot` immediately, heartbeat comment every 15s (HEAD → 405) |
   | GET | `/api/config` | | `EngineConfig` |
   | PUT | `/api/config` | `Partial<EngineConfig>` (risk/ensemble may be partial) | `EngineConfig` (validated, persisted to `<dataDir>/config.json`; 500 if active but not saved) |
-  | POST | `/api/engine/start` / `stop` | | `EngineSnapshot` |
+  | POST | `/api/engine/start` | | `EngineSnapshot` (409 "Starten geblokkeerd: noodstop bezig …" while a kill runs) |
+  | POST | `/api/engine/stop` | | `EngineSnapshot` (the price monitor takes over) |
   | POST | `/api/engine/kill` | | `EngineSnapshot & { killResult?: KillResult }` — **200 also when positions could not be sold**; the UI shows `killResult.failed` |
-  | POST | `/api/positions/:id/close` | | `Trade` (404 unknown id, 409 not closed — see the log) |
-  | POST | `/api/positions/:id/writeoff` | | `Trade` (404 unknown id, 409 "Afschrijven kan …", 501 engine without write-off) |
-  | POST | `/api/live/arm` | `{ confirm: "IK BEGRIJP HET RISICO" }` | `AppInfo` (400 in paper mode, wrong text or no API keys; 409 "Armen geblokkeerd" while a state recovery is unacknowledged) |
+  | POST | `/api/positions/:id/close` | | `Trade` (404 unknown id; 409 not closed, with the engine's Dutch `lastCloseFailure`, e.g. "onverkoopbaar: …" or "positie is afgeschreven …") |
+  | POST | `/api/positions/:id/writeoff` | | `Trade` with `exitReason: "write-off"` (awaits the async engine, which fetches a fresh price and, live, a fresh balance; 404 unknown id, 409 "Afschrijven kan …" — e.g. sellable again, kill running, price/balance unavailable; 501 engine without write-off) |
+  | POST | `/api/live/arm` | `{ confirm: "IK BEGRIJP HET RISICO" }` | `AppInfo` (400 in paper mode, wrong text or no API keys; 409 "Armen geblokkeerd …" while a state recovery is unacknowledged or a kill runs) |
   | POST | `/api/live/disarm` | | `AppInfo` |
   | POST | `/api/live/unknown-orders/ack` | | `EngineSnapshot` (lifts the entry block after the user checked Bitvavo; 501 if unsupported) |
   | POST | `/api/state/recovery/ack` | | `EngineSnapshot` (acknowledges an unusable state file; arming allowed again; 501 if unsupported) |
   | POST | `/api/paper/reset` | `{ startingCapital? }` (5 – 10 000 000, default `PAPER_STARTING_CAPITAL`) | `EngineSnapshot` (400 in live mode) |
   | GET | `/api/markets` | | `MarketInfo[]` (quote EUR, status trading, sorted) |
-  | GET | `/api/candles` | `market, interval, limit` (limit clamped to 50–1000) | `CandlesResponse` |
-  | GET | `/api/scanner` | `limit` (max 60) | `ScannerRow[]` (top-N EUR markets by 24h volume, cached 60s) |
+  | GET | `/api/candles` | `market, interval, limit` (limit clamped to 50–1000; unknown market → 400) | `CandlesResponse` |
+  | GET | `/api/scanner` | `limit` (positive integer, default 30, max 60) | `ScannerRow[]` (top-N EUR markets by 24h volume, cached 60s) |
   | GET | `/api/strategies` | | `StrategyMeta[]` |
   | POST | `/api/backtest` | `BacktestRequest` | `BacktestResult` |
   | POST | `/api/optimize` | `OptimizeRequest` | `OptimizationResult` |
@@ -538,14 +678,22 @@ entry point that wires in the real `runEnsemble` / `RiskManager` / strategies.
 
 ### A9 — Dashboard core (live view)
 Owns `public/index.html`, `public/css/base.css`, `public/js/main.js`, `public/js/liveChart.js`,
-`public/js/header.js`, `public/js/tables.js`, `public/js/log.js`, `public/favicon.svg`.
+`public/js/header.js`, `public/js/tables.js`, `public/js/tradeNotify.js`, `public/js/log.js`, `public/favicon.svg`.
 * `header.js` — stats, bot controls, mode banner and the **alert banners** (`#alert-banners`): "Onbekende
   orderuitkomst" (`snapshot.unknownOrders`, button "Ik heb het gecontroleerd" → `POST /api/live/unknown-orders/ack`)
   and "Opgeslagen staat was onbruikbaar" (`snapshot.stateRecovery` → `POST /api/state/recovery/ack`). Exports
-  `killOutcome(res, fmt, minOrder?)` (Dutch toast text from the kill response, listing `killResult.failed`) and
-  `accountReturns(snap)` (returns incl. skimmed profit).
+  `killReport(res, fmt, minFor?, openBefore?)` / `killOutcome(…)` (structured result and Dutch toast text from the kill
+  response, listing `killResult.failed`; `minFor` = exchange minimum as a number, Map or function, invalid → €5) and
+  `accountReturns(snap)` (the engine's `totalPnlQuote` / `dayPnlQuote` / `totalReturnPct` / `dayReturnPct`; own
+  computation only for an older server). The "Equity" card shows the start capital (paper) or the limit and the skimmed amount (live).
 * `tables.js` — open positions (badge "Onverkoopbaar" from `unsellable`/`unsellableReason`, buttons "Sluit" and
-  "Afschrijven" → `POST /api/positions/:id/writeoff`) and trades. Exports `unsellableWhy(p)`.
+  "Afschrijven" → `POST /api/positions/:id/writeoff`) and trades ("Afgeschreven" for `exitReason: "write-off"`).
+  The write-off modal says the loss counts as today's realised loss (daily loss limit, market cool-down), shows a
+  busy state while the server fetches a fresh price, and handles a 409 "weer verkoopbaar". Exports `unsellableWhy(p)`,
+  `closeRefusalInfo(err, p, snap, fmt)` (Dutch explanation after "Toch proberen te verkopen" on a dust position; only
+  promises an automatic sale when the bot runs and, live, is armed) and `writeOffRefusalInfo(err, p, fmt)`.
+* `tradeNotify.js` — `closedTradeMessage(t, fmt, mode)` and `createTradeNotifier(toast, fmt, getMode)`: one toast per
+  trade id, whether it arrives via SSE `position-closed` or as the response of a close / write-off.
 
 ### A10 — Dashboard panels (analysis views)
 Owns `public/css/panels.css`, `public/js/panels/{signals,equity,risk,backtest,scanner,settings}.js` and the pure,
@@ -592,8 +740,12 @@ DOM-free helper modules:
   plus UI events `market-selected` `{ market }`, `tab-changed` `{ tab }` (`live|backtest|scanner|settings`),
   `connection` `{ status }`, `config-changed` (EngineConfig). Panels that are hidden in an inactive tab must
   call `chart.applyOptions({ width, height })`/`resize` on `tab-changed` or use `autoSize: true`.
-* Use the engine's numbers where they exist: `account.totalReturnPct` / `dayReturnPct` for returns, `equity + skimmed`
-  for live equity curves, `unsellable` / `unsellableReason` for positions, `killResult.failed` after a kill.
+* Use the engine's numbers where they exist: `account.totalPnlQuote` / `dayPnlQuote` / `totalReturnPct` /
+  `dayReturnPct` for results (percentages against `startingEquity` = capital given to the bot, resp. the capital
+  traded today), `equity + skimmed` per point for equity curves (`skimmed` = net transfers out, so skimming or a
+  changed limit is no jump), `unsellable` / `unsellableReason` for positions, `killResult.failed` after a kill.
+  The equity panel's "Max. daling" (`equityFigures` / `maxDrop` in `equity.js`) is the largest peak-to-trough drop of
+  the cumulative result in EUR, and as % of `startingEquity`.
 * Container IDs in `index.html` (A9 creates them all, A10 fills its own):
   * Tabs: `#tab-live`, `#tab-backtest`, `#tab-scanner`, `#tab-settings` (nav buttons `[data-tab="live"]` etc.)
   * A9: `#header-stats`, `#bot-controls`, `#mode-banner`, `#alert-banners`, `#market-tabs`, `#chart-main`, `#chart-rsi`, `#chart-macd`, `#panel-positions`, `#panel-trades`, `#panel-log`, `#toast-root`, `#modal-root`
@@ -607,6 +759,7 @@ DOM-free helper modules:
 * Tests: `tests/frontend/*.test.ts` run in vitest's **Node** environment (no browser, no jsdom).
   `tests/frontend/helpers.ts` loads the browser modules from `public/` by absolute path (`loadPublic`) and provides a
   fake bus (`makeBus`, same semantics as `bus.js`) and a minimal fake DOM (`fakeNode`). Pure logic
-  (`backtestLogic.js`, `settingsLogic.js`, `killOutcome`, `accountReturns`, `unsellableWhy`, `api.js`) is tested
+  (`backtestLogic.js`, `settingsLogic.js`, `killReport` / `killOutcome`, `accountReturns`, `unsellableWhy`,
+  `closeRefusalInfo`, `writeOffRefusalInfo`, `tradeNotify.js`, `equityFigures`, `api.js`) is tested
   directly; panels (`backtest`, `settings`, `signals`, `equity`, header alerts, tables) are mounted against the fakes.
   Keep new UI logic in such pure modules so it can be tested the same way.

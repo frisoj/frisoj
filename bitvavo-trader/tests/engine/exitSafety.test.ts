@@ -232,14 +232,24 @@ describe("Onverkoopbare posities (waarde onder het beursminimum)", () => {
       "onverkoopbaar: orderwaarde ca. €4,99 is lager dan het beursminimum van €5,00 voor BTC-EUR",
     );
     expect(count(h, (m) => m.startsWith("BTC-EUR positie is onverkoopbaar"))).toBe(2);
-    // Koers hoger dan bij de weigering: de volgende tick probeert het opnieuw (en het lukt)
+    // Herschreven (ronde 4): hier verstuurde de bot al opnieuw bij 49.000 (+0,2%). Nu
+    // pas bij ≥ 1% meer waarde dan bij de weigering én hooguit één keer per 5 minuten.
+    const refusedAt = h.clock.t;
     h.feed.setLast("BTC-EUR", 49_000);
     h.clock.advance(15_000);
     await h.engine.tick();
+    expect(h.broker.sells()).toHaveLength(2);
+    h.feed.setLast("BTC-EUR", 49_400); // ≥ 48.900 × 1,01, maar nog geen 5 minuten na de weigering
+    h.clock.advance(15_000);
+    await h.engine.tick();
+    expect(h.broker.sells()).toHaveLength(2);
+    h.clock.set(refusedAt + 5 * 60_000);
+    await h.engine.tick(); // nu wel: één poging (en het lukt)
     s = h.engine.snapshot();
     expect(h.broker.sells()).toHaveLength(3);
     expect(s.positions).toHaveLength(0);
     expect(s.trades[0].exitReason).toBe("manual"); // de laatst gevraagde exit (handmatig sluiten)
+    expect(count(h, (m) => m.startsWith("BTC-EUR positie is onverkoopbaar"))).toBe(2);
   });
 });
 
@@ -248,15 +258,16 @@ describe("writeOffPosition", () => {
     const file = join(tmp(), "state.json");
     const h = setup({ deps: { store: new StateStore(file) } });
     const pos = await smallBtcPosition(h);
-    expect(() => h.engine.writeOffPosition(pos.id)).toThrow(/^Afschrijven kan alleen/);
-    expect(() => h.engine.writeOffPosition("pos_bestaatniet")).toThrow(/niet gevonden/);
+    // (Ronde 4: writeOffPosition is async — verse koers vlak voor de beslissing.)
+    await expect(h.engine.writeOffPosition(pos.id)).rejects.toThrow(/^Afschrijven kan alleen/);
+    await expect(h.engine.writeOffPosition("pos_bestaatniet")).rejects.toThrow(/niet gevonden/);
 
     h.feed.setLast("BTC-EUR", 40_000);
     h.clock.advance(15_000);
     h.risk.stopDist = 20_000;
     await h.engine.tick(); // koers bijwerken
     const cash = h.engine.snapshot().account.cashQuote;
-    const trade = h.engine.writeOffPosition(pos.id);
+    const trade = await h.engine.writeOffPosition(pos.id);
     expect(trade).toMatchObject({
       market: "BTC-EUR",
       entryTime: pos.entryTime,

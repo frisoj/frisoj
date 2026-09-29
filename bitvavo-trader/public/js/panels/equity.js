@@ -73,7 +73,12 @@ const isNum = (n) => typeof n === "number" && Number.isFinite(n);
  *  - winst/rendement = `account.totalPnlQuote` / `totalReturnPct` van de engine
  *    (correct na afromen); zelf rekenen alleen bij een oudere server;
  *  - `skimmed` = `snapshot.skimmedQuote` (regel "Afgeroomd boven limiet");
- *  - `netOut` = netto uit het budget volgens het laatste punt (afgeroomd + terug − erbij).
+ *  - `netOut` = netto uit het budget volgens het laatste punt (afgeroomd + terug − erbij);
+ *  - `ddEur` / `dd` = max. daling: de grootste daling van piek naar dal van het
+ *    resultaat (curve − baseline = cumulatieve winst/verlies) in EUR (≤ 0), en als
+ *    % van `startingEquity` (het kapitaal dat de bot kreeg). Nooit als % van een
+ *    piek van de curve: na een verhoogde limiet is de curve het kleine beginkapitaal
+ *    plus het resultaat (kan zelfs < 0 worden) en gaf dat onzin (−127%).
  */
 export function equityFigures(s) {
   const a = (s && s.account) || {};
@@ -95,19 +100,25 @@ export function equityFigures(s) {
     // zodat de stippellijn niet bij elke snapshot opnieuw getekend wordt.
     if (derived > 0 && Math.abs(derived - start) > 0.005) base = Math.round(derived * 100) / 100;
   }
-  const now = { equity: nowCurve };
-  const dd = maxDrawdownPct(hist.length ? hist.map((p) => ({ equity: curveValue(p) })).concat([now]) : [now]);
-  return { equity, skimmed, start, base, netOut, pnl, ret, dd };
+  // Curve (per punt en nu) = baseline + cumulatief resultaat: de daling in EUR is dezelfde
+  // De baseline (resultaat 0) telt als eerste piek: ook de fee van de allereerste koop is een daling
+  const drop = maxDrop([base].concat(hist.map(curveValue), [nowCurve]));
+  const ddEur = drop > 0 ? -drop : 0;
+  const ddBase = rawStart > 0 ? rawStart : start;
+  const dd = drop > 0 && ddBase > 0 ? -(drop / ddBase) * 100 : 0;
+  return { equity, skimmed, start, base, netOut, pnl, ret, dd, ddEur, ddBase };
 }
 
-function maxDrawdownPct(points) {
+/** Grootste daling (≥ 0) van een piek naar een later dal in een reeks bedragen */
+export function maxDrop(values) {
   let peak = -Infinity;
-  let dd = 0;
-  for (const p of points) {
-    if (p.equity > peak) peak = p.equity;
-    if (peak > 0) dd = Math.min(dd, (p.equity / peak - 1) * 100);
+  let drop = 0;
+  for (const v of values) {
+    if (!Number.isFinite(v)) continue;
+    if (v > peak) peak = v;
+    else drop = Math.max(drop, peak - v);
   }
-  return dd;
+  return drop;
 }
 
 export function mountEquity(ctx, el) {
@@ -124,7 +135,7 @@ export function mountEquity(ctx, el) {
     <div class="eq-chart-wrap"><div class="eq-chart"></div><div class="eq-empty pn-empty" hidden></div></div>
     <div class="eq-stats">
       <div class="stat"><span class="stat-label">Rendement</span><span class="stat-value eq-s-ret">–</span></div>
-      <div class="stat" title="Max. drawdown: grootste daling van een piek naar een dal"><span class="stat-label">Max. daling</span><span class="stat-value eq-s-dd">–</span></div>
+      <div class="stat eq-s-ddbox" title="Max. drawdown: grootste daling van je resultaat van een piek naar een dal, in euro en als % van je startkapitaal"><span class="stat-label">Max. daling</span><span class="stat-value eq-s-dd">–</span><span class="stat-sub eq-s-ddpct"></span></div>
       <div class="stat"><span class="stat-label">Trades</span><span class="stat-value eq-s-trades">–</span></div>
       <div class="stat" title="Percentage winnende trades"><span class="stat-label">Winrate</span><span class="stat-value eq-s-win">–</span></div>
     </div>
@@ -198,7 +209,7 @@ export function mountEquity(ctx, el) {
   function update(s) {
     if (!s || !s.account) return;
     const hist = Array.isArray(s.equityHistory) ? s.equityHistory : [];
-    const { equity, skimmed, start, base, netOut, pnl, ret, dd } = equityFigures(s);
+    const { equity, skimmed, start, base, netOut, pnl, ret, dd, ddEur, ddBase } = equityFigures(s);
     const trades = Array.isArray(s.trades) ? s.trades : [];
     const wins = trades.filter((x) => x.pnlQuote > 0).length;
 
@@ -210,9 +221,17 @@ export function mountEquity(ctx, el) {
     sr.textContent = fmt.pct(ret, 2);
     sr.title = `${fmt.eurSigned(pnl)} t.o.v. start ${fmt.eur(start)}`;
     sr.className = `stat-value eq-s-ret ${fmt.pnlClass(ret)}`;
+    // Max. daling in EUR, met het % van het kapitaal dat de bot kreeg (startingEquity) eronder
+    // (minder dan een halve cent: "€ 0,00" en "0,00%", geen "-€ 0,00")
+    const ddShown = ddEur <= -0.005 ? ddEur : 0;
+    const ddPct = ddShown ? dd : 0;
     const sd = $(".eq-s-dd");
-    sd.textContent = fmt.pct(dd, 2);
-    sd.className = `stat-value eq-s-dd ${dd < -0.005 ? "neg" : "flat"}`;
+    sd.textContent = fmt.eurSigned(ddShown);
+    sd.className = `stat-value eq-s-dd ${ddShown ? "neg" : "flat"}`;
+    $(".eq-s-ddpct").textContent = fmt.pct(ddPct, 2);
+    $(".eq-s-ddbox").title =
+      `Max. drawdown: grootste daling van je resultaat van een piek naar een dal: ${fmt.eurSigned(ddShown)}` +
+      ` = ${fmt.pct(ddPct, 2)} van je startkapitaal (${fmt.eur(ddBase)})`;
     $(".eq-s-trades").textContent = trades.length >= 200 ? "200+" : String(trades.length);
     $(".eq-s-win").textContent = trades.length ? fmt.pct((wins / trades.length) * 100, 0, false) : "–";
     // Live: winst boven de kapitaallimiet wordt buiten het handelsbudget gehouden

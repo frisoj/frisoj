@@ -101,7 +101,7 @@ describe("Onverkoopbaar = altijd tegen de actuele koers", () => {
     expect(s.positions[0].currentPrice).toBe(50_000);
     expect(s.positions[0].unsellable).toBeUndefined();
     expect(s.positions[0].unsellableReason).toBeUndefined();
-    expect(() => h.engine.writeOffPosition(pos.id)).toThrow(/^Afschrijven kan alleen voor een onverkoopbare positie/);
+    await expect(h.engine.writeOffPosition(pos.id)).rejects.toThrow(/^Afschrijven kan alleen voor een onverkoopbare positie/);
     expect(h.engine.snapshot().positions).toHaveLength(1);
     expect(h.engine.snapshot().trades).toHaveLength(0);
 
@@ -112,7 +112,7 @@ describe("Onverkoopbaar = altijd tegen de actuele koers", () => {
     s = h.engine.snapshot();
     expect(s.positions[0].unsellable).toBe(true);
     expect(s.positions[0].unsellableReason).toContain("waarde €4,78 < minimum €5,00");
-    const t = h.engine.writeOffPosition(pos.id);
+    const t = await h.engine.writeOffPosition(pos.id);
     expect(t.exitReason).toBe("write-off");
     await h.engine.stop();
   });
@@ -129,16 +129,19 @@ describe("Onverkoopbaar = altijd tegen de actuele koers", () => {
     const gate = new Deferred();
     const orig = h.broker.getBalances.bind(h.broker);
     let waiting = false;
+    // Alleen de tick blijft hangen; het afschrijven haalt (ronde 4) zelf een vers saldo op.
     h.broker.getBalances = async () => {
-      waiting = true;
-      await gate.promise;
+      if (!waiting) {
+        waiting = true;
+        await gate.promise;
+      }
       return orig();
     };
     h.clock.advance(15_000);
     const tick = h.engine.tick();
     await waitFor(() => waiting); // koers al bijgewerkt, tick wacht op GET /balance
     expect(h.engine.snapshot().positions[0].unsellable).toBeUndefined();
-    expect(() => h.engine.writeOffPosition(pos.id)).toThrow(/^Afschrijven kan alleen/);
+    await expect(h.engine.writeOffPosition(pos.id)).rejects.toThrow(/^Afschrijven kan alleen/);
     gate.resolve();
     await tick;
     const s = h.engine.snapshot();
@@ -179,7 +182,7 @@ describe("Onverkoopbaar = altijd tegen de actuele koers", () => {
     s = h.engine.snapshot();
     expect(h.broker.sells()).toHaveLength(1);
     expect(s.positions[0].unsellable).toBeUndefined();
-    expect(() => h.engine.writeOffPosition(pos.id)).toThrow(/^Afschrijven kan alleen/);
+    await expect(h.engine.writeOffPosition(pos.id)).rejects.toThrow(/^Afschrijven kan alleen/);
 
     // Lager dan bij de weigering → weer onverkoopbaar, afschrijven mag
     h.feed.setLast("BTC-EUR", 48_800);
@@ -187,12 +190,15 @@ describe("Onverkoopbaar = altijd tegen de actuele koers", () => {
     await h.engine.tick();
     s = h.engine.snapshot();
     expect(s.positions[0].unsellable).toBe(true);
-    const t = h.engine.writeOffPosition(pos.id);
+    const t = await h.engine.writeOffPosition(pos.id);
     expect(t).toMatchObject({ exitReason: "write-off", pnlPct: -100, proceedsQuote: 0 });
     expect(h.engine.snapshot().positions).toHaveLength(0);
   });
 
-  it("gearmd: na een broker-weigering wordt pas opnieuw verstuurd als de koers hoger is dan bij de weigering", async () => {
+  it("gearmd: na een broker-weigering pas opnieuw bij ≥ 1% meer waarde dan de (hoogste) weigering, hooguit 1× per 5 minuten", async () => {
+    // Herschreven (ronde 4): hier verstuurde de bot al opnieuw bij +0,1% (48.950) en
+    // daarna bij 49.000 — bij een koers die rond het minimum schommelt elke paar ticks
+    // een geweigerde order. Nu met hysterese (1%) en hooguit één poging per 5 minuten.
     const h = setup({ mode: "live", startingCapital: 50 });
     h.engine.arm();
     await openBtcPosition(h);
@@ -201,16 +207,27 @@ describe("Onverkoopbaar = altijd tegen de actuele koers", () => {
     h.clock.advance(15_000);
     h.feed.setLast("BTC-EUR", 48_900);
     await h.engine.tick();
-    h.feed.setLast("BTC-EUR", 48_950); // hoger: één nieuwe poging (weer geweigerd)
+    const firstRefusal = h.clock.t;
+    expect(h.broker.sells()).toHaveLength(1);
+    for (const px of [48_950, 49_000, 49_300]) {
+      h.feed.setLast("BTC-EUR", px); // < 48.900 × 1,01: niet opnieuw
+      h.clock.advance(15_000);
+      await h.engine.tick();
+    }
+    expect(h.broker.sells()).toHaveLength(1);
+    h.feed.setLast("BTC-EUR", 49_400); // ≥ 1% hoger, maar binnen 5 minuten na de weigering
     h.clock.advance(15_000);
     await h.engine.tick();
+    expect(h.broker.sells()).toHaveLength(1);
+    h.clock.set(firstRefusal + 5 * 60_000);
+    await h.engine.tick(); // nu één nieuwe poging (weer geweigerd, bij 49.400)
     expect(h.broker.sells()).toHaveLength(2);
-    for (let i = 0; i < 3; i++) {
-      h.clock.advance(15_000);
-      await h.engine.tick(); // zelfde koers: niets
-    }
+    const secondRefusal = h.clock.t;
+    h.feed.setLast("BTC-EUR", 49_800); // < 49.400 × 1,01 (de hoogste weigering telt)
+    h.clock.set(secondRefusal + 6 * 60_000);
+    await h.engine.tick();
     expect(h.broker.sells()).toHaveLength(2);
-    h.feed.setLast("BTC-EUR", 49_000); // weer hoger: nu lukt het
+    h.feed.setLast("BTC-EUR", 49_900); // ≥ 49.894 en > 5 minuten: nu lukt het
     h.clock.advance(15_000);
     await h.engine.tick();
     expect(h.broker.sells()).toHaveLength(3);
@@ -253,7 +270,7 @@ describe("Onverkoopbaar met een iets lager saldo op Bitvavo (fee in de munt)", (
     await h.engine.tick();
     s = h.engine.snapshot();
     expect(s.positions[0].unsellable).toBeUndefined();
-    expect(() => h.engine.writeOffPosition(pos.id)).toThrow(/^Afschrijven kan alleen/);
+    await expect(h.engine.writeOffPosition(pos.id)).rejects.toThrow(/^Afschrijven kan alleen/);
   });
 });
 
@@ -550,7 +567,7 @@ describe("Late extra vullingen: alleen het nieuwe deel, tegen zijn eigen prijs",
 });
 
 describe("Noodstop: armen geblokkeerd, altijd ontwapend, logniveaus", () => {
-  it("Start + arm tijdens de noodstop: arm() weigert ('Armen geblokkeerd: noodstop bezig'), de noodstop eindigt ontwapend; daarna mag armen weer", async () => {
+  it("Start + arm tijdens de noodstop: start() en arm() weigeren ('… geblokkeerd: noodstop bezig'), de noodstop eindigt ontwapend en gestopt; daarna mag armen weer", async () => {
     const h = setup({ mode: "live", startingCapital: 50, markets: ["BTC-EUR", "ETH-EUR"] });
     h.engine.arm();
     h.risk.quote = 20;
@@ -564,15 +581,17 @@ describe("Noodstop: armen geblokkeerd, altijd ontwapend, logniveaus", () => {
     };
     const killing = h.engine.killSwitch();
     await waitFor(() => gates.length === 1); // noodstop verkoopt BTC
-    const starting = h.engine.start(); // gebruiker drukt op Start
+    // Herschreven (ronde 4): Start werd hier geaccepteerd (en pas door de noodstop weer
+    // teruggedraaid); nu weigert start() zelf, zodat een noodstop nooit met een draaiende bot eindigt.
+    await expect(h.engine.start()).rejects.toThrow(/^Starten geblokkeerd: noodstop bezig/);
     expect(() => h.engine.arm()).toThrow(/^Armen geblokkeerd: noodstop bezig/);
     expect(h.engine.liveArmed).toBe(false);
     gates.shift()!();
     await waitFor(() => gates.length === 1);
     expect(() => h.engine.arm()).toThrow(/^Armen geblokkeerd: noodstop bezig/);
+    await expect(h.engine.start()).rejects.toThrow(/^Starten geblokkeerd: noodstop bezig/);
     gates.shift()!();
     const res = await killing;
-    await starting;
     expect(res).toEqual({ closed: 2, failed: [] });
     const s = h.engine.snapshot();
     expect(s.liveArmed).toBe(false);

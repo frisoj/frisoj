@@ -1020,15 +1020,17 @@
   gap: var(--gap);
   align-items: start;
 }
+/* Geen eigen scrollbalk (knoppen onderaan waren alleen via die interne scroll bereikbaar):
+   de zijbalk scrolt mee met de pagina, en is alleen sticky (.is-sticky, gezet door
+   backtest.js) als hij helemaal onder de vaste kopbalk in beeld past. */
 .bt-side {
-  position: sticky;
-  top: 70px;
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  max-height: calc(100vh - 84px);
-  overflow-y: auto;
-  scrollbar-width: thin;
+}
+.bt-side.is-sticky {
+  position: sticky;
+  top: calc(var(--header-h) + 12px);
 }
 .bt-form .form-row {
   margin-bottom: 10px;
@@ -2786,9 +2788,9 @@
   .bt {
     grid-template-columns: minmax(0, 1fr);
   }
-  .bt-side {
+  .bt-side,
+  .bt-side.is-sticky {
     position: static;
-    max-height: none;
   }
   .bt-empty-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -2820,5 +2822,14 @@
   .risk-halt {
     transition: none;
     animation: none;
+  }
+}
+
+/* Telefoon: KPI-subregels mogen afbreken i.p.v. cijfers af te kappen */
+@media (max-width: 600px) {
+  .bt-kpi-sub {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
 }

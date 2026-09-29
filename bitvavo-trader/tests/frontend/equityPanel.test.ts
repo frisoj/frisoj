@@ -243,3 +243,93 @@ describe("equity na een gewijzigde kapitaallimiet (ronde 3)", () => {
     expect(p.nodes[".eq-skim"].innerHTML).not.toContain("Kapitaallimiet gewijzigd");
   });
 });
+
+// Echte engine-uitkomsten (verifier ronde 3, live). De max. daling was een % van de piek van de
+// curve; na een verhoogde limiet is de curve het kleine beginkapitaal + resultaat, dus
+// 50 → 100 → 50 met −€ 9,40 verlies gaf −18,81% en 50 → 500 met verlies zelfs −126,96%.
+// Nu: grootste daling van het resultaat in EUR, en als % van startingEquity (kapitaal van de bot).
+const raiseLower = {
+  mode: "live",
+  account: { startingEquity: 100, equity: 50, cashQuote: 50, dayStartEquity: 50, totalPnlQuote: -9.403990024937642, totalReturnPct: -9.403990024937642 },
+  skimmedQuote: 0,
+  trades: [{ pnlQuote: -9.403990024937642 }],
+  equityHistory: [
+    { time: T, equity: 100, skimmed: -50 },
+    { time: T + 900_000, equity: 99.77556109725687, skimmed: -50 },
+    { time: T + 960_000, equity: 90.59600997506236, skimmed: -50 },
+    { time: T + 1_020_000, equity: 50, skimmed: -9.403990024937642 },
+  ],
+};
+const raiseThenLoss = {
+  mode: "live",
+  account: { startingEquity: 500, equity: 436.5516882793018, cashQuote: 436.5516882793018, dayStartEquity: 50, totalPnlQuote: -63.4483117206982, totalReturnPct: -12.689662344139641 },
+  skimmedQuote: 0,
+  trades: [{ pnlQuote: -45.313648379052324 }, { pnlQuote: -18.13466334164588 }],
+  equityHistory: [
+    { time: T, equity: 49.887780548628434, skimmed: 0 },
+    { time: T + 60_000, equity: 31.86533665835412, skimmed: 0 },
+    { time: T + 120_000, equity: 481.8653366583541, skimmed: -450 },
+    { time: T + 1_020_000, equity: 480.7838653366584, skimmed: -450 },
+    { time: T + 1_080_000, equity: 436.5516882793018, skimmed: -450 },
+    { time: T + 1_200_000, equity: 436.5516882793018, skimmed: -450 },
+  ],
+};
+
+describe("max. daling in EUR en als % van startingEquity (ronde 4)", () => {
+  it("50 → 100 → 50 met −€ 9,40 verlies: −€ 9,40 = −9,40% van € 100 (niet −18,81%)", async () => {
+    const { equityFigures } = await loadPublic("js/panels/equity.js");
+    const f = equityFigures(raiseLower);
+    expect(f.ddEur).toBeCloseTo(-9.404, 3);
+    expect(f.dd).toBeCloseTo(-9.404, 3);
+    expect(f.ddBase).toBe(100);
+  });
+
+  it("50 → verlies → 500 → verlies: −€ 63,45 = −12,69% van € 500 (niet −126,96%), binnen [−100%, 0]", async () => {
+    const { equityFigures } = await loadPublic("js/panels/equity.js");
+    const f = equityFigures(raiseThenLoss);
+    // Herschreven (ronde 4, lead): de baseline € 50 (resultaat 0, vóór de eerste fee) is de
+    // eerste piek → dal 436,55 − 450 = −13,45: daling 63,45 (eerder 63,34 vanaf het eerste
+    // punt 49,89, waardoor de fee van de eerste koop ontbrak)
+    expect(f.ddEur).toBeCloseTo(-63.448, 3);
+    expect(f.dd).toBeCloseTo(-12.690, 3);
+    expect(f.dd).toBeGreaterThanOrEqual(-100);
+  });
+
+  it("de curve blijft doorlopen bij de storting (geen sprong van € 450)", async () => {
+    const p = await mount(raiseThenLoss);
+    const vals = p.series.data.map((d: Fake) => Number(d.value.toFixed(2)));
+    expect(vals).toEqual([49.89, 31.87, 31.87, 30.78, -13.45, -13.45]);
+    expect(Math.max(...vals.slice(1).map((v: number, i: number) => Math.abs(v - vals[i])))).toBeLessThan(45);
+  });
+
+  it("paneel: waarde in EUR, % eronder, uitleg met het startkapitaal", async () => {
+    const p = await mount(raiseLower);
+    expect(norm(p.nodes[".eq-s-dd"].textContent)).toBe("-€ 9,40");
+    expect(p.nodes[".eq-s-dd"].className).toContain("neg");
+    expect(p.nodes[".eq-s-ddpct"].textContent).toBe("-9,40%");
+    expect(norm(p.nodes[".eq-s-ddbox"].title)).toContain("-€ 9,40 = -9,40% van je startkapitaal (€ 100,00)");
+  });
+
+  it("zonder daling: € 0,00 en 0,00% (geen '-€ 0,00'), neutraal", async () => {
+    const p = await mount({
+      mode: "paper",
+      account: { equity: 52, startingEquity: 50, totalReturnPct: 4 },
+      equityHistory: [
+        { time: T, equity: 50 },
+        { time: T + 60_000, equity: 52 },
+      ],
+      trades: [],
+    });
+    expect(norm(p.nodes[".eq-s-dd"].textContent)).toBe("€ 0,00");
+    expect(p.nodes[".eq-s-dd"].className).toContain("flat");
+    expect(p.nodes[".eq-s-ddpct"].textContent).toBe("0,00%");
+  });
+
+  it("maxDrop: grootste daling van piek naar later dal, niet-getallen overgeslagen", async () => {
+    const { maxDrop } = await loadPublic("js/panels/equity.js");
+    expect(maxDrop([10, 12, 9, 11, 8, 13])).toBe(4);
+    expect(maxDrop([5, 6, 7])).toBe(0);
+    expect(maxDrop([NaN, 3, 1])).toBe(2);
+    expect(maxDrop([])).toBe(0);
+  });
+});

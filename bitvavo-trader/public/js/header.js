@@ -223,6 +223,19 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
       }
     }
     if (s && subHtml !== undefined) s.innerHTML = subHtml;
+    if (v) fitValue(v);
+  }
+
+  /** Past een bedrag niet in de kaart, dan een kleinere letter i.p.v. afkappen met "…" */
+  function fitValue(v) {
+    if (!v.style || typeof v.scrollWidth !== "number" || typeof getComputedStyle !== "function") return;
+    v.style.fontSize = "";
+    if (v.scrollWidth <= v.clientWidth) return;
+    let size = parseFloat(getComputedStyle(v).fontSize) || 17;
+    while (size > 11 && v.scrollWidth > v.clientWidth) {
+      size -= 1;
+      v.style.fontSize = `${size}px`;
+    }
   }
 
   function renderSpark(points) {
@@ -269,8 +282,8 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
       "equity",
       esc(fmt.eur(eq)),
       paper
-        ? `start ${esc(fmt.eur(start))}`
-        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : capital))}` +
+        ? `<span>start ${esc(fmt.eur(start))}</span>`
+        : `<span>limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : capital))}</span>` +
             (skimmed > 0
               ? ` · <span title="Winst boven je kapitaallimiet: blijft op je Bitvavo-account, buiten het handelsbudget van de bot">afgeroomd ${esc(
                   fmt.eur(skimmed),
@@ -294,7 +307,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     setStat(
       "total",
       esc(fmt.eurSigned(totPnl)),
-      `<span class="${fmt.pnlClass(totPct)}">${esc(fmt.pct(totPct))}</span> t.o.v. ${esc(fmt.eur(capital))}`,
+      `<span class="${fmt.pnlClass(totPct)}">${esc(fmt.pct(totPct))}</span> <span>t.o.v. ${esc(fmt.eur(capital))}</span>`,
       fmt.pnlClass(totPnl),
       totPnl,
     );
@@ -303,7 +316,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     setStat(
       "cash",
       esc(fmt.eur(a.cashQuote)),
-      `${esc(fmt.pct(cashPct, 0, false))} vrij<div class="meter"><i style="width:${
+      `<span>${esc(fmt.pct(cashPct, 0, false))} vrij</span><div class="meter"><i style="width:${
         Number.isFinite(cashPct) ? Math.max(0, Math.min(100, cashPct)).toFixed(1) : 0
       }%"></i></div>`,
     );
@@ -323,7 +336,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     setStat(
       "fees",
       esc(fmt.eur(a.feesPaid)),
-      `${esc(a.tradesToday ?? 0)}${maxTrades != null ? ` / ${esc(maxTrades)}` : ""} trades vandaag`,
+      `<span>${esc(a.tradesToday ?? 0)}${maxTrades != null ? ` / ${esc(maxTrades)}` : ""}</span> trades vandaag`,
     );
 
     const trades = snap.trades || [];
@@ -774,7 +787,11 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
         title: "Noodstop",
         danger: true,
         bodyHtml: positions.length
-          ? `<p>Alle <strong>${positions.length} open ${positions.length === 1 ? "positie wordt" : "posities worden"}</strong> direct tegen marktprijs verkocht (ca. <strong>${esc(
+          ? `<p>${
+              positions.length === 1
+                ? "De <strong>open positie wordt</strong>"
+                : `Alle <strong>${positions.length} open posities worden</strong>`
+            } direct tegen marktprijs verkocht (ca. <strong>${esc(
               fmt.eur(total),
             )}</strong>) en de bot stopt.</p><p class="muted">Bij een snelle markt kan de verkoopprijs afwijken.</p>${
               dust.length

@@ -56,6 +56,7 @@ import {
 /** Wat de server van de TradingEngine gebruikt (structureel, zodat tests een fake kunnen geven). */
 export interface EngineLike {
   snapshot(): EngineSnapshot;
+  /** Verwerpt met "Starten geblokkeerd: …" (→ 409) zolang een noodstop loopt. */
   start(): Promise<void>;
   stop(): Promise<void>;
   updateConfig(partial: Partial<EngineConfig>): EngineConfig;
@@ -72,7 +73,10 @@ export interface EngineLike {
   acknowledgeUnknownOrders?(): void;
   /** Herstelmelding (onbruikbaar statusbestand bij het starten) bevestigen; daarna mag armen weer. */
   acknowledgeStateRecovery?(): void;
-  /** Onverkoopbare positie afschrijven; gooit "Afschrijven kan …" als dat (nu) niet mag. */
+  /**
+   * Onverkoopbare positie afschrijven (de echte engine is async: verse koers/saldo);
+   * gooit/verwerpt met "Afschrijven kan …" als dat (nu) niet mag.
+   */
   writeOffPosition?(id: string): Trade | Promise<Trade>;
   /**
    * Nederlandse reden waarom de laatste `closePosition` de positie niet sloot
@@ -363,7 +367,14 @@ export function buildApiRouter(deps: ApiDeps): Router {
   });
 
   router.post("/api/engine/start", async () => {
-    await engine.start();
+    try {
+      await engine.start();
+    } catch (err) {
+      const msg = errorMessage(err);
+      // "Starten geblokkeerd: noodstop bezig …": een noodstop eindigt altijd met een stilstaande bot.
+      if (msg.startsWith("Starten geblokkeerd")) throw new HttpError(409, msg);
+      throw err;
+    }
     return engine.snapshot();
   });
   router.post("/api/engine/stop", async () => {
@@ -406,7 +417,9 @@ export function buildApiRouter(deps: ApiDeps): Router {
     const exists = engine.snapshot().positions.some((p) => p.id === id);
     if (!exists) throw new HttpError(404, "Positie niet gevonden (misschien al gesloten).");
     try {
-      return await engine.writeOffPosition(id);
+      // De engine haalt vlak voor de beslissing een verse koers (en live een vers saldo) op.
+      const trade = await engine.writeOffPosition(id);
+      return trade;
     } catch (err) {
       const msg = errorMessage(err);
       // "Afschrijven kan alleen voor een onverkoopbare positie …" / "Afschrijven kan nu (even) niet …"

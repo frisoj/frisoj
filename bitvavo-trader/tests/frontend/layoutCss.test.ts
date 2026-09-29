@@ -51,3 +51,53 @@ describe("base.css", () => {
     expect(rule(".app-header", "(max-width: 1440px)")).toContain("gap: 12px");
   });
 });
+
+describe("base.css (ronde 4: 390 px en statistiekkaarten)", () => {
+  it("390 px: hoofdtabs zonder iconen en met minder ruimte, vervaagde rand zolang er nog tabs buiten beeld staan", () => {
+    expect(rule(".nav-tabs button svg", "(max-width: 480px)")).toContain("display: none");
+    expect(rule(".nav-tabs button", "(max-width: 480px)")).toContain("padding: 0 10px");
+    // ook voor de marktbalk (klassen gezet door main.js)
+    expect(css).toMatch(/\.nav-tabs\.can-right,\s*\.market-tabs\.can-right \{[^}]*mask-image/);
+    expect(css).toMatch(/\.nav-tabs\.can-left,\s*\.market-tabs\.can-left \{[^}]*mask-image/);
+  });
+
+  it("markttab krimpt nooit onder zijn inhoud (24u-label niet afgesneden)", () => {
+    expect(rule(".mkt-tab")).toContain("flex: none");
+  });
+
+  it("OHLC-legenda op ≤ 600 px minstens zo ver van rechts als de prijsschaal (82 px) + marge", () => {
+    expect(css).toMatch(/@media \(max-width: 600px\) \{[^@]*\.chart-legend \{\s*[^}]*right: 90px;/);
+    expect(css).not.toMatch(/\.chart-legend \{[^}]*right: 70px/);
+  });
+
+  it("statistiekkaarten: subregels breken af i.p.v. bedragen/percentages af te kappen; haltreden leesbaar", () => {
+    const sub = rule(".stats-bar .stat-sub");
+    expect(sub).toContain("white-space: normal");
+    expect(sub).toContain("overflow: visible");
+    expect(sub).toContain("text-overflow: clip");
+    expect(rule(".stats-bar .stat-sub > span")).toContain("white-space: nowrap");
+    expect(rule(".stat-bot .stat-sub.halt")).toContain("overflow-wrap: break-word");
+  });
+
+  it("vaste kopbalk: scroll-padding zodat gefocuste velden er niet onder vallen", () => {
+    expect(rule("html", "(min-width: 901px)")).toContain("scroll-padding-top: calc(var(--header-h) + 12px)");
+  });
+});
+
+describe("panels.css (ronde 4: zijbalk Backtest-lab)", () => {
+  const panels = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../public/css/panels.css"), "utf8");
+  const block = (sel: string) => {
+    const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = new RegExp(`(^|\\n)${esc}\\s*\\{([^}]*)\\}`).exec(panels);
+    expect(m, sel).not.toBeNull();
+    return m![2];
+  };
+
+  it("geen eigen scrollbalk (geen scrollval), alleen sticky onder de kopbalk als hij past", () => {
+    const side = block(".bt-side");
+    expect(side).not.toMatch(/overflow-y|max-height|position:\s*sticky/);
+    const sticky = block(".bt-side.is-sticky");
+    expect(sticky).toContain("position: sticky");
+    expect(sticky).toContain("top: calc(var(--header-h) + 12px)");
+  });
+});

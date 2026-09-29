@@ -126,22 +126,8 @@ function printBanner(config: AppConfig, feed: MarketDataFeed, engineCfg: EngineC
   console.log(out.join("\n"));
 }
 
-/**
- * Tijdelijke blokkade: de code-review vond bevestigde kritieke problemen in
- * het live-orderpad (zie docs/REVIEW-STATUS.md). Weghalen zodra die zijn opgelost.
- */
-function refuseLiveUntilReviewed(mode: string): void {
-  if (mode === "live") {
-    throw new StartupError(
-      "Live trading is tijdelijk uitgeschakeld: de code-review vond nog kritieke problemen " +
-        "in het orderpad (zie docs/REVIEW-STATUS.md). Gebruik voorlopig TRADING_MODE=paper.",
-    );
-  }
-}
-
 async function main(): Promise<void> {
   const config = loadConfig();
-  refuseLiveUntilReviewed(config.mode);
   const engineConfig = structuredClone(config.engine);
   // Vóór het bouwen van een broker: de PaperBroker neemt fee/slippage over.
   const fixedRisk = repairRiskConfig(engineConfig.risk);
@@ -196,6 +182,9 @@ async function main(): Promise<void> {
   // Ook wat de engine al tijdens het bouwen logde (bijv. "Opgeslagen staat onbruikbaar …"),
   // daarna elke nieuwe regel.
   attachTerminalLog(engine);
+  // Zolang de bot niet draait (vóór Start, na Stop/noodstop): alleen koersen verversen,
+  // meteen één keer, zodat herstelde posities niet tegen de instapkoers getoond worden.
+  void engine.startPriceMonitor();
 
   // Backtests/optimalisaties in een worker-thread: de engine en de noodstop blijven reageren.
   const heavyRunner = new HeavyRunner({ log: (m) => console.warn(m) });
@@ -259,6 +248,7 @@ async function main(): Promise<void> {
   const { shutdown } = createShutdown({
     mode: config.mode,
     stopEngine: async () => {
+      engine.stopPriceMonitor();
       await heavyRunner.close().catch(() => undefined);
       await engine.stop();
     },
