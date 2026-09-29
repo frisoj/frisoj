@@ -25,18 +25,11 @@ export interface OptimizeOptions {
 }
 
 /**
- * Score → action (the ensemble's `classify`). `exitScore` is the optional
- * exit score of the decision (see `EnsembleDecision.exitScore` in the ensemble).
+ * Score → action (the ensemble's `classify`). `exitScore` is the decision's
+ * optional `EnsembleDecision.exitScore` (the score selling is based on).
  */
 export type ClassifyFn = (score: number, regime: Regime, cfg: EnsembleConfig, exitScore?: number) => SignalAction;
 
-/** A decision that may carry the ensemble's exit score (not part of the core contract yet). */
-type DecisionWithExit = EnsembleDecision & { exitScore?: number };
-
-function exitScoreOf(d: EnsembleDecision): number | undefined {
-  const v = (d as DecisionWithExit).exitScore;
-  return typeof v === "number" ? v : undefined;
-}
 export type ParamSpaceFn = (strategy: StrategyId) => Record<string, number[]>;
 
 /** BacktestDeps plus optional hooks for the optimizer (mainly for tests). */
@@ -199,23 +192,6 @@ function decodeCombo(index: number, keys: string[], grid: Record<string, number[
   return ordered;
 }
 
-/**
- * Heatmap with per-cell details. `values` = MEDIAN of the scored (non-penalised)
- * combinations in the cell, so one lucky combination cannot paint a region
- * green; the extra arrays let the UI show how robust a cell is.
- * (Extra fields on top of the core `Heatmap` contract; JSON-safe.)
- */
-export interface HeatmapDetail extends Heatmap {
-  /** Best score per cell (max over the other params), null = no combination with enough trades */
-  best: (number | null)[][];
-  /** Number of sampled combinations that fell into the cell */
-  tested: number[][];
-  /** Of those: number with at least MIN_TRADES_FOR_SCORE trades (score counts) */
-  scored: number[][];
-  /** Of the scored ones: number above the neutral point (profitFactor: 1, otherwise 0) */
-  positive: number[][];
-}
-
 /** Neutral score of an objective: profit factor 1, everything else 0. */
 export function objectivePivot(objective: OptimizeObjective | undefined): number {
   return objective === "profitFactor" ? 1 : 0;
@@ -229,14 +205,22 @@ function median(xs: number[]): number | null {
 }
 
 /**
- * Heatmap over the two params with the most distinct values. Cell value =
- * median score over the other (hidden) params; `best` keeps the maximum.
+ * Heatmap over the two params with the most distinct values, with ALL the
+ * per-cell details of the `Heatmap` contract filled in (JSON-safe):
+ * - `values` = MEDIAN of the scored (non-penalised) combinations in the cell
+ *   (over the other, hidden params), so one lucky combination cannot paint a
+ *   region green;
+ * - `best` = best score per cell (null = no combination with enough trades);
+ * - `tested` = sampled combinations that fell into the cell;
+ * - `scored` = of those, the ones with at least MIN_TRADES_FOR_SCORE trades;
+ * - `positive` = of the scored ones, the ones above the neutral point
+ *   (profitFactor: 1, otherwise 0).
  */
 export function buildHeatmap(
   grid: Record<string, number[]>,
   tested: { params: Record<string, number>; score: number }[],
   objective?: OptimizeObjective,
-): HeatmapDetail | null {
+): Required<Heatmap> | null {
   const keys = Object.keys(grid);
   if (keys.length < 2) return null;
   const byCount = keys
@@ -301,7 +285,7 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
         const overridden = new Uint8Array(computed.length);
         for (let i = 0; i < computed.length; i++) {
           const d = computed[i];
-          if (classify(d.score, d.regime, ens, exitScoreOf(d)) !== d.action) overridden[i] = 1;
+          if (classify(d.score, d.regime, ens, d.exitScore) !== d.action) overridden[i] = 1;
         }
         entry = { decisions: computed, overridden };
         scoreCache.set(scoreKey, entry);
@@ -315,7 +299,7 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
             decisions[i] = d;
             continue;
           }
-          const action = classify(d.score, d.regime, ens, exitScoreOf(d));
+          const action = classify(d.score, d.regime, ens, d.exitScore);
           decisions[i] = action === d.action ? d : { ...d, action };
         }
       }

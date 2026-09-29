@@ -165,7 +165,9 @@ export function mountSettings(ctx, el) {
       <div class="panel st-top">
         <div>
           <div class="panel-title">Instellingen</div>
-          <p class="pn-hint">Pas aan hoe de bot handelt. Wijzigingen gelden pas na <b>Opslaan</b> en worden bewaard in <span class="mono">data/config.json</span>.</p>
+          <p class="pn-hint">Pas aan hoe de bot handelt. Wijzigingen gelden pas na <b>Opslaan</b> en worden bewaard in <span class="mono">&lt;DATA_DIR&gt;/config.json</span>
+            (standaard <span class="mono">data/config.json</span>). Wat hier is opgeslagen gaat vóór <span class="mono">MARKETS</span> en
+            <span class="mono">INTERVAL</span> uit <span class="mono">.env</span>: die worden dan genegeerd.</p>
         </div>
         <div class="st-top-actions">
           <button type="button" class="btn btn-ghost" data-act="defaults" title="Vul de fabrieksinstellingen in (nog niet opgeslagen)">↺ Standaardwaarden</button>
@@ -192,7 +194,7 @@ export function mountSettings(ctx, el) {
                 help: "Hoe vaak de bot koersen ophaalt en stops controleert." })}
             </div>
             ${numField({ path: "historyCandles", key: "historyCandles", label: "Historie per analyse", unit: "candles", step: 50, min: 100, max: 1000,
-              help: "Aantal candles dat de strategieën per keer bekijken. Minimaal ~250 zodat ook de EMA 200 klopt." })}
+              help: "Aantal candles dat de strategieën per analyse bekijken. Is dat minder dan de opwarmtijd die een strategie nodig heeft (bijv. voor de EMA 200), dan haalt de bot die extra candles zelf op." })}
           </section>
 
           <section class="panel st-sec st-sec-strats">
@@ -256,7 +258,8 @@ export function mountSettings(ctx, el) {
                 <button type="button" data-remove="${esc(m)}" aria-label="${esc(m)} verwijderen" title="Verwijderen">×</button></span>`).join("")
             : '<span class="neg">Kies minstens één markt.</span>'
         }</div>
-        <div class="st-help">Maximaal ${MAX_MARKETS}. Met een klein saldo zijn 2–4 liquide markten (BTC, ETH, SOL) verstandig: minder spreiding van je €5-orders.</div>
+        <div class="st-help">Maximaal ${MAX_MARKETS}. Met een klein saldo zijn 2–4 liquide markten (BTC, ETH, SOL) verstandig: minder spreiding van je €5-orders.
+          Opgeslagen markten en interval gaan vóór <span class="mono">MARKETS</span>/<span class="mono">INTERVAL</span> in <span class="mono">.env</span>.</div>
       </div>
       <div class="st-madd">
         <input class="input st-msearch" type="search" placeholder="Zoek markt om toe te voegen…" value="${esc(state.search)}" aria-label="Zoek markt">

@@ -278,22 +278,78 @@ describe("TradingEngine — orderuitkomsten van de broker", () => {
     expect(h.engine.snapshot().positions).toHaveLength(0);
   });
 
-  it("live: onbekende koop die bij Bitvavo niet bestaat (null) heft de blokkade op zonder positie", async () => {
+  it("live: onbekende koop die bij Bitvavo 3 ticks op rij niet bestaat (null) heft de blokkade op zonder positie", async () => {
+    // Herschreven (ronde 2): één "niet gevonden" was genoeg; nu pas na 3 ticks op rij.
+    const h = setup({ mode: "live", startingCapital: 50 });
+    h.engine.arm();
+    h.broker.script.push((req) => result(req, { status: "new", error: "UITKOMST ONBEKEND: time-out" }));
+    h.signals.buyAt.add(h.lastClosed());
+    await h.engine.tick();
+    const lookups: string[] = [];
+    h.broker.lookupOrder = async (_m, cid) => {
+      lookups.push(cid);
+      return null;
+    };
+    // Tick 1 en 2: nog geblokkeerd (1/3, 2/3), ook bij een nieuw koopsignaal
+    nextBuyCandle(h);
+    await h.engine.tick();
+    expect(h.engine.snapshot().unknownOrders).toHaveLength(1);
+    expect(h.broker.buys()).toHaveLength(1);
+    expect(h.logs().some((m) => m.includes("nog niet gevonden bij Bitvavo (1/3)"))).toBe(true);
+    h.clock.advance(15_000);
+    await h.engine.tick();
+    expect(h.engine.snapshot().unknownOrders).toHaveLength(1);
+    expect(h.logs().some((m) => m.includes("(2/3)"))).toBe(true);
+    expect(h.logs().some((m) => m.includes("bestaat volgens Bitvavo niet"))).toBe(false);
+    // Tick 3: definitief niet geplaatst → blokkade weg, vóór de entries van deze tick
+    nextBuyCandle(h);
+    await h.engine.tick();
+    const s = h.engine.snapshot();
+    expect(lookups).toHaveLength(3);
+    expect(s.unknownOrders).toEqual([]);
+    expect(h.logs().some((m) => m.includes("bestaat volgens Bitvavo niet") && m.includes("3× op rij niet gevonden"))).toBe(true);
+    expect(h.broker.buys()).toHaveLength(2);
+    expect(s.positions).toHaveLength(1);
+    expect(s.account.cashQuote).toBeCloseTo(30, 9);
+  });
+
+  it("live: 'niet gevonden' telt alleen op rij — een lookup-fout of open status zet de teller terug", async () => {
+    const h = setup({ mode: "live", startingCapital: 50 });
+    h.engine.arm();
+    h.broker.script.push((req) => result(req, { status: "new", error: "UITKOMST ONBEKEND: time-out" }));
+    h.signals.buyAt.add(h.lastClosed());
+    await h.engine.tick();
+    const answers: ("null" | "throw" | "open")[] = ["null", "null", "throw", "null", "null", "open", "null", "null", "null"];
+    h.broker.lookupOrder = async (market, clientOrderId) => {
+      const a = answers.shift();
+      if (a === "throw") throw new Error("rate limit");
+      if (a === "open")
+        return { orderId: "o", clientOrderId, market, side: "buy", status: "new", filledAmount: 0, filledQuote: 0, avgPrice: 0, feeQuote: 0, timestamp: 0 };
+      return null;
+    };
+    for (let i = 0; i < 8; i++) {
+      h.clock.advance(15_000);
+      await h.engine.tick();
+      expect(h.engine.snapshot().unknownOrders).toHaveLength(1);
+    }
+    h.clock.advance(15_000);
+    await h.engine.tick(); // derde null op rij
+    expect(h.engine.snapshot().unknownOrders).toEqual([]);
+  });
+
+  it("live: noodstop telt 'niet gevonden' niet mee en meldt de onbekende koop als niet gesloten", async () => {
     const h = setup({ mode: "live", startingCapital: 50 });
     h.engine.arm();
     h.broker.script.push((req) => result(req, { status: "new", error: "UITKOMST ONBEKEND: time-out" }));
     h.signals.buyAt.add(h.lastClosed());
     await h.engine.tick();
     h.broker.lookupOrder = async () => null;
-    nextBuyCandle(h);
-    await h.engine.tick();
-    const s = h.engine.snapshot();
-    expect(s.unknownOrders).toEqual([]);
-    expect(h.logs().some((m) => m.includes("bestaat volgens Bitvavo niet"))).toBe(true);
-    // De blokkade is opgeheven vóór de entries van deze tick: nieuwe koop gaat door
-    expect(h.broker.buys()).toHaveLength(2);
-    expect(s.positions).toHaveLength(1);
-    expect(s.account.cashQuote).toBeCloseTo(30, 9);
+    const res = await h.engine.killSwitch();
+    expect(res.closed).toBe(0);
+    expect(res.failed).toHaveLength(1);
+    expect(res.failed[0].market).toBe("BTC-EUR");
+    expect(res.failed[0].reason).toContain("kooporder met onbekende uitkomst");
+    expect(h.engine.snapshot().unknownOrders).toHaveLength(1);
   });
 
   it("live: deels gevulde koop met UITKOMST ONBEKEND → bekende deel geboekt, blokkade tot opgehelderd, later bijgeboekt", async () => {
@@ -354,17 +410,25 @@ describe("TradingEngine — orderuitkomsten van de broker", () => {
     expect(s.logs.some((l) => l.level === "error" && l.message.startsWith("UITKOMST ONBEKEND bij verkoop BTC-EUR"))).toBe(true);
     const sellsBefore = h.broker.sells().length;
 
-    // De verkoop bleek toch uitgevoerd: geen BTC meer op het account
+    // De verkoop bleek toch uitgevoerd: geen BTC meer op het account.
+    // Herschreven (ronde 2): pas bij de tweede waarneming (volgende tick) wordt er geboekt.
     h.broker.balances.set("BTC", 0);
     h.clock.advance(15_000);
     await h.engine.tick();
     s = h.engine.snapshot();
     expect(h.broker.sells()).toHaveLength(sellsBefore); // niet opnieuw verstuurd
+    expect(s.positions).toHaveLength(1);
+    expect(h.logs().some((m) => m.startsWith("BTC-EUR: er staat maar 0 van") && m.includes("op Bitvavo"))).toBe(true);
+    h.clock.advance(15_000);
+    await h.engine.tick();
+    s = h.engine.snapshot();
+    expect(h.broker.sells()).toHaveLength(sellsBefore);
     expect(s.positions).toHaveLength(0);
     expect(s.trades).toHaveLength(1);
     expect(s.trades[0].amount).toBeCloseTo(pos.amount, 12);
     expect(s.trades[0].exitReason).toBe("stop-loss");
-    expect(h.logs().some((m) => m.includes("staat niet meer op Bitvavo"))).toBe(true);
+    const msg = h.logs().find((m) => m.includes("staat niet meer op Bitvavo"));
+    expect(msg).toContain("vermoedelijk verkocht bij de order met onbekende uitkomst");
   });
 
   it("live: verkoop met UITKOMST ONBEKEND en het saldo is er nog → volgende tick opnieuw verkopen", async () => {
@@ -393,7 +457,14 @@ describe("TradingEngine — orderuitkomsten van de broker", () => {
     h.clock.advance(15_000);
     h.feed.setLast("BTC-EUR", 48_900);
     await h.engine.tick();
+    // Herschreven (ronde 2): één saldo-antwoord is niet genoeg — eerst nog een tick kijken.
     let s = h.engine.snapshot();
+    expect(h.broker.sells()).toHaveLength(0);
+    expect(s.positions).toHaveLength(1);
+    expect(s.trades).toHaveLength(0);
+    h.clock.advance(15_000);
+    await h.engine.tick();
+    s = h.engine.snapshot();
     expect(h.broker.sells()).toHaveLength(0);
     expect(s.positions).toHaveLength(0);
     expect(s.trades).toHaveLength(1);

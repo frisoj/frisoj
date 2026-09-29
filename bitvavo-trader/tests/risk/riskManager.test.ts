@@ -321,6 +321,41 @@ describe("planEntry — sizing", () => {
     expect(capped.reasons).toContain("Te klein: €9,00 < minimum €10,00");
   });
 
+  it("zonder MarketInfo verlaagt een lagere instelling (< €5) het beursminimum niet", () => {
+    // Vroeger werd de instelling (€1) dan als beursminimum gebruikt: €4,04 werd goedgekeurd
+    // (de broker weigert die koop) en €5,53 ook (bij de stop ~€4,80: onverkoopbaar).
+    const low = { minOrderQuote: 1 };
+    const small = rm(low).planEntry(decision({ atr: 9 }), account(), undefined, NOW);
+    expect(small.approved).toBe(false);
+    expect(small.quoteAmount).toBe(0);
+    expect(small.reasons).toContain("Te klein: €4,04 < minimum €5,00");
+
+    const atStop = rm(low).planEntry(decision({ atr: 6.5 }), account(), undefined, NOW);
+    expect(atStop.approved).toBe(false);
+    expect(atStop.reasons[0]).toBe(
+      "Positie van €5,53 zakt bij de stop-loss onder het minimum van €5,00 en kan dan niet verkocht worden (minimaal €5,94 nodig)",
+    );
+    // Precies hetzelfde als met de MarketInfo van Bitvavo (€5).
+    const withInfo = rm(low).planEntry(decision({ atr: 6.5 }), account(), marketInfo(), NOW);
+    expect(withInfo.approved).toBe(false);
+    expect(withInfo.reasons.join(" ")).toContain("minimaal €5,94 nodig");
+
+    // Een ruime positie wordt gewoon goedgekeurd.
+    const ok = rm(low).planEntry(decision(), account(), undefined, NOW);
+    expect(ok.approved).toBe(true);
+    expect(ok.quoteAmount).toBe(22.5);
+
+    // MarketInfo met een lager beursminimum (€1) blijft wél gelden.
+    const lowMarket = rm(low).planEntry(decision({ atr: 9 }), account(), marketInfo({ minOrderQuote: 1 }), NOW);
+    expect(lowMarket.approved).toBe(true);
+    expect(lowMarket.quoteAmount).toBe(4.04);
+
+    // Hogere instelling zonder MarketInfo: die geldt (strengste telt), zoals voorheen.
+    const high = rm({ minOrderQuote: 30 }).planEntry(decision(), account(), undefined, NOW);
+    expect(high.approved).toBe(false);
+    expect(high.reasons).toContain("Te klein: €22,50 < minimum €30,00");
+  });
+
   it("verkoopbaarheid bij de stop rekent met het beursminimum, niet met de (hogere) instelling", () => {
     // Stop −20% (ATR 10): beurs €5 → minimaal €5 × 1,0025 × 100,05/80,05 × 1,03 ≈ €6,46.
     // Met instelling €10 is het minimum dus €10 (niet €10 × 1,29 ≈ €12,90):
@@ -384,6 +419,34 @@ describe("planEntry — positie blijft verkoopbaar (min. €5 bij verkopen)", ()
       NOW,
     );
     expect(sol.approved).toBe(false);
+  });
+
+  it("ook zonder MarketInfo en met een verlaagde instelling (€1): goedgekeurd = te kopen én bij de stop te verkopen", async () => {
+    // Standaard PaperBroker (zonder marktinfo): beursminimum €5, net als Bitvavo.
+    const c = cfg({ minOrderQuote: 1 });
+    let approved = 0;
+    for (const equity of [20, 50, 100]) {
+      for (let atrPct = 0.5; atrPct <= 20; atrPct += 0.5) {
+        const px = 100;
+        const plan = new RiskManager(c, "15m").planEntry(
+          decision({ price: px, atr: (px * atrPct) / 100 }),
+          account({ equity, cashQuote: equity, dayStartEquity: equity }),
+          undefined,
+          NOW,
+        );
+        if (!plan.approved) continue;
+        approved++;
+        expect(plan.quoteAmount).toBeGreaterThanOrEqual(5);
+        for (const ref of [plan.stopPrice, plan.stopPrice * 0.975]) {
+          const broker = new PaperBroker({ startingQuote: equity, takerFee: c.takerFee, slippagePct: c.slippagePct, now: () => NOW });
+          const buy = await broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: plan.quoteAmount }, px);
+          expect(buy.status, `atr ${atrPct}%, equity ${equity}: ${buy.error}`).toBe("filled");
+          const sell = await broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: buy.filledAmount }, ref);
+          expect(sell.status, `atr ${atrPct}%, equity ${equity}, ref ${ref}: ${sell.error}`).toBe("filled");
+        }
+      }
+    }
+    expect(approved).toBeGreaterThan(20);
   });
 
   it("elke goedgekeurde positie is op én iets onder de stop nog te verkopen, met risico ≤ budget", async () => {
@@ -849,10 +912,12 @@ describe("haltStatus", () => {
     const r = rm({ dailyLossLimitPct: 5 });
     const at = r.haltStatus(account({ equity: 47.5, dayStartEquity: 50 }));
     expect(at.halted).toBe(true);
+    expect(at.dailyLimit).toBe(true);
     expect(at.reason).toContain("Dagelijkse verlieslimiet bereikt (-5,0%");
     expect(r.haltStatus(account({ equity: 47.51, dayStartEquity: 50 }))).toEqual({ halted: false });
     const below = r.haltStatus(account({ equity: 46.9, dayStartEquity: 50 }));
     expect(below.halted).toBe(true);
+    expect(below.dailyLimit).toBe(true);
     expect(below.reason).toContain("(-6,2%");
     expect(r.haltStatus(account({ equity: 55, dayStartEquity: 50 })).halted).toBe(false);
   });
@@ -862,6 +927,22 @@ describe("haltStatus", () => {
     expect(r.haltStatus(account({ equity: 0, dayStartEquity: 0 })).halted).toBe(true);
     expect(r.haltStatus(account({ equity: -1 })).halted).toBe(true);
     expect(r.haltStatus(account({ equity: Number.NaN })).halted).toBe(true);
+    // Dit is niet de dagelijkse verlieslimiet (die geldt de hele dag; deze stops niet per se).
+    expect(r.haltStatus(account({ equity: 0, dayStartEquity: 0 })).dailyLimit).toBeUndefined();
+    expect(r.haltStatus(account({ equity: Number.NaN })).dailyLimit).toBeUndefined();
+  });
+
+  it("dailyLimit: true bij de dagelijkse verlieslimiet; planEntry neemt de reden over", () => {
+    const r = rm({ dailyLossLimitPct: 5 });
+    expect(r.haltStatus(account({ equity: 40, dayStartEquity: 50 }))).toEqual({
+      halted: true,
+      reason: "Dagelijkse verlieslimiet bereikt (-20,0%, limiet -5,0%)",
+      dailyLimit: true,
+    });
+    // planEntry neemt de reden over
+    const plan = r.planEntry(decision(), account({ equity: 40, cashQuote: 40, dayStartEquity: 50 }), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons).toContain("Dagelijkse verlieslimiet bereikt (-20,0%, limiet -5,0%)");
   });
 
   it("dayStartEquity 0 → alleen de equity-check", () => {

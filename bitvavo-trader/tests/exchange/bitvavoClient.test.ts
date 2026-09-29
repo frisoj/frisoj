@@ -459,7 +459,7 @@ describe("BitvavoClient: fouten, retries, rate limit", () => {
     expect(err.message).toContain("timeout");
   });
 
-  it("houdt rate-limit headers bij en wacht bij < 20 resterend", async () => {
+  it("houdt rate-limit headers bij en laat publieke verzoeken wachten bij < 50 resterend", async () => {
     sleeps.length = 0;
     const { fetchImpl } = mockFetch(() => ({
       body: { time: NOW },

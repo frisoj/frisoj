@@ -7,6 +7,97 @@ export const MIN_TRADES_FOR_SCORE = 5;
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
+export const INTERVAL_MS = {
+  "1m": 6e4, "5m": 3e5, "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5,
+  "4h": 144e5, "6h": 216e5, "8h": 288e5, "12h": 432e5, "1d": 864e5,
+};
+const DAY_MS = 86_400_000;
+
+/** Zelfde als MIN_PERIOD_CANDLES in src/server/routes.ts: minimaal aantal candles in de testperiode. */
+export const MIN_PERIOD_CANDLES = 30;
+
+/** Aantal candles in `days` dagen van `interval` (NaN bij onbekend interval). */
+export function periodCandles(days, interval) {
+  const ms = INTERVAL_MS[interval];
+  return ms ? (Number(days) * DAY_MS) / ms : NaN;
+}
+
+/** Kleinste aantal (hele) dagen dat minstens MIN_PERIOD_CANDLES candles van `interval` geeft. */
+export function minPeriodDays(interval) {
+  const ms = INTERVAL_MS[interval];
+  return ms ? Math.max(1, Math.ceil((MIN_PERIOD_CANDLES * ms) / DAY_MS - 1e-9)) : 1;
+}
+
+/** Nederlandse melding als de periode te kort is voor een backtest, anders null. */
+export function periodError(days, interval) {
+  const n = periodCandles(days, interval);
+  if (!Number.isFinite(n) || n + 1e-9 >= MIN_PERIOD_CANDLES) return null;
+  return (
+    `Periode te kort: ${days} ${Number(days) === 1 ? "dag" : "dagen"} van ${interval} is maar ${Math.floor(n + 1e-9)} candles ` +
+    `(minimaal ${MIN_PERIOD_CANDLES}). Kies minstens ${minPeriodDays(interval)} dagen of een korter interval.`
+  );
+}
+
+/** Lengte van de ECHTE testperiode van een backtestresultaat in dagen (from/to = openingstijd eerste/laatste candle). */
+export function resultDays(res) {
+  if (!res || !isNum(res.from) || !isNum(res.to) || res.to < res.from) return NaN;
+  return (res.to - res.from + (INTERVAL_MS[res.interval] || 0)) / DAY_MS;
+}
+
+// ── Heatmap (optimizer) ──
+
+const idxOf = (list, v) => (Array.isArray(list) && isNum(v) ? list.findIndex((x) => Math.abs(x - v) <= 1e-9 * Math.max(1, Math.abs(v))) : -1);
+
+/**
+ * Eén heatmapcel. `values` zijn de MEDIAAN-scores over de overige parameters.
+ * status: "ok" (score), "untested" (niets getest in deze cel), "few" (wel
+ * getest, maar geen combinatie met genoeg trades) of "none" (oudere server
+ * zonder `tested`: null = niet getest óf te weinig trades).
+ */
+export function heatmapCell(hm, xi, yi) {
+  const v = hm?.values?.[yi]?.[xi];
+  const value = isNum(v) ? v : null;
+  const arr = (k) => (Array.isArray(hm?.[k]) ? hm[k][yi]?.[xi] : undefined);
+  const count = (k) => {
+    const c = arr(k);
+    return isNum(c) ? c : Array.isArray(hm?.[k]) ? 0 : null;
+  };
+  const b = arr("best");
+  const tested = count("tested");
+  const scored = count("scored");
+  const positive = count("positive");
+  let status = "ok";
+  if (value === null) status = tested === null ? "none" : tested > 0 ? "few" : "untested";
+  return { value, best: isNum(b) ? b : null, tested, scored, positive, status };
+}
+
+/** Cel van de beste combinatie (res.best) in de heatmap, of null (niet max(values): die is een mediaan). */
+export function bestHeatmapCell(hm, bestRow) {
+  if (!hm || !bestRow || !isScoredRow(bestRow) || !bestRow.params) return null;
+  const xi = idxOf(hm.xValues, bestRow.params[hm.xParam]);
+  const yi = idxOf(hm.yValues, bestRow.params[hm.yParam]);
+  return xi >= 0 && yi >= 0 ? { xi, yi } : null;
+}
+
+/**
+ * Tooltiptekst (zonder HTML) van een heatmapcel, bijv.
+ * "mediaan 0,42 · beste 1,10 · 3 van 4 winstgevend (6 getest)".
+ * `fmtScore(v)` formatteert een score.
+ */
+export function heatmapCellTip(cell, fmtScore) {
+  if (!cell) return "";
+  if (cell.status === "untested") return "niet getest";
+  if (cell.status === "few") return `te weinig trades (${cell.tested} getest, geen enkele met minstens ${MIN_TRADES_FOR_SCORE} trades)`;
+  if (cell.status === "none") return "niet getest of te weinig trades";
+  let s = `mediaan ${fmtScore(cell.value)}`;
+  if (cell.best !== null) s += ` · beste ${fmtScore(cell.best)}`;
+  if (cell.positive !== null && cell.scored !== null) {
+    s += ` · ${cell.positive} van ${cell.scored} winstgevend`;
+    if (cell.tested !== null) s += ` (${cell.tested} getest)`;
+  }
+  return s;
+}
+
 /**
  * Kwaliteit van een KPI-kaart: "good" | "warn" | "bad" | "neutral".
  * `maxDrawdownPct` is volgens het contract ≤ 0 (metrics.ts); we vergelijken de

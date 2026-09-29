@@ -4,6 +4,7 @@
  * (`<dataDir>/config.json`) samen met de standaardwaarden.
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { isIPv6 } from "node:net";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
@@ -61,19 +62,30 @@ export class ConfigError extends Error {
 
 export const OVERRIDES_FILE = "config.json";
 
-const LOOPBACK_NAMES = new Set(["localhost", "::1", "[::1]"]);
 const OCTET = "(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)";
 const LOOPBACK_V4 = new RegExp(`^127\\.${OCTET}\\.${OCTET}\\.${OCTET}$`);
 
+/** Canonieke vorm van een IPv6-adres (met of zonder [ ]), bijv. "0:0:0:0:0:0:0:1" → "[::1]"; anders null. */
+function canonicalIpv6(h: string): string | null {
+  const inner = h.startsWith("[") && h.endsWith("]") ? h.slice(1, -1) : h;
+  if (!isIPv6(inner)) return null;
+  try {
+    return new URL(`http://[${inner}]/`).hostname;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * True als `host` (zonder poort) EXACT een loopback-adres is: localhost, ::1,
- * [::1] of een IPv4-adres 127.x.y.z. Namen die alleen met "127." beginnen
- * (bijv. "127.aanvaller.example" of "127.0.0.1.nip.io") zijn gewone
- * domeinnamen en tellen NIET als loopback (bescherming tegen DNS-rebinding).
+ * True als `host` (zonder poort) EXACT een loopback-adres is: localhost, een
+ * IPv4-adres 127.x.y.z of IPv6 ::1 in elke schrijfwijze (::1, [::1],
+ * 0:0:0:0:0:0:0:1, …). Namen die alleen met "127." beginnen (bijv.
+ * "127.aanvaller.example" of "127.0.0.1.nip.io") zijn gewone domeinnamen en
+ * tellen NIET als loopback (bescherming tegen DNS-rebinding).
  */
 export function isLoopbackHost(host: string): boolean {
   const h = host.trim().toLowerCase();
-  return LOOPBACK_NAMES.has(h) || LOOPBACK_V4.test(h);
+  return h === "localhost" || LOOPBACK_V4.test(h) || canonicalIpv6(h) === "[::1]";
 }
 
 // ─────────────────────────────── helpers ───────────────────────────────

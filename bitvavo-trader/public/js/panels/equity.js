@@ -49,6 +49,32 @@ function tickFormatter(time, type) {
   return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Waarde die de curve toont: equity + (live) cumulatief afgeroomde winst */
+export function curveValue(p) {
+  return Number(p && p.equity) + (Number(p && p.skimmed) || 0);
+}
+
+/**
+ * Kerncijfers voor het paneel. Live wordt winst boven de kapitaallimiet
+ * afgeroomd: de engine verlaagt dan `startingEquity` met dat bedrag, dus de
+ * baseline (oorspronkelijke start) is `startingEquity + skimmedQuote` en de
+ * curve toont `equity + skimmed`. Rendement: `account.totalReturnPct` als de
+ * server die meestuurt.
+ */
+export function equityFigures(s) {
+  const a = (s && s.account) || {};
+  const hist = Array.isArray(s && s.equityHistory) ? s.equityHistory : [];
+  const skimmed = Number(s && s.skimmedQuote) > 0 ? Number(s.skimmedQuote) : 0;
+  const equity = Number(a.equity);
+  const rawStart = Number(a.startingEquity);
+  const start = rawStart > 0 ? rawStart + skimmed : hist.length ? curveValue(hist[0]) : 0;
+  const pnl = Number.isFinite(rawStart) && rawStart > 0 ? equity - rawStart : equity + skimmed - start;
+  const ret = Number.isFinite(a.totalReturnPct) ? a.totalReturnPct : start > 0 ? ((equity + skimmed) / start - 1) * 100 : NaN;
+  const now = { equity: equity + skimmed };
+  const dd = maxDrawdownPct(hist.length ? hist.map((p) => ({ equity: curveValue(p) })).concat([now]) : [now]);
+  return { equity, skimmed, start, pnl, ret, dd };
+}
+
 function maxDrawdownPct(points) {
   let peak = -Infinity;
   let dd = 0;
@@ -61,7 +87,7 @@ function maxDrawdownPct(points) {
 
 export function mountEquity(ctx, el) {
   ensureCss();
-  const { fmt, bus } = ctx;
+  const { fmt, esc, bus } = ctx;
   if (!el) return;
   el.classList.add("eq");
 
@@ -77,6 +103,7 @@ export function mountEquity(ctx, el) {
       <div class="stat"><span class="stat-label">Trades</span><span class="stat-value eq-s-trades">–</span></div>
       <div class="stat" title="Percentage winnende trades"><span class="stat-label">Winrate</span><span class="stat-value eq-s-win">–</span></div>
     </div>
+    <div class="eq-skim" hidden></div>
     <p class="pn-hint">Groen = boven je startkapitaal, rood = eronder. De stippellijn is je startbedrag.</p>`;
 
   const $ = (s) => el.querySelector(s);
@@ -137,20 +164,16 @@ export function mountEquity(ctx, el) {
   function toData(hist) {
     const bySec = new Map();
     for (const p of hist || []) {
-      if (!p || !Number.isFinite(p.time) || !Number.isFinite(p.equity)) continue;
-      bySec.set(Math.floor(p.time / 1000), p.equity);
+      if (!p || !Number.isFinite(p.time) || !Number.isFinite(curveValue(p))) continue;
+      bySec.set(Math.floor(p.time / 1000), curveValue(p));
     }
     return [...bySec.entries()].sort((a, b) => a[0] - b[0]).map(([time, value]) => ({ time, value }));
   }
 
   function update(s) {
     if (!s || !s.account) return;
-    const a = s.account;
     const hist = Array.isArray(s.equityHistory) ? s.equityHistory : [];
-    const start = Number(a.startingEquity) || (hist[0]?.equity ?? 0);
-    const equity = Number(a.equity);
-    const ret = start > 0 ? (equity / start - 1) * 100 : NaN;
-    const dd = maxDrawdownPct(hist.length ? hist.concat([{ equity }]) : [{ equity }]);
+    const { equity, skimmed, start, pnl, ret, dd } = equityFigures(s);
     const trades = Array.isArray(s.trades) ? s.trades : [];
     const wins = trades.filter((x) => x.pnlQuote > 0).length;
 
@@ -160,13 +183,21 @@ export function mountEquity(ctx, el) {
     retEl.className = `eq-ret mono ${fmt.pnlClass(ret)}`;
     const sr = $(".eq-s-ret");
     sr.textContent = fmt.pct(ret, 2);
-    sr.title = `${fmt.eurSigned(equity - start)} t.o.v. start ${fmt.eur(start)}`;
+    sr.title = `${fmt.eurSigned(pnl)} t.o.v. start ${fmt.eur(start)}`;
     sr.className = `stat-value eq-s-ret ${fmt.pnlClass(ret)}`;
     const sd = $(".eq-s-dd");
     sd.textContent = fmt.pct(dd, 2);
     sd.className = `stat-value eq-s-dd ${dd < -0.005 ? "neg" : "flat"}`;
     $(".eq-s-trades").textContent = trades.length >= 200 ? "200+" : String(trades.length);
     $(".eq-s-win").textContent = trades.length ? fmt.pct((wins / trades.length) * 100, 0, false) : "–";
+    // Live: winst boven de kapitaallimiet wordt buiten het handelsbudget gehouden
+    const skimEl = $(".eq-skim");
+    const showSkim = s.mode === "live" && skimmed > 0;
+    skimEl.hidden = !showSkim;
+    skimEl.innerHTML = showSkim
+      ? `Afgeroomd boven limiet: <b class="mono pos">${esc(fmt.eur(skimmed))}</b>
+         <span class="muted">— blijft op je Bitvavo-account, buiten het handelsbudget. De curve telt het mee (equity + afgeroomd).</span>`
+      : "";
 
     if (!series) return;
     const data = toData(hist);

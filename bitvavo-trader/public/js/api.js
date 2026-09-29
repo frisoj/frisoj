@@ -71,9 +71,15 @@ export const api = {
   /** Noodstop: sluit alle posities en stopt de bot */
   kill: () => request("POST", "/api/engine/kill"),
   closePosition: (id) => request("POST", `/api/positions/${encodeURIComponent(id)}/close`),
+  /** Onverkoopbare positie afschrijven (bot beheert hem niet meer, inleg = verlies) → Trade */
+  writeOffPosition: (id) => request("POST", `/api/positions/${encodeURIComponent(id)}/writeoff`),
   /** Live mode: bevestigingstekst moet exact "IK BEGRIJP HET RISICO" zijn */
   arm: (confirm) => request("POST", "/api/live/arm", { confirm }),
   disarm: () => request("POST", "/api/live/disarm"),
+  /** Live: gebruiker heeft Bitvavo gecontroleerd na kooporder(s) met onbekende uitkomst → EngineSnapshot */
+  ackUnknownOrders: () => request("POST", "/api/live/unknown-orders/ack"),
+  /** Onbruikbare opgeslagen staat bevestigd (deblokkeert live armen) → EngineSnapshot */
+  ackStateRecovery: () => request("POST", "/api/state/recovery/ack"),
   /** Paper mode: reset account naar startkapitaal */
   resetPaper: () => request("POST", "/api/paper/reset"),
   /** MarketInfo[] (alleen EUR-markten die traden) */

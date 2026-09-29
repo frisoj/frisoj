@@ -58,6 +58,8 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
   const runButtons = ["optimize", "walkforward"].map((run) => fakeNode({ dataset: { run } }));
   const formEl = fakeNode({
     elements: { namedItem: (n: string) => (inputs[n] ||= fakeNode({ name: n, value: form[n] ?? "" })) },
+    // Anker voor de foutmeldingen van het formulier (showFormErrors)
+    querySelector: (sel: string) => (sel === ".bt-run-main" ? fakeNode({ before() {} }) : null),
     querySelectorAll: (sel: string) => {
       if (sel.startsWith('input[name="strat"]')) return strats.map((value) => ({ value }));
       if (sel.startsWith(".bt-run[data-run]")) return runButtons;
@@ -66,6 +68,8 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
   });
   // De knoppen die het paneel van een klik-handler voorziet (uit de gerenderde HTML)
   let applyNodes: Fake[] = [];
+  // Vaste nep-nodes per selector binnen het resultaat; alleen de heatmap heeft een breedte (die wordt dus getekend)
+  const outNodes: Record<string, Fake> = {};
   const outEl = fakeNode({
     querySelectorAll: (sel: string) => {
       if (sel !== ".bt-apply") return [];
@@ -73,18 +77,19 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
       applyNodes = rows.map((row) => fakeNode({ dataset: { row } }));
       return applyNodes;
     },
-    querySelector: () => fakeNode({ clientWidth: 0 }),
+    querySelector: (sel: string) => (outNodes[sel] ||= fakeNode({ clientWidth: sel === ".bt-hm" ? 600 : 0, contains: () => true })),
   });
   const applyButtons = () => applyNodes;
   const nodes: Record<string, Fake> = { ".bt-form": formEl, ".bt-out": outEl };
   const el = fakeNode({ querySelector: (sel: string) => (nodes[sel] ||= fakeNode()) });
+  const calls: string[] = [];
   const api = {
     getMarkets: async () => [{ market: "BTC-EUR" }],
     getStrategies: async () => listStrategies(),
     getConfig: async () => structuredClone(config),
     info: async () => ({ dataSource: "simulated" }),
-    optimize: async () => structuredClone(opts.optimize),
-    backtest: async () => structuredClone(opts.backtest),
+    optimize: async () => (calls.push("optimize"), structuredClone(opts.optimize)),
+    backtest: async () => (calls.push("backtest"), structuredClone(opts.backtest)),
     putConfig: async (p: Fake) => {
       puts.push(structuredClone(p));
       config = structuredClone({
@@ -116,6 +121,9 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
   for (const [k, v] of Object.entries(form)) if (inputs[k]) inputs[k].value = v;
   return {
     out: outEl,
+    outNodes,
+    calls,
+    formEl,
     puts,
     modals,
     toasts,
@@ -219,5 +227,133 @@ describe("backtest-KPI's", () => {
     const html = String(p.out.innerHTML);
     const card = html.slice(html.lastIndexOf('<div class="bt-kpi"', html.indexOf("Max. drawdown")), html.indexOf("Max. drawdown"));
     expect(card).toContain('data-q="bad"');
+  });
+});
+
+describe("minimale periode in het formulier", () => {
+  it("1 dag op 1h (24 candles) wordt al in de browser geweigerd met een Nederlandse uitleg", async () => {
+    const p = await mount({ form: { days: "1", interval: "1h" }, backtest: {} });
+    await p.run("backtest");
+    expect(p.calls).toEqual([]);
+    expect(p.toasts[p.toasts.length - 1]).toBe(
+      "warn: Periode te kort: 1 dag van 1h is maar 24 candles (minimaal 30). Kies minstens 2 dagen of een korter interval.",
+    );
+  });
+
+  it("2 dagen op 1h mag wel", async () => {
+    const bt = { market: "BTC-EUR", interval: "1h", initialCapital: 50, metrics: metrics(), trades: [], equityCurve: [], candles: [], markers: [] };
+    const p = await mount({ form: { days: "2", interval: "1h" }, backtest: bt });
+    await p.run("backtest");
+    expect(p.calls).toEqual(["backtest"]);
+  });
+});
+
+describe("backtest-resultaat: periode, note en vastgelopen verkopen", () => {
+  const from = Date.UTC(2026, 8, 20);
+  const bt = (over: Fake = {}) => ({
+    market: "BTC-EUR",
+    interval: "1h",
+    dataSource: "bitvavo",
+    from,
+    to: from + (5 * 24 - 1) * 3600e3,
+    candlesCount: 120,
+    initialCapital: 50,
+    durationMs: 10,
+    metrics: metrics(),
+    trades: [],
+    equityCurve: [],
+    candles: [],
+    markers: [],
+    ...over,
+  });
+
+  it("toont de echte testperiode uit from/to, de note van de server en een waarschuwing voor stuckTrades", async () => {
+    const note = "Periode ingekort: NEW-EUR heeft pas historie vanaf 15 september 2026.";
+    const p = await mount({ backtest: bt({ note, stuckTrades: 2 }) });
+    await p.run("backtest");
+    const html = String(p.out.innerHTML).replace(/\s+/g, " ");
+    expect(html).toContain("20-9-2026 → 24-9-2026 (5 dagen)");
+    expect(html).toContain(`<b>Periode aangepast.</b> ${note}`);
+    expect(html).toContain("2 trades konden eerst niet verkocht worden.");
+    expect(html).toContain("zonder werkende stop-loss");
+  });
+
+  it("zonder note en zonder stuckTrades geen extra banners", async () => {
+    const p = await mount({ backtest: bt({ stuckTrades: 0 }) });
+    await p.run("backtest");
+    const html = String(p.out.innerHTML);
+    expect(html).not.toContain("bt-note");
+    expect(html).not.toContain("bt-stuck");
+  });
+});
+
+describe("heatmap: mediaan en de beste combinatie", () => {
+  it("ster en kader op de cel van res.best (niet op de hoogste mediaan), arcering alleen voor niet-geteste cellen", async () => {
+    const tip = fakeNode({ getBoundingClientRect: () => ({ width: 100, height: 40 }) });
+    const g = globalThis as Record<string, Fake>;
+    g.document.getElementById = () => tip;
+    Object.assign(g.window, { innerWidth: 1600, innerHeight: 900 });
+    const best = {
+      params: { "ensemble.buyThreshold": 0.45, "risk.stopAtrMult": 3, "risk.takeProfitR": 2 },
+      score: 1.4,
+      metrics: metrics(),
+    };
+    const heatmap = {
+      xParam: "ensemble.buyThreshold",
+      yParam: "risk.stopAtrMult",
+      xValues: [0.35, 0.45],
+      yValues: [2, 3],
+      values: [
+        [0.9, null],
+        [null, 0.2],
+      ],
+      best: [
+        [1.1, null],
+        [null, 1.4],
+      ],
+      tested: [
+        [4, 4],
+        [0, 4],
+      ],
+      scored: [
+        [4, 0],
+        [0, 3],
+      ],
+      positive: [
+        [4, 0],
+        [0, 2],
+      ],
+    };
+    const res = { objective: "sharpe", rows: [best], best, combosTested: 12, heatmap, durationMs: 10 };
+    const p = await mount({ optimize: res });
+    await p.run("optimize");
+    const svg = String(p.outNodes[".bt-hm"].innerHTML).replace(/\s+/g, " ");
+    const cell = (x: number, y: number) => {
+      const m = new RegExp(`<g class="bt-cell ([^"]*)" data-x="${x}" data-y="${y}">(.*?)</g>`).exec(svg);
+      return { cls: m?.[1] ?? "", body: m?.[2] ?? "" };
+    };
+    // beste combinatie (0,45 / 3) = cel (1,1), ook al heeft (0,0) de hoogste mediaan
+    expect(cell(1, 1).cls).toContain("is-best");
+    expect(cell(1, 1).body).toContain("★");
+    expect(cell(0, 0).cls).not.toContain("is-best");
+    // niet getest → gearceerd; getest maar te weinig trades → effen, met label
+    expect(cell(0, 1).body).toContain("url(#bt-hatch)");
+    expect(cell(1, 0).body).not.toContain("url(#bt-hatch)");
+    expect(cell(1, 0).body).toContain(">te weinig trades</text>");
+    // legenda
+    expect(String(p.outNodes[".bt-hm-legend"].innerHTML)).toContain("kleur = mediaan over de overige parameters");
+    // tooltip van cel (0,0)
+    p.outNodes[".bt-hm"].fire("mousemove", {
+      clientX: 10,
+      clientY: 10,
+      target: { closest: () => ({ dataset: { x: "0", y: "0" } }) },
+    });
+    expect(String(tip.innerHTML).replace(/\s+/g, " ")).toContain("Sharpe: mediaan 0,9 · beste 1,1 · 4 van 4 winstgevend (4 getest)");
+    p.outNodes[".bt-hm"].fire("mousemove", {
+      clientX: 10,
+      clientY: 10,
+      target: { closest: () => ({ dataset: { x: "1", y: "1" } }) },
+    });
+    expect(String(tip.innerHTML)).toContain("★ hier zit de beste combinatie");
   });
 });

@@ -96,6 +96,9 @@ export function mountSignals(ctx, el) {
           <path class="sig-value" d="${arc(-1, 1, RI)}" pathLength="1000"/>
           <line class="sig-zero" x1="${CX}" y1="${CY - RI + 7}" x2="${CX}" y2="${CY - RI - 7}"/>
           <g class="sig-ticks"></g>
+          <g class="sig-exit" style="transform:rotate(90deg);display:none">
+            <path class="sig-exit-mark" d="M${CX - RI} ${CY - 7} L${CX - RI + 5.5} ${CY} L${CX - RI} ${CY + 7} L${CX - RI - 5.5} ${CY} Z"/>
+          </g>
           <g class="sig-ptr" style="transform:rotate(90deg)">
             <circle cx="${CX - R}" cy="${CY}" r="7.5" class="sig-ptr-dot"/>
           </g>
@@ -108,6 +111,8 @@ export function mountSignals(ctx, el) {
       <div class="sig-side">
         <div class="sig-action" data-a="hold"><span class="sig-action-ico"></span><span class="sig-action-txt">WACHT</span></div>
         <div class="sig-conf"><span class="muted">Zekerheid</span> <b class="sig-conf-val">–</b></div>
+        <div class="sig-exit-row" hidden title="Score van alleen de strategieën die een mening hebben (KOOP of VERKOOP). Verkopen gebeurt als deze onder de verkoopdrempel zakt.">
+          <span class="muted"><span class="sig-exit-ico" aria-hidden="true">◆</span> Exit-score</span> <b class="sig-exit-val mono">–</b></div>
         <div class="sig-regime pn-chip" data-r="unknown"></div>
         <div class="sig-price muted"></div>
       </div>
@@ -117,8 +122,10 @@ export function mountSignals(ctx, el) {
     <details class="pn-help">
       <summary>Hoe werkt dit?</summary>
       <p>Vijf strategieën bekijken elke gesloten candle en stemmen <b>KOOP</b>, <b>VERKOOP</b> of <b>WACHT</b>, elk met een zekerheid.
-      De gewogen som is de <b>score</b> van −1 tot +1. Komt de score in de groene zone (boven de koopdrempel), dan koopt de bot;
-      in de rode zone (onder de verkoopdrempel) verkoopt hij een open positie. Het <b>regime</b> bepaalt welke strategieën zwaarder tellen.</p>
+      De gewogen som van alle stemmen is de <b>score</b> van −1 tot +1 (de wijzer). Komt de score in de groene zone (boven de koopdrempel), dan koopt de bot.</p>
+      <p>Verkopen gaat op de <b>exit-score</b> (het ruitje ◆): het gewogen gemiddelde van alléén de strategieën die wél een mening hebben
+      (KOOP of VERKOOP; WACHT telt niet mee). Zakt die samen onder de verkoopdrempel, dan verkoopt de bot een open positie — ook als de
+      andere strategieën op WACHT staan. Het <b>regime</b> bepaalt welke strategieën zwaarder tellen.</p>
     </details>`;
 
   const $ = (s) => el.querySelector(s);
@@ -129,6 +136,10 @@ export function mountSignals(ctx, el) {
     ticks: $(".sig-ticks"),
     value: $(".sig-value"),
     ptr: $(".sig-ptr"),
+    exit: $(".sig-exit"),
+    exitMark: $(".sig-exit-mark"),
+    exitRow: $(".sig-exit-row"),
+    exitVal: $(".sig-exit-val"),
     ptrDot: $(".sig-ptr-dot"),
     scoreTxt: $(".sig-score-txt"),
     action: $(".sig-action"),
@@ -156,7 +167,7 @@ export function mountSignals(ctx, el) {
     lastGaugeSig = sig;
     q.zones.innerHTML = `
       <path class="sig-track" d="${arc(-1, 1, R)}"/>
-      <path class="sig-zone sig-zone-sell" d="${arc(-1, sell, R)}"><title>Verkoopzone (score ≤ ${esc(fmt.num(sell, 2))})</title></path>
+      <path class="sig-zone sig-zone-sell" d="${arc(-1, sell, R)}"><title>Verkoopzone (exit-score ≤ ${esc(fmt.num(sell, 2))})</title></path>
       <path class="sig-zone sig-zone-hold" d="${arc(sell, buy, R)}"><title>Wachtzone</title></path>
       <path class="sig-zone sig-zone-buy" d="${arc(buy, 1, R)}"><title>Koopzone (score ≥ ${esc(fmt.num(buy, 2))})</title></path>`;
     const tick = (s, cls, label) => {
@@ -170,6 +181,25 @@ export function mountSignals(ctx, el) {
       tick(sell, "sell", fmt.num(sell, 2)) + tick(buy, "buy", (buy > 0 ? "+" : "") + fmt.num(buy, 2));
   }
 
+  /** Tweede markering op de meter: de exit-score (verkopen gebeurt op deze score) */
+  function renderExit(d) {
+    const ex = d ? Number(d.exitScore) : NaN;
+    const has = d != null && d.exitScore != null && Number.isFinite(ex);
+    q.exit.style.display = has ? "" : "none";
+    q.exitRow.hidden = !has;
+    if (!has) {
+      q.exitVal.textContent = "–";
+      return;
+    }
+    const e = Math.max(-1, Math.min(1, ex));
+    const { sell } = thresholds();
+    const a = e < 0 && e <= sell ? "sell" : "hold";
+    q.exit.style.transform = `rotate(${((e + 1) / 2) * 180}deg)`;
+    q.exitMark.dataset.a = a;
+    q.exitVal.textContent = (e > 0 ? "+" : "") + NF2.format(e);
+    q.exitVal.dataset.a = a;
+  }
+
   function renderEmpty(msg) {
     q.body.classList.add("is-empty");
     q.scoreTxt.textContent = "–";
@@ -180,6 +210,7 @@ export function mountSignals(ctx, el) {
     q.actionIco.innerHTML = "";
     q.actionTxt.textContent = "GEEN DATA";
     q.conf.textContent = "–";
+    renderExit(null);
     q.regime.dataset.r = "unknown";
     q.regime.innerHTML = `${regimeIcon("unknown")}<span>Regime onbekend</span>`;
     q.price.textContent = "";
@@ -202,7 +233,7 @@ export function mountSignals(ctx, el) {
     // Veroudering vóór de signatuurcheck: anders verschijnt "verouderd" nooit na de eerste render
     const ivMs = INTERVAL_MS[config?.interval] || 0;
     const stale = !!ivMs && Date.now() - d.time > ivMs * 3;
-    const sig = `${market}|${d.time}|${d.score}|${d.action}|${d.regime}|${lastGaugeSig}|${Object.keys(names).length}|${config?.interval || ""}|${stale}`;
+    const sig = `${market}|${d.time}|${d.score}|${d.exitScore}|${d.action}|${d.regime}|${lastGaugeSig}|${Object.keys(names).length}|${config?.interval || ""}|${stale}`;
     if (sig === lastSig) return;
     lastSig = sig;
     q.body.classList.remove("is-empty");
@@ -218,6 +249,7 @@ export function mountSignals(ctx, el) {
     q.ptrDot.dataset.a = d.action;
     q.scoreTxt.textContent = (score > 0 ? "+" : "") + NF2.format(score);
     q.scoreTxt.dataset.a = d.action;
+    renderExit(d);
 
     q.action.dataset.a = d.action;
     q.actionIco.innerHTML = actionIcon(d.action);

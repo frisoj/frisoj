@@ -15,10 +15,12 @@
  *   signal exit, its close for an intrabar exit (stop / TP / time-stop), just
  *   like the engine, which books intrabar exits after the candle opened;
  * - stop and take-profit in one candle → the risk manager assumes the stop;
- * - an exit is only booked when the position is worth at least the minimum
- *   order (Bitvavo and the brokers reject smaller sells). Otherwise the sell
- *   stays pending, exactly like the engine: no stops / signals any more, just
- *   a new attempt as soon as `amount × price >= minimum`;
+ * - an exit is only booked when the position is worth at least the EXCHANGE
+ *   minimum order (MarketInfo, default €5 — never `risk.minOrderQuote`, which
+ *   is a user setting for entries): Bitvavo and the brokers reject smaller
+ *   sells. Otherwise the sell stays pending, exactly like the engine: no
+ *   stops / signals any more, just a new attempt as soon as
+ *   `amount × price >= minimum`;
  * - slippage per side is never below half the market's bid/ask spread
  *   (`spreadPct`, optional).
  */
@@ -92,6 +94,20 @@ export function spreadFromTicker(t: Pick<Ticker24h, "bid" | "ask"> | undefined |
   return Number.isFinite(s) ? s : undefined;
 }
 
+/** Bitvavo's minimum order value in EUR when there is no MarketInfo (same default as the brokers and the engine). */
+export const DEFAULT_EXCHANGE_MIN_QUOTE = 5;
+
+/**
+ * The EXCHANGE minimum order value (EUR) for buys and sells: MarketInfo's
+ * value, or Bitvavo's default of €5. Never `risk.minOrderQuote`: that is a
+ * user setting (the risk manager uses it as an extra floor for entries); the
+ * brokers refuse exactly what Bitvavo refuses, not more and not less.
+ */
+export function exchangeMinOrderQuote(marketInfo?: Pick<MarketInfo, "minOrderQuote"> | null): number {
+  const v = marketInfo?.minOrderQuote;
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : DEFAULT_EXCHANGE_MIN_QUOTE;
+}
+
 export interface BacktestDeps {
   decide?: (market: string, candles: Candle[], cfg: EnsembleConfig) => EnsembleDecision[];
   createRisk?: (cfg: RiskConfig, interval: Interval) => RiskManagerLike;
@@ -110,10 +126,18 @@ export interface SimulationOutput {
   exposureCandles: number;
   /** Slippage per side that was actually used (incl. half the spread). */
   slippagePct: number;
-  /** Trades whose sell was first refused because the position was worth less than the minimum order. */
+  /** Trades whose sell was first refused because the position was worth less than the minimum order (= result.stuckTrades). */
   stuckTrades: number;
+  /**
+   * Of those: trades that were STILL unsellable at the end of the test (booked
+   * as "end-of-backtest" at the last close, which in reality is not possible).
+   * The rest was sold later after all.
+   */
+  stuckAtEnd: number;
   /** Candles spent waiting for such a refused sell (position open, no stops). */
   stuckCandles: number;
+  /** Exchange minimum order value (EUR) that was used for buys and sells. */
+  minOrderQuote: number;
 }
 
 /** Max number of candles returned for the chart. */
@@ -218,7 +242,9 @@ function emptyResult(input: BacktestInput, startedAt: number): SimulationOutput 
     exposureCandles: 0,
     slippagePct: effectiveSlippagePct(input.risk, input.spreadPct),
     stuckTrades: 0,
+    stuckAtEnd: 0,
     stuckCandles: 0,
+    minOrderQuote: exchangeMinOrderQuote(input.marketInfo),
     result: {
       market: input.market,
       interval: input.interval,
@@ -233,6 +259,7 @@ function emptyResult(input: BacktestInput, startedAt: number): SimulationOutput 
       candles: [],
       markers: [],
       durationMs: Date.now() - startedAt,
+      stuckTrades: 0,
     },
   };
 }
@@ -265,7 +292,8 @@ export function simulate(
 
   const fee = input.risk.takerFee;
   const slip = effectiveSlippagePct(input.risk, input.spreadPct);
-  const minOrder = input.marketInfo?.minOrderQuote ?? input.risk.minOrderQuote ?? 0;
+  // Exchange minimum for buys AND sells (like PaperBroker / LiveBroker), not the risk setting.
+  const minOrder = exchangeMinOrderQuote(input.marketInfo);
   const intervalMs = INTERVAL_MS[interval] ?? 0;
   const dayKeys = dayKeysFor(candles);
   const loopStart = Math.max(evalStart, 1);
@@ -283,6 +311,7 @@ export function simulate(
    */
   let pendingExit = null as { reason: ExitReason; score: number; candles: number } | null;
   let stuckTrades = 0;
+  let stuckAtEnd = 0;
   let stuckCandles = 0;
 
   const trades: Trade[] = [];
@@ -485,6 +514,7 @@ export function simulate(
 
   if (pos) {
     // Mark-to-market at the last close (not a real sell, so no minimum-order check).
+    if (pendingExit) stuckAtEnd++;
     closePosition(n - 1, candles[n - 1].close, "end-of-backtest", decisions[n - 1].score);
     eqValues[curveLen - 1] = cash;
   }
@@ -541,7 +571,9 @@ export function simulate(
     exposureCandles,
     slippagePct: slip,
     stuckTrades,
+    stuckAtEnd,
     stuckCandles,
+    minOrderQuote: minOrder,
     result: {
       market,
       interval,
@@ -556,6 +588,7 @@ export function simulate(
       candles: chartCandles,
       markers,
       durationMs: Date.now() - startedAt,
+      stuckTrades,
     },
   };
 }

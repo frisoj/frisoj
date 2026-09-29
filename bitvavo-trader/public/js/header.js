@@ -21,30 +21,83 @@ let sparkSeq = 0;
 const MIN_ORDER_EUR = 5;
 
 const posValue = (p) => (Number(p && p.amount) || 0) * (Number(p && p.currentPrice) || 0);
+const isNum = (n) => typeof n === "number" && Number.isFinite(n);
+/** Positie die nu niet verkocht kan worden (engine-vlag, of waarde onder het minimum) */
+const isDust = (p, minOrder) => !!(p && (p.unsellable || posValue(p) < minOrder));
+
+const STILL = "Let op: de bot staat stil, stop-loss en take-profit worden NIET bewaakt.";
 
 /**
  * Uitkomst van een noodstop op basis van het antwoord van POST /api/engine/kill
- * (EngineSnapshot). De engine stopt de bot óók als verkopen mislukken; posities
- * die nog in `res.positions` staan zijn dus NIET verkocht en worden niet meer bewaakt.
+ * (EngineSnapshot, met `killResult` als de server die meestuurt). De engine stopt
+ * de bot óók als verkopen mislukken. Met `killResult.failed` tonen we precies welke
+ * posities (of orders met onbekende uitkomst) NIET verkocht zijn en waarom; zonder
+ * `killResult` gelden de posities die nog in `res.positions` staan als niet verkocht.
  * @returns {[string, "warn" | "error"]}
  */
 export function killOutcome(res, fmt, minOrder = MIN_ORDER_EUR) {
   const left = res && Array.isArray(res.positions) ? res.positions : [];
+  const failed = res && res.killResult && Array.isArray(res.killResult.failed) ? res.killResult.failed : null;
+  // Vangnet: "niets mislukt" terwijl er nog posities openstaan → die tellen toch als niet verkocht
+  if (failed && (failed.length || !left.length)) {
+    if (!failed.length) return ["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"];
+    const byId = new Map(left.map((p) => [p.id, p]));
+    const n = failed.length;
+    const list = failed
+      .map((f) => {
+        const p = byId.get(f && f.id);
+        const market = (f && f.market) || (p && p.market) || (f && f.id) || "?";
+        const value = p ? ` ≈ ${fmt.eur(posValue(p))}` : "";
+        return `${market}${value}: ${(f && f.reason) || "reden onbekend (zie het logboek)"}`;
+      })
+      .join("; ");
+    const dust = failed.some((f) => isDust(byId.get(f && f.id), minOrder));
+    return [
+      `Noodstop: bot gestopt, maar ${n} ${n === 1 ? "positie" : "posities"} NIET verkocht — ${list}. ` +
+        (dust
+          ? `Een positie onder het Bitvavo-minimum van ${fmt.eur(minOrder)} kan niet verkocht worden: wacht tot de waarde weer boven ${fmt.eur(minOrder)} is of schrijf hem af (knop Afschrijven bij Open posities). `
+          : "Controleer je account en sluit handmatig (of probeer de noodstop opnieuw). ") +
+        STILL,
+      "error",
+    ];
+  }
   if (!left.length) return ["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"];
   const list = left.map((p) => `${p.market} ≈ ${fmt.eur(posValue(p))}`).join(", ");
-  const dust = left.some((p) => posValue(p) < minOrder);
+  const dust = left.some((p) => isDust(p, minOrder));
   const n = left.length;
   return [
     `Noodstop: bot gestopt, maar ${n} ${n === 1 ? "positie" : "posities"} NIET verkocht (${list}). ` +
       (dust
         ? `Waarde onder het Bitvavo-minimum van ${fmt.eur(minOrder)}: die kan niet verkocht worden. Sluit handmatig of wacht tot de waarde weer boven ${fmt.eur(minOrder)} is. `
         : "Controleer je account en sluit handmatig (of probeer de noodstop opnieuw). ") +
-      "Let op: de bot staat stil, stop-loss en take-profit worden NIET bewaakt.",
+      STILL,
     "error",
   ];
 }
 
-export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
+/**
+ * Rendement in % voor de statistiekkaarten: de engine rekent dit zelf uit
+ * (`account.totalReturnPct` / `dayReturnPct`, correct ook na het afromen van
+ * winst boven de kapitaallimiet); alleen bij een oudere server zelf berekenen.
+ * Het oorspronkelijke startbedrag is `startingEquity + skimmedQuote` (de engine
+ * verlaagt de start met wat er afgeroomd is).
+ * @returns {{ dayPnl: number, dayPct: number, totPnl: number, totPct: number, origStart: number, skimmed: number }}
+ */
+export function accountReturns(snap) {
+  const a = (snap && snap.account) || {};
+  const eq = a.equity;
+  const start = a.startingEquity;
+  const dayStart = a.dayStartEquity;
+  const skimmed = isNum(snap && snap.skimmedQuote) && snap.skimmedQuote > 0 ? snap.skimmedQuote : 0;
+  // equity − start is ook met afromen de juiste winst in euro's: (equity + afgeroomd) − (start + afgeroomd)
+  const dayPnl = isNum(eq) && isNum(dayStart) ? eq - dayStart : NaN;
+  const totPnl = isNum(eq) && isNum(start) ? eq - start : NaN;
+  const dayPct = isNum(a.dayReturnPct) ? a.dayReturnPct : dayStart ? (dayPnl / dayStart) * 100 : NaN;
+  const totPct = isNum(a.totalReturnPct) ? a.totalReturnPct : start ? (totPnl / start) * 100 : NaN;
+  return { dayPnl, dayPct, totPnl, totPct, origStart: isNum(start) ? start + skimmed : start, skimmed };
+}
+
+export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
   const { fmt, esc, api, bus } = ctx;
   let snap = ctx.getState();
   let info = ctx.getInfo ? ctx.getInfo() : null;
@@ -111,7 +164,11 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
   function renderSpark(points) {
     const el = statsEl && statsEl.querySelector("[data-spark]");
     if (!el) return;
-    const pts = (points || []).slice(-240).map((p) => p.equity).filter(Number.isFinite);
+    // Live: equity + afgeroomde winst, zodat afromen geen nep-daling geeft
+    const pts = (points || [])
+      .slice(-240)
+      .map((p) => p.equity + (Number(p.skimmed) || 0))
+      .filter(Number.isFinite);
     if (pts.length < 2) {
       el.innerHTML = "";
       return;
@@ -141,22 +198,25 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     const a = snap.account || {};
     const eq = a.equity;
     const start = a.startingEquity;
-    const dayStart = a.dayStartEquity;
     const paper = snap.mode === "paper";
+    const { dayPnl, dayPct, totPnl, totPct, origStart, skimmed } = accountReturns(snap);
 
     setStat(
       "equity",
       esc(fmt.eur(eq)),
       paper
         ? `start ${esc(fmt.eur(start))}`
-        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : start))}`,
+        : `limiet ${esc(fmt.eur(info && info.capitalLimitQuote != null ? info.capitalLimitQuote : origStart))}` +
+            (skimmed > 0
+              ? ` · <span title="Winst boven je kapitaallimiet: blijft op je Bitvavo-account, buiten het handelsbudget van de bot">afgeroomd ${esc(
+                  fmt.eur(skimmed),
+                )}</span>`
+              : ""),
       "",
       eq,
     );
     renderSpark(snap.equityHistory);
 
-    const dayPnl = Number.isFinite(eq) && Number.isFinite(dayStart) ? eq - dayStart : NaN;
-    const dayPct = dayStart ? (dayPnl / dayStart) * 100 : NaN;
     setStat(
       "day",
       esc(fmt.eurSigned(dayPnl)),
@@ -167,12 +227,10 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
       dayPnl,
     );
 
-    const totPnl = Number.isFinite(eq) && Number.isFinite(start) ? eq - start : NaN;
-    const totPct = start ? (totPnl / start) * 100 : NaN;
     setStat(
       "total",
       esc(fmt.eurSigned(totPnl)),
-      `<span class="${fmt.pnlClass(totPct)}">${esc(fmt.pct(totPct))}</span> t.o.v. ${esc(fmt.eur(start))}`,
+      `<span class="${fmt.pnlClass(totPct)}">${esc(fmt.pct(totPct))}</span> t.o.v. ${esc(fmt.eur(origStart))}`,
       fmt.pnlClass(totPnl),
       totPnl,
     );
@@ -320,6 +378,113 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
       else if (b.dataset.banner === "disarm") disarmLive(b);
     });
 
+  // ───────────── Waarschuwingsbanners (onder de mode-banner) ─────────────
+  // Kooporders met onbekende uitkomst (nieuwe aankopen gepauzeerd) en een
+  // onbruikbare opgeslagen staat (lege administratie, live armen geblokkeerd).
+  // Ze verdwijnen vanzelf zodra de snapshot ze niet meer bevat.
+
+  const WARN_ICON = svg('<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>');
+  const unknownOrdersOf = (s) => (s && Array.isArray(s.unknownOrders) ? s.unknownOrders.filter(Boolean) : []);
+  const recoveryOf = (s) => (s && s.stateRecovery && typeof s.stateRecovery === "object" ? s.stateRecovery : null);
+  const orderLine = (u) =>
+    `${u.market || "?"}${isNum(u.quoteAmount) ? ` · ${fmt.eur(u.quoteAmount)}` : ""}${isNum(u.at) ? ` · ${fmt.dateTime(u.at)}` : ""}`;
+
+  let alertKey = "";
+  function renderAlerts() {
+    if (!alertEl || !snap) return;
+    const unknown = unknownOrdersOf(snap);
+    const rec = recoveryOf(snap);
+    const live = snap.mode === "live";
+    const key = JSON.stringify([unknown, rec, live]);
+    if (key === alertKey) return;
+    alertKey = key;
+    let html = "";
+    if (rec) {
+      html += `<div class="alert-banner bad" role="alert" data-alert="recovery">
+        <span class="ab-main">${WARN_ICON}<span><b>Opgeslagen staat was onbruikbaar</b> — ${esc(rec.reason || "onbekende reden")}.
+          De bot begon met een <b>lege administratie</b>${
+            live
+              ? ": posities van vóór de herstart worden NIET bewaakt. Live handel inschakelen is geblokkeerd tot je dit bevestigt."
+              : " (oefengeld)."
+          }${rec.quarantinedTo ? ` <span class="ab-sub">Het oude bestand is bewaard als <span class="mono">${esc(rec.quarantinedTo)}</span>.</span>` : ""}</span></span>
+        <button type="button" class="btn" data-alert-act="ack-recovery">Ik heb het gecontroleerd</button>
+      </div>`;
+    }
+    if (unknown.length) {
+      html += `<div class="alert-banner warn" role="alert" data-alert="unknown-orders">
+        <span class="ab-main">${WARN_ICON}<span><b>Onbekende orderuitkomst</b> — nieuwe aankopen zijn gepauzeerd. Controleer je open orders en saldo op Bitvavo.
+          <span class="ab-sub">${unknown.map((u) => `<span class="ab-chip mono" title="clientOrderId ${esc(u.clientOrderId || "")}">${esc(orderLine(u))}</span>`).join("")}</span></span></span>
+        <button type="button" class="btn" data-alert-act="ack-unknown">Ik heb het gecontroleerd</button>
+      </div>`;
+    }
+    alertEl.innerHTML = html;
+    alertEl.hidden = !html;
+  }
+
+  alertEl &&
+    alertEl.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-alert-act]");
+      if (!b || b.disabled) return;
+      if (b.dataset.alertAct === "ack-unknown") confirmAckUnknown();
+      else if (b.dataset.alertAct === "ack-recovery") confirmAckRecovery();
+    });
+
+  /** Antwoord van een ack-route (EngineSnapshot) direct doorgeven, anders de staat verversen */
+  async function applyAckResult(res) {
+    if (res && typeof res === "object" && res.account) bus.emit("snapshot", res);
+    else await refreshState();
+  }
+
+  function confirmAckUnknown() {
+    const unknown = unknownOrdersOf(snap);
+    const n = unknown.length;
+    ctx.openModal({
+      title: "Onbekende orderuitkomst",
+      danger: true,
+      bodyHtml: `
+        <p>De bot weet niet zeker of ${n === 1 ? "deze kooporder" : "deze kooporders"} op Bitvavo ${
+          n === 1 ? "is" : "zijn"
+        } uitgevoerd:</p>
+        <ul>${unknown.map((u) => `<li class="mono">${esc(orderLine(u))}</li>`).join("") || "<li>–</li>"}</ul>
+        <p>Zolang dat onduidelijk is, doet de bot <strong>geen nieuwe aankopen</strong> (in geen enkele markt).</p>
+        <ul>
+          <li>Kijk op Bitvavo bij je <strong>open orders</strong> en je <strong>saldo</strong> of er iets gekocht is.</li>
+          <li>Is er toch gekocht? Die coins worden <strong>niet door de bot beheerd</strong> (geen stop-loss, geen take-profit): verkoop ze zelf op Bitvavo.</li>
+          <li>Na bevestigen mag de bot weer nieuwe aankopen doen.</li>
+        </ul>`,
+      confirmText: "Gecontroleerd — aankopen hervatten",
+      onConfirm: async () => {
+        await applyAckResult(await api.ackUnknownOrders());
+        ctx.toast("Bevestigd — de bot mag weer nieuwe aankopen doen", "success");
+      },
+    });
+  }
+
+  function confirmAckRecovery() {
+    const rec = recoveryOf(snap);
+    const live = !!snap && snap.mode === "live";
+    ctx.openModal({
+      title: "Herstelmelding bevestigen",
+      danger: live,
+      bodyHtml: `
+        <p>De opgeslagen staat was bij het starten onbruikbaar${rec && rec.reason ? `: <strong>${esc(rec.reason)}</strong>` : ""}. De bot begon met een <strong>lege administratie</strong>.</p>
+        ${
+          live
+            ? `<ul>
+                <li>Posities van vóór de herstart worden <strong>niet bewaakt</strong> (geen stop-loss): controleer je saldi op Bitvavo en verkoop zo nodig zelf.</li>
+                <li>Na bevestigen gaat de bot verder met de huidige administratie en kun je live handel weer inschakelen.</li>
+              </ul>`
+            : `<p>Dit is de oefenmodus: er staat geen echt geld op het spel. Na bevestigen gaat de bot verder met de huidige administratie.</p>`
+        }
+        ${rec && rec.quarantinedTo ? `<p class="muted">Het oude bestand is bewaard als <span class="mono">${esc(rec.quarantinedTo)}</span>.</p>` : ""}`,
+      confirmText: "Bevestigen",
+      onConfirm: async () => {
+        await applyAckResult(await api.ackStateRecovery());
+        ctx.toast("Herstelmelding bevestigd", "success");
+      },
+    });
+  }
+
   function armLive() {
     const limit = info && info.capitalLimitQuote != null ? fmt.eur(info.capitalLimitQuote) : null;
     ctx.openModal({
@@ -457,7 +622,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     } else if (act === "kill") {
       const total = positions.reduce((s, p) => s + posValue(p), 0);
       const minOrder = Number(snap && snap.config && snap.config.risk && snap.config.risk.minOrderQuote) || MIN_ORDER_EUR;
-      const dust = positions.filter((p) => posValue(p) < minOrder);
+      const dust = positions.filter((p) => isDust(p, minOrder));
       ctx.openModal({
         title: "Noodstop",
         danger: true,
@@ -482,7 +647,9 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
           run(button, api.kill, (res) => killOutcome(res && Array.isArray(res.positions) ? res : snap, fmt, minOrder), "warn", true),
       });
     } else if (act === "reset") {
-      const start = snap && snap.account ? snap.account.startingEquity : null;
+      // De server reset naar het startkapitaal uit de configuratie (PAPER_STARTING_CAPITAL),
+      // niet naar account.startingEquity (dat kan na een eerdere reset afwijken).
+      const start = info && isNum(info.paperStartingCapital) ? info.paperStartingCapital : null;
       ctx.openModal({
         title: "Oefengeld resetten?",
         bodyHtml: `<p>Je oefenaccount wordt teruggezet naar het startkapitaal${
@@ -500,6 +667,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     snap = s;
     renderStats();
     renderBanner();
+    renderAlerts();
     renderControls();
   }
 

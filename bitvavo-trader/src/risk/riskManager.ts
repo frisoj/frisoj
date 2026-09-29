@@ -47,6 +47,11 @@ const MAX_BUMP_RISK_MULTIPLE = 1;
 const SELL_MIN_BUFFER = 1.03;
 /** Relatieve tolerantie voor het herkennen van stop-niveaus (initieel / break-even). */
 const LEVEL_REL_EPS = 1e-6;
+/**
+ * Beursminimum per order (EUR) als er geen MarketInfo is: Bitvavo weigert koop-
+ * én verkooporders onder €5 (zelfde standaard als PaperBroker en de engine).
+ */
+const DEFAULT_EXCHANGE_MIN_QUOTE = 5;
 
 function isNum(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x);
@@ -322,14 +327,17 @@ export class RiskManager implements RiskManagerLike {
         const raw = Math.min(quoteByRisk, posCap, exposureCap, cashCap);
         let q = floorCents(raw);
 
-        // Minimale orderwaarde. Het beursminimum (uit MarketInfo; zonder
-        // MarketInfo de instelling) geldt voor kopen ÉN verkopen: Bitvavo weigert
-        // ook verkopen onder €5. De instelling minOrderQuote is daarnaast een
-        // eigen ondergrens voor instappen; het strengste van de twee telt.
+        // Minimale orderwaarde. Het beursminimum geldt voor kopen ÉN verkopen:
+        // Bitvavo weigert ook verkopen onder €5. Het komt uit MarketInfo; zonder
+        // MarketInfo is het het standaardminimum van €5, of de instelling als
+        // die hoger is. Een verlaagde instelling (< €5) verlaagt het
+        // beursminimum NIET: de brokers weigeren kleinere orders toch. De
+        // instelling minOrderQuote is daarnaast een eigen ondergrens voor
+        // instappen; het strengste van de twee telt.
         const cfgMin = isNum(cfg.minOrderQuote) && cfg.minOrderQuote >= 0 ? cfg.minOrderQuote : 0;
         const marketMin = market?.minOrderQuote;
         const hasMarketMin = isNum(marketMin) && marketMin >= 0;
-        const exchangeMin = hasMarketMin ? marketMin : cfgMin;
+        const exchangeMin = hasMarketMin ? marketMin : Math.max(cfgMin, DEFAULT_EXCHANGE_MIN_QUOTE);
         const minOrder = Math.max(exchangeMin, cfgMin);
 
         // De positie moet bij de stop-loss nog boven het beursminimum verkocht
@@ -533,6 +541,7 @@ export class RiskManager implements RiskManagerLike {
         return {
           halted: true,
           reason: `Dagelijkse verlieslimiet bereikt (${pct(changePct)}, limiet -${pct(this.cfg.dailyLossLimitPct)})`,
+          dailyLimit: true,
         };
       }
     }

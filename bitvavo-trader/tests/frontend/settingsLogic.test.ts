@@ -154,3 +154,12 @@ describe("rebaseDraft: concept overzetten op een nieuwere serverconfig", () => {
     expect(r.draft.interval).toBe("1h");
   });
 });
+
+describe("helpteksten", () => {
+  it("minimale ordergrootte: beschrijft wat de bot echt doet (€5-minimum, verkoopbaar bij de stop)", () => {
+    const f = L.RISK_GROUPS.flatMap((g: Fake) => g.fields).find((x: Fake) => x.key === "minOrderQuote");
+    expect(f.help).toBe(
+      "Kleinste bedrag waarmee de bot een positie opent. Bitvavo eist minimaal €5; de bot gebruikt altijd minstens dat, en maakt een positie bovendien zo groot dat hij bij de stop-loss nog boven €5 verkocht kan worden. Is de berekende positie kleiner, dan slaat de bot de trade over.",
+    );
+  });
+});

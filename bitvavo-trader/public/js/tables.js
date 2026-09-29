@@ -4,12 +4,21 @@ import { coinColor } from "./liveChart.js";
 
 const isNum = (n) => typeof n === "number" && Number.isFinite(n);
 
+/** Uitleg bij een onverkoopbare positie (engine-tekst, of een algemene uitleg) */
+export function unsellableWhy(p) {
+  return (
+    (p && typeof p.unsellableReason === "string" && p.unsellableReason.trim()) ||
+    "Onverkoopbaar: de waarde ligt onder het Bitvavo-minimum van € 5 per order, dus een verkooporder wordt geweigerd."
+  );
+}
+
 const EMPTY_POS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
 const EMPTY_TRD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>`;
 
 export function mountTables(ctx, { positionsEl, tradesEl }) {
   const { fmt, esc, api, bus } = ctx;
   const closing = new Set();
+  const writingOff = new Set();
   const shownPrice = new Map();
   const seenTrades = new Set();
   let firstTrades = true;
@@ -67,8 +76,13 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
       .map((p) => {
         const cls = fmt.pnlClass(p.unrealizedPnl);
         const trailing = isNum(p.initialStopPrice) && isNum(p.stopPrice) && p.stopPrice > p.initialStopPrice + 1e-12;
-        return `<tr data-id="${esc(p.id)}">
-          <td class="first" data-label="Markt">${marketCell(p.market)}</td>
+        const stuck = !!p.unsellable;
+        const why = unsellableWhy(p);
+        const busy = closing.has(p.id) || writingOff.has(p.id);
+        return `<tr data-id="${esc(p.id)}"${stuck ? ' class="is-unsellable"' : ""}>
+          <td class="first" data-label="Markt"><div class="pos-market">${marketCell(p.market)}${
+            stuck ? `<span class="badge badge-yellow" title="${esc(why)}">Onverkoopbaar</span>` : ""
+          }</div></td>
           <td data-label="Sinds" title="${esc(fmt.dateTime(p.entryTime))}">${esc(fmt.duration(now - p.entryTime))}</td>
           <td class="num" data-label="Entry">${esc(fmt.price(p.entryPrice))}</td>
           <td class="num" data-label="Koers"><span class="price-cell" data-price="${esc(p.id)}">${esc(fmt.price(p.currentPrice))}</span></td>
@@ -82,9 +96,17 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
             fmt.pct(p.unrealizedPct),
           )}</small></div></td>
           <td class="full" data-label="Stop ↔ doel">${rangeBar(p)}</td>
-          <td class="full" data-label=""><button type="button" class="btn btn-sm btn-danger" data-close="${esc(p.id)}" ${
-            closing.has(p.id) ? "disabled" : ""
-          } title="Verkoop deze positie nu tegen marktprijs">Sluit</button></td>
+          <td class="full" data-label=""><div class="pos-actions"><button type="button" class="btn btn-sm btn-danger" data-close="${esc(
+            p.id,
+          )}" ${busy ? "disabled" : ""} title="${esc(
+            stuck ? `Verkopen lukt nu niet — ${why}` : "Verkoop deze positie nu tegen marktprijs",
+          )}">Sluit</button>${
+            stuck
+              ? `<button type="button" class="btn btn-sm" data-writeoff="${esc(p.id)}" ${busy ? "disabled" : ""} title="${esc(
+                  "Bot stopt met beheren; de coins blijven op je account; de inleg wordt als verlies geboekt",
+                )}">Afschrijven</button>`
+              : ""
+          }</div></td>
         </tr>`;
       })
       .join("");
@@ -129,23 +151,40 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
       return;
     }
     const b = e.target.closest("[data-close]");
-    if (b && !b.disabled) confirmClose(b.dataset.close);
+    if (b && !b.disabled) return confirmClose(b.dataset.close);
+    const w = e.target.closest("[data-writeoff]");
+    if (w && !w.disabled) confirmWriteOff(w.dataset.writeoff);
   });
+
+  async function refreshState() {
+    try {
+      const s = await api.getState();
+      if (s) bus.emit("snapshot", s);
+    } catch {
+      /* SSE volgt */
+    }
+  }
 
   function confirmClose(id) {
     const snap = ctx.getState();
     const p = ((snap && snap.positions) || []).find((x) => x.id === id);
     if (!p) return;
     const live = snap.mode === "live";
+    // Onverkoopbaar: uitleggen waarom verkopen nu niet lukt; proberen mag (de koers kan net gestegen zijn)
+    const stuckHtml = p.unsellable
+      ? `<p class="neg"><strong>Deze positie kan nu waarschijnlijk niet verkocht worden.</strong> ${esc(unsellableWhy(p))}</p>
+        <p>Bitvavo weigert verkooporders onder het minimum (ook handmatig). Je kunt het toch proberen, wachten tot de waarde weer boven het minimum
+        komt, of de positie <strong>afschrijven</strong> (knop naast Sluit).</p>`
+      : "";
     ctx.openModal({
       title: `Positie ${p.market} sluiten?`,
       danger: live,
-      bodyHtml: `<p>De positie wordt direct <strong>tegen marktprijs verkocht</strong>${live ? " (echt geld)" : " (oefengeld)"}.</p>
+      bodyHtml: `${stuckHtml}<p>De positie wordt direct <strong>tegen marktprijs verkocht</strong>${live ? " (echt geld)" : " (oefengeld)"}.</p>
         <p>Huidige koers <strong class="mono">${esc(fmt.price(p.currentPrice))}</strong> · geschatte P&amp;L
         <strong class="mono ${fmt.pnlClass(p.unrealizedPnl)}">${esc(fmt.eurSigned(p.unrealizedPnl))} (${esc(
           fmt.pct(p.unrealizedPct),
         )})</strong></p>`,
-      confirmText: "Nu verkopen",
+      confirmText: p.unsellable ? "Toch proberen te verkopen" : "Nu verkopen",
       onConfirm: async () => {
         closing.add(id);
         renderPositions();
@@ -156,14 +195,46 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
           } else {
             ctx.toast(`${p.market} gesloten`, "success");
           }
-          try {
-            const s = await api.getState();
-            if (s) bus.emit("snapshot", s);
-          } catch {
-            /* SSE volgt */
-          }
+          await refreshState();
         } finally {
           closing.delete(id);
+          renderPositions();
+        }
+      },
+    });
+  }
+
+  function confirmWriteOff(id) {
+    const snap = ctx.getState();
+    const p = ((snap && snap.positions) || []).find((x) => x.id === id);
+    if (!p) return;
+    const live = snap.mode === "live";
+    const base = String(p.market || "").split("-")[0];
+    const value = (Number(p.amount) || 0) * (Number(p.currentPrice) || 0);
+    ctx.openModal({
+      title: `Positie ${p.market} afschrijven?`,
+      danger: true,
+      bodyHtml: `<p>${esc(unsellableWhy(p))}</p>
+        <ul>
+          <li>De bot <strong>stopt met het beheren</strong> van deze positie: geen stop-loss, geen take-profit en geen verkooppogingen meer.</li>
+          <li>De coins (<span class="mono">${esc(fmt.amount(p.amount))} ${esc(base)}</span>, nu ≈ <span class="mono">${esc(fmt.eur(value))}</span>)
+            <strong>blijven op je ${live ? "Bitvavo-account" : "oefenaccount"} staan</strong>${
+              live ? " — je kunt ze later zelf op Bitvavo verkopen (of bijkopen tot boven het minimum)" : ""
+            }.</li>
+          <li>De inleg van <strong class="mono">${esc(fmt.eur(p.costQuote))}</strong> wordt als <strong>verlies</strong> geboekt (−100%) in je P&amp;L en trades.</li>
+        </ul>
+        <p class="muted">Dit kan niet ongedaan worden gemaakt.</p>`,
+      confirmText: "Afschrijven",
+      onConfirm: async () => {
+        writingOff.add(id);
+        renderPositions();
+        try {
+          const trade = await api.writeOffPosition(id);
+          const loss = trade && isNum(trade.pnlQuote) ? trade.pnlQuote : -(Number(p.costQuote) || 0);
+          ctx.toast(`${p.market} afgeschreven: ${fmt.eurSigned(loss)} als verlies geboekt; de coins blijven op je account`, "warn");
+          await refreshState();
+        } finally {
+          writingOff.delete(id);
           renderPositions();
         }
       },

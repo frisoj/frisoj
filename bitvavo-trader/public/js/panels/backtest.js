@@ -2,13 +2,25 @@
 // Alles wordt server-side berekend (POST /api/backtest|optimize|walkforward);
 // dit paneel bouwt het formulier en visualiseert de resultaten.
 
-import { quality, isScoredRow, bestScoredRow, scoreBarMax, testedPartial, describeApply, MIN_TRADES_FOR_SCORE } from "./backtestLogic.js";
+import {
+  quality,
+  isScoredRow,
+  bestScoredRow,
+  scoreBarMax,
+  testedPartial,
+  describeApply,
+  MIN_TRADES_FOR_SCORE,
+  INTERVAL_MS,
+  MIN_PERIOD_CANDLES,
+  minPeriodDays,
+  periodError,
+  resultDays,
+  heatmapCell,
+  bestHeatmapCell,
+  heatmapCellTip,
+} from "./backtestLogic.js";
 
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
-const INTERVAL_MS = {
-  "1m": 6e4, "5m": 3e5, "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5,
-  "4h": 144e5, "6h": 216e5, "8h": 288e5, "12h": 432e5, "1d": 864e5,
-};
 const INTERVAL_LABELS = {
   "1m": "1 minuut", "5m": "5 minuten", "15m": "15 minuten", "30m": "30 minuten", "1h": "1 uur", "2h": "2 uur",
   "4h": "4 uur", "6h": "6 uur", "8h": "8 uur", "12h": "12 uur", "1d": "1 dag",
@@ -364,9 +376,13 @@ export function mountBacktest(ctx, el) {
     const n = Math.round((days * 864e5) / INTERVAL_MS[iv]);
     const heavy = n > MAX_CANDLES_WARN;
     const tooLong = days > maxDays;
-    est.className = `bt-est ${heavy || tooLong ? "is-warn" : ""}`;
+    const tooShort = !!periodError(days, iv);
+    est.className = `bt-est ${heavy || tooLong || tooShort ? "is-warn" : ""}`;
     est.innerHTML = `≈ <b class="mono">${esc(fmt.num(n, 0))}</b> candles van ${esc(INTERVAL_LABELS[iv])} · max. ${maxDays} dagen bij ${esc(iv)}` +
       (tooLong ? ` — <b>te lang</b>: verlaag naar ${maxDays} dagen of kies een groter interval.` : "") +
+      (tooShort
+        ? ` — <b>te kort</b>: minimaal ${MIN_PERIOD_CANDLES} candles nodig, dus minstens ${minPeriodDays(iv)} dagen bij ${esc(iv)} (of kies een korter interval).`
+        : "") +
       (heavy && !tooLong ? ` — <b>veel data</b>: dit kan lang duren.` : "");
     const tr = num(F("trainRatio").value);
     const r = Number.isFinite(tr) ? Math.max(0.5, Math.min(0.9, tr)) : 0.7;
@@ -385,6 +401,10 @@ export function mountBacktest(ctx, el) {
     if (!market) errors.push("Kies een markt.");
     const maxDays = MAX_DAYS[interval] || 365;
     if (!(days >= 1 && days <= maxDays)) errors.push(`Periode moet tussen 1 en ${maxDays} dagen liggen voor interval ${interval}.`);
+    else {
+      const short = periodError(days, interval);
+      if (short) errors.push(short);
+    }
     if (!(initialCapital >= 5)) errors.push("Startkapitaal moet minimaal €5 zijn (het Bitvavo-minimum per order).");
     const buy = num(F("buyThreshold").value);
     const sell = num(F("sellThreshold").value);
@@ -917,6 +937,19 @@ export function mountBacktest(ctx, el) {
       ${trades.length > rows.length ? `<p class="pn-hint">Eerste ${rows.length} van ${trades.length} trades getoond.</p>` : ""}`;
   }
 
+  /** Server-uitleg als de periode is aangepast (bijv. ingekort door te weinig historie) */
+  function noteBanner(note) {
+    return note ? `<div class="pn-banner pn-banner-warn bt-note" role="status"><b>Periode aangepast.</b> ${esc(note)}</div>` : "";
+  }
+
+  function stuckWarning(n) {
+    if (!(Number(n) > 0)) return "";
+    return `<div class="pn-banner pn-banner-warn bt-stuck"><b>${esc(fmt.num(n, 0))} ${n === 1 ? "trade kon" : "trades konden"} eerst niet verkocht worden.</b>
+      Bij de exit was de positie minder waard dan het Bitvavo-minimum van €&nbsp;5, dus werd de verkoop geweigerd. De backtest verkoopt pas zodra
+      dat weer kan (zie de uitleg bij die trades); live blijft zo'n positie al die tijd open, <b>zonder werkende stop-loss</b>. Met een groter
+      startkapitaal gebeurt dit minder vaak.</div>`;
+  }
+
   function simWarning(isSim) {
     return isSim
       ? `<div class="pn-banner pn-banner-warn"><b>Gesimuleerde data.</b> Deze test gebruikt nagemaakte koersen (Bitvavo was niet bereikbaar of de simulator staat aan). De uitkomst zegt niets over de echte markt.</div>`
@@ -929,12 +962,17 @@ export function mountBacktest(ctx, el) {
     const trades = res.trades || [];
     const exitCounts = {};
     for (const t of trades) exitCounts[t.exitReason] = (exitCounts[t.exitReason] || 0) + 1;
+    const days = resultDays(res);
     out.innerHTML = `
       <div class="bt-res-head">
         <h3>${esc(res.market)} <span class="muted">· ${esc(res.interval)}</span></h3>
-        <div class="muted">${esc(fmt.date(res.from))} → ${esc(fmt.date(res.to))} · ${esc(fmt.num(res.candlesCount, 0))} candles · startkapitaal ${esc(fmt.eur(res.initialCapital))} · berekend in ${esc(fmt.duration(res.durationMs))}</div>
+        <div class="muted"><span title="Testperiode (na de opwarmtijd van de strategieën)">${esc(fmt.date(res.from))} → ${esc(fmt.date(res.to))}${
+          Number.isFinite(days) ? ` (${esc(fmt.num(days, 1))} dagen)` : ""
+        }</span> · ${esc(fmt.num(res.candlesCount, 0))} candles · startkapitaal ${esc(fmt.eur(res.initialCapital))} · berekend in ${esc(fmt.duration(res.durationMs))}</div>
       </div>
+      ${noteBanner(res.note)}
       ${simWarning(res.dataSource === "simulated")}
+      ${stuckWarning(res.stuckTrades)}
       ${kpiCards(m, res.initialCapital)}
       <div class="panel bt-card">
         <div class="pn-head"><div class="panel-title">Koers &amp; trades</div>
@@ -1008,9 +1046,10 @@ export function mountBacktest(ctx, el) {
     const bm = best?.metrics;
     out.innerHTML = `
       <div class="bt-res-head">
-        <h3>Optimalisatie <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen</span></h3>
+        <h3>Optimalisatie <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen${res.note ? " (ingekort)" : ""}</span></h3>
         <div class="muted">Doel: ${esc(OBJECTIVES[obj] || obj)} · ${esc(req.strategy ? `parameters van ${stratName(req.strategy)}` : "ensemble-drempels & risico")} · ${esc(fmt.num(res.combosTested, 0))} combinaties in ${esc(fmt.duration(res.durationMs))}</div>
       </div>
+      ${noteBanner(res.note)}
       ${simWarning(state.info?.dataSource === "simulated")}
       <div class="pn-banner pn-banner-warn"><b>Pas op voor overfitting.</b> De beste combinatie op het verleden is vaak deels toeval.
         Kies liever instellingen in een <i>breed</i> groen gebied van de heatmap en controleer ze met een walk-forward.</div>
@@ -1035,7 +1074,7 @@ export function mountBacktest(ctx, el) {
           }
         </div>
         <div class="panel bt-card bt-hm-card">
-          <div class="pn-head"><div class="panel-title">Heatmap</div><div class="pn-head-meta muted">kleur = ${esc(OBJECTIVE_SHORT[obj] || obj)}</div></div>
+          <div class="pn-head"><div class="panel-title">Heatmap</div><div class="pn-head-meta muted">kleur = mediaan ${esc(OBJECTIVE_SHORT[obj] || obj)}</div></div>
           <div class="bt-hm"></div>
           <div class="bt-hm-legend"></div>
         </div>
@@ -1072,10 +1111,10 @@ export function mountBacktest(ctx, el) {
         if (row) confirmApply(row, req);
       });
     }
-    heatmap(out.querySelector(".bt-hm"), out.querySelector(".bt-hm-legend"), res.heatmap, obj);
+    heatmap(out.querySelector(".bt-hm"), out.querySelector(".bt-hm-legend"), res.heatmap, obj, best);
   }
 
-  function heatmap(container, legend, hm, obj) {
+  function heatmap(container, legend, hm, obj, bestRow) {
     if (!hm || !hm.xValues?.length || !hm.yValues?.length) {
       container.innerHTML = '<div class="pn-empty">Geen heatmap: er werd maar één parameter gevarieerd.</div>';
       legend.innerHTML = "";
@@ -1083,14 +1122,23 @@ export function mountBacktest(ctx, el) {
     }
     const pivot = obj === "profitFactor" ? 1 : 0;
     const cap = (v) => (obj === "profitFactor" ? Math.min(v, 5) : v);
-    const vals = hm.values.flat().filter((v) => v !== null && Number.isFinite(v));
-    const span = Math.max(1e-9, ...vals.map((v) => Math.abs(cap(v) - pivot)));
-    const bestVal = vals.length ? Math.max(...vals) : null;
     const nx = hm.xValues.length;
     const ny = hm.yValues.length;
-    const fill = (v) => {
-      if (v === null || !Number.isFinite(v)) return "url(#bt-hatch)";
-      const t = Math.max(-1, Math.min(1, (cap(v) - pivot) / span));
+    const cellAt = (xi, yi) => heatmapCell(hm, xi, yi);
+    const vals = [];
+    for (let yi = 0; yi < ny; yi++) for (let xi = 0; xi < nx; xi++) {
+      const c = cellAt(xi, yi);
+      if (c.value !== null) vals.push(c.value);
+    }
+    const span = Math.max(1e-9, ...vals.map((v) => Math.abs(cap(v) - pivot)));
+    // Ster/kader op de cel van de beste combinatie (res.best), niet op de hoogste mediaan
+    const bestAt = bestHeatmapCell(hm, bestRow);
+    const isBestCell = (xi, yi) => !!bestAt && bestAt.xi === xi && bestAt.yi === yi;
+    const hasCounts = Array.isArray(hm.tested);
+    const fill = (c) => {
+      if (c.status === "untested" || c.status === "none") return "url(#bt-hatch)";
+      if (c.status === "few") return "color-mix(in srgb, var(--muted) 16%, var(--panel-2))";
+      const t = Math.max(-1, Math.min(1, (cap(c.value) - pivot) / span));
       const pct = Math.round(8 + Math.abs(t) * 72);
       return `color-mix(in srgb, var(${t >= 0 ? "--green" : "--red"}) ${pct}%, var(--panel-2))`;
     };
@@ -1106,13 +1154,16 @@ export function mountBacktest(ctx, el) {
       let cells = "";
       for (let yi = 0; yi < ny; yi++) {
         for (let xi = 0; xi < nx; xi++) {
-          const v = hm.values[yi]?.[xi] ?? null;
+          const c = cellAt(xi, yi);
           const x = ml + xi * cw;
           const y = mt + (ny - 1 - yi) * ch;
-          const isBest = v !== null && v === bestVal;
-          cells += `<g class="bt-cell ${isBest ? "is-best" : ""}" data-x="${xi}" data-y="${yi}">
-            <rect x="${x + 1}" y="${y + 1}" width="${Math.max(0, cw - 2)}" height="${Math.max(0, ch - 2)}" rx="3" style="fill:${fill(v)}"/>
-            ${showTxt ? `<text x="${x + cw / 2}" y="${y + ch / 2 + 4}" text-anchor="middle" class="bt-cell-txt">${esc(v === null ? "–" : fmtScore(v, obj))}</text>` : ""}
+          const isBest = isBestCell(xi, yi);
+          const txt =
+            c.status === "ok" ? fmtScore(c.value, obj) : c.status === "few" ? (cw >= 110 ? "te weinig trades" : cw >= 64 ? "te weinig" : "–") : c.status === "none" ? "–" : "";
+          cells += `<g class="bt-cell ${isBest ? "is-best" : ""} is-${c.status}" data-x="${xi}" data-y="${yi}">
+            <rect x="${x + 1}" y="${y + 1}" width="${Math.max(0, cw - 2)}" height="${Math.max(0, ch - 2)}" rx="3" style="fill:${fill(c)}"/>
+            ${showTxt && txt ? `<text x="${x + cw / 2}" y="${y + ch / 2 + 4}" text-anchor="middle" class="bt-cell-txt">${esc(txt)}</text>` : ""}
+            ${isBest ? `<text x="${x + cw - 4}" y="${y + 12}" text-anchor="end" class="bt-cell-star">★</text>` : ""}
           </g>`;
         }
       }
@@ -1124,7 +1175,7 @@ export function mountBacktest(ctx, el) {
       const yl = hm.yValues
         .map((v, i) => (i % yEvery ? "" : `<text class="pn-axis" x="${ml - 8}" y="${mt + (ny - 1 - i) * ch + ch / 2 + 4}" text-anchor="end">${esc(fmtParam(v))}</text>`))
         .join("");
-      container.innerHTML = `<svg class="bt-hm-svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}" role="img" aria-label="Heatmap van de optimalisatie">
+      container.innerHTML = `<svg class="bt-hm-svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}" role="img" aria-label="Heatmap van de optimalisatie (mediaan per cel)">
         <defs><pattern id="bt-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="6" height="6" class="bt-hatch-bg"/><line x1="0" y1="0" x2="0" y2="6" class="bt-hatch-line"/></pattern></defs>
         ${cells}${xl}${yl}
@@ -1135,14 +1186,18 @@ export function mountBacktest(ctx, el) {
     bindTip(container, ".bt-cell", (g) => {
       const xi = Number(g.dataset.x);
       const yi = Number(g.dataset.y);
-      const v = hm.values[yi]?.[xi] ?? null;
+      const c = cellAt(xi, yi);
+      const tip = heatmapCellTip(c, (v) => fmtScore(v, obj));
       return `${esc(paramLabel(hm.xParam))}: <b>${esc(fmtParam(hm.xValues[xi]))}</b><br>${esc(paramLabel(hm.yParam))}: <b>${esc(fmtParam(hm.yValues[yi]))}</b><br>` +
-        (v === null ? '<span class="muted">niet getest</span>' : `${esc(OBJECTIVE_SHORT[obj] || obj)}: <b>${esc(fmtScore(v, obj))}</b>${v === bestVal ? " ★ beste" : ""}`);
+        (c.status === "ok" ? `${esc(OBJECTIVE_SHORT[obj] || obj)}: ${esc(tip)}` : `<span class="muted">${esc(tip)}</span>`) +
+        (isBestCell(xi, yi) ? "<br>★ hier zit de beste combinatie" : "");
     });
     const lo = pivot - span;
     const hi = pivot + span;
     legend.innerHTML = `<span class="mono">${esc(fmtScore(lo, obj))}</span><span class="bt-hm-grad"></span><span class="mono">${esc(fmtScore(hi, obj))}</span>
-      <span class="muted bt-hm-legend-txt">rood = slecht · grijs = neutraal (${esc(fmtScore(pivot, obj))}) · groen = goed · gearceerd = niet getest · wit kader = beste</span>`;
+      <span class="muted bt-hm-legend-txt">kleur = mediaan over de overige parameters · rood = slecht · grijs = neutraal (${esc(fmtScore(pivot, obj))}) · groen = goed · gearceerd = niet getest${
+        hasCounts ? " · effen grijs = te weinig trades" : ""
+      } · ★ wit kader = beste combinatie</span>`;
   }
 
   // ── Toepassen van parameters ──
@@ -1241,9 +1296,10 @@ export function mountBacktest(ctx, el) {
     const initial = req.initialCapital || 50;
     out.innerHTML = `
       <div class="bt-res-head">
-        <h3>Walk-forward <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen</span></h3>
+        <h3>Walk-forward <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen${res.note ? " (ingekort)" : ""}</span></h3>
         <div class="muted">${esc(String(folds.length))} folds · ${esc(fmt.num(req.trainRatio * 100, 0))}% train / ${esc(fmt.num((1 - req.trainRatio) * 100, 0))}% test · doel ${esc(OBJECTIVE_SHORT[req.objective] || req.objective)} · berekend in ${esc(fmt.duration(res.durationMs))}</div>
       </div>
+      ${noteBanner(res.note)}
       <div class="bt-verdict" data-lv="${lv}" role="status">
         <svg class="bt-verdict-ico" viewBox="0 0 15 15" aria-hidden="true">${icon}</svg>
         <div><div class="bt-verdict-lbl">Oordeel</div><div class="bt-verdict-txt">${esc(res.verdict || "Geen oordeel beschikbaar.")}</div></div>

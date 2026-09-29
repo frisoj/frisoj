@@ -16,7 +16,7 @@ export const RISK_GROUPS = [
       { key: "maxTotalExposurePct", label: "Max. totale blootstelling", unit: "%", step: 5, min: 1, max: 100,
         help: "Maximaal deel van je saldo dat in alle posities samen zit; de rest blijft in euro's." },
       { key: "minOrderQuote", label: "Minimale ordergrootte", unit: "€", step: 1, min: 0, max: 100000,
-        help: "Bitvavo accepteert geen orders onder €5. Kleinere orders slaat de bot over." },
+        help: "Kleinste bedrag waarmee de bot een positie opent. Bitvavo eist minimaal €5; de bot gebruikt altijd minstens dat, en maakt een positie bovendien zo groot dat hij bij de stop-loss nog boven €5 verkocht kan worden. Is de berekende positie kleiner, dan slaat de bot de trade over." },
     ],
   },
   {

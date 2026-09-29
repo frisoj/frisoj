@@ -8,10 +8,9 @@ import {
   objectiveScore,
   optimizeWith,
   sampleComboIndices,
-  type HeatmapDetail,
 } from "../../src/backtest/optimizerCore";
 import { emptyMetrics } from "../../src/backtest/metrics";
-import type { Candle, EnsembleConfig, EnsembleDecision, Regime, RiskConfig, SignalAction } from "../../src/core/types";
+import type { Candle, EnsembleConfig, EnsembleDecision, Heatmap, Regime, RiskConfig, SignalAction } from "../../src/core/types";
 import { decisionsFrom, input, momentumDecide, stubOptimizerDeps, stubRisk, walkCandles } from "./helpers";
 
 const candles = walkCandles(2000, 7);
@@ -53,7 +52,13 @@ describe("optimizer", () => {
 
   it("builds a heatmap over the two params with the most distinct values", () => {
     const res = optimizeWith(input(candles), { objective: "sharpe" }, stubOptimizerDeps());
-    const hm = res.heatmap as HeatmapDetail;
+    // The result itself (no cast) carries all per-cell details of the Heatmap contract.
+    const heatmap = res.heatmap!;
+    expect(heatmap.best).toBeDefined();
+    expect(heatmap.tested).toBeDefined();
+    expect(heatmap.scored).toBeDefined();
+    expect(heatmap.positive).toBeDefined();
+    const hm = heatmap as Required<Heatmap>;
     expect(hm.xParam).toBe("ensemble.buyThreshold");
     expect(hm.yParam).toBe("risk.stopAtrMult");
     expect(hm.xValues).toEqual([0.25, 0.35, 0.45, 0.55]);

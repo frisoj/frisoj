@@ -15,6 +15,7 @@ import {
   type EnsembleDecision,
   type ExitReason,
   type Interval,
+  type KillResult,
   type MarketDataFeed,
   type MarketInfo,
   type OpenPositionView,
@@ -358,7 +359,8 @@ export class FakeEngine extends EventEmitter implements EngineLike {
     this.trades.unshift(trade);
     return trade;
   }
-  async killSwitch() {
+  /** Oude vorm: geen KillResult (de echte engine geeft er wel een; zie engineActions.test.ts) */
+  async killSwitch(): Promise<KillResult | void> {
     this.killed++;
     this.running = false;
   }

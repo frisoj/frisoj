@@ -59,16 +59,37 @@ winstgevendheid.
 Instellingen aanpassen? Kopieer `.env.example` naar `.env` en pas die aan, of
 gebruik het tabblad **Instellingen** in het dashboard.
 
+> **Dashboard gaat vóór `.env`.** Zodra je in het dashboard instellingen opslaat,
+> bewaart de bot ze in `data/config.json` (in je `DATA_DIR`). Vanaf dan gelden de
+> markten en het interval uit het dashboard, en worden `MARKETS` en `INTERVAL` in
+> `.env` genegeerd. De bot meldt dat bij het starten. Wil je `.env` weer laten
+> gelden, pas het dan aan in het dashboard, of verwijder `data/config.json`
+> (let op: dan vervallen ook je andere opgeslagen instellingen, zoals risico en
+> strategieën).
+
 ## Wat zit erin
 
 ### Dashboard
 
 | Tabblad | Wat je ziet |
 |---|---|
-| **Live** | Candlestick-grafiek met EMA 9/21/200, Bollinger-banden, VWAP en volume; RSI- en MACD-panelen; koop- en verkoopsignalen en je trades als markeringen; lijnen voor instap, stop-loss en koersdoel van open posities. Daarnaast: een meter met de stemmen van alle strategieën, het marktregime, risicometers (dagverlies, blootstelling, aantal trades), je equity-curve, open posities, tradehistorie en een live logboek. Knoppen voor Start, Stop en **Noodstop**. |
+| **Live** | Candlestick-grafiek met EMA 9/21/200, Bollinger-banden, VWAP en volume; RSI- en MACD-panelen; koop- en verkoopsignalen en je trades als markeringen; lijnen voor instap, stop-loss en koersdoel van open posities. Daarnaast: een meter met de stemmen van alle strategieën, het marktregime, risicometers (dagverlies, blootstelling, aantal trades), je equity-curve, open posities (met de knoppen **Sluit** en, als een positie onverkoopbaar is, **Afschrijven**), tradehistorie en een live logboek. Knoppen voor Start, Stop en **Noodstop**. |
 | **Backtest-lab** | Test de strategie op historische data: rendement tegenover buy & hold, max drawdown, Sharpe, winrate, profit factor en betaalde fees; grafieken met trades, equity en drawdown; een histogram van trade-resultaten. **Optimaliseer** zoekt de beste parameters (met heatmap). **Walk-forward** controleert of die parameters ook werken op data waarop ze níét getraind zijn, en geeft een eerlijk oordeel. |
 | **Scanner** | De 30 meest verhandelde EUR-markten met koers, 24u-verandering, volatiliteit, spread, regime, signaal, RSI en een mini-grafiek, als tabel of heatmap. |
 | **Instellingen** | Markten, interval, alle risico-instellingen met uitleg, strategieën aan/uit met gewichten en drempels, en de live-modus. |
+
+Backtests, optimalisaties en walk-forward-tests zijn zwaar rekenwerk. Ze draaien
+daarom in een **aparte rekenthread**: de bot blijft ondertussen gewoon werken
+(stop-losses bewaken, de Noodstop, live-updates in het dashboard). Er loopt één
+berekening tegelijk; duurt hij langer dan 2 minuten, dan wordt hij afgebroken en
+krijg je het advies om minder dagen of minder combinaties te kiezen.
+
+De backtest rekent zo eerlijk mogelijk: een signaal wordt pas bij de opening van
+de volgende candle uitgevoerd, met fees en slippage (minstens de helft van de
+echte bied/laat-spread van de markt). Ook in de backtest weigert de "beurs"
+verkopen onder €5; je krijgt dan een waarschuwing hoeveel trades daardoor
+vastzaten. Heeft een markt te weinig historie, dan wordt de periode ingekort en
+staat dat erbij.
 
 ### De "hersenen": vijf strategieën die stemmen
 
@@ -81,25 +102,69 @@ gebruik het tabblad **Instellingen** in het dashboard.
 | VWAP-reversie | Koers ver onder de dag-VWAP en RSI draait omhoog | Zijwaarts/volatiel |
 
 Elke strategie geeft koop, verkoop of wacht, met een zekerheid. Het **ensemble**
-weegt de stemmen tot een score tussen −1 en +1. Een **regimefilter** (trend omhoog,
+weegt de stemmen tot een score tussen −1 en +1. Voor een **koop** is brede steun
+nodig: de score telt alle strategieën mee. Voor een **verkoop** tellen alleen de
+strategieën die iets vinden, zodat één duidelijk verkoopsignaal niet wordt
+"weggestemd" door strategieën die afwachten. Een **regimefilter** (trend omhoog,
 trend omlaag, zijwaarts of volatiel) laat strategieën die niet bij de markt passen
 minder zwaar meetellen, en blokkeert nieuwe aankopen in een dalende trend.
 
 ### Risicobeheer (standaardinstellingen voor €50)
 
-- **Positiegrootte op basis van risico**: maximaal 1,5% van je kapitaal verliezen
-  per trade als de stop-loss geraakt wordt; maximaal 45% van je kapitaal per positie.
+- **Positiegrootte op basis van risico**: je verliest maximaal 1,5% van je kapitaal
+  per trade (inclusief kosten) als de stop-loss geraakt wordt. Bij €50 is dat
+  ongeveer €0,75. Daarnaast maximaal 45% van je kapitaal per positie.
+- **Altijd verkoopbaar bij de stop-loss.** Bitvavo weigert elke order onder €5,
+  ook een verkooporder. Een positie van precies €5 kun je dus niet meer verkopen
+  zodra de koers een beetje daalt. Daarom koopt de bot alleen als de positie zo
+  groot is dat hij **bij de stop-loss nog boven €5** verkocht kan worden (met 3%
+  extra marge voor koersgaten en afronding).
+- **Nooit meer risico om het minimum te halen.** Is de positie volgens je risico
+  te klein, dan maakt de bot hem alleen groter als het verlies bij de stop-loss
+  daardoor níét boven je "Risico per trade" komt. Lukt dat niet, dan slaat hij de
+  trade over en staat in het logboek waarom.
 - **Stop-loss** op 2× ATR (beweegt mee met de volatiliteit), **koersdoel** op 2× het
   risico.
-- **Break-even-stop** zodra je 1R winst hebt, en daarna een **trailing stop** om
-  winst vast te houden.
-- **Dagelijkse verlieslimiet** van 5%: daarna geen nieuwe trades meer die dag.
+- **Break-even-stop**: na 1R winst gaat de stop naar je instapprijs plus kosten.
+  Daarna een **trailing stop** die op 2,5× ATR onder de hoogste koers meeschuift.
+  De stop gaat alleen omhoog als een candle is afgesloten (niet halverwege), en
+  naar break-even alleen als de slotkoers daar al boven ligt. Zo word je niet
+  meteen met verlies uitgestopt.
+- **Dagelijkse verlieslimiet** van 5%: daarna geen nieuwe trades meer tot de
+  volgende dag, ook als je posities die dag weer herstellen. Open posities worden
+  wel bewaakt.
 - **Maximaal 6 trades per dag** en maximaal 2 posities tegelijk.
-- **Afkoelperiode** na een verlies in dezelfde markt.
+- **Afkoelperiode**: na een verlies koopt de bot 4 candles lang niet in dezelfde markt.
 - **Kostenfilter**: een trade gaat alleen door als het koersdoel minstens 3× de
   totale kosten (fees + slippage) oplevert.
-- **Tijdslimiet**: een positie die na 48 candles niet in de winst staat, wordt gesloten.
-- Houdt rekening met de **minimale ordergrootte van €5** bij Bitvavo.
+- **Tijdslimiet**: een positie die na 48 candles niet in de winst staat (na kosten),
+  wordt gesloten.
+
+### Open posities: "Onverkoopbaar" en "Afschrijven"
+
+Soms is een positie toch minder dan €5 waard, bijvoorbeeld na een flinke
+koersdaling. Bitvavo weigert dan elke verkoop: van de stop-loss, van de knop
+**Sluit** en van de **Noodstop**. De bot doet dan het volgende:
+
+- Hij stuurt geen zinloze order, maar zet bij de positie het label
+  **Onverkoopbaar**, met de reden (bijv. "waarde €4,60 < minimum €5,00").
+- Wil hij de positie verkopen (stop-loss, verkoopsignaal of jouw klik op Sluit),
+  dan onthoudt hij dat en verkoopt hij **zodra de waarde weer €5 of meer is**
+  (zolang de bot draait). Stop-loss en koersdoel worden voor die positie dan niet
+  meer opnieuw bekeken: de verkoop staat al klaar.
+- Tot die tijd telt de positie gewoon mee (als een van je 2 posities).
+
+Wil je niet wachten, dan kun je de positie **afschrijven** (knop **Afschrijven**
+naast Sluit). Dat betekent:
+
+- de bot beheert de positie niet meer: geen stop-loss, geen koersdoel, geen
+  verkooppogingen;
+- je volledige inleg wordt als **verlies** geboekt (−100%) in je resultaten;
+- de munten **blijven gewoon op je Bitvavo-account staan** (in de oefenmodus: op
+  je oefenaccount). Je kunt ze later zelf op Bitvavo verkopen, bijvoorbeeld door
+  bij te kopen tot boven €5 en dan alles te verkopen.
+
+Afschrijven kan alleen bij een onverkoopbare positie en is niet terug te draaien.
 
 ## Live handelen (echt geld). Doe dit pas na weken oefenen
 
@@ -114,15 +179,76 @@ minder zwaar meetellen, en blokkeert nieuwe aankopen in een dalende trend.
    BITVAVO_API_KEY=...
    BITVAVO_API_SECRET=...
    CAPITAL_LIMIT_EUR=50
+   DASHBOARD_TOKEN=een-lang-geheim-wachtwoord
    ```
-4. Start met `npm start`. De bot rekent in live-modus alleen signalen uit en plaatst
-   **geen** orders totdat je in **Instellingen → Live trading** op "Arm" klikt en
-   `IK BEGRIJP HET RISICO` intypt.
-5. De rode **Noodstop**-knop verkoopt alle open posities van de bot direct en zet
-   hem stil.
+   Het dashboard weigert al verzoeken van andere websites, maar met een
+   `DASHBOARD_TOKEN` (minstens 8 tekens) kan ook geen ander programma op je
+   computer de bot bedienen. Het dashboard vraagt er één keer om en onthoudt het
+   in je browser.
+4. Start met `npm start` en klik in het dashboard op **Start**. In live-modus
+   start de bot nooit vanzelf. Hij rekent eerst alleen signalen uit en plaatst
+   **geen** orders ("zou kopen …" in het logboek), totdat je in
+   **Instellingen → Live trading** op **Arm live trading** klikt (of bovenaan op
+   **Live handel inschakelen**) en `IK BEGRIJP HET RISICO` intypt.
+5. **Let op:** zolang live trading niet aan staat, voert de bot ook **geen
+   stop-losses** uit op je echte posities (hij logt dan alleen "zou verkopen").
+   Dat geldt ook na elke herstart: live trading staat dan weer uit. Zet het weer
+   aan, of sluit je posities zelf. De knoppen **Sluit** en **Noodstop** verkopen
+   wél, ook als live trading uit staat.
 
 De bot raakt alleen posities aan die hij zelf heeft geopend, en gebruikt nooit
-meer dan `CAPITAL_LIMIT_EUR`.
+meer dan `CAPITAL_LIMIT_EUR` (geld in open posities telt mee). Winst boven die
+limiet laat hij op je account staan, buiten zijn handelsbudget. Het dashboard
+toont dat als "afgeroomd".
+
+### De Noodstop
+
+De rode **Noodstop**-knop:
+
+1. zet de bot direct stil (ook een ronde die op dat moment loopt koopt niets
+   meer) en zet live trading uit;
+2. zoekt eerst uit hoe het zit met orders waarvan de uitkomst nog onbekend is;
+3. probeert daarna **elke** open positie van de bot direct tegen marktprijs te
+   verkopen;
+4. vertelt je precies wat er gelukt is: "alles verkocht", of welke posities
+   **niet** verkocht konden worden en waarom. Bijvoorbeeld: onder het minimum van
+   €5, geweigerd door Bitvavo, uitkomst van de verkoop onbekend, of munten die
+   vastzitten in een openstaande order. Ook kooporders met een onbekende uitkomst
+   staan in dat lijstje: als zo'n order toch is uitgevoerd, staan die munten nog
+   op je account.
+
+De bot stopt ook als een verkoop mislukt. Wat niet verkocht is, blijft open
+**zonder stop-loss**. Controleer je account en verkoop het zelf op Bitvavo, of
+schrijf een onverkoopbare positie af.
+
+### Melding "Onbekende orderuitkomst"
+
+Soms weet de bot niet zeker of een order bij Bitvavo is uitgevoerd, bijvoorbeeld
+als je internet precies tijdens het plaatsen wegvalt. Hij verstuurt de order dan
+**nooit** blind opnieuw (dan zou hij misschien twee keer kopen of verkopen).
+
+Bij een **kooporder** verschijnt bovenaan een gele balk **Onbekende
+orderuitkomst**, en koopt de bot **niets meer, in geen enkele markt**. Elke ronde
+zoekt hij de order op bij Bitvavo:
+
+- Vindt hij de order, dan boekt hij wat er gekocht is als positie (mét stop-loss)
+  en gaat hij verder.
+- Meldt Bitvavo drie rondes op rij dat de order niet bestaat, dan is hij niet
+  geplaatst en gaat de bot ook verder.
+
+Wil je niet wachten? Kijk dan zelf op Bitvavo bij je **open orders** en je
+**saldo** of er iets gekocht is. Klik daarna op **Ik heb het gecontroleerd**. Let
+op: munten die zo'n order toch gekocht heeft, beheert de bot dan **niet** (geen
+stop-loss). Verkoop die zelf op Bitvavo.
+
+Bij een **verkooporder** met onbekende uitkomst verkoopt de bot die positie niet
+nog een keer, totdat vaststaat wat er met de eerste order gebeurd is.
+
+Was het opgeslagen bestand van de bot bij het starten kapot, dan zie je de
+melding **Opgeslagen staat was onbruikbaar**. De bot begint dan met een lege
+administratie (het oude bestand blijft bewaard) en bewaakt posities van vóór de
+herstart niet. Live trading aanzetten kan pas als je je saldi op Bitvavo hebt
+gecontroleerd en op **Ik heb het gecontroleerd** hebt geklikt.
 
 ## Backtesten vanaf de command line
 
@@ -131,6 +257,10 @@ npm run backtest -- --market BTC-EUR --interval 15m --days 30
 npm run backtest -- --market ETH-EUR --interval 15m --days 60 --walkforward
 npm run backtest -- --market SOL-EUR --interval 5m --days 14 --source simulated
 ```
+
+Let op: de command line gebruikt altijd de **standaardinstellingen**, niet wat je
+in het dashboard hebt opgeslagen. Wil je je eigen instellingen testen, gebruik
+dan het Backtest-lab in het dashboard.
 
 ## Hoe het in elkaar zit
 
@@ -141,7 +271,8 @@ Bitvavo REST ──▶ BitvavoFeed ─┐                        ┌─▶ Paper
                                    │  5 strategieën + ensemble
                                    │  RiskManager
                                    └─▶ events ──▶ SSE ──▶ dashboard (browser)
-Backtester gebruikt exact dezelfde strategieën en RiskManager.
+Backtester gebruikt exact dezelfde strategieën en RiskManager, en draait in
+een aparte rekenthread (worker) zodat de bot blijft reageren.
 ```
 
 | Map | Inhoud |
@@ -155,8 +286,9 @@ Backtester gebruikt exact dezelfde strategieën en RiskManager.
 | `src/backtest` | Backtester, statistieken, optimizer, walk-forward |
 | `src/broker` | Paper broker en live broker |
 | `src/engine` | De trading-engine en opslag van de toestand (`data/`) |
-| `src/server` | HTTP-server, API, live-updates (SSE), scanner |
+| `src/server` | HTTP-server, API, live-updates (SSE), scanner, rekenthread voor backtests |
 | `public/` | Het dashboard (HTML/CSS/JS, grafieken via TradingView Lightweight Charts) |
+| `tests/` | Automatische tests, ook voor het dashboard (`tests/frontend`) |
 
 Het volledige technische contract tussen de modules staat in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -171,6 +303,9 @@ npm run typecheck  # TypeScript-controle
 - **De bot moet blijven draaien.** Stop-losses worden door de bot bewaakt, niet
   als order op de beurs gezet. Gaat je computer in slaapstand of valt internet weg,
   dan worden stops pas uitgevoerd als de bot weer draait.
+- **Een stop-loss is geen garantie.** De bot verkoopt tegen marktprijs zodra de
+  stop geraakt is. Zakt de koers in één klap door je stop heen (een "gat"), dan
+  verkoop je lager en kan het verlies groter zijn dan 1,5%.
 - **Alleen long**: de bot koopt en verkoopt. Short gaan (verdienen aan dalingen)
   kan niet op de spotmarkt van Bitvavo.
 - **Market orders** betalen de hogere taker fee (0,25%).

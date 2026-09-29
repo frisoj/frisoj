@@ -456,7 +456,12 @@ function fallbackHtml(file, err) {
 }
 
 safeMount("header", () =>
-  mountHeader(ctx, { statsEl: $("header-stats"), controlsEl: $("bot-controls"), bannerEl: $("mode-banner") }),
+  mountHeader(ctx, {
+    statsEl: $("header-stats"),
+    controlsEl: $("bot-controls"),
+    bannerEl: $("mode-banner"),
+    alertEl: $("alert-banners"),
+  }),
 );
 safeMount("grafiek", () =>
   mountLiveChart(ctx, {

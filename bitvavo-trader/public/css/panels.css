@@ -553,6 +553,30 @@
   transform-origin: 120px 122px;
   transition: transform 0.7s cubic-bezier(0.3, 1.3, 0.5, 1);
 }
+.sig-exit {
+  transform-box: view-box;
+  transform-origin: 120px 122px;
+  transition: transform 0.7s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+.sig-exit-mark {
+  fill: var(--panel);
+  stroke: var(--text-dim, var(--muted));
+  stroke-width: 2;
+}
+.sig-exit-mark[data-a="sell"] {
+  fill: var(--red-bg);
+  stroke: var(--red);
+}
+.sig-exit-row {
+  font-size: 12px;
+  cursor: help;
+}
+.sig-exit-ico {
+  font-size: 10px;
+}
+.sig-exit-val[data-a="sell"] {
+  color: var(--red);
+}
 .sig-ptr-dot {
   fill: var(--text);
   stroke: var(--panel);
@@ -964,6 +988,18 @@
 }
 .eq .pn-hint {
   margin-bottom: 0;
+}
+.eq-skim {
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+  background: var(--green-bg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.eq-skim[hidden] {
+  display: none;
 }
 
 /* ─────────────────────────────── Backtest-lab ─────────────────────────────── */
@@ -1641,6 +1677,16 @@
 }
 .bt-cell.is-best rect {
   stroke: var(--text);
+}
+.bt-cell-star {
+  fill: var(--yellow);
+  font-size: 11px;
+  pointer-events: none;
+}
+.bt-cell.is-few .bt-cell-txt,
+.bt-cell.is-none .bt-cell-txt {
+  fill: var(--muted);
+  font-weight: 500;
 }
 .bt-cell-txt {
   fill: var(--text);
@@ -2758,6 +2804,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .sig-ptr,
+  .sig-exit,
   .sig-value,
   .risk-val,
   .risk-halt {

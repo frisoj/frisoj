@@ -30,6 +30,7 @@ import { validateRiskConfig } from "./risk/riskManager";
 import { createApp, startHttpServer, isLoopbackHost, type RunningServer } from "./server/httpServer";
 import { HeavyRunner } from "./server/heavyRunner";
 import { createShutdown } from "./server/shutdown";
+import { syncAccountFees } from "./server/accountFees";
 import type { Services } from "./server/routes";
 
 class StartupError extends Error {}
@@ -182,23 +183,13 @@ async function main(): Promise<void> {
     broker = new LiveBroker(client, {
       getMarketInfo: async (market: string) => (await feed.getMarkets()).find((m) => m.market === market),
     });
-    try {
-      const account = await client.account();
-      // Alleen fees binnen de grenzen van de risicomanager overnemen (anders keurt hij elke koop af).
-      if (validateRiskConfig({ takerFee: account.takerFee }).ok) engineConfig.risk.takerFee = account.takerFee;
-      else console.warn(`⚠ Onverwachte taker fee van Bitvavo (${account.takerFee}); de ingestelde waarde blijft in gebruik.`);
-      if (validateRiskConfig({ makerFee: account.makerFee }).ok) engineConfig.risk.makerFee = account.makerFee;
-      else console.warn(`⚠ Onverwachte maker fee van Bitvavo (${account.makerFee}); de ingestelde waarde blijft in gebruik.`);
-      console.log(
-        `Bitvavo-account gevonden. Jouw fees: taker ${(engineConfig.risk.takerFee * 100).toFixed(2)}%, ` +
-          `maker ${(engineConfig.risk.makerFee * 100).toFixed(2)}%.`,
-      );
-    } catch (err) {
-      console.warn(
-        `⚠ Kon je Bitvavo-account niet ophalen (${(err as Error).message}). ` +
-          "Controleer je API-sleutel en IP-whitelist. Standaard-fees worden gebruikt.",
-      );
-    }
+    // Echte fees ophalen en daarna ook aan de (al gebouwde) LiveBroker doorgeven.
+    await syncAccountFees({
+      account: () => client.account(),
+      broker,
+      risk: engineConfig.risk,
+      validateRisk: validateRiskConfig,
+    });
   }
 
   const store = new StateStore(join(config.dataDir, `state-${config.mode}.json`));

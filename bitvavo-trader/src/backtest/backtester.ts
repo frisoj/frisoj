@@ -16,9 +16,11 @@ import {
 
 export type { BacktestDeps, BacktestInput, ResolvedBacktestDeps, SimulationOutput } from "./simulator";
 export {
+  DEFAULT_EXCHANGE_MIN_QUOTE,
   MAX_CHART_CANDLES,
   aggregateCandles,
   effectiveSlippagePct,
+  exchangeMinOrderQuote,
   exitMarkerLabel,
   fmtPctNl,
   spreadFromTicker,
@@ -38,8 +40,9 @@ export function runBacktest(input: BacktestInput, deps?: BacktestDeps): Backtest
 
 /**
  * runBacktest plus simulation details that are not part of BacktestResult:
- * the slippage actually used (incl. half the spread) and how many trades /
- * candles were stuck because a sell below the minimum order was refused.
+ * the slippage actually used (incl. half the spread), the exchange minimum
+ * order, and how many trades were stuck because a sell below that minimum was
+ * refused (sold later vs. still unsellable at the end) and for how many candles.
  */
 export function runBacktestDetailed(input: BacktestInput, deps?: BacktestDeps): SimulationOutput {
   return runBacktestWith(input, resolveBacktestDeps(deps));

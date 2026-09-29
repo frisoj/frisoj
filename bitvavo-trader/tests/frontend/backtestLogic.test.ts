@@ -147,3 +147,84 @@ describe("toepassen: de getest configuratie, niet alleen de grid-parameters", ()
     expect(byKey["risk.takeProfitR"]).toMatchObject({ same: true });
   });
 });
+
+describe("minimale periode (≥ 30 candles, zelfde grens als de server)", () => {
+  it("rekent dagen × 86.400.000 / interval-ms", () => {
+    expect(L.periodCandles(30, "1d")).toBe(30);
+    expect(L.periodCandles(1, "15m")).toBe(96);
+    expect(L.periodCandles(14, "12h")).toBe(28);
+    expect(L.MIN_PERIOD_CANDLES).toBe(30);
+  });
+
+  it("geeft een Nederlandse melding met het minimum aantal dagen", () => {
+    expect(L.periodError(30, "1d")).toBeNull();
+    expect(L.periodError(1, "15m")).toBeNull();
+    expect(L.periodError(1, "1h")).toBe(
+      "Periode te kort: 1 dag van 1h is maar 24 candles (minimaal 30). Kies minstens 2 dagen of een korter interval.",
+    );
+    expect(L.periodError(14, "12h")).toContain("Kies minstens 15 dagen");
+    expect(L.periodError(29, "1d")).toContain("maar 29 candles");
+    expect(L.minPeriodDays("4h")).toBe(5);
+    expect(L.minPeriodDays("1m")).toBe(1);
+  });
+
+  it("resultDays: echte testlengte uit from/to (inclusief de laatste candle)", () => {
+    const from = Date.UTC(2026, 8, 1);
+    expect(L.resultDays({ interval: "1h", from, to: from + 47 * 3600e3 })).toBeCloseTo(2, 9);
+    expect(L.resultDays({ interval: "1h" })).toBeNaN();
+  });
+});
+
+describe("heatmap: mediaan, beste combinatie en telling per cel", () => {
+  // 2 × 2: cel (0,0) goed, (1,0) alleen afgestraft (te weinig trades), (0,1) niet getest, (1,1) mediaan laag maar beste hoog
+  const hm = {
+    xParam: "ensemble.buyThreshold",
+    yParam: "risk.stopAtrMult",
+    xValues: [0.3, 0.4],
+    yValues: [2, 3],
+    values: [
+      [0.5, null],
+      [null, 0.1],
+    ],
+    best: [
+      [0.8, null],
+      [null, 1.4],
+    ],
+    tested: [
+      [4, 3],
+      [0, 5],
+    ],
+    scored: [
+      [4, 0],
+      [0, 5],
+    ],
+    positive: [
+      [3, 0],
+      [0, 2],
+    ],
+  };
+  const f = (v: number) => v.toFixed(2).replace(".", ",");
+
+  it("status per cel: ok / te weinig trades / niet getest", () => {
+    expect(L.heatmapCell(hm, 0, 0)).toMatchObject({ status: "ok", value: 0.5, best: 0.8, tested: 4, scored: 4, positive: 3 });
+    expect(L.heatmapCell(hm, 1, 0)).toMatchObject({ status: "few", value: null, tested: 3, scored: 0 });
+    expect(L.heatmapCell(hm, 0, 1)).toMatchObject({ status: "untested", tested: 0 });
+    // oudere server zonder tellingen: null = "niet getest of te weinig trades"
+    expect(L.heatmapCell({ ...hm, tested: undefined, scored: undefined, positive: undefined, best: undefined }, 1, 0).status).toBe("none");
+  });
+
+  it("tooltip: mediaan · beste · winstgevend van gescoord (getest)", () => {
+    expect(L.heatmapCellTip(L.heatmapCell(hm, 0, 0), f)).toBe("mediaan 0,50 · beste 0,80 · 3 van 4 winstgevend (4 getest)");
+    expect(L.heatmapCellTip(L.heatmapCell(hm, 1, 0), f)).toContain("te weinig trades (3 getest");
+    expect(L.heatmapCellTip(L.heatmapCell(hm, 0, 1), f)).toBe("niet getest");
+  });
+
+  it("de ster hoort bij de cel van res.best, niet bij de hoogste mediaan", () => {
+    const bestRow = { params: { "ensemble.buyThreshold": 0.4, "risk.stopAtrMult": 3, "risk.takeProfitR": 2 }, score: 1.4, metrics: {} };
+    // hoogste mediaan zit in (0,0), maar de beste combinatie in (1,1)
+    expect(L.bestHeatmapCell(hm, bestRow)).toEqual({ xi: 1, yi: 1 });
+    expect(L.bestHeatmapCell(hm, null)).toBeNull();
+    expect(L.bestHeatmapCell(hm, { ...bestRow, score: -1e9 })).toBeNull();
+    expect(L.bestHeatmapCell(hm, { ...bestRow, params: { "ensemble.buyThreshold": 0.5, "risk.stopAtrMult": 3 } })).toBeNull();
+  });
+});

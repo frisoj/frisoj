@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_CONFIG } from "../../src/core/defaults";
-import { INTERVAL_MS, type Candle, type Interval } from "../../src/core/types";
-import { BACKTEST_WARMUP_CANDLES, MIN_PERIOD_CANDLES } from "../../src/server/routes";
+import { INTERVAL_MS, type Candle, type Interval, type Ticker24h } from "../../src/core/types";
+import { BACKTEST_WARMUP_CANDLES, MIN_PERIOD_CANDLES, SPREAD_LOOKUP_TIMEOUT_MS } from "../../src/server/routes";
 import { backtestWarmupCandles } from "../../src/server/warmup";
 import { FakeFeed, NOW, json, makeCandles, makePosition, startTestServer, type TestServer } from "./helpers";
 
@@ -355,6 +355,65 @@ describe("API: backtest / optimize / walk-forward", () => {
     const third = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "15m", days: 5 });
     expect(third.status).toBe(200);
   });
+});
+
+describe("API: spread uit de 24h-ticker voor backtests", () => {
+  class TickerFeed extends FakeFeed {
+    constructor(private readonly mode: "throw" | "no-bid" | "hang") {
+      super();
+    }
+    override async getTickers24h(): Promise<Ticker24h[]> {
+      const all = await super.getTickers24h(); // telt tickerCalls
+      if (this.mode === "throw") throw new Error("Bitvavo onbereikbaar");
+      if (this.mode === "hang") return new Promise<Ticker24h[]>(() => {});
+      return all.map((t) => ({ ...t, bid: null }));
+    }
+  }
+
+  it("backtest, optimize en walk-forward krijgen de huidige spread (fractie) mee", async () => {
+    srv = await startTestServer();
+    const b = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "1h", days: 30 });
+    expect(b.status).toBe(200);
+    const o = await json(srv.base, "POST", "/api/optimize", { market: "ETH-EUR", interval: "1h", days: 30, objective: "sharpe" });
+    expect(o.status).toBe(200);
+    const w = await json(srv.base, "POST", "/api/walkforward", {
+      market: "SOL-EUR",
+      interval: "1h",
+      days: 60,
+      objective: "return",
+      folds: 3,
+      trainRatio: 0.6,
+    });
+    expect(w.status).toBe(200);
+    // FakeFeed: bid 99.9, ask 100.1 → (0.2 / 100) = 0.002
+    expect(srv.calls.runBacktest[0].spreadPct).toBeCloseTo(0.002, 10);
+    expect(srv.calls.optimize[0].input.spreadPct).toBeCloseTo(0.002, 10);
+    expect(srv.calls.walkForward[0].input.spreadPct).toBeCloseTo(0.002, 10);
+  });
+
+  it.each(["throw", "no-bid"] as const)("ticker faalt/onbruikbaar (%s) → backtest gaat door zonder spread", async (mode) => {
+    const feed = new TickerFeed(mode);
+    srv = await startTestServer({ feed });
+    const r = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "1h", days: 30 });
+    expect(r.status).toBe(200);
+    expect(feed.tickerCalls).toBe(1);
+    expect(srv.calls.runBacktest[0].spreadPct).toBeUndefined();
+    expect("spreadPct" in srv.calls.runBacktest[0]).toBe(false);
+  });
+
+  it(
+    "een hangende ticker houdt de backtest niet tegen",
+    async () => {
+      const feed = new TickerFeed("hang");
+      srv = await startTestServer({ feed });
+      const t0 = Date.now();
+      const r = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "1h", days: 30 });
+      expect(r.status).toBe(200);
+      expect(Date.now() - t0).toBeLessThan(SPREAD_LOOKUP_TIMEOUT_MS + 2_000);
+      expect(srv.calls.runBacktest[0].spreadPct).toBeUndefined();
+    },
+    SPREAD_LOOKUP_TIMEOUT_MS + 5_000,
+  );
 });
 
 describe("API: backtestperiode en warmup", () => {

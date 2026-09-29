@@ -2,6 +2,11 @@
  * Marktscanner: de N EUR-markten met het hoogste 24h-volume, met per markt
  * volatiliteit (ATR%), regime, laatste ensemble-signaal, RSI en een sparkline.
  * Resultaten worden 60 seconden gecachet.
+ *
+ * Er wordt nooit precies "top-N" gescand, maar altijd een vaste set: de top 30
+ * (standaard van het dashboard) of, voor een grotere N, de top 60. Elk verzoek
+ * krijgt daar een stuk van. Zo kost een reeks oplopende `?limit=`-verzoeken
+ * binnen één cachevenster hooguit twee scans in plaats van één per limit.
  */
 import type {
   Candle,
@@ -33,6 +38,13 @@ export interface ScannerOptions {
 }
 
 export const SCANNER_MAX_LIMIT = 60;
+/** Kleinste scan (en de limit die het dashboard gebruikt) */
+export const SCANNER_DEFAULT_LIMIT = 30;
+
+/** Hoeveel markten er gescand worden om een verzoek om top-`n` te bedienen: 30 of 60. */
+export function scanSize(n: number): number {
+  return n <= SCANNER_DEFAULT_LIMIT ? SCANNER_DEFAULT_LIMIT : SCANNER_MAX_LIMIT;
+}
 
 /** Voert `fn` uit over `items` met maximaal `limit` tegelijk; volgorde blijft behouden. */
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
@@ -70,7 +82,13 @@ interface RankedRow {
 interface ScanResult {
   /** Voor hoeveel markten (top-N) deze scan is berekend */
   limit: number;
+  /** Er waren minder markten dan `limit`: de scan bevat ze allemaal (bedient dus ook een grotere N) */
+  complete: boolean;
   rows: RankedRow[];
+}
+
+function covers(result: ScanResult, size: number): boolean {
+  return result.limit >= size || result.complete;
 }
 
 function topN(result: ScanResult, n: number): ScannerRow[] {
@@ -101,18 +119,20 @@ export class Scanner {
   }
 
   async scan(limit: number, interval: Interval, ensemble: EnsembleConfig): Promise<ScannerRow[]> {
-    const n = Math.max(1, Math.min(SCANNER_MAX_LIMIT, Math.floor(limit)));
+    const n = Math.max(1, Math.min(SCANNER_MAX_LIMIT, Math.floor(Number.isFinite(limit) ? limit : 1)));
+    // Vaste scangrootte (30 of 60), niet `n`: anders start elke hogere limit een nieuwe scan.
+    const size = scanSize(n);
     const key = `${interval}|${hashString(JSON.stringify(ensemble))}`;
     const hit = this.cache.get(key);
-    if (hit && hit.result.limit >= n && this.now() - hit.at < this.cacheMs) return topN(hit.result, n);
+    if (hit && covers(hit.result, size) && this.now() - hit.at < this.cacheMs) return topN(hit.result, n);
     const running = this.inflight.get(key);
-    if (running && running.limit >= n) return topN(await running.promise, n);
+    if (running && running.limit >= size) return topN(await running.promise, n);
     const entry = {
-      limit: n,
-      promise: this.compute(n, interval, ensemble).then((result) => {
+      limit: size,
+      promise: this.compute(size, interval, ensemble).then((result) => {
         const prev = this.cache.get(key);
         // Een verse, grotere scan niet overschrijven met een kleinere
-        if (!prev || prev.result.limit <= result.limit || this.now() - prev.at >= this.cacheMs) {
+        if (!prev || covers(result, prev.result.limit) || this.now() - prev.at >= this.cacheMs) {
           this.cache.set(key, { at: this.now(), result });
         }
         return result;
@@ -151,7 +171,7 @@ export class Scanner {
     if (ok.length === 0 && failures > 0) {
       throw new Error("De scanner kon geen enkele markt ophalen. Probeer het later opnieuw.");
     }
-    return { limit, rows: ok };
+    return { limit, complete: top.length < limit, rows: ok };
   }
 
   private async row(t: Ticker24h, interval: Interval, ensemble: EnsembleConfig): Promise<ScannerRow> {

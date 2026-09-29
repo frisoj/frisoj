@@ -18,11 +18,12 @@ import { getStrategy, isStrategyId, resolveParams } from "./registry";
 export const OFF_REGIME_WEIGHT = 0.5;
 
 /**
- * Beslissing plus de exit-score: Σ w·dir·conf gedeeld door het gewicht van
- * alleen de strategieën die iets vinden (niet "hold"). Strategieën die wachten
- * verdunnen een exit-stem dus niet. (Extra veld bovenop het core-contract.)
+ * Beslissing waarvan de (in het contract optionele) `exitScore` altijd gevuld
+ * is: Σ w·dir·conf gedeeld door het gewicht van alleen de strategieën die iets
+ * vinden (niet "hold"). Strategieën die wachten verdunnen een exit-stem dus
+ * niet. `runEnsemble` en `latestDecision` vullen hem altijd.
  */
-export type EnsembleDecisionWithExit = EnsembleDecision & { exitScore: number };
+export type EnsembleDecisionWithExit = EnsembleDecision & Required<Pick<EnsembleDecision, "exitScore">>;
 
 /**
  * Score → actie. De ENIGE plek waar drempels en regimefilter worden toegepast

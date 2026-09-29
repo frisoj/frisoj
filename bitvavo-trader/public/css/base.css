@@ -910,6 +910,72 @@ input[type="range"] {
   padding: 0 10px;
   font-size: 11.5px;
 }
+
+/* Waarschuwingsbanners onder de mode-banner (onbekende orders, herstelmelding) */
+.alert-banners[hidden] {
+  display: none;
+}
+.alert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  border-bottom: 1px solid var(--border);
+}
+.alert-banner .ab-main {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 1100px;
+}
+.alert-banner svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin-top: 1px;
+}
+.alert-banner .ab-sub {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-left: 4px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+.alert-banner .ab-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.alert-banner .btn {
+  height: 26px;
+  padding: 0 12px;
+  font-size: 12px;
+  flex: none;
+}
+.alert-banner.warn {
+  background: var(--yellow-bg);
+  border-bottom-color: rgba(244, 182, 58, 0.45);
+  color: var(--yellow);
+}
+.alert-banner.bad {
+  background: var(--red-bg);
+  border-bottom-color: color-mix(in srgb, var(--red) 55%, transparent);
+  color: #ff9aa6;
+}
+.alert-banner.bad b {
+  color: var(--red);
+}
 body.live-armed {
   box-shadow: inset 0 0 0 2px rgba(242, 73, 92, 0.55);
 }
@@ -1633,6 +1699,24 @@ body.live-armed {
 .price-cell {
   padding: 0 3px;
   border-radius: 3px;
+}
+.pos-market {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.pos-market .badge {
+  cursor: help;
+}
+.pos-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+}
+tr.is-unsellable > td {
+  background: rgba(244, 182, 58, 0.05);
 }
 .rangebar {
   position: relative;

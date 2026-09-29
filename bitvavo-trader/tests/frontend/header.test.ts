@@ -118,3 +118,70 @@ describe("Noodstop-knop", () => {
     expect(h.toasts.some((t) => t.includes("alles verkocht"))).toBe(false);
   });
 });
+
+describe("killOutcome met killResult van de server", () => {
+  const withKill = (positions: Fake[], failed: Fake[], closed = 0) => ({ ...snapshot(positions, false), killResult: { closed, failed } });
+
+  it("noemt precies welke posities niet verkocht zijn en waarom", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const res = withKill(
+      [dust, big],
+      [
+        { id: "p1", market: "SOL-EUR", reason: "onverkoopbaar: waarde € 4,89 is onder het minimum van € 5,00" },
+        { id: "p2", market: "BTC-EUR", reason: "verkooporder afgewezen: rate limit" },
+      ],
+    );
+    const [raw, kind] = killOutcome(res, fmt);
+    const msg = norm(raw);
+    expect(kind).toBe("error");
+    expect(msg).toContain("2 posities NIET verkocht");
+    expect(msg).toContain("SOL-EUR ≈ € 4,89: onverkoopbaar: waarde € 4,89 is onder het minimum van € 5,00");
+    expect(msg).toContain("BTC-EUR ≈ € 30,00: verkooporder afgewezen: rate limit");
+    // positie onder het minimum → uitleg over wachten/afschrijven
+    expect(msg).toContain("schrijf hem af");
+    expect(msg).toContain("de bot staat stil");
+  });
+
+  it("toont ook een kooporder met onbekende uitkomst (geen positie in de snapshot)", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const res = withKill([], [{ id: "bvt-abc", market: "ETH-EUR", reason: "kooporder met onbekende uitkomst: controleer Bitvavo" }], 1);
+    const [raw, kind] = killOutcome(res, fmt);
+    expect(kind).toBe("error");
+    expect(norm(raw)).toContain("1 positie NIET verkocht — ETH-EUR: kooporder met onbekende uitkomst: controleer Bitvavo");
+    expect(raw).not.toContain("alles verkocht");
+  });
+
+  it("failed leeg en niets meer open → 'alles verkocht'", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    expect(killOutcome(withKill([], [], 2), fmt)).toEqual(["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"]);
+  });
+
+  it("failed leeg maar er staan nog posities open → valt terug op de posities (nooit 'alles verkocht')", async () => {
+    const { killOutcome } = await loadPublic("js/header.js");
+    const { fmt } = await loadPublic("js/format.js");
+    const [raw, kind] = killOutcome(withKill([dust], []), fmt);
+    expect(kind).toBe("error");
+    expect(norm(raw)).toContain("NIET verkocht (SOL-EUR ≈ € 4,89)");
+  });
+
+  it("de knop toont de reden uit killResult in de modal", async () => {
+    const res = withKill([big], [{ id: "p2", market: "BTC-EUR", reason: "uitkomst onbekend (time-out)" }]);
+    const h = await mount(snapshot([big]), res);
+    const modal = h.pressKill();
+    const err = await modal.onConfirm().catch((e: Error) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(norm(err.message)).toContain("BTC-EUR ≈ € 30,00: uitkomst onbekend (time-out)");
+  });
+
+  it("de modal waarschuwt vooraf voor een positie die de engine als onverkoopbaar markeert", async () => {
+    // Waarde boven €5, maar de engine weet beter (bijv. minimum in base-eenheden)
+    const flagged = { ...big, unsellable: true, unsellableReason: "Onverkoopbaar: onder het minimum in BTC" };
+    const h = await mount(snapshot([flagged]), snapshot([], false));
+    const modal = h.pressKill();
+    expect(modal.bodyHtml).toContain("niet verkocht");
+    expect(modal.bodyHtml).toContain("BTC-EUR");
+  });
+});

@@ -4,7 +4,7 @@
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import type { AddressInfo } from "node:net";
+import { isIPv6, type AddressInfo } from "node:net";
 import type { AppInfo, EngineConfig, MarketDataFeed } from "../core/types";
 import { isLoopbackHost, saveEngineOverrides, type AppConfig } from "../config";
 import { HttpError, readJsonBody, sendError, type Router } from "./router";
@@ -63,13 +63,15 @@ function setSecurityHeaders(res: ServerResponse): void {
 /** Exacte loopback-check (zie config.ts); hier opnieuw geëxporteerd voor bestaande imports. */
 export { isLoopbackHost };
 
-/** Hostnaam uit een Host-header (zonder poort), ook voor IPv6 "[::1]:4321". */
+/** Hostnaam uit een Host-header (zonder poort), ook voor IPv6 "[::1]:4321" (en een kaal "::1"). */
 export function hostnameOf(hostHeader: string): string {
   const h = hostHeader.trim().toLowerCase();
   if (h.startsWith("[")) {
     const end = h.indexOf("]");
     return end > 0 ? h.slice(0, end + 1) : h;
   }
+  // Een IPv6-adres zonder haken (en dus zonder poort) is als geheel de hostnaam.
+  if (isIPv6(h)) return h;
   const colon = h.lastIndexOf(":");
   return colon > 0 ? h.slice(0, colon) : h;
 }
@@ -154,10 +156,14 @@ export function createApp(deps: CreateAppDeps): App {
     const pathname = url.pathname;
     const isApi = pathname === "/api" || pathname.startsWith("/api/");
 
-    // Bescherming tegen DNS-rebinding: bij binden op loopback alleen lokale Host-headers
+    // Bescherming tegen DNS-rebinding: bij binden op loopback alleen lokale Host-headers.
+    // Zonder Host-header (HTTP/1.0) valt er niets te controleren → weigeren.
     if (checkHost) {
       const hostHeader = req.headers.host;
-      if (hostHeader && !isLoopbackHost(hostnameOf(hostHeader))) {
+      if (hostHeader === undefined || hostHeader.trim() === "") {
+        throw new HttpError(400, "Ongeldig verzoek: de Host-header ontbreekt.");
+      }
+      if (!isLoopbackHost(hostnameOf(hostHeader))) {
         throw new HttpError(403, "Toegang geweigerd: onbekende Host-header.");
       }
     }

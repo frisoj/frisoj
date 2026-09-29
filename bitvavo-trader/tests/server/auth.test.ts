@@ -1,6 +1,24 @@
+import { connect } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { isLoopbackHost, tokensEqual } from "../../src/server/httpServer";
+import { hostnameOf, isLoopbackHost, tokensEqual } from "../../src/server/httpServer";
 import { json, rawGet, rawRequest, startTestServer, type TestServer } from "./helpers";
+
+/** Ruw verzoek over een socket (bijv. HTTP/1.0 zonder Host-header); geeft statusregel + body. */
+function rawSocket(port: number, request: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const sock = connect(port, "127.0.0.1");
+    const chunks: Buffer[] = [];
+    sock.on("data", (c: Buffer) => chunks.push(c));
+    sock.on("error", reject);
+    sock.on("close", () => {
+      const text = Buffer.concat(chunks).toString("utf8");
+      const status = Number(/^HTTP\/1\.[01] (\d{3})/.exec(text)?.[1] ?? 0);
+      const idx = text.indexOf("\r\n\r\n");
+      resolve({ status, body: idx >= 0 ? text.slice(idx + 4) : "" });
+    });
+    sock.write(request);
+  });
+}
 
 let srv: TestServer | null = null;
 afterEach(async () => {
@@ -78,7 +96,22 @@ describe("bescherming tegen andere websites", () => {
   });
 
   it("isLoopbackHost accepteert alleen echte loopback-adressen", () => {
-    for (const h of ["127.0.0.1", "127.0.0.2", "127.255.255.254", "localhost", "LOCALHOST", "::1", "[::1]", " 127.0.0.1 "]) {
+    for (const h of [
+      "127.0.0.1",
+      "127.0.0.2",
+      "127.255.255.254",
+      "localhost",
+      "LOCALHOST",
+      "::1",
+      "[::1]",
+      " 127.0.0.1 ",
+      // IPv6-loopback in andere schrijfwijzen
+      "0:0:0:0:0:0:0:1",
+      "[0:0:0:0:0:0:0:1]",
+      "0000:0000:0000:0000:0000:0000:0000:0001",
+      "::0:1",
+      "0::1",
+    ]) {
       expect(isLoopbackHost(h), h).toBe(true);
     }
     for (const h of [
@@ -93,9 +126,25 @@ describe("bescherming tegen andere websites", () => {
       "192.168.1.50",
       "evil.example",
       "localhost.evil.example",
+      "::2",
+      "1::",
+      "0:0:0:0:0:0:1:0",
+      "[::1",
+      "::1]",
+      "[::]",
+      "::1%lo",
+      "",
     ]) {
       expect(isLoopbackHost(h), h).toBe(false);
     }
+  });
+
+  it("hostnameOf haalt de poort eraf, ook bij IPv6", () => {
+    expect(hostnameOf("localhost:4321")).toBe("localhost");
+    expect(hostnameOf("[::1]:4321")).toBe("[::1]");
+    expect(hostnameOf("[0:0:0:0:0:0:0:1]:4321")).toBe("[0:0:0:0:0:0:0:1]");
+    expect(hostnameOf("::1")).toBe("::1");
+    expect(hostnameOf("127.0.0.1")).toBe("127.0.0.1");
   });
 
   it("weigert DNS-rebinding met een hostnaam die met 127. begint", async () => {
@@ -122,10 +171,49 @@ describe("bescherming tegen andere websites", () => {
 
   it("staat echte loopback-hosts toe (127.0.0.2, [::1], localhost)", async () => {
     srv = await startTestServer();
-    for (const host of [`127.0.0.2:${srv.port}`, `[::1]:${srv.port}`, `localhost:${srv.port}`, "127.0.0.1"]) {
+    for (const host of [
+      `127.0.0.2:${srv.port}`,
+      `[::1]:${srv.port}`,
+      `[0:0:0:0:0:0:0:1]:${srv.port}`,
+      `localhost:${srv.port}`,
+      "127.0.0.1",
+    ]) {
       const r = await rawGet(srv.port, "/api/info", { Host: host });
       expect(r.status, host).toBe(200);
     }
+  });
+
+  it("weigert verzoeken ZONDER Host-header als de Host-check geldt (400)", async () => {
+    srv = await startTestServer();
+    // HTTP/1.0 mag zonder Host: Node laat dat door, onze check niet.
+    const api = await rawSocket(srv.port, "POST /api/engine/kill HTTP/1.0\r\nContent-Length: 0\r\n\r\n");
+    expect(api.status).toBe(400);
+    expect(JSON.parse(api.body).error).toMatch(/Host-header ontbreekt/);
+    expect(srv.engine.killed).toBe(0);
+    const page = await rawSocket(srv.port, "GET / HTTP/1.0\r\n\r\n");
+    expect(page.status).toBe(400);
+    const empty = await rawSocket(srv.port, "GET /api/info HTTP/1.0\r\nHost: \r\n\r\n");
+    expect(empty.status).toBe(400);
+    // HTTP/1.1 zonder Host weigert Node zelf al (ook 400)
+    const v11 = await rawSocket(srv.port, "GET /api/info HTTP/1.1\r\nConnection: close\r\n\r\n");
+    expect(v11.status).toBe(400);
+    // Met een lokale Host-header werkt HTTP/1.0 gewoon
+    const ok = await rawSocket(srv.port, `GET /api/info HTTP/1.0\r\nHost: 127.0.0.1:${srv.port}\r\n\r\n`);
+    expect(ok.status).toBe(200);
+  });
+
+  it("zonder Host-check (niet op loopback gebonden) mag een verzoek zonder Host-header", async () => {
+    srv = await startTestServer({ config: { host: "0.0.0.0" } });
+    const r = await rawSocket(srv.port, "GET /api/info HTTP/1.0\r\n\r\n");
+    expect(r.status).toBe(200);
+  });
+
+  it("HOST=0:0:0:0:0:0:0:1 telt als loopback: de Host-check (DNS-rebinding) staat aan", async () => {
+    srv = await startTestServer({ config: { host: "0:0:0:0:0:0:0:1" } });
+    const evil = await rawGet(srv.port, "/api/state", { Host: `evil.example:${srv.port}` });
+    expect(evil.status).toBe(403);
+    const local = await rawGet(srv.port, "/api/info", { Host: `[::1]:${srv.port}` });
+    expect(local.status).toBe(200);
   });
 
   it("weigert cross-site GET's (Sec-Fetch-Site) zonder Bitvavo aan te roepen", async () => {

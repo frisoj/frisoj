@@ -155,7 +155,7 @@ describe("loadConfig", () => {
   describe("live mode buiten loopback", () => {
     const live = { TRADING_MODE: "live", BITVAVO_API_KEY: "k", BITVAVO_API_SECRET: "s" };
 
-    it.each(["0.0.0.0", "::", "192.168.1.20", "127.evil.example", "127.0.0.1.nip.io"])(
+    it.each(["0.0.0.0", "::", "::2", "192.168.1.20", "127.evil.example", "127.0.0.1.nip.io"])(
       "weigert HOST=%s zonder DASHBOARD_TOKEN",
       (host) => {
         const load = () => loadConfig({ ...live, HOST: host, DATA_DIR: tmp() });
@@ -166,7 +166,7 @@ describe("loadConfig", () => {
 
     it("staat live toe met een token, of op loopback zonder token", () => {
       expect(loadConfig({ ...live, HOST: "0.0.0.0", DASHBOARD_TOKEN: "lang-genoeg-1", DATA_DIR: tmp() }).host).toBe("0.0.0.0");
-      for (const host of ["127.0.0.1", "127.0.0.2", "localhost", "::1"]) {
+      for (const host of ["127.0.0.1", "127.0.0.2", "localhost", "::1", "[::1]", "0:0:0:0:0:0:0:1"]) {
         expect(loadConfig({ ...live, HOST: host, DATA_DIR: tmp() }).host).toBe(host);
       }
       expect(loadConfig({ ...live, DATA_DIR: tmp() }).host).toBe("127.0.0.1");

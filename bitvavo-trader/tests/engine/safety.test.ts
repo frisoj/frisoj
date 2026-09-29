@@ -254,6 +254,73 @@ describe("Kapitaallimiet (live)", () => {
     expect(s.account.dayStartEquity).toBeCloseTo(dayStart - s.skimmedQuote!, 9);
     expect(s.account.startingEquity).toBeCloseTo(50 - s.skimmedQuote!, 9);
     expect(s.account.equity - s.account.startingEquity).toBeCloseTo(trade.pnlQuote, 9);
+    // Rendementen tellen het afgeroomde bedrag mee (geen winst of verlies door afromen)
+    expect(s.account.totalReturnPct).toBeCloseTo(((s.account.equity + s.skimmedQuote! - 50) / 50) * 100, 9);
+    expect(s.account.dayReturnPct).toBeCloseTo(((s.account.equity + s.skimmedQuote!) / dayStart - 1) * 100, 9);
+    expect(s.account.dayReturnPct).toBeLessThan(0); // alleen de exit-fee
+    expect(s.account.dayReturnPct).toBeGreaterThan(-0.3);
+    // Elk equity-punt heeft het cumulatief afgeroomde bedrag: equity + afgeroomd daalt niet door het afromen
+    const hist = s.equityHistory;
+    expect(hist[0].skimmed).toBe(0);
+    expect(hist[hist.length - 1].skimmed).toBeCloseTo(s.skimmedQuote!, 9);
+    const total = hist.map((p) => p.equity + (p.skimmed ?? 0));
+    for (let i = 1; i < total.length; i++) expect(total[i]).toBeGreaterThan(total[i - 1] - 0.1);
+  });
+
+  it("afromen en daarna verlies op dezelfde dag: dag-% = (equity + vandaag afgeroomd − dagstart) / dagstart, ook voor de verlieslimiet", async () => {
+    const file = join(dir, "state.json");
+    const h = setup({ mode: "live", startingCapital: 50, deps: { store: new StateStore(file) } });
+    realHalt(h);
+    h.engine.arm();
+    h.risk.quote = 25;
+    h.risk.stopDist = 40_000;
+    h.risk.tpDist = 40_000;
+    const p1 = await openBtcPosition(h);
+    h.feed.setLast("BTC-EUR", 60_000); // +20%
+    await h.engine.closePosition(p1.id);
+    let s = h.engine.snapshot();
+    const skimmed = s.skimmedQuote!;
+    expect(skimmed).toBeGreaterThan(4);
+    expect(s.account.cashQuote).toBeCloseTo(50, 9);
+    expect(s.account.dayReturnPct).toBeCloseTo(((50 + skimmed) / 50 - 1) * 100, 9);
+
+    // Tweede trade verliest ~€6,8 van het (afgeroomde) budget van €50
+    h.risk.quote = 40;
+    h.feed.append("BTC-EUR", 50_000);
+    h.clock.set(h.feed.lastTime("BTC-EUR") + 30_000);
+    h.signals.buyAt.add(h.lastClosed());
+    await h.engine.tick();
+    const p2 = h.engine.snapshot().positions[0];
+    h.feed.setLast("BTC-EUR", 41_800);
+    await h.engine.closePosition(p2.id);
+    await h.engine.tick();
+    s = h.engine.snapshot();
+    const truePct = ((s.account.equity + skimmed - 50) / 50) * 100;
+    expect(truePct).toBeLessThan(-3);
+    expect(truePct).toBeGreaterThan(-5);
+    expect(s.account.dayReturnPct).toBeCloseTo(truePct, 9);
+    expect(s.account.totalReturnPct).toBeCloseTo(truePct, 9);
+    // EUR-dagresultaat (equity − dagstart) = wat vandaag echt gerealiseerd is
+    expect(s.account.equity - s.account.dayStartEquity).toBeCloseTo(s.account.realizedPnlToday, 9);
+    // De limiet (5%) kijkt naar hetzelfde dag-% (naar rato schalen gaf ~-5,3% → onterechte pauze)
+    expect(s.halted.halted).toBe(false);
+    await h.engine.stop();
+
+    // Herstart op dezelfde dag: zelfde dag-%
+    const h2 = setup({ mode: "live", startingCapital: 50, clock: h.clock, feed: h.feed, deps: { store: new StateStore(file) } });
+    realHalt(h2);
+    await h2.engine.tick();
+    s = h2.engine.snapshot();
+    expect(s.account.dayReturnPct).toBeCloseTo(truePct, 9);
+    expect(s.halted.halted).toBe(false);
+
+    // Dagwissel: het afgeroomde bedrag van gisteren telt niet meer mee voor vandaag
+    h2.clock.set(NEXT_DAY);
+    await h2.engine.tick();
+    s = h2.engine.snapshot();
+    expect(s.account.dayKey).toBe("2026-01-06");
+    expect(s.account.dayReturnPct).toBeCloseTo(0, 9);
+    expect(s.account.totalReturnPct).toBeCloseTo(truePct, 9);
   });
 
   it("cash + inleg van open posities blijft binnen de limiet als een winnaar sluit terwijl een andere positie openstaat", async () => {
@@ -301,6 +368,7 @@ describe("Kapitaallimiet (live)", () => {
     await openBtcPosition(h1);
     await h1.engine.stop();
 
+    const before = h1.engine.snapshot().account;
     const h2 = setup({ mode: "live", startingCapital: 20, clock: h1.clock, deps: { store: new StateStore(file) } });
     realHalt(h2);
     await h2.engine.tick();
@@ -308,7 +376,61 @@ describe("Kapitaallimiet (live)", () => {
     expect(s.positions).toHaveLength(1);
     expect(s.account.cashQuote).toBe(0); // inleg 22,50 > limiet 20: geen cash meer
     expect(s.halted.halted).toBe(false);
-    expect(s.account.startingEquity).toBeCloseTo(22.5, 9);
+    // Herschreven (ronde 2): de opname van 27,50 is geen winst of verlies. Start en
+    // dag-start schalen mee (was: start − 27,50 = 22,50, wat het verlies-% opblies),
+    // zodat totaal- en dagrendement gelijk blijven.
+    const equity = s.account.equity;
+    expect(s.account.startingEquity).toBeCloseTo((50 * equity) / (equity + 27.5), 9);
+    expect(s.account.totalReturnPct).toBeCloseTo(before.totalReturnPct!, 9);
+    expect(s.account.dayReturnPct).toBeCloseTo(before.dayReturnPct!, 9);
+    expect(s.account.totalReturnPct).toBeLessThan(0); // alleen de instapfee
+    expect(s.account.totalReturnPct).toBeGreaterThan(-0.2);
+  });
+
+  it("herstart met een lagere limiet NA verlies: budget = min(nieuwe limiet, wat de bot heeft), dag-% niet opgeblazen", async () => {
+    const file = join(dir, "state.json");
+    const h1 = setup({ mode: "live", startingCapital: 100, deps: { store: new StateStore(file) } });
+    h1.engine.arm();
+    h1.risk.quote = 90;
+    h1.risk.stopDist = 40_000;
+    h1.risk.tpDist = 40_000;
+    const pos = await openBtcPosition(h1);
+    h1.feed.setLast("BTC-EUR", 30_000); // -40%
+    await h1.engine.closePosition(pos.id);
+    let s = h1.engine.snapshot();
+    const cash = s.account.cashQuote; // ~63,7
+    expect(cash).toBeGreaterThan(55);
+    expect(cash).toBeLessThan(70);
+    const dayPct = s.account.dayReturnPct!;
+    await h1.engine.stop();
+
+    const h2 = setup({ mode: "live", startingCapital: 50, clock: h1.clock, deps: { store: new StateStore(file) } });
+    realHalt(h2);
+    s = h2.engine.snapshot();
+    // Niet het volledige verschil (50) eraf: de bot houdt min(50, ~63,7) = 50
+    expect(s.account.cashQuote).toBe(50);
+    expect(s.account.dayReturnPct).toBeCloseTo(dayPct, 9);
+    expect(s.account.totalReturnPct).toBeCloseTo(dayPct, 9);
+    expect(s.account.dayStartEquity).toBeCloseTo((100 * 50) / cash, 9);
+    expect(h2.logs().some((m) => m.startsWith("Kapitaallimiet €100,00 → €50,00"))).toBe(true);
+
+    // Kleine koers-/limietverlaging na een klein verlies triggert de 5%-limiet niet
+    const file2 = join(dir, "state2.json");
+    const h3 = setup({ mode: "live", startingCapital: 50, deps: { store: new StateStore(file2) } });
+    h3.engine.arm();
+    h3.risk.quote = 40;
+    h3.risk.stopDist = 40_000;
+    const p3 = await openBtcPosition(h3);
+    h3.feed.setLast("BTC-EUR", 48_000); // -4% op €40 → ~-3,5% van de equity
+    await h3.engine.closePosition(p3.id);
+    await h3.engine.stop();
+    const h4 = setup({ mode: "live", startingCapital: 25, clock: h3.clock, feed: h3.feed, deps: { store: new StateStore(file2) } });
+    realHalt(h4);
+    await h4.engine.tick();
+    s = h4.engine.snapshot();
+    expect(s.account.cashQuote).toBe(25);
+    expect(s.account.dayReturnPct).toBeGreaterThan(-5);
+    expect(s.halted.halted).toBe(false);
   });
 
   it("herstart op dezelfde dag met een lagere limiet zonder posities: geen halt", async () => {

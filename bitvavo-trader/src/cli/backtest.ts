@@ -11,7 +11,12 @@
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { computeMetrics } from "../backtest/metrics";
-import { runBacktestDetailed, spreadFromTicker, type BacktestInput } from "../backtest/backtester";
+import {
+  exchangeMinOrderQuote,
+  runBacktestDetailed,
+  spreadFromTicker,
+  type BacktestInput,
+} from "../backtest/backtester";
 import { optimize } from "../backtest/optimizer";
 import { backtestVerdict } from "../backtest/verdict";
 import { walkForward } from "../backtest/walkForward";
@@ -33,7 +38,10 @@ import { BitvavoFeed } from "../data/bitvavoFeed";
 import { isBitvavoReachable } from "../data/reachability";
 import { SimulatedFeed } from "../data/simulatedFeed";
 import { BitvavoClient } from "../exchange/bitvavoClient";
+import { backtestWarmupCandles } from "../server/warmup";
+import { backtestWindow, stuckTradesWarning } from "./backtestReport";
 
+/** Minimaal aantal candles vóór de periode dat opgehaald wordt (indicatoren convergeren). */
 const WARMUP_CANDLES = 250;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVES: OptimizeObjective[] = ["sharpe", "return", "profitFactor", "calmar"];
@@ -310,14 +318,33 @@ async function main(): Promise<void> {
 
   const now = Date.now();
   const periodStart = now - opts.days * DAY_MS;
-  const fromMs = periodStart - WARMUP_CANDLES * INTERVAL_MS[opts.interval];
+  // Opwarmtijd van de strategieën + regimedetectie (zelfde regel als de server). Bij
+  // optimaliseren van één strategie telt ook de grootste combinatie uit de zoekruimte.
+  const requiredWarmup = backtestWarmupCandles(cfg.ensemble, opts.optimize || opts.walkforward ? opts.strategy : undefined);
+  const fromMs = periodStart - Math.max(WARMUP_CANDLES, requiredWarmup) * INTERVAL_MS[opts.interval];
   process.stdout.write(dim("Candles ophalen ... "));
   const candles = await feed.getHistory(opts.market, opts.interval, fromMs, now);
-  let tradeFromIndex = candles.findIndex((c) => c.time >= periodStart);
-  if (tradeFromIndex < 0) tradeFromIndex = candles.length;
-  console.log(dim(`${candles.length} candles (${tradeFromIndex} warmup)`));
+  // Nooit handelen tijdens de opwarmtijd: bij korte historie schuift het begin op.
+  const { tradeFromIndex, shortened } = backtestWindow(candles, periodStart, requiredWarmup);
+  console.log(dim(`${candles.length} candles (${tradeFromIndex} warmup, minimaal ${requiredWarmup} nodig)`));
   if (candles.length - tradeFromIndex < 50) {
-    throw new Error(`Te weinig candles in de periode (${candles.length - tradeFromIndex}); kies meer dagen of een korter interval.`);
+    throw new Error(
+      shortened
+        ? `${opts.market} heeft te weinig historie op ${opts.interval}: de strategieën hebben ${requiredWarmup} candles ` +
+            `opwarmtijd nodig en daarna blijven er maar ${candles.length - tradeFromIndex} candles over om te testen ` +
+            `(minimaal 50). Kies een korter interval of een andere markt.`
+        : `Te weinig candles in de periode (${candles.length - tradeFromIndex}); kies meer dagen of een korter interval.`,
+    );
+  }
+  if (shortened) {
+    const days = (now - candles[tradeFromIndex].time) / DAY_MS;
+    console.log(
+      yellow(
+        `Periode ingekort: ${opts.market} heeft pas historie vanaf ${when(candles[0].time)}. Na ${requiredWarmup} candles ` +
+          `opwarmtijd begint de test op ${when(candles[tradeFromIndex].time)} (${nf(0, 1).format(days)} dagen in plaats van ` +
+          `${nf(0, 1).format(opts.days)}).`,
+      ),
+    );
   }
 
   let marketInfo: MarketInfo | undefined;
@@ -326,7 +353,11 @@ async function main(): Promise<void> {
   } catch {
     marketInfo = undefined;
   }
-  if (!marketInfo) console.log(yellow(`Marktinfo voor ${opts.market} niet gevonden: minimale order ${eur(cfg.risk.minOrderQuote)} aangenomen.`));
+  if (!marketInfo) {
+    console.log(
+      yellow(`Marktinfo voor ${opts.market} niet gevonden: beursminimum van ${eur(exchangeMinOrderQuote(undefined))} per order aangenomen.`),
+    );
+  }
 
   // Huidige bid/ask-spread (best effort): een market order betaalt ongeveer de helft per kant.
   let spreadPct: number | undefined;
@@ -367,16 +398,13 @@ async function main(): Promise<void> {
         `kosten per round trip ${plainPct(roundTrip * 100, 2)} (2× ${plainPct(cfg.risk.takerFee * 100, 2)} fee + 2× ${plainPct(slip * 100, 2)} slippage, ${spreadTxt}) · ${result.durationMs} ms`,
     ),
   );
-  if (detail.stuckTrades > 0) {
-    const minOrder = marketInfo?.minOrderQuote ?? cfg.risk.minOrderQuote;
-    console.log(
-      yellow(
-        `Let op: bij ${detail.stuckTrades} ${detail.stuckTrades === 1 ? "trade" : "trades"} weigerde de beurs de verkoop: de positie was minder ` +
-          `waard dan het minimum van ${eur(minOrder)}. De positie bleef dan open zonder stop-loss (samen ${detail.stuckCandles} candles) ` +
-          `tot hij weer genoeg waard was. Een grotere inleg per trade of een kleinere stop-afstand voorkomt dit.`,
-      ),
-    );
-  }
+  const stuckWarning = stuckTradesWarning({
+    stuckTrades: result.stuckTrades ?? detail.stuckTrades,
+    stuckAtEnd: detail.stuckAtEnd,
+    stuckCandles: detail.stuckCandles,
+    minOrderQuote: detail.minOrderQuote,
+  });
+  if (stuckWarning) console.log(yellow(stuckWarning));
   printMetrics(result.metrics, benchmarkMetrics(result, cfg.risk.takerFee), opts.capital);
   console.log();
   console.log(bold(`── Laatste ${Math.min(10, result.trades.length)} trades ──`));

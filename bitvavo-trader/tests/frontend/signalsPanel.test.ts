@@ -56,6 +56,8 @@ async function mount(snap: Fake) {
   mountSignals(ctx, el);
   return {
     bus,
+    el,
+    q: (sel: string) => el.querySelector(sel),
     time: () => el.querySelector(".sig-time").innerHTML as string,
     action: () => el.querySelector(".sig-action-txt").textContent as string,
   };
@@ -99,5 +101,46 @@ describe("signaalpaneel: verouderde en vervallen beslissingen", () => {
     p.bus.emit("decision", { ...dec, action: "sell", score: -0.5 });
     env.flushRaf();
     expect(p.action()).toBe("VERKOOP");
+  });
+});
+
+describe("signaalpaneel: exit-score", () => {
+  it("toont de exit-score als tweede markering op de meter en als waarde", async () => {
+    // score dicht bij 0 (veel WACHT), maar de strategieën met een mening zeggen samen VERKOOP
+    const p = await mount({ config: config15, decisions: { "BTC-EUR": { ...dec, score: -0.12, exitScore: -0.45, action: "sell" } } });
+    expect(p.q(".sig-exit").style.display).toBe("");
+    expect(p.q(".sig-exit").style.transform).toBe(`rotate(${((-0.45 + 1) / 2) * 180}deg)`);
+    expect(p.q(".sig-exit-mark").dataset.a).toBe("sell");
+    expect(p.q(".sig-exit-row").hidden).toBe(false);
+    expect(p.q(".sig-exit-val").textContent).toBe("-0,45");
+    // de wijzer blijft de gewone score
+    expect(p.q(".sig-ptr").style.transform).toBe(`rotate(${((-0.12 + 1) / 2) * 180}deg)`);
+  });
+
+  it("boven de verkoopdrempel: markering neutraal", async () => {
+    const p = await mount({ config: config15, decisions: { "BTC-EUR": { ...dec, exitScore: 0.6 } } });
+    expect(p.q(".sig-exit-mark").dataset.a).toBe("hold");
+    expect(p.q(".sig-exit-val").textContent).toBe("+0,60");
+  });
+
+  it("zonder exitScore (oudere server) geen tweede markering", async () => {
+    const p = await mount({ config: config15, decisions: { "BTC-EUR": dec } });
+    expect(p.q(".sig-exit").style.display).toBe("none");
+    expect(p.q(".sig-exit-row").hidden).toBe(true);
+  });
+
+  it("een gewijzigde exit-score in een nieuwe beslissing wordt opnieuw getekend", async () => {
+    const p = await mount({ config: config15, decisions: { "BTC-EUR": { ...dec, exitScore: 0.2 } } });
+    p.bus.emit("decision", { ...dec, exitScore: -0.5 });
+    env.flushRaf();
+    expect(p.q(".sig-exit-val").textContent).toBe("-0,50");
+  });
+
+  it("de uitleg noemt de exit-score van de strategieën mét een mening", async () => {
+    const p = await mount({ config: config15, decisions: {} });
+    const help = String(p.el.innerHTML).replace(/\s+/g, " ");
+    expect(help).toContain("Verkopen gaat op de <b>exit-score</b>");
+    expect(help).toContain("alléén de strategieën die wél een mening hebben");
+    expect(help).toContain("onder de verkoopdrempel");
   });
 });

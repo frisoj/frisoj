@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_EXCHANGE_MIN_QUOTE,
+  exchangeMinOrderQuote,
   runBacktestWith,
   simulate,
   effectiveSlippagePct,
@@ -9,8 +11,23 @@ import {
   fmtPctNl,
   type BacktestInput,
 } from "../../src/backtest/simulator";
-import type { Candle, RiskConfig } from "../../src/core/types";
+import type { Candle, MarketInfo, RiskConfig } from "../../src/core/types";
 import { FEE, SLIP, T0, STEP, candle, decisionsFrom, flatCandles, input, riskCfg, stubRisk, type StubRiskOptions } from "./helpers";
+
+function marketInfo(over: Partial<MarketInfo> = {}): MarketInfo {
+  return {
+    market: "TEST-EUR",
+    base: "TEST",
+    quote: "EUR",
+    status: "trading",
+    minOrderQuote: 5,
+    minOrderBase: 0,
+    pricePrecision: 5,
+    quantityDecimals: 8,
+    notionalDecimals: 2,
+    ...over,
+  };
+}
 
 /** Run the backtest with stub deps: `actions[i]` is the decision on candle i. */
 function run(candles: Candle[], actions: string, riskOpts: StubRiskOptions = {}, overrides: Partial<BacktestInput> = {}) {
@@ -313,12 +330,22 @@ describe("runBacktest – robustness", () => {
     expect(result.trades).toEqual([]);
     expect(result.equityCurve).toEqual([]);
     expect(result.metrics.finalEquity).toBe(100);
+    expect(result.stuckTrades).toBe(0);
   });
 
   it("does not buy below the minimum order size", () => {
     const candles = flatCandles(10);
     const { result } = run(candles, "..B.......", { quote: 4 });
     expect(result.trades).toHaveLength(0);
+  });
+
+  it("does not buy below the EXCHANGE minimum, even when risk.minOrderQuote is lowered (the broker refuses it)", () => {
+    const candles = flatCandles(10);
+    const { result } = run(candles, "..B.......", { quote: 4 }, { risk: riskCfg({ minOrderQuote: 1 }) });
+    expect(result.trades).toHaveLength(0);
+    // With a market whose exchange minimum is €1, the same €4 buy is accepted.
+    const info = marketInfo({ minOrderQuote: 1 });
+    expect(run(candles, "..B.......", { quote: 4 }, { marketInfo: info }).result.trades).toHaveLength(1);
   });
 
   it("has a sane time axis", () => {
@@ -362,7 +389,10 @@ describe("runBacktest – sells below the minimum order (€5) are refused, like
     expect(result.metrics.maxDrawdownPct).toBeLessThan(-1);
     expect(t.candlesHeld).toBe(4); // candles 4, 5, 6, 7 (entry candle 3 does not count)
     expect(out.stuckTrades).toBe(1);
+    expect(result.stuckTrades).toBe(1); // also in the (API) result
+    expect(out.stuckAtEnd).toBe(0); // sold later after all
     expect(out.stuckCandles).toBe(3);
+    expect(out.minOrderQuote).toBe(5);
     expect(t.entryReason).toMatch(/verkoop \(stop-loss\) geweigerd/);
     expect(t.entryReason).toContain("€5,00");
     expect(t.entryReason).toContain("3 candles");
@@ -407,6 +437,8 @@ describe("runBacktest – sells below the minimum order (€5) are refused, like
     expect(t.exitPrice).toBeCloseTo(80 * (1 - SLIP), 12);
     expect(t.entryReason).toMatch(/nog steeds niet verkoopbaar/);
     expect(out.stuckTrades).toBe(1);
+    expect(out.result.stuckTrades).toBe(1);
+    expect(out.stuckAtEnd).toBe(1); // still unsellable at the end
     expect(out.stuckCandles).toBe(5);
     expect(out.exposureCandles).toBe(7); // entry candle + 6 candles after it
   });
@@ -417,9 +449,48 @@ describe("runBacktest – sells below the minimum order (€5) are refused, like
     const { result } = run(candles, "..B.....", { quote: 5, stopDist: 15, tpDist: 50 }, { marketInfo: info });
     expect(result.trades[0].exitTime).toBe(candles[4].time); // €4,24 >= €1 minimum: sold at the stop
     expect(result.trades[0].exitReason).toBe("stop-loss");
-    const big = run(candles, "..B.....", { quote: 50, stopDist: 15, tpDist: 50 }).result.trades[0];
-    expect(big.exitTime).toBe(candles[4].time);
-    expect(big.exitPrice).toBeCloseTo((100 * (1 + SLIP) - 15) * (1 - SLIP), 12);
+    const big = run(candles, "..B.....", { quote: 50, stopDist: 15, tpDist: 50 });
+    expect(big.result.trades[0].exitTime).toBe(candles[4].time);
+    expect(big.result.trades[0].exitPrice).toBeCloseTo((100 * (1 + SLIP) - 15) * (1 - SLIP), 12);
+    expect(big.result.stuckTrades).toBe(0);
+    expect(big.stuckAtEnd).toBe(0);
+  });
+
+  it("the sell minimum is the EXCHANGE minimum, never risk.minOrderQuote (like PaperBroker / LiveBroker)", () => {
+    const candles = [...flatCandles(4, 100), candle(4, 100, 100.1, 84, 85), ...flatCandles(3, 85, 5)];
+    const stubOpts = { quote: 8, stopDist: 15, tpDist: 50 };
+    // €8 position is worth ≈ €6,79 at the stop: Bitvavo (€5) accepts that sell. A user-raised
+    // risk.minOrderQuote of €10 must NOT make the backtest refuse it (no MarketInfo …).
+    const raised = run(candles, "..B.....", stubOpts, { risk: riskCfg({ minOrderQuote: 10 }) });
+    expect(raised.result.trades[0].exitTime).toBe(candles[4].time);
+    expect(raised.result.trades[0].exitReason).toBe("stop-loss");
+    expect(raised.result.stuckTrades).toBe(0);
+    expect(raised.minOrderQuote).toBe(5);
+    // … nor with MarketInfo (€5).
+    const withInfo = run(candles, "..B.....", stubOpts, { risk: riskCfg({ minOrderQuote: 10 }), marketInfo: marketInfo() });
+    expect(withInfo.result.trades[0].exitTime).toBe(candles[4].time);
+    expect(withInfo.result.stuckTrades).toBe(0);
+
+    // A user-LOWERED risk.minOrderQuote (€1) does not lower the exchange minimum: the €5 position
+    // worth ≈ €4,24 at the stop is still refused, and the note names the €5 exchange minimum.
+    const lowered = run(candles, "..B.....", { quote: 5, stopDist: 15, tpDist: 50 }, { risk: riskCfg({ minOrderQuote: 1 }) });
+    const t = lowered.result.trades[0];
+    expect(t.exitReason).toBe("end-of-backtest");
+    expect(lowered.result.stuckTrades).toBe(1);
+    expect(lowered.stuckAtEnd).toBe(1);
+    expect(t.entryReason).toContain("minimum van €5,00");
+    expect(lowered.minOrderQuote).toBe(5);
+  });
+
+  it("exchangeMinOrderQuote: MarketInfo's value, otherwise Bitvavo's €5", () => {
+    expect(DEFAULT_EXCHANGE_MIN_QUOTE).toBe(5);
+    expect(exchangeMinOrderQuote(undefined)).toBe(5);
+    expect(exchangeMinOrderQuote(null)).toBe(5);
+    expect(exchangeMinOrderQuote(marketInfo({ minOrderQuote: 2 }))).toBe(2);
+    expect(exchangeMinOrderQuote(marketInfo({ minOrderQuote: 25 }))).toBe(25);
+    expect(exchangeMinOrderQuote(marketInfo({ minOrderQuote: 0 }))).toBe(0);
+    expect(exchangeMinOrderQuote(marketInfo({ minOrderQuote: Number.NaN }))).toBe(5);
+    expect(exchangeMinOrderQuote(marketInfo({ minOrderQuote: -1 }))).toBe(5);
   });
 });
 

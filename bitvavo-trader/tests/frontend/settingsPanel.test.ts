@@ -167,3 +167,15 @@ describe("Instellingen opslaan draait wijzigingen van elders niet terug", () => 
     expect(errorsBox.innerHTML).not.toContain("0,01");
   });
 });
+
+describe("Instellingen: uitleg", () => {
+  it("historie: de bot haalt zelf de opwarm-candles; opgeslagen instellingen gaan vóór MARKETS/INTERVAL in .env", async () => {
+    const { el } = await mount();
+    const html = String(el.innerHTML).replace(/\s+/g, " ");
+    expect(html).toContain("dan haalt de bot die extra candles zelf op");
+    expect(html).not.toContain("Minimaal ~250");
+    expect(html).toContain("&lt;DATA_DIR&gt;/config.json");
+    expect(html).toMatch(/gaat vóór <span class="mono">MARKETS<\/span> en <span class="mono">INTERVAL<\/span> uit <span class="mono">\.env<\/span>/);
+    expect(html).toContain("Kleinste bedrag waarmee de bot een positie opent.");
+  });
+});

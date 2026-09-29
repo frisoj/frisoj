@@ -127,6 +127,18 @@ describe("runEnsemble", () => {
     expect(checked).toBeGreaterThan(100);
   });
 
+  it("vult het contractveld EnsembleDecision.exitScore altijd (ook in latestDecision en na JSON)", () => {
+    // Via het core-type (waar exitScore optioneel is): elke beslissing heeft hem.
+    const asContract: EnsembleDecision[] = decisions;
+    expect(asContract.every((d) => typeof d.exitScore === "number" && Number.isFinite(d.exitScore))).toBe(true);
+    const last = latestDecision("BTC-EUR", candles, cfg)!;
+    expect(last.exitScore).toBe(decisions[decisions.length - 1].exitScore);
+    const json = JSON.parse(JSON.stringify(last)) as EnsembleDecision;
+    expect(json.exitScore).toBe(last.exitScore);
+    // classify met de exitScore uit het contract geeft dezelfde actie
+    expect(classify(json.score, json.regime, cfg, json.exitScore)).toBe(last.action);
+  });
+
   it("één duidelijke exit-stem terwijl de rest wacht → verkoop (werd vroeger weggedrukt door de wachters)", () => {
     const thr = Math.abs(cfg.sellThreshold);
     const single = decisions.filter((d) => {

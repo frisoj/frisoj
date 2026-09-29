@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import type { Candle } from "../../src/core/types";
+import type { Candle, OptimizationResult } from "../../src/core/types";
 import { DEFAULT_ENGINE_CONFIG } from "../../src/core/defaults";
 import type { BacktestInput } from "../../src/backtest/simulator";
 import { decisionsFrom, stubRisk } from "./helpers";
@@ -73,6 +73,8 @@ describe.skipIf(!available)("backtest integration (real ensemble + risk manager 
     expect(res.metrics.feesPaid).toBeCloseTo(fees, 9);
     const pnl = res.trades.reduce((s, t) => s + t.pnlQuote, 0);
     expect(res.metrics.finalEquity).toBeCloseTo(50 + pnl, 9);
+    // Refused sells (below the €5 exchange minimum) are counted in the result.
+    expect(res.stuckTrades).toBe(res.trades.filter((t) => t.entryReason.includes("geweigerd")).length);
     expect(res.candles.length).toBeLessThanOrEqual(1500);
   });
 
@@ -99,6 +101,23 @@ describe.skipIf(!available)("backtest integration (real ensemble + risk manager 
     expect(res.rows.length).toBeGreaterThan(0);
     expect(res.heatmap).not.toBeNull();
     expect(ms).toBeLessThan(15_000);
+    // What the API sends (JSON): the heatmap carries best / tested / scored / positive per cell.
+    const hm = (JSON.parse(JSON.stringify(res)) as OptimizationResult).heatmap!;
+    const ny = hm.yValues.length;
+    const nx = hm.xValues.length;
+    for (const key of ["values", "best", "tested", "scored", "positive"] as const) {
+      const grid = hm[key]!;
+      expect(grid, key).toHaveLength(ny);
+      for (const row of grid) expect(row, key).toHaveLength(nx);
+    }
+    expect(hm.tested!.flat().reduce((a, b) => a + b, 0)).toBe(120);
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        expect(hm.scored![y][x]).toBeLessThanOrEqual(hm.tested![y][x]);
+        expect(hm.positive![y][x]).toBeLessThanOrEqual(hm.scored![y][x]);
+        expect(hm.best![y][x] === null).toBe(hm.scored![y][x] === 0);
+      }
+    }
     console.log(`[integration] optimize 120 combos on ${candles.length} candles: ${ms} ms, best score ${res.best?.score ?? "n.v.t."}`);
   });
 
