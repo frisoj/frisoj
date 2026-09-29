@@ -368,6 +368,21 @@ Let op: de command line gebruikt altijd de **standaardinstellingen**, niet wat j
 in het dashboard hebt opgeslagen. Wil je je eigen instellingen testen, gebruik
 dan het Backtest-lab in het dashboard.
 
+### Strategie-toernooi: welke werkt het best?
+
+```bash
+npm run tournament -- --source bitvavo
+```
+
+Test de bot en elk van de vijf strategieën apart, naast "gewoon kopen en
+vasthouden", over **1 week, 1 maand, 1 jaar en 5 jaar**, op BTC, ETH, SOL, XRP en ADA
+(elk met €50, fees en slippage meegerekend). Voor 1 en 5 jaar volgt een
+**walk-forward-controle** op data die de strategie nog niet kende; kijk vooral
+daarnaar, want "de beste achteraf" is vaak geluk. Opties: `--markets BTC-EUR,ETH-EUR`,
+`--capital 50`, `--quick` (alleen week en maand), `--json uitvoer.json`.
+Het ophalen van 5 jaar koersen duurt de eerste keer even; daarna staan ze in
+`data/cache`.
+
 ## Hoe het in elkaar zit
 
 ```

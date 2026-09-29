@@ -40,8 +40,8 @@ const MIN_PER_DAY = 1440;
 const SQRT_MIN_PER_DAY = Math.sqrt(MIN_PER_DAY);
 /** Dag 0 van het ankerpad (UTC-middernacht). */
 const EPOCH = Date.UTC(2024, 0, 1);
-/** Hoe ver terug (vanaf "nu") historie ondersteund wordt. */
-export const SIM_MAX_HISTORY_DAYS = 1500;
+/** Hoe ver terug (vanaf "nu") historie ondersteund wordt: 5 jaar + opwarmtijd op 1d-candles. */
+export const SIM_MAX_HISTORY_DAYS = 2200;
 /** Zelfde maximum als de Bitvavo API per request. */
 const MAX_CANDLES_LIMIT = 1440;
 /** Veiligheidsgrens voor het ankerpad (±~270 jaar rond het epoch). */

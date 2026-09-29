@@ -12,7 +12,8 @@
     "dev": "tsx watch src/main.ts",
     "backtest": "tsx src/cli/backtest.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tournament": "tsx src/cli/tournament.ts"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
