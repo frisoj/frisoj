@@ -61,9 +61,27 @@ function round(v: number, digits: number): number {
   return Math.round(v * f) / f;
 }
 
+/** Rij plus zijn plek in de volumeranglijst (vóór het overslaan van mislukte markten). */
+interface RankedRow {
+  rank: number;
+  row: ScannerRow;
+}
+
+interface ScanResult {
+  /** Voor hoeveel markten (top-N) deze scan is berekend */
+  limit: number;
+  rows: RankedRow[];
+}
+
+function topN(result: ScanResult, n: number): ScannerRow[] {
+  return result.rows.filter((r) => r.rank < n).map((r) => r.row);
+}
+
 export class Scanner {
-  private readonly cache = new Map<string, { at: number; rows: ScannerRow[] }>();
-  private readonly inflight = new Map<string, Promise<ScannerRow[]>>();
+  // Sleutel zonder `limit`: een grotere scan bedient ook kleinere verzoeken, zodat
+  // limit=1..60 niet 60 aparte scans (en Bitvavo-verzoeken) oplevert.
+  private readonly cache = new Map<string, { at: number; result: ScanResult }>();
+  private readonly inflight = new Map<string, { limit: number; promise: Promise<ScanResult> }>();
   private readonly now: () => number;
   private readonly cacheMs: number;
   private readonly candleCount: number;
@@ -84,22 +102,32 @@ export class Scanner {
 
   async scan(limit: number, interval: Interval, ensemble: EnsembleConfig): Promise<ScannerRow[]> {
     const n = Math.max(1, Math.min(SCANNER_MAX_LIMIT, Math.floor(limit)));
-    const key = `${interval}|${n}|${hashString(JSON.stringify(ensemble))}`;
+    const key = `${interval}|${hashString(JSON.stringify(ensemble))}`;
     const hit = this.cache.get(key);
-    if (hit && this.now() - hit.at < this.cacheMs) return hit.rows;
+    if (hit && hit.result.limit >= n && this.now() - hit.at < this.cacheMs) return topN(hit.result, n);
     const running = this.inflight.get(key);
-    if (running) return running;
-    const p = this.compute(n, interval, ensemble)
-      .then((rows) => {
-        this.cache.set(key, { at: this.now(), rows });
-        return rows;
+    if (running && running.limit >= n) return topN(await running.promise, n);
+    const entry = {
+      limit: n,
+      promise: this.compute(n, interval, ensemble).then((result) => {
+        const prev = this.cache.get(key);
+        // Een verse, grotere scan niet overschrijven met een kleinere
+        if (!prev || prev.result.limit <= result.limit || this.now() - prev.at >= this.cacheMs) {
+          this.cache.set(key, { at: this.now(), result });
+        }
+        return result;
+      }),
+    };
+    this.inflight.set(key, entry);
+    entry.promise
+      .finally(() => {
+        if (this.inflight.get(key) === entry) this.inflight.delete(key);
       })
-      .finally(() => this.inflight.delete(key));
-    this.inflight.set(key, p);
-    return p;
+      .catch(() => undefined);
+    return topN(await entry.promise, n);
   }
 
-  private async compute(limit: number, interval: Interval, ensemble: EnsembleConfig): Promise<ScannerRow[]> {
+  private async compute(limit: number, interval: Interval, ensemble: EnsembleConfig): Promise<ScanResult> {
     const { feed } = this.opts;
     const markets = await feed.getMarkets();
     const tradable = new Set(markets.filter((m) => m.quote === "EUR" && m.status === "trading").map((m) => m.market));
@@ -110,20 +138,20 @@ export class Scanner {
       .slice(0, limit);
 
     let failures = 0;
-    const rows = await mapLimit(top, this.concurrency, async (t) => {
+    const rows = await mapLimit(top, this.concurrency, async (t, rank): Promise<RankedRow | null> => {
       try {
-        return await this.row(t, interval, ensemble);
+        return { rank, row: await this.row(t, interval, ensemble) };
       } catch (err) {
         failures++;
         this.log(`Scanner: ${t.market} overgeslagen (${(err as Error).message})`);
         return null;
       }
     });
-    const ok = rows.filter((r): r is ScannerRow => r !== null);
+    const ok = rows.filter((r): r is RankedRow => r !== null);
     if (ok.length === 0 && failures > 0) {
       throw new Error("De scanner kon geen enkele markt ophalen. Probeer het later opnieuw.");
     }
-    return ok;
+    return { limit, rows: ok };
   }
 
   private async row(t: Ticker24h, interval: Interval, ensemble: EnsembleConfig): Promise<ScannerRow> {

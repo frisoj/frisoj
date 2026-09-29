@@ -497,3 +497,29 @@ export function rawGet(
     req.end();
   });
 }
+
+/** Ruwe HTTP-request met eigen Host/Origin/Sec-Fetch-headers (fetch staat die niet altijd toe). */
+export function rawRequest(
+  port: number,
+  method: string,
+  path: string,
+  headers: Record<string, string> = {},
+  body?: string,
+): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
+  return new Promise((resolve, reject) => {
+    const allHeaders: Record<string, string> = { ...headers };
+    if (body !== undefined) {
+      allHeaders["Content-Type"] ??= "application/json";
+      allHeaders["Content-Length"] = String(Buffer.byteLength(body));
+    }
+    const req = httpRequest({ host: "127.0.0.1", port, path, method, headers: allHeaders }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () =>
+        resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8"), headers: res.headers }),
+      );
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}

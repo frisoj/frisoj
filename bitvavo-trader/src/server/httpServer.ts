@@ -6,7 +6,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { AppInfo, EngineConfig, MarketDataFeed } from "../core/types";
-import { saveEngineOverrides, type AppConfig } from "../config";
+import { isLoopbackHost, saveEngineOverrides, type AppConfig } from "../config";
 import { HttpError, readJsonBody, sendError, type Router } from "./router";
 import { buildApiRouter, type EngineLike, type Services } from "./routes";
 import type { Scanner } from "./scanner";
@@ -60,11 +60,8 @@ function setSecurityHeaders(res: ServerResponse): void {
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
 }
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
-
-export function isLoopbackHost(host: string): boolean {
-  return LOOPBACK_HOSTS.has(host.toLowerCase()) || host.startsWith("127.");
-}
+/** Exacte loopback-check (zie config.ts); hier opnieuw geëxporteerd voor bestaande imports. */
+export { isLoopbackHost };
 
 /** Hostnaam uit een Host-header (zonder poort), ook voor IPv6 "[::1]:4321". */
 export function hostnameOf(hostHeader: string): string {
@@ -75,6 +72,38 @@ export function hostnameOf(hostHeader: string): string {
   }
   const colon = h.lastIndexOf(":");
   return colon > 0 ? h.slice(0, colon) : h;
+}
+
+const CROSS_SITE_ERROR = "Verzoek van een andere website geweigerd.";
+
+/**
+ * Weigert API-verzoeken die (volgens de browser) van een andere website komen,
+ * voor ELKE methode: ook GET's zijn niet onschuldig, want /api/scanner en
+ * /api/candles gebruiken dezelfde Bitvavo-rate-limit als de stop-loss-orders.
+ * - `Sec-Fetch-Site: cross-site/same-site` → geweigerd (browsers sturen dit
+ *   ook bij no-cors-GET's en <img>/<script>-verzoeken zonder Origin).
+ * - Een Origin (of "null") die niet bij de Host-header past → geweigerd.
+ * Zonder deze headers (curl, scripts) of met `same-origin`/`none` (eigen
+ * dashboard, adresbalk) is het verzoek toegestaan.
+ */
+function rejectCrossSite(req: IncomingMessage): void {
+  const site = req.headers["sec-fetch-site"];
+  const siteValue = (Array.isArray(site) ? site.join(",") : (site ?? "")).trim().toLowerCase();
+  if (siteValue !== "" && siteValue !== "same-origin" && siteValue !== "none") {
+    throw new HttpError(403, CROSS_SITE_ERROR);
+  }
+  const origin = req.headers.origin;
+  if (origin === undefined) return;
+  if (origin === "null") throw new HttpError(403, CROSS_SITE_ERROR);
+  let originHost: string | null = null;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    originHost = null;
+  }
+  if (!originHost || originHost !== String(req.headers.host ?? "").toLowerCase()) {
+    throw new HttpError(403, CROSS_SITE_ERROR);
+  }
 }
 
 function digest(s: string): Buffer {
@@ -135,23 +164,7 @@ export function createApp(deps: CreateAppDeps): App {
 
     if (isApi) {
       res.setHeader("Cache-Control", "no-store");
-      // CSRF: wijzigende verzoeken moeten van dezelfde origin komen
-      if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-        const origin = req.headers.origin;
-        if (origin && origin !== "null") {
-          let originHost: string | null = null;
-          try {
-            originHost = new URL(origin).host.toLowerCase();
-          } catch {
-            originHost = null;
-          }
-          if (!originHost || originHost !== String(req.headers.host ?? "").toLowerCase()) {
-            throw new HttpError(403, "Verzoek van een andere website geweigerd.");
-          }
-        } else if (origin === "null") {
-          throw new HttpError(403, "Verzoek van een andere website geweigerd.");
-        }
-      }
+      rejectCrossSite(req);
       if (token) {
         const header = req.headers["x-dashboard-token"];
         let given = typeof header === "string" ? header : undefined;

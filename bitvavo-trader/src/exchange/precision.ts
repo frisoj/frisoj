@@ -17,11 +17,17 @@ const DEFAULT_PRICE_PRECISION = 5;
 const DEFAULT_QUANTITY_DECIMALS = 8;
 const DEFAULT_NOTIONAL_DECIMALS = 2;
 const MAX_DECIMALS = 100;
+/** Onder deze grootte houdt toPrecision(15) minstens één decimaal over. */
+const SNAP_LIMIT = 1e14;
 
-/** Verwijdert float-ruis (alles voorbij 15 significante cijfers). */
+/**
+ * Verwijdert float-ruis (alles voorbij 15 significante cijfers), maar alleen
+ * zolang dat minder is dan 0,05 eenheid: vanaf 1e14 zou toPrecision(15) op
+ * hele eenheden afronden (naar het dichtstbijzijnde getal, dus soms OMHOOG).
+ */
 function snap(x: number): number {
   if (!Number.isFinite(x) || x === 0) return x;
-  return Number(x.toPrecision(15));
+  return Math.abs(x) < SNAP_LIMIT ? Number(x.toPrecision(15)) : x;
 }
 
 function applyMode(x: number, mode: RoundMode): number {
@@ -36,7 +42,16 @@ export function roundToDecimals(value: number, decimals: number, mode: RoundMode
   const d = Math.trunc(decimals);
   if (d >= 0) {
     const f = 10 ** d;
-    return applyMode(snap(value * f), mode) / f;
+    const scaled = value * f;
+    let n = applyMode(snap(scaled), mode);
+    if (mode === "down" && Math.abs(scaled) >= SNAP_LIMIT) {
+      // Geen snap: value * f kan door afrondingsruis één stap te laag of te hoog uitkomen.
+      if ((n + 1) / f <= value) n += 1;
+      // Nooit boven de invoer. Boven 2^53 (bijv. > 9e7 eenheden met 8 decimalen)
+      // is de afstand tussen doubles groter dan 1, dus met minstens één ulp omlaag.
+      for (let i = 0; i < 64 && n / f > value; i++) n -= Math.max(1, Math.abs(n) * Number.EPSILON);
+    }
+    return n / f;
   }
   const f = 10 ** -d;
   return applyMode(snap(value / f), mode) * f;
@@ -103,12 +118,15 @@ export function roundQuote(q: number, m: MarketInfo): number {
  * Schrijft een getal in gewone decimale notatie met maximaal 15 significante
  * cijfers (geen exponent, geen float-ruis, geen overbodige nullen).
  * 1e-7 → "0.0000001", 0.1 + 0.2 → "0.3", 1e21 → "1000000000000000000000".
+ * Met `exact` = de kortste notatie die precies dit getal oplevert (tot 17
+ * significante cijfers), bijv. 12345678.12345678 → "12345678.12345678".
  */
-export function toPlainString(value: number): string {
+export function toPlainString(value: number, exact = false): string {
   if (!Number.isFinite(value)) throw new RangeError(`Ongeldig getal: ${value}`);
   if (value === 0) return "0";
   const neg = value < 0;
-  const [mantissa, expStr] = Math.abs(value).toExponential(14).split("e");
+  const abs = Math.abs(value);
+  const [mantissa, expStr] = (exact ? abs.toExponential() : abs.toExponential(14)).split("e");
   const exp = Number(expStr);
   const digits = mantissa.replace(".", "");
   let intPart: string;
@@ -140,8 +158,11 @@ export function formatDecimal(value: number, decimals: number): string {
   if (!Number.isFinite(value)) throw new RangeError(`Ongeldig getal: ${value}`);
   const d = Math.min(MAX_DECIMALS, Math.max(0, Math.trunc(Number.isFinite(decimals) ? decimals : 0)));
   const abs = Math.abs(value);
-  const truncated = roundToDecimals(abs, d, "down");
-  let s = toPlainString(truncated);
+  // 15 significante cijfers verwijdert float-ruis, maar rondt af naar het
+  // dichtstbijzijnde getal: ligt dat boven de waarde, dan de exacte notatie
+  // gebruiken en die afkappen (nooit naar boven afronden).
+  let s = toPlainString(abs);
+  if (Number(s) > abs) s = toPlainString(abs, true);
   const dot = s.indexOf(".");
   if (dot >= 0 && s.length - dot - 1 > d) {
     s = d === 0 ? s.slice(0, dot) : s.slice(0, dot + 1 + d);

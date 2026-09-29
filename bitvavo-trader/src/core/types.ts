@@ -499,6 +499,19 @@ export interface EngineSnapshot {
   halted: HaltStatus;
   /** Laatste 150 logregels, nieuwste eerst */
   logs: LogEntry[];
+  /**
+   * Live: kooporders waarvan de uitkomst onbekend is. Zolang hier iets staat,
+   * opent de bot GEEN nieuwe posities (in geen enkele markt).
+   */
+  unknownOrders?: { market: string; clientOrderId: string; quoteAmount: number; at: number }[];
+  /**
+   * De opgeslagen staat was bij het starten onbruikbaar (corrupt/onleesbaar):
+   * de bot begon met een lege administratie. Live armen is geblokkeerd tot de
+   * gebruiker dit bevestigt.
+   */
+  stateRecovery?: { reason: string; quarantinedTo?: string; at: number } | null;
+  /** Live: totaal aan winst dat boven de kapitaallimiet buiten het handelsbudget is gehouden */
+  skimmedQuote?: number;
 }
 
 /** Wat de StateStore op schijf bewaart */
@@ -512,6 +525,32 @@ export interface PersistedState {
   equityHistory: EquityPoint[];
   /** Balances van de paper broker (alleen paper mode) */
   paperBalances?: Balance[];
+  // ── Optioneel (engine-herstel; oudere bestanden hebben deze velden niet) ──
+  /** Live: de kapitaallimiet waarmee deze staat is opgeslagen */
+  capitalLimitQuote?: number;
+  /** Laatst geëvalueerde gesloten candle per markt; alleen geldig voor dit interval */
+  lastEvaluated?: { interval: Interval; candles: Record<string, number> };
+  /** Live: kooporders met onbekende uitkomst die nog niet opgehelderd zijn */
+  unknownOrders?: {
+    market: string;
+    clientOrderId: string;
+    /** Gevraagd bedrag in EUR (incl. fee) */
+    quoteAmount: number;
+    at: number;
+    /** Plan-afstanden entry → stop / entry → take-profit (voor het boeken van een alsnog gevulde order) */
+    stopDist: number;
+    tpDist: number;
+    entryReason: string;
+    /** Deel dat al als positie geboekt is (bij een deels bekende vulling) */
+    positionId?: string;
+    bookedAmount?: number;
+  }[];
+  /** Dag (YYYY-MM-DD, Europe/Amsterdam) waarop de dagelijkse verlieslimiet geraakt is */
+  haltedDayKey?: string;
+  /** Live: cumulatief afgeroomde winst boven de kapitaallimiet */
+  skimmedQuote?: number;
+  /** Staat was onbruikbaar bij het laden en wacht op bevestiging van de gebruiker */
+  stateRecovery?: { reason: string; quarantinedTo?: string; at: number };
 }
 
 /**

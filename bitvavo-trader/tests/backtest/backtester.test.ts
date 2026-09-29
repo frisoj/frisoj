@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { runBacktestWith, simulate, MAX_CHART_CANDLES, fmtPctNl, type BacktestInput } from "../../src/backtest/simulator";
-import type { Candle } from "../../src/core/types";
-import { FEE, SLIP, T0, STEP, candle, decisionsFrom, flatCandles, input, stubRisk, type StubRiskOptions } from "./helpers";
+import {
+  runBacktestWith,
+  simulate,
+  effectiveSlippagePct,
+  spreadFromTicker,
+  withSpreadCosts,
+  MAX_CHART_CANDLES,
+  fmtPctNl,
+  type BacktestInput,
+} from "../../src/backtest/simulator";
+import type { Candle, RiskConfig } from "../../src/core/types";
+import { FEE, SLIP, T0, STEP, candle, decisionsFrom, flatCandles, input, riskCfg, stubRisk, type StubRiskOptions } from "./helpers";
 
 /** Run the backtest with stub deps: `actions[i]` is the decision on candle i. */
 function run(candles: Candle[], actions: string, riskOpts: StubRiskOptions = {}, overrides: Partial<BacktestInput> = {}) {
@@ -51,9 +60,11 @@ describe("runBacktest – execution timing", () => {
     expect(pos.initialStopPrice).toBeCloseTo(fill - 2, 12);
     expect(pos.stopPrice).toBeCloseTo(fill - 2, 12);
     expect(pos.takeProfitPrice).toBeCloseTo(fill + 4, 12);
-    // Exit check on the entry candle itself, with candlesHeld already incremented and the previous candle's ATR.
+    // Exit check on the entry candle itself (previous candle's ATR), but the entry candle is not a
+    // held candle: like the engine, candlesHeld only counts full candles after the fill.
     expect(risk.updateCalls[0].candle.time).toBe(candles[3].time);
-    expect(pos.candlesHeld).toBe(1);
+    expect(pos.candlesHeld).toBe(0);
+    expect(risk.updateCalls[1].pos.candlesHeld).toBe(1);
     expect(risk.updateCalls[0].atr).toBe(1);
   });
 });
@@ -92,7 +103,7 @@ describe("runBacktest – fees and slippage", () => {
     expect(t.pnlQuote).toBeCloseTo(proceeds - Q, 12);
     expect(t.pnlPct).toBeCloseTo(((proceeds - Q) / Q) * 100, 10);
     expect(t.rMultiple).toBeCloseTo((proceeds - Q) / (2 * amount), 10);
-    expect(t.candlesHeld).toBe(3); // candles 3, 4, 5 (exit at the open of 6)
+    expect(t.candlesHeld).toBe(2); // candles 4, 5 (entry candle 3 does not count; exit at the open of 6)
     expect(result.metrics.finalEquity).toBeCloseTo(100 - Q + proceeds, 10);
     expect(result.metrics.feesPaid).toBeCloseTo(entryFee + exitFee, 12);
   });
@@ -118,7 +129,7 @@ describe("runBacktest – exits", () => {
     expect(t.entryTime).toBe(candles[3].time);
     expect(t.exitTime).toBe(candles[3].time);
     expect(t.exitPrice).toBeCloseTo((fill - 2) * (1 - SLIP), 12);
-    expect(t.candlesHeld).toBe(1);
+    expect(t.candlesHeld).toBe(0);
     expect(t.rMultiple).toBeLessThan(-1); // fees + slippage make a stop worse than -1R
   });
 
@@ -179,7 +190,8 @@ describe("runBacktest – account snapshot for the risk manager", () => {
     expect(first.account.tradesToday).toBe(0);
     expect(first.account.lastLossAt).toEqual({});
     expect(second.account.tradesToday).toBe(1);
-    expect(second.account.lastLossAt["TEST-EUR"]).toBe(candles[4].time);
+    // Intrabar stop on candle 4: the cooldown runs from the moment of the exit (after the open → its close).
+    expect(second.account.lastLossAt["TEST-EUR"]).toBe(candles[4].time + STEP);
     expect(second.account.realizedPnlToday).toBeCloseTo(result.trades[0].pnlQuote, 10);
     const third = risk.planCalls[2];
     expect(third.now).toBe(candles[96].time);
@@ -313,5 +325,174 @@ describe("runBacktest – robustness", () => {
     const candles = flatCandles(3);
     expect(candles[1].time - candles[0].time).toBe(STEP);
     expect(candles[0].time).toBe(T0);
+  });
+});
+
+describe("runBacktest – sells below the minimum order (€5) are refused, like the brokers do", () => {
+  // €5,00 at 100 → after fee and slippage the position is worth < €5 at the entry price already.
+  const amount5 = 5 / (1 + FEE) / (100 * (1 + SLIP));
+  const minPrice = 5 / amount5; // ≈ 100,30: from here on the sell is accepted
+
+  it("keeps a stopped-out €5 position open (no stops) until it is worth €5 again, then sells", () => {
+    const candles = [
+      ...flatCandles(4, 100), // entry at the open of candle 3
+      candle(4, 100, 100.1, 84, 85), // hits the 15-point stop (≈85,05): worth ≈ €4,24 → refused
+      candle(5, 85, 86, 70, 72), // far below the stop, still worth < €5
+      candle(6, 72, 90, 71, 88),
+      candle(7, 88, 101, 87, 100.8), // high reaches the minimum → sold at ≈100,30
+      ...flatCandles(2, 100.8, 8),
+    ];
+    const out = run(candles, "..B.......", { quote: 5, stopDist: 15, tpDist: 50 });
+    const { result, risk } = out;
+    expect(result.trades).toHaveLength(1);
+    const t = result.trades[0];
+    expect(t.costQuote).toBeCloseTo(5, 12);
+    expect(t.amount).toBeCloseTo(amount5, 12);
+    // Not booked on the stop candle …
+    expect(result.trades.some((x) => x.exitTime === candles[4].time)).toBe(false);
+    // … but only once amount × price >= €5.
+    expect(t.exitTime).toBe(candles[7].time);
+    expect(t.exitReason).toBe("stop-loss");
+    expect(t.exitPrice).toBeCloseTo(minPrice * (1 - SLIP), 9);
+    expect(t.amount * (t.exitPrice / (1 - SLIP))).toBeGreaterThanOrEqual(5 - 1e-9);
+    // While the sell is pending the risk manager is not asked again (the engine does the same).
+    expect(risk.updateCalls.map((u) => u.candle.time)).toEqual([candles[3].time, candles[4].time]);
+    // The position stays in the equity curve, marked at the close (drawdown becomes visible).
+    expect(result.equityCurve[5].equity).toBeCloseTo(100 - 5 + amount5 * 72, 10);
+    expect(result.metrics.maxDrawdownPct).toBeLessThan(-1);
+    expect(t.candlesHeld).toBe(4); // candles 4, 5, 6, 7 (entry candle 3 does not count)
+    expect(out.stuckTrades).toBe(1);
+    expect(out.stuckCandles).toBe(3);
+    expect(t.entryReason).toMatch(/verkoop \(stop-loss\) geweigerd/);
+    expect(t.entryReason).toContain("€5,00");
+    expect(t.entryReason).toContain("3 candles");
+  });
+
+  it("sells a pending position at the open when the open is already worth enough", () => {
+    const candles = [
+      ...flatCandles(4, 100),
+      candle(4, 100, 100.1, 84, 85),
+      candle(5, 101, 102, 100.5, 101.5),
+      ...flatCandles(2, 101.5, 6),
+    ];
+    const { result } = run(candles, "..B.....", { quote: 5, stopDist: 15, tpDist: 50 });
+    const t = result.trades[0];
+    expect(t.exitTime).toBe(candles[5].time);
+    expect(t.exitReason).toBe("stop-loss");
+    expect(t.exitPrice).toBeCloseTo(101 * (1 - SLIP), 12);
+  });
+
+  it("also refuses a signal exit below the minimum and retries it", () => {
+    const candles = [...flatCandles(7, 100), candle(7, 100, 100.5, 99.9, 100.4), ...flatCandles(4, 100.4, 8)];
+    const actions = "..B..S...B..";
+    const { result, risk } = run(candles, actions, { quote: 5, stopDist: 15, tpDist: 50 });
+    const t = result.trades[0];
+    expect(t.exitReason).toBe("signal");
+    expect(t.exitTime).toBe(candles[7].time); // not at the open of 6 (worth ≈ €4,99)
+    expect(t.exitPrice).toBeCloseTo(minPrice * (1 - SLIP), 9);
+    expect(t.entryReason).toMatch(/verkoop \(verkoopsignaal\) geweigerd/);
+    // Intrabar sale with a loss: cooldown runs from the end of candle 7.
+    expect(t.pnlQuote).toBeLessThan(0);
+    const next = risk.planCalls[1];
+    expect(next.now).toBe(candles[10].time);
+    expect(next.account.lastLossAt["TEST-EUR"]).toBe(candles[7].time + STEP);
+  });
+
+  it("marks a position that never becomes sellable to market at the end, with a note", () => {
+    const candles = [...flatCandles(4, 100), candle(4, 100, 100.1, 84, 85), ...flatCandles(5, 80, 5)];
+    const out = run(candles, "..B.......", { quote: 5, stopDist: 15, tpDist: 50 });
+    const t = out.result.trades[0];
+    expect(t.exitReason).toBe("end-of-backtest");
+    expect(t.exitTime).toBe(candles[9].time);
+    expect(t.exitPrice).toBeCloseTo(80 * (1 - SLIP), 12);
+    expect(t.entryReason).toMatch(/nog steeds niet verkoopbaar/);
+    expect(out.stuckTrades).toBe(1);
+    expect(out.stuckCandles).toBe(5);
+    expect(out.exposureCandles).toBe(7); // entry candle + 6 candles after it
+  });
+
+  it("uses the market's minimum from MarketInfo and books normal-size stops as before", () => {
+    const candles = [...flatCandles(4, 100), candle(4, 100, 100.1, 84, 85), ...flatCandles(3, 85, 5)];
+    const info = { market: "TEST-EUR", base: "TEST", quote: "EUR", status: "trading", minOrderQuote: 1, minOrderBase: 0, pricePrecision: 5, quantityDecimals: 8, notionalDecimals: 2 };
+    const { result } = run(candles, "..B.....", { quote: 5, stopDist: 15, tpDist: 50 }, { marketInfo: info });
+    expect(result.trades[0].exitTime).toBe(candles[4].time); // €4,24 >= €1 minimum: sold at the stop
+    expect(result.trades[0].exitReason).toBe("stop-loss");
+    const big = run(candles, "..B.....", { quote: 50, stopDist: 15, tpDist: 50 }).result.trades[0];
+    expect(big.exitTime).toBe(candles[4].time);
+    expect(big.exitPrice).toBeCloseTo((100 * (1 + SLIP) - 15) * (1 - SLIP), 12);
+  });
+});
+
+describe("runBacktest – held candles, time-stop and cooldown match the engine", () => {
+  it("time-stop fires after N full candles after the entry candle", () => {
+    const candles = flatCandles(12, 100);
+    const { result } = run(candles, "..B.........", { timeStop: 3, exitOnSell: false });
+    const t = result.trades[0];
+    expect(t.entryTime).toBe(candles[3].time);
+    expect(t.exitReason).toBe("time-stop");
+    expect(t.exitTime).toBe(candles[6].time); // candles 4, 5, 6 held
+    expect(t.candlesHeld).toBe(3);
+    expect(result.metrics.avgCandlesHeld).toBe(3);
+  });
+
+  it("loss cooldown starts at the exit moment: close for intrabar exits, open for signal / gap exits", () => {
+    // Time-stop (at the close of candle 6) → next plan sees candles[6].time + STEP.
+    const flat = flatCandles(12, 100);
+    const ts = run(flat, "..B...B.....", { timeStop: 3, exitOnSell: false });
+    expect(ts.result.trades[0].pnlQuote).toBeLessThan(0);
+    expect(ts.risk.planCalls[1].now).toBe(flat[7].time);
+    expect(ts.risk.planCalls[1].account.lastLossAt["TEST-EUR"]).toBe(flat[6].time + STEP);
+
+    // Signal exit at the open of candle 6 → candles[6].time.
+    const sig = run(flat, "..B..S.B....", { quote: 50 });
+    expect(sig.result.trades[0].exitTime).toBe(flat[6].time);
+    expect(sig.risk.planCalls[1].account.lastLossAt["TEST-EUR"]).toBe(flat[6].time);
+
+    // Gap below the stop: filled at the open → candles[4].time.
+    const gap = [...flatCandles(4), candle(4, 95, 96, 94, 95.5), ...flatCandles(4, 95.5, 5)];
+    const g = run(gap, "..B...B..", { stopDist: 2 });
+    expect(g.result.trades[0].exitPrice).toBeCloseTo(95 * (1 - SLIP), 12);
+    expect(g.risk.planCalls[1].account.lastLossAt["TEST-EUR"]).toBe(gap[4].time);
+  });
+});
+
+describe("runBacktest – spread-aware slippage", () => {
+  it("uses max(slippagePct, spread / 2) per side", () => {
+    const r = riskCfg();
+    expect(effectiveSlippagePct(r, 0.004)).toBeCloseTo(0.002, 15);
+    expect(effectiveSlippagePct(r, 0.0004)).toBe(SLIP); // half-spread below the configured slippage
+    expect(effectiveSlippagePct(r)).toBe(SLIP);
+    expect(effectiveSlippagePct(r, Number.NaN)).toBe(SLIP);
+    expect(effectiveSlippagePct(r, -1)).toBe(SLIP);
+    const inp = input(flatCandles(3));
+    expect(withSpreadCosts(inp)).toBe(inp);
+    expect(withSpreadCosts({ ...inp, spreadPct: 0.004 }).risk.slippagePct).toBeCloseTo(0.002, 15);
+    expect(inp.risk.slippagePct).toBe(SLIP); // not mutated
+  });
+
+  it("fills entries and exits with the half-spread and hands the same cost to the risk manager", () => {
+    const candles = [...flatCandles(6, 100), candle(6, 102, 102.4, 101.7, 102.2), ...flatCandles(2, 102, 7)];
+    const decisions = decisionsFrom(candles, "..B..S...");
+    const seen: RiskConfig[] = [];
+    const out = runBacktestWith(input(candles, { spreadPct: 0.004 }), {
+      decide: () => decisions,
+      createRisk: (cfg) => {
+        seen.push(cfg);
+        return stubRisk({ quote: 50 });
+      },
+    });
+    expect(out.slippagePct).toBeCloseTo(0.002, 15);
+    expect(seen[0].slippagePct).toBeCloseTo(0.002, 15);
+    const t = out.result.trades[0];
+    expect(t.entryPrice).toBeCloseTo(100 * 1.002, 12);
+    expect(t.exitPrice).toBeCloseTo(102 * 0.998, 12);
+  });
+
+  it("derives the spread from a ticker (best effort)", () => {
+    expect(spreadFromTicker({ bid: 99.9, ask: 100.1 })).toBeCloseTo(0.002, 12);
+    expect(spreadFromTicker({ bid: null, ask: 100 })).toBeUndefined();
+    expect(spreadFromTicker({ bid: 101, ask: 100 })).toBeUndefined();
+    expect(spreadFromTicker({ bid: 0, ask: 100 })).toBeUndefined();
+    expect(spreadFromTicker(undefined)).toBeUndefined();
   });
 });

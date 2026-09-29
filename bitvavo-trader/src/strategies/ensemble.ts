@@ -18,19 +18,30 @@ import { getStrategy, isStrategyId, resolveParams } from "./registry";
 export const OFF_REGIME_WEIGHT = 0.5;
 
 /**
+ * Beslissing plus de exit-score: Σ w·dir·conf gedeeld door het gewicht van
+ * alleen de strategieën die iets vinden (niet "hold"). Strategieën die wachten
+ * verdunnen een exit-stem dus niet. (Extra veld bovenop het core-contract.)
+ */
+export type EnsembleDecisionWithExit = EnsembleDecision & { exitScore: number };
+
+/**
  * Score → actie. De ENIGE plek waar drempels en regimefilter worden toegepast
  * (de optimizer hergebruikt dit om gecachte scores opnieuw te beoordelen).
  * - score >= buyThreshold → "buy" (maar "hold" bij regimefilter + "trend-down")
- * - score <= sellThreshold → "sell"
+ * - exitScore <= sellThreshold → "sell" (zonder exitScore: de score zelf)
  * - anders "hold"
+ * Kopen gebruikt de score over ALLE strategieën (brede steun nodig); verkopen
+ * de exit-score over de strategieën die een mening hebben, zodat één duidelijke
+ * exit-stem (bijv. RSI overbought) een positie echt kan sluiten.
  * Een score van precies 0 (geen enkele mening) is nooit een koop of verkoop.
  */
-export function classify(score: number, regime: Regime, cfg: EnsembleConfig): SignalAction {
+export function classify(score: number, regime: Regime, cfg: EnsembleConfig, exitScore: number = score): SignalAction {
   if (!Number.isFinite(score)) return "hold";
   if (score > 0 && score >= cfg.buyThreshold) {
     return cfg.regimeFilter && regime === "trend-down" ? "hold" : "buy";
   }
-  if (score < 0 && score <= cfg.sellThreshold) return "sell";
+  const exit = Number.isFinite(exitScore) ? exitScore : score;
+  if (exit < 0 && exit <= cfg.sellThreshold) return "sell";
   return "hold";
 }
 
@@ -48,11 +59,12 @@ function enabledIds(cfg: EnsembleConfig): StrategyId[] {
 /**
  * Draait elke ingeschakelde strategie één keer over alle candles en combineert
  * de signalen per candle tot een gewogen score:
- *   score = Σ w·dir·conf / Σ w   (dir: buy +1, sell −1, hold 0)
+ *   score     = Σ w·dir·conf / Σ w            (dir: buy +1, sell −1, hold 0)
+ *   exitScore = Σ w·dir·conf / Σ w (dir ≠ 0)  (alleen strategieën met een mening)
  * Met regimefilter tellen strategieën buiten hun voorkeursregime voor de helft.
  * Resultaat heeft dezelfde lengte als `candles`; beslissing i gebruikt alleen candles[0..i].
  */
-export function runEnsemble(market: string, candles: Candle[], cfg: EnsembleConfig): EnsembleDecision[] {
+export function runEnsemble(market: string, candles: Candle[], cfg: EnsembleConfig): EnsembleDecisionWithExit[] {
   const n = candles.length;
   if (n === 0) return [];
   const ids = enabledIds(cfg);
@@ -67,12 +79,13 @@ export function runEnsemble(market: string, candles: Candle[], cfg: EnsembleConf
   const atrs = atr(candles, 14);
   const m = ids.length;
 
-  const out: EnsembleDecision[] = new Array(n);
+  const out: EnsembleDecisionWithExit[] = new Array(n);
   for (let i = 0; i < n; i++) {
     const regime = regimes[i];
     const filter = cfg.regimeFilter && regime !== "unknown";
     let num = 0;
     let den = 0;
+    let activeDen = 0;
     const votes: StrategySignal[] = new Array(m);
     for (let s = 0; s < m; s++) {
       const sig = signals[s][i];
@@ -83,17 +96,21 @@ export function runEnsemble(market: string, candles: Candle[], cfg: EnsembleConf
       if (dir !== 0) {
         const conf = Number.isFinite(sig.confidence) ? Math.min(1, Math.max(0, sig.confidence)) : 0;
         num += w * dir * conf;
+        activeDen += w;
       }
     }
     let score = den > 0 ? num / den : 0;
     score = score > 1 ? 1 : score < -1 ? -1 : score;
+    let exitScore = activeDen > 0 ? num / activeDen : 0;
+    exitScore = exitScore > 1 ? 1 : exitScore < -1 ? -1 : exitScore;
     const a = atrs[i];
     out[i] = {
       market,
       time: candles[i].time,
       price: candles[i].close,
-      action: classify(score, regime, cfg),
+      action: classify(score, regime, cfg, exitScore),
       score,
+      exitScore,
       confidence: Math.min(1, Math.abs(score)),
       regime,
       atr: Number.isFinite(a) ? a : NaN,
@@ -104,7 +121,7 @@ export function runEnsemble(market: string, candles: Candle[], cfg: EnsembleConf
 }
 
 /** Beslissing op de laatste candle (de caller geeft alleen gesloten candles mee). */
-export function latestDecision(market: string, candles: Candle[], cfg: EnsembleConfig): EnsembleDecision | null {
+export function latestDecision(market: string, candles: Candle[], cfg: EnsembleConfig): EnsembleDecisionWithExit | null {
   if (candles.length === 0) return null;
   const all = runEnsemble(market, candles, cfg);
   return all[all.length - 1] ?? null;

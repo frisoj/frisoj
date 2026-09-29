@@ -2,6 +2,8 @@
 // Alles wordt server-side berekend (POST /api/backtest|optimize|walkforward);
 // dit paneel bouwt het formulier en visualiseert de resultaten.
 
+import { quality, isScoredRow, bestScoredRow, scoreBarMax, testedPartial, describeApply, MIN_TRADES_FOR_SCORE } from "./backtestLogic.js";
+
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
 const INTERVAL_MS = {
   "1m": 6e4, "5m": 3e5, "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5,
@@ -630,28 +632,6 @@ export function mountBacktest(ctx, el) {
     return [...m.values()].sort((a, b) => a.time - b.time);
   }
 
-  function quality(kind, m, initial) {
-    switch (kind) {
-      case "ret":
-        return m.totalReturnPct <= 0 ? "bad" : m.totalReturnPct >= m.buyHoldReturnPct ? "good" : "warn";
-      case "dd":
-        return m.maxDrawdownPct <= 10 ? "good" : m.maxDrawdownPct <= 20 ? "warn" : "bad";
-      case "sharpe":
-        return m.sharpe >= 1 ? "good" : m.sharpe >= 0.3 ? "warn" : "bad";
-      case "win":
-        return m.winRatePct >= 50 ? "good" : m.winRatePct >= 35 ? "warn" : "bad";
-      case "pf":
-        return m.profitFactor >= 1.5 ? "good" : m.profitFactor >= 1 ? "warn" : "bad";
-      case "trades":
-        return m.trades >= 30 ? "good" : m.trades >= 10 ? "warn" : "bad";
-      case "fees":
-        return initial > 0 && m.feesPaid / initial > 0.05 ? "warn" : "neutral";
-      case "final":
-        return m.finalEquity > initial ? "good" : m.finalEquity < initial ? "bad" : "neutral";
-      default:
-        return "neutral";
-    }
-  }
   const Q_ICON = { good: "✓", warn: "!", bad: "✕", neutral: "•" };
 
   function kpiCards(m, initial) {
@@ -1021,9 +1001,10 @@ export function mountBacktest(ctx, el) {
 
   function renderOptimize({ req, res }) {
     const rows = (res.rows || []).slice(0, 20);
-    const best = res.best || rows[0] || null;
+    // Nooit terugvallen op rows[0]: zonder geldige combinatie is die afgestraft (te weinig trades).
+    const best = bestScoredRow(res);
     const obj = res.objective || req.objective;
-    const maxScore = Math.max(...rows.map((r) => (Number.isFinite(r.score) ? Math.abs(Math.min(r.score, 999)) : 0)), 1e-9);
+    const maxScore = scoreBarMax(rows);
     const bm = best?.metrics;
     out.innerHTML = `
       <div class="bt-res-head">
@@ -1050,7 +1031,7 @@ export function mountBacktest(ctx, el) {
                  ${bm.trades < 10 ? '<div class="pn-banner pn-banner-warn">Minder dan 10 trades: te weinig om op te vertrouwen.</div>' : ""}
                  <button type="button" class="btn btn-primary bt-apply" data-row="best">Pas beste instellingen toe</button>
                  <p class="pn-hint">Zet deze waarden in de bot (je krijgt eerst een overzicht ter bevestiging).</p>`
-              : '<div class="pn-empty">Geen geldige combinaties gevonden.</div>'
+              : `<div class="pn-empty">Geen enkele combinatie haalde minimaal ${MIN_TRADES_FOR_SCORE} trades — kies een langere periode of een kleiner interval.</div>`
           }
         </div>
         <div class="panel bt-card bt-hm-card">
@@ -1068,12 +1049,20 @@ export function mountBacktest(ctx, el) {
               (r, i) => `<tr>
               <td class="muted">${i + 1}</td>
               <td><div class="bt-pchips">${paramChips(r.params)}</div></td>
-              <td class="r"><div class="bt-score"><span class="bt-score-bar"><i class="${r.score >= (obj === "profitFactor" ? 1 : 0) ? "is-pos" : "is-neg"}" style="width:${((Math.abs(Math.min(r.score, 999)) / maxScore) * 100).toFixed(1)}%"></i></span><span class="mono">${esc(fmtScore(r.score, obj))}</span></div></td>
+              <td class="r">${
+                isScoredRow(r)
+                  ? `<div class="bt-score"><span class="bt-score-bar"><i class="${r.score >= (obj === "profitFactor" ? 1 : 0) ? "is-pos" : "is-neg"}" style="width:${((Math.abs(Math.min(r.score, 999)) / maxScore) * 100).toFixed(1)}%"></i></span><span class="mono">${esc(fmtScore(r.score, obj))}</span></div>`
+                  : `<span class="muted" title="Minder dan ${MIN_TRADES_FOR_SCORE} trades: telt niet mee">te weinig trades</span>`
+              }</td>
               <td class="r mono ${fmt.pnlClass(r.metrics?.totalReturnPct)}">${esc(fmt.pct(r.metrics?.totalReturnPct, 2))}</td>
               <td class="r mono">${esc(fmt.pct(-Math.abs(r.metrics?.maxDrawdownPct ?? NaN), 1))}</td>
               <td class="r mono">${esc(fmt.num(r.metrics?.trades, 0))}</td>
               <td class="r mono">${esc(fmt.pct(r.metrics?.winRatePct, 0, false))}</td>
-              <td class="r"><button type="button" class="btn btn-ghost pn-btn-sm bt-apply" data-row="${i}" title="Deze combinatie in de bot zetten">Toepassen</button></td></tr>`,
+              <td class="r">${
+                isScoredRow(r)
+                  ? `<button type="button" class="btn btn-ghost pn-btn-sm bt-apply" data-row="${i}" title="Deze combinatie in de bot zetten">Toepassen</button>`
+                  : `<button type="button" class="btn btn-ghost pn-btn-sm" disabled title="Minder dan ${MIN_TRADES_FOR_SCORE} trades">Toepassen</button>`
+              }</td></tr>`,
             )
             .join("")}</tbody></table></div>
       </div>`;
@@ -1157,47 +1146,14 @@ export function mountBacktest(ctx, el) {
   }
 
   // ── Toepassen van parameters ──
-  function paramsToPartial(params, cfg) {
-    const partial = {};
-    const ids = new Set(state.strategies.map((s) => s.id));
-    for (const [key, value] of Object.entries(params || {})) {
-      const i = key.indexOf(".");
-      if (i < 0) continue;
-      const head = key.slice(0, i);
-      const rest = key.slice(i + 1);
-      if (head === "ensemble") {
-        partial.ensemble ??= {};
-        if (rest.startsWith("weights.")) {
-          partial.ensemble.weights ??= { ...(cfg?.ensemble?.weights || {}) };
-          partial.ensemble.weights[rest.slice(8)] = value;
-        } else partial.ensemble[rest] = value;
-      } else if (head === "risk") {
-        partial.risk ??= {};
-        partial.risk[rest] = value;
-      } else if (ids.has(head)) {
-        partial.ensemble ??= {};
-        partial.ensemble.params ??= JSON.parse(JSON.stringify(cfg?.ensemble?.params || {}));
-        partial.ensemble.params[head] = { ...(partial.ensemble.params[head] || {}), [rest]: value };
-      }
-    }
-    return partial;
-  }
-
-  function currentValue(key, cfg) {
-    const i = key.indexOf(".");
-    const head = key.slice(0, i);
-    const rest = key.slice(i + 1);
-    if (head === "ensemble") {
-      if (rest.startsWith("weights.")) return cfg?.ensemble?.weights?.[rest.slice(8)];
-      return cfg?.ensemble?.[rest];
-    }
-    if (head === "risk") return cfg?.risk?.[rest];
-    const p = cfg?.ensemble?.params?.[head]?.[rest];
-    if (p !== undefined) return p;
-    return state.strategies.find((s) => s.id === head)?.defaultParams?.[rest];
-  }
-
+  // De bot krijgt precies de configuratie die de optimizer testte: strategieën,
+  // drempels en risico uit het formulier + de geforceerd aangezette strategie +
+  // de parameters van de rij (zie backtestLogic.testedPartial).
   async function confirmApply(row, req) {
+    if (!isScoredRow(row)) {
+      ctx.toast(`Deze combinatie had minder dan ${MIN_TRADES_FOR_SCORE} trades en telt niet mee — niet toepassen.`, "warn");
+      return;
+    }
     let cfg = state.config;
     try {
       cfg = await api.getConfig();
@@ -1205,27 +1161,42 @@ export function mountBacktest(ctx, el) {
     } catch {
       /* gebruik bekende config */
     }
-    const partial = paramsToPartial(row.params, cfg);
+    const partial = testedPartial(row, req, cfg, new Set(state.strategies.map((s) => s.id)));
     if (!partial.ensemble && !partial.risk) {
       ctx.toast("Deze parameters kunnen niet automatisch worden toegepast.", "warn");
       return;
     }
-    const lines = Object.entries(row.params)
-      .map(([k, v]) => {
-        const cur = currentValue(k, cfg);
-        const same = cur === v;
-        return `<tr><td>${esc(paramLabel(k))}</td><td class="mono r">${esc(cur === undefined ? "–" : fmtParam(cur))}</td>
-          <td class="mono r">${same ? `<span class="muted">${esc(fmtParam(v))} (gelijk)</span>` : `<b>${esc(fmtParam(v))}</b>`}</td></tr>`;
-      })
-      .join("");
+    const { enabled, rows: changes } = describeApply(partial, row, cfg, state.strategies);
+    const names = (ids) => (ids.length ? ids.map(stratName).join(", ") : "–");
+    let enabledLine = "";
+    if (enabled) {
+      const same = !enabled.added.length && !enabled.removed.length;
+      const nextHtml = enabled.next
+        .map((id) => (enabled.added.includes(id) ? `<b>${esc(stratName(id))}</b>` : esc(stratName(id))))
+        .join(", ");
+      enabledLine = `<tr><td>Strategieën aan</td><td class="bt-apply-list">${esc(names(enabled.cur))}</td>
+        <td class="bt-apply-list">${same ? `<span class="muted">${nextHtml} (gelijk)</span>` : nextHtml}${
+          enabled.removed.length ? ` <span class="neg">(uit: ${esc(names(enabled.removed))})</span>` : ""
+        }</td></tr>`;
+    }
+    const lines =
+      enabledLine +
+      changes
+        .map(({ key, cur, next, same }) => {
+          return `<tr><td>${esc(paramLabel(key))}</td><td class="mono r">${esc(cur === undefined ? "–" : fmtParam(cur))}</td>
+          <td class="mono r">${same ? `<span class="muted">${esc(fmtParam(next))} (gelijk)</span>` : `<b>${esc(fmtParam(next))}</b>`}</td></tr>`;
+        })
+        .join("");
     const warn = [];
     if (cfg && req.interval !== cfg.interval)
       warn.push(`De bot draait op interval <b>${esc(cfg.interval)}</b>, maar deze waarden zijn getest op <b>${esc(req.interval)}</b>.`);
     if (cfg && !cfg.markets?.includes(req.market))
       warn.push(`<b>${esc(req.market)}</b> staat niet in de markten van de bot.`);
+    if (enabled?.removed.length)
+      warn.push(`Strategieën die in het lab uit stonden, worden ook in de bot <b>uitgezet</b>: ${esc(names(enabled.removed))}.`);
     if (row.metrics?.totalReturnPct <= 0) warn.push("Deze combinatie was verliesgevend in de test.");
     const bodyHtml = `
-      <p>De volgende instellingen worden in de bot gezet:</p>
+      <p>De bot krijgt precies de configuratie die de optimizer heeft getest (strategieën, drempels en risico uit het formulier plus de gevonden parameters):</p>
       <table class="table bt-apply-table"><thead><tr><th>Instelling</th><th class="r">Nu</th><th class="r">Nieuw</th></tr></thead><tbody>${lines}</tbody></table>
       ${warn.length ? `<div class="pn-banner pn-banner-warn"><ul>${warn.map((w) => `<li>${w}</li>`).join("")}</ul></div>` : ""}
       <p class="pn-hint">Getest op ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen. ${esc(HONEST_NOTE)} Test nieuwe instellingen eerst een tijd met paper trading.</p>`;

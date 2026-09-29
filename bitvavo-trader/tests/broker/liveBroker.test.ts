@@ -153,6 +153,67 @@ describe("LiveBroker.placeMarketOrder", () => {
     expect(res.feeQuote).toBe(0.025);
   });
 
+  it("schat de fee met de taker-fee als Bitvavo de fill (na het pollen) nog niet heeft afgerekend", async () => {
+    const unsettledFill = { id: "f", timestamp: NOW, amount: "0.0004", price: "50000", taker: true, settled: false };
+    const t = setup(() => ({ body: order({ feePaid: "0", fills: [unsettledFill] }) }));
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50000);
+    expect(t.calls.filter((c) => c.method === "GET")).toHaveLength(5); // niet langer pollen dan voorheen
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(0); // gevuld: niets te annuleren
+    expect(res.status).toBe("filled");
+    expect(res.filledQuote).toBe(20);
+    expect(res.feeQuote).toBeCloseTo(20 * 0.0025, 10);
+    expect(res.error).toContain("fee nog niet door Bitvavo afgerekend");
+    expect(res.error).toContain("€ 0,05");
+
+    // setCosts (zelfde hook als PaperBroker) past de schatting aan.
+    t.broker.setCosts(0.0015, 0.0005);
+    expect(t.broker.takerFee).toBe(0.0015);
+    const res2 = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50000);
+    expect(res2.feeQuote).toBeCloseTo(20 * 0.0015, 10);
+    t.broker.setCosts(Number.NaN, 0);
+    expect(t.broker.takerFee).toBe(0.0015);
+  });
+
+  it("schat alleen het nog niet afgerekende deel en gebruikt de echte fee zodra die bekend is", async () => {
+    const settled = { id: "f1", timestamp: NOW, amount: "0.0001", price: "50000", taker: true, fee: "0.0125", feeCurrency: "EUR", settled: true };
+    const unsettled = { id: "f2", timestamp: NOW, amount: "0.0003", price: "50000", taker: true, settled: false };
+    const t = setup(() => ({ body: order({ feePaid: "0.0125", fills: [settled, unsettled] }) }));
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50000);
+    expect(res.feeQuote).toBeCloseTo(0.0125 + 15 * 0.0025, 10);
+    expect(res.error).toContain("geschat");
+
+    // Afgerekend bij de 2e poll: echte fee, geen melding.
+    let gets = 0;
+    const t2 = setup((c) => {
+      if (c.method === "POST") return { body: order({ feePaid: "0", fills: [unsettled] }) };
+      gets++;
+      if (gets < 2) return { body: order({ feePaid: "0", fills: [unsettled] }) };
+      return { body: order({ feePaid: "0.0375", fills: [{ ...unsettled, fee: "0.0375", feeCurrency: "EUR", settled: true }] }) };
+    });
+    const res2 = await t2.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 15 }, 50000);
+    expect(gets).toBe(2);
+    expect(res2.feeQuote).toBeCloseTo(0.0375, 10);
+    expect(res2.error).toBeUndefined();
+
+    // Fee in een onbekende valuta: ook schatten i.p.v. € 0.
+    const t3 = setup(() => ({
+      body: order({ fills: [{ id: "f", timestamp: NOW, amount: "0.0004", price: "50000", taker: true, fee: "0.01", feeCurrency: "XYZ", settled: true }] }),
+    }));
+    const res3 = await t3.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50000);
+    expect(res3.feeQuote).toBeCloseTo(0.05, 10);
+  });
+
+  it("gebruikt de meegegeven takerFee-optie voor de schatting", async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        JSON.stringify(order({ feePaid: "0", fills: [{ id: "f", timestamp: NOW, amount: "0.0004", price: "50000", taker: true, settled: false }] })),
+      )) as typeof fetch;
+    const client = new BitvavoClient({ apiKey: "k".repeat(64), apiSecret: "s", fetchImpl, autoTimeSync: false });
+    const broker = new LiveBroker(client, { getMarketInfo: async () => BTC, sleep: async () => {}, takerFee: 0.001 });
+    const res = await broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50000);
+    expect(res.feeQuote).toBeCloseTo(0.02, 10);
+  });
+
   it("pollt getOrder zolang de order nog 'new' is", async () => {
     let gets = 0;
     const t = setup((c) => {
@@ -174,12 +235,126 @@ describe("LiveBroker.placeMarketOrder", () => {
     expect(t.posts()).toHaveLength(1);
   });
 
-  it("geeft 'new' met melding als de order na het pollen nog niet gevuld is", async () => {
-    const t = setup(() => ({ body: order({ status: "new" }) }));
+  it("annuleert een order die na het pollen nog open staat en meldt 'cancelled' als er niets gevuld is", async () => {
+    let cancelled = false;
+    const t = setup((c) => {
+      if (c.method === "DELETE") {
+        expect(c.url.searchParams.get("orderId")).toBe("order-1");
+        expect(c.url.searchParams.get("market")).toBe("BTC-EUR");
+        cancelled = true;
+        return { body: { orderId: "order-1" } };
+      }
+      return { body: order({ status: cancelled ? "canceled" : "new" }) };
+    });
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
+    const methods = t.calls.map((c) => c.method);
+    expect(methods).toEqual(["POST", "GET", "GET", "GET", "GET", "GET", "DELETE", "GET"]);
+    expect(res.status).toBe("cancelled"); // dood: de engine mag dit als afwijzing behandelen
+    expect(res.filledAmount).toBe(0);
+    expect(res.error).toContain("door de bot geannuleerd");
+    expect(res.error).not.toContain("UITKOMST ONBEKEND");
+    expect(t.posts()).toHaveLength(1);
+  });
+
+  it("geeft de vulling terug als de order tijdens het annuleren toch gevuld blijkt (annuleren → 240)", async () => {
+    let gets = 0;
+    const t = setup((c) => {
+      if (c.method === "DELETE") return { status: 404, body: { errorCode: 240, error: "No order found." } };
+      if (c.method === "POST") return { body: order({ status: "new" }) };
+      gets++;
+      if (gets <= 5) return { body: order({ status: "new" }) };
+      return {
+        body: order({
+          fills: [{ id: "f", timestamp: NOW, amount: "0.0002", price: "50000", taker: true, fee: "0.025", feeCurrency: "EUR", settled: true }],
+        }),
+      };
+    });
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
+    expect(res.status).toBe("filled");
+    expect(res.filledAmount).toBe(0.0002);
+    expect(res.feeQuote).toBe(0.025);
+    expect(res.error).toBeUndefined();
+  });
+
+  it("rapporteert een deels gevulde order die de bot annuleert als partiallyFilled (order is klaar)", async () => {
+    let cancelled = false;
+    const fill = { id: "f", timestamp: NOW, amount: "0.0001", price: "50000", taker: true, fee: "0.0125", feeCurrency: "EUR", settled: true };
+    const t = setup((c) => {
+      if (c.method === "DELETE") {
+        cancelled = true;
+        return { body: { orderId: "order-1" } };
+      }
+      return { body: order({ status: cancelled ? "canceled" : "partiallyFilled", fills: [fill] }) };
+    });
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
+    expect(res.status).toBe("partiallyFilled");
+    expect(res.filledAmount).toBe(0.0001);
+    expect(res.error).toContain("door de bot geannuleerd");
+    expect(res.error).not.toContain("UITKOMST ONBEKEND");
+  });
+
+  it("meldt UITKOMST ONBEKEND (status 'new') als een open order niet te annuleren/controleren is", async () => {
+    const t = setup((c) => {
+      if (c.method === "DELETE") return new TypeError("socket hang up");
+      return { body: order({ status: "new" }) };
+    });
     const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
     expect(res.status).toBe("new");
-    expect(res.error).toContain("nog niet gevuld");
-    expect(t.calls.filter((c) => c.method === "GET")).toHaveLength(5);
+    expect(res.filledAmount).toBe(0);
+    expect(res.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
+    expect(res.error).toContain("order-1");
+    // Annuleren wordt opnieuw geprobeerd zolang het niet lukt, nooit opnieuw geplaatst.
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(3);
+    expect(t.posts()).toHaveLength(1);
+  });
+
+  it("meldt UITKOMST ONBEKEND met status partiallyFilled als een deels gevulde order open blijft", async () => {
+    const fill = { id: "f", timestamp: NOW, amount: "0.0001", price: "50000", taker: true, fee: "0.0125", feeCurrency: "EUR", settled: true };
+    const t = setup((c) => {
+      if (c.method === "DELETE") return { body: { orderId: "order-1" } }; // geaccepteerd, maar blijft open
+      return { body: order({ status: "partiallyFilled", fills: [fill] }) };
+    });
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.0002 }, 50000);
+    expect(res.status).toBe("partiallyFilled");
+    expect(res.filledAmount).toBe(0.0001);
+    expect(res.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(1); // geaccepteerd: niet herhalen
+  });
+
+  it("annuleert ook als de status niet op te halen was (polls mislukken) en meldt dan UITKOMST ONBEKEND", async () => {
+    const t = setup((c) => {
+      if (c.method === "POST") return { body: order({ status: "new" }) };
+      if (c.method === "DELETE") return { status: 503, body: { error: "down" } };
+      return { status: 503, body: { error: "down" } };
+    });
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
+    expect(t.posts()).toHaveLength(1);
+    expect(t.calls.filter((c) => c.method === "DELETE").length).toBeGreaterThan(0);
+    expect(res.status).toBe("new");
+    expect(res.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
+  });
+
+  it("zet een klein-saldo-notitie ACHTER de UITKOMST ONBEKEND-melding", async () => {
+    const t = setup((c) => {
+      if (c.url.pathname === "/v2/balance") return { body: [{ symbol: "BTC", available: "0.00019950", inOrder: "0" }] };
+      if (c.method === "DELETE") return new TypeError("socket hang up");
+      return { body: order({ side: "sell", status: "new" }) };
+    });
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: 0.0002 }, 50000);
+    expect(res.status).toBe("new");
+    expect(res.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
+    expect(res.error).toContain("verlaagd");
+  });
+
+  it("behandelt 'filled' zonder gevulde hoeveelheid als onbekende uitkomst, niet als afwijzing", async () => {
+    const t = setup(() => ({ body: order({ status: "filled", filledAmount: "0", fills: [] }) }));
+    const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
+    expect(res.status).toBe("new");
+    expect(res.filledAmount).toBe(0);
+    expect(res.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(0);
   });
 
   it("mapt een Bitvavo-afwijzing naar status rejected (gooit niet)", async () => {
@@ -250,15 +425,19 @@ describe("LiveBroker.placeMarketOrder", () => {
     expect(res.clientOrderId).toBe(sentClientId);
   });
 
-  it("meldt 'waarschijnlijk niet geplaatst' als de lookup steeds 'niet gevonden' geeft", async () => {
+  it("meldt UITKOMST ONBEKEND (niet 'rejected') als de lookup steeds 'niet gevonden' geeft", async () => {
     const t = setup((c) => {
       if (c.method === "POST") return new TypeError("fetch failed");
       return { status: 404, body: { errorCode: 240, error: "No order found." } };
     });
     const res = await t.broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 10 }, 50000);
     expect(t.posts()).toHaveLength(1);
-    expect(res.status).toBe("rejected");
+    // "Niet gevonden" is geen bewijs dat de order niet bestaat (vertraagde 109/timeout):
+    // de engine moet de markt blokkeren i.p.v. opnieuw te kopen.
+    expect(res.status).toBe("new");
+    expect(res.error?.startsWith("UITKOMST ONBEKEND")).toBe(true);
     expect(res.error).toContain("niet teruggevonden");
+    expect(res.filledAmount).toBe(0);
     expect(t.calls.filter((c) => c.method === "GET")).toHaveLength(5);
   });
 
@@ -352,6 +531,55 @@ describe("LiveBroker.placeMarketOrder", () => {
     expect(r1.status).toBe("filled");
     expect(r2.status).toBe("rejected");
     expect(calls).toEqual(["GET /v2/markets", "POST /v2/order"]); // markten gecachet
+  });
+});
+
+describe("LiveBroker.lookupOrder", () => {
+  const CID = "12345678-1234-4234-8234-123456789abc";
+
+  it("geeft null als Bitvavo de clientOrderId niet kent (240)", async () => {
+    const t = setup(() => ({ status: 404, body: { errorCode: 240, error: "No order found." } }));
+    expect(await t.broker.lookupOrder("BTC-EUR", CID)).toBeNull();
+    expect(t.calls).toHaveLength(1);
+    expect(t.calls[0].url.searchParams.get("clientOrderId")).toBe(CID);
+    expect(t.calls[0].url.searchParams.get("market")).toBe("BTC-EUR");
+  });
+
+  it("geeft een gevulde order terug als OrderResult", async () => {
+    const t = setup(() => ({
+      body: order({
+        clientOrderId: CID,
+        fills: [{ id: "f", timestamp: NOW, amount: "0.0002", price: "50000", taker: true, fee: "0.025", feeCurrency: "EUR", settled: true }],
+      }),
+    }));
+    const res = await t.broker.lookupOrder("BTC-EUR", CID);
+    expect(res?.status).toBe("filled");
+    expect(res?.filledAmount).toBe(0.0002);
+    expect(res?.feeQuote).toBe(0.025);
+    expect(res?.clientOrderId).toBe(CID);
+    expect(t.posts()).toHaveLength(0);
+  });
+
+  it("annuleert een gevonden order die nog open staat", async () => {
+    let cancelled = false;
+    const t = setup((c) => {
+      if (c.method === "DELETE") {
+        cancelled = true;
+        return { body: { orderId: "order-1" } };
+      }
+      return { body: order({ clientOrderId: CID, status: cancelled ? "canceled" : "new" }) };
+    });
+    const res = await t.broker.lookupOrder("BTC-EUR", CID);
+    expect(t.calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
+    expect(res?.status).toBe("cancelled");
+    expect(t.posts()).toHaveLength(0);
+  });
+
+  it("gooit bij een netwerkfout (later opnieuw proberen) en zet niet-UUID ids om", async () => {
+    const t = setup(() => new TypeError("fetch failed"));
+    await expect(t.broker.lookupOrder("BTC-EUR", "pos_abc123")).rejects.toThrow();
+    expect(t.calls[0].url.searchParams.get("clientOrderId")).toBe(toClientOrderUuid("pos_abc123"));
+    await expect(t.broker.lookupOrder("BTC-EUR", "")).rejects.toThrow();
   });
 });
 

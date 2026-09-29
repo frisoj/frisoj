@@ -11,7 +11,7 @@
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { computeMetrics } from "../backtest/metrics";
-import { runBacktest, type BacktestInput } from "../backtest/backtester";
+import { runBacktestDetailed, spreadFromTicker, type BacktestInput } from "../backtest/backtester";
 import { optimize } from "../backtest/optimizer";
 import { backtestVerdict } from "../backtest/verdict";
 import { walkForward } from "../backtest/walkForward";
@@ -328,6 +328,14 @@ async function main(): Promise<void> {
   }
   if (!marketInfo) console.log(yellow(`Marktinfo voor ${opts.market} niet gevonden: minimale order ${eur(cfg.risk.minOrderQuote)} aangenomen.`));
 
+  // Huidige bid/ask-spread (best effort): een market order betaalt ongeveer de helft per kant.
+  let spreadPct: number | undefined;
+  try {
+    spreadPct = spreadFromTicker((await feed.getTickers24h([opts.market])).find((t) => t.market === opts.market));
+  } catch {
+    spreadPct = undefined;
+  }
+
   const input: BacktestInput = {
     market: opts.market,
     interval: opts.interval,
@@ -338,18 +346,37 @@ async function main(): Promise<void> {
     marketInfo,
     dataSource: feed.source,
     tradeFromIndex,
+    spreadPct,
   };
 
-  const result = runBacktest(input);
-  const roundTrip = 2 * cfg.risk.takerFee + 2 * cfg.risk.slippagePct;
+  const detail = runBacktestDetailed(input);
+  const result = detail.result;
+  const slip = detail.slippagePct;
+  const roundTrip = 2 * cfg.risk.takerFee + 2 * slip;
+  const spreadTxt =
+    spreadPct === undefined
+      ? "spread onbekend"
+      : slip > cfg.risk.slippagePct
+        ? `incl. halve spread, huidige spread ${plainPct(spreadPct * 100, 2)}`
+        : `spread ${plainPct(spreadPct * 100, 2)} valt binnen de slippage`;
   console.log();
   console.log(bold("── Resultaat ──"));
   console.log(
     dim(
       `Periode ${when(result.from)} t/m ${when(result.to)} · ${result.candlesCount} candles · ` +
-        `kosten per round trip ${plainPct(roundTrip * 100, 2)} (2× ${plainPct(cfg.risk.takerFee * 100, 2)} fee + 2× ${plainPct(cfg.risk.slippagePct * 100, 2)} slippage) · ${result.durationMs} ms`,
+        `kosten per round trip ${plainPct(roundTrip * 100, 2)} (2× ${plainPct(cfg.risk.takerFee * 100, 2)} fee + 2× ${plainPct(slip * 100, 2)} slippage, ${spreadTxt}) · ${result.durationMs} ms`,
     ),
   );
+  if (detail.stuckTrades > 0) {
+    const minOrder = marketInfo?.minOrderQuote ?? cfg.risk.minOrderQuote;
+    console.log(
+      yellow(
+        `Let op: bij ${detail.stuckTrades} ${detail.stuckTrades === 1 ? "trade" : "trades"} weigerde de beurs de verkoop: de positie was minder ` +
+          `waard dan het minimum van ${eur(minOrder)}. De positie bleef dan open zonder stop-loss (samen ${detail.stuckCandles} candles) ` +
+          `tot hij weer genoeg waard was. Een grotere inleg per trade of een kleinere stop-afstand voorkomt dit.`,
+      ),
+    );
+  }
   printMetrics(result.metrics, benchmarkMetrics(result, cfg.risk.takerFee), opts.capital);
   console.log();
   console.log(bold(`── Laatste ${Math.min(10, result.trades.length)} trades ──`));

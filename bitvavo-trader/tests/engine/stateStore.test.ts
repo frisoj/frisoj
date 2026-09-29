@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,6 +105,47 @@ describe("StateStore", () => {
     writeFileSync(file, JSON.stringify({ version: 2, hello: "world" }));
     expect(new StateStore(file, { now: () => 99 }).load()).toBeNull();
     expect(existsSync(`${file}.corrupt-99`)).toBe(true);
+  });
+
+  it("meldt waarom een bestand onbruikbaar was (lastLoadProblem) incl. het .corrupt-pad", () => {
+    const file = join(dir, "state.json");
+    writeFileSync(file, '{"version":1,"mode":"live","acc');
+    const store = new StateStore(file, { now: () => 777 });
+    expect(store.load()).toBeNull();
+    expect(store.lastLoadProblem?.reason).toMatch(/^geen geldige JSON/);
+    expect(store.lastLoadProblem?.quarantinedTo).toBe(`${file}.corrupt-777`);
+    expect(store.writesBlocked).toBe(false); // origineel is veilig bewaard
+
+    writeFileSync(file, "   ");
+    expect(store.load()).toBeNull();
+    expect(store.lastLoadProblem?.reason).toBe("bestand is leeg");
+
+    writeFileSync(file, JSON.stringify({ version: 2 }));
+    expect(store.load()).toBeNull();
+    expect(store.lastLoadProblem?.reason).toBe("onbekende structuur of versie");
+
+    // Een goede load wist de melding; geen bestand is geen probleem
+    store.save(state(3));
+    store.flush();
+    expect(store.load()!.account.cashQuote).toBe(3);
+    expect(store.lastLoadProblem).toBeNull();
+    expect(new StateStore(join(dir, "nope.json")).load()).toBeNull();
+  });
+
+  it("onleesbaar bestand → schrijven geblokkeerd (niet overschrijven met een lege administratie) tot unblockWrites()", () => {
+    const file = join(dir, "state.json");
+    mkdirSync(file); // bestaat, maar readFileSync faalt (EISDIR)
+    const store = new StateStore(file);
+    expect(store.load()).toBeNull();
+    expect(store.lastLoadProblem?.reason).toMatch(/^bestand kon niet gelezen worden/);
+    expect(store.lastLoadProblem?.quarantinedTo).toBeUndefined();
+    expect(store.writesBlocked).toBe(true);
+    store.save(state(1));
+    expect(() => store.flush()).toThrow(/Opslaan geblokkeerd/);
+    expect(store.hasPending).toBe(true);
+    expect(statSync(file).isDirectory()).toBe(true);
+    store.unblockWrites();
+    expect(store.writesBlocked).toBe(false);
   });
 
   it("isPersistedState controleert de structuur", () => {

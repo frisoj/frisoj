@@ -2,6 +2,19 @@
 // (armen/ontwapenen) en het dashboard-token. Opslaan via PUT /api/config.
 
 import { setToken } from "../api.js";
+import {
+  RISK_GROUPS,
+  clone,
+  stable,
+  getPath,
+  setPath,
+  round,
+  parseNum,
+  validateDraft,
+  feeWarnings,
+  buildPatch,
+  rebaseDraft,
+} from "./settingsLogic.js";
 
 const TOKEN_KEY = "bvt-dashboard-token";
 const ARM_TEXT = "IK BEGRIJP HET RISICO";
@@ -51,64 +64,6 @@ const FALLBACK_STRATEGIES = [
   { id: "vwap-reversion", name: "VWAP-omkeer", description: "Koopt ver onder de gemiddelde handelsprijs van de dag.", preferredRegimes: ["range"] },
 ];
 
-// Alle RiskConfig-velden met Nederlandse uitleg. scale = weergavefactor (fractie → %).
-const RISK_GROUPS = [
-  {
-    title: "Positiegrootte",
-    fields: [
-      { key: "riskPerTradePct", label: "Risico per trade", unit: "%", step: 0.1, min: 0.1, max: 10,
-        help: "Hoeveel % van je saldo je maximaal verliest als de stop-loss geraakt wordt. 1–2% is gebruikelijk." },
-      { key: "maxPositionPct", label: "Max. positiegrootte", unit: "%", step: 5, min: 1, max: 100,
-        help: "Maximaal deel van je saldo in één positie." },
-      { key: "maxOpenPositions", label: "Max. open posities", unit: "stuks", step: 1, min: 1, max: 10, int: true,
-        help: "Hoeveel posities er tegelijk open mogen staan. Met €50 zijn 1–2 posities realistisch (min. order €5)." },
-      { key: "maxTotalExposurePct", label: "Max. totale blootstelling", unit: "%", step: 5, min: 1, max: 100,
-        help: "Maximaal deel van je saldo dat in alle posities samen zit; de rest blijft in euro's." },
-      { key: "minOrderQuote", label: "Minimale ordergrootte", unit: "€", step: 1, min: 0, max: 100000,
-        help: "Bitvavo accepteert geen orders onder €5. Kleinere orders slaat de bot over." },
-    ],
-  },
-  {
-    title: "Stop-loss & winst nemen",
-    fields: [
-      { key: "stopAtrMult", label: "Stop-loss afstand", unit: "× ATR", step: 0.1, min: 0.5, max: 10,
-        help: "De stop ligt zoveel keer de gemiddelde candle-beweging (ATR) onder je instap. Groter = meer ademruimte, maar groter verlies per keer." },
-      { key: "takeProfitR", label: "Winstdoel", unit: "R", step: 0.1, min: 0.5, max: 10,
-        help: "Take-profit op zoveel keer je risico (R). 2R = je mikt op twee keer zoveel winst als je riskeert." },
-      { key: "trailingAtrMult", label: "Trailing stop", unit: "× ATR", step: 0.1, min: 0, max: 10, zeroOff: true,
-        help: "De stop schuift mee omhoog, op deze afstand onder de hoogste koers. 0 = uit." },
-      { key: "breakEvenAtR", label: "Break-even vanaf", unit: "R", step: 0.1, min: 0, max: 5, zeroOff: true,
-        help: "Zet de stop op instap + kosten zodra je deze winst hebt, zodat een winnaar geen verliezer meer wordt. 0 = uit." },
-      { key: "timeStopCandles", label: "Tijdslimiet", unit: "candles", step: 1, min: 0, max: 10000, int: true, zeroOff: true,
-        help: "Sluit een positie na zoveel candles als hij niet in de winst staat. 0 = uit." },
-    ],
-  },
-  {
-    title: "Dagelijkse limieten",
-    fields: [
-      { key: "dailyLossLimitPct", label: "Max. dagverlies", unit: "%", step: 0.5, min: 0.5, max: 50,
-        help: "Verlies je vandaag dit % van je saldo, dan stopt de bot met nieuwe trades tot morgen." },
-      { key: "maxTradesPerDay", label: "Max. trades per dag", unit: "trades", step: 1, min: 1, max: 100, int: true,
-        help: "Voorkomt overtraden: elke trade kost fees." },
-      { key: "cooldownCandlesAfterLoss", label: "Afkoelperiode na verlies", unit: "candles", step: 1, min: 0, max: 500, int: true,
-        help: "Na een verliestrade zoveel candles niet opnieuw instappen in dezelfde markt (tegen 'revenge trading')." },
-    ],
-  },
-  {
-    title: "Kosten",
-    fields: [
-      { key: "takerFee", label: "Taker fee", unit: "%", scale: 100, step: 0.01, min: 0, max: 1,
-        help: "Bitvavo-fee voor market orders (standaard 0,25%). Je betaalt hem bij kopen én verkopen." },
-      { key: "makerFee", label: "Maker fee", unit: "%", scale: 100, step: 0.01, min: 0, max: 1,
-        help: "Fee voor limit orders die in het orderboek blijven staan (standaard 0,15%)." },
-      { key: "slippagePct", label: "Slippage", unit: "%", scale: 100, step: 0.01, min: 0, max: 2,
-        help: "Verwacht verschil tussen de koers en je werkelijke vulprijs, per kant." },
-      { key: "minEdgeFeeMultiple", label: "Min. winstruimte", unit: "× kosten", step: 0.5, min: 0, max: 20,
-        help: "Het winstdoel moet minstens zoveel keer de totale kosten zijn, anders slaat de bot de trade over." },
-    ],
-  },
-];
-
 const INTERVAL_HELP = {
   "1m": "Zeer kort: veel ruis, veel trades en veel fees. Niet aan te raden met €50.",
   "5m": "Kort: veel signalen, maar fees wegen zwaar bij een klein account.",
@@ -133,39 +88,20 @@ function ensureCss() {
   document.head.append(l);
 }
 
-const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
-function stable(o) {
-  if (Array.isArray(o)) return `[${o.map(stable).join(",")}]`;
-  if (o && typeof o === "object") return `{${Object.keys(o).sort().map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
-  return JSON.stringify(o);
-}
-function getPath(o, path) {
-  return path.split(".").reduce((a, k) => (a == null ? undefined : a[k]), o);
-}
-function setPath(o, path, v) {
-  const ks = path.split(".");
-  let cur = o;
-  for (let i = 0; i < ks.length - 1; i++) {
-    if (cur[ks[i]] == null || typeof cur[ks[i]] !== "object") cur[ks[i]] = {};
-    cur = cur[ks[i]];
-  }
-  cur[ks[ks.length - 1]] = v;
-}
-const round = (v, d = 8) => (Number.isFinite(v) ? Number(v.toFixed(d)) : v);
-const parseNum = (s) => {
-  const n = Number(String(s).trim().replace(",", "."));
-  return String(s).trim() === "" ? NaN : n;
-};
-
 export function mountSettings(ctx, el) {
   ensureCss();
   const { fmt, esc, api, bus } = ctx;
   if (!el) return;
   el.classList.add("st");
 
+  // `server` = de serverconfig waar het concept (`draft`) op gebaseerd is. Komt er
+  // een nieuwere serverconfig binnen, dan wordt het concept daarop overgezet
+  // (rebaseDraft) en stuurt Opslaan alleen de eigen wijzigingen (buildPatch).
   const state = {
     server: null,
     draft: null,
+    /** Velden die hier én elders gewijzigd zijn (melding boven het formulier) */
+    notice: null,
     strategies: FALLBACK_STRATEGIES,
     info: ctx.getInfo?.() || null,
     markets: [],
@@ -180,6 +116,13 @@ export function mountSettings(ctx, el) {
   el.innerHTML = `<div class="panel st-loading"><span class="spinner"></span> Instellingen laden…</div>`;
 
   const dirty = () => state.server && state.draft && stable(normalize(state.draft)) !== stable(normalize(state.server));
+  /** Oudere configs aanvullen met standaardwaarden (zelfde vorm als het concept) */
+  function withDefaults(cfg) {
+    const c = clone(cfg);
+    c.risk = { ...DEFAULTS.risk, ...(c.risk || {}) };
+    c.ensemble = { ...clone(DEFAULTS.ensemble), ...(c.ensemble || {}) };
+    return c;
+  }
   function normalize(c) {
     return {
       markets: c.markets,
@@ -231,6 +174,7 @@ export function mountSettings(ctx, el) {
         </div>
       </div>
       <div class="st-errors" hidden></div>
+      <div class="st-notice" hidden></div>
       <div class="st-grid">
         <div class="st-col">
           <section class="panel st-sec st-sec-markets">
@@ -283,6 +227,7 @@ export function mountSettings(ctx, el) {
     renderLive();
     renderToken();
     renderErrors();
+    renderNotice();
     updateDirty();
   }
 
@@ -438,6 +383,7 @@ export function mountSettings(ctx, el) {
     if ((eq * r.maxPositionPct) / 100 < 5) warnings.push("Max. positie is kleiner dan het Bitvavo-minimum van €5: de bot kan dan niet kopen.");
     if (r.riskPerTradePct > 3) warnings.push("Meer dan 3% risico per trade is agressief: een paar verliezers op rij kosten veel.");
     if (r.takeProfitR * 1 < 1) warnings.push("Een winstdoel onder 1R betekent dat je winsten kleiner zijn dan je verliezen.");
+    warnings.push(...feeWarnings(r));
     box.innerHTML = `<div class="st-example">
         <div class="st-example-title">Wat betekent dit bij een saldo van <b class="mono">${esc(fmt.eur(eq))}</b>?</div>
         <div class="st-example-grid">${items.map(([k, v]) => `<div><span class="muted">${esc(k)}</span><b class="mono">${esc(v)}</b></div>`).join("")}</div>
@@ -589,6 +535,76 @@ CAPITAL_LIMIT_EUR=50`;
       .join("")}</ul></div>`;
   }
 
+  function pathLabel(path) {
+    const f = RISK_GROUPS.flatMap((g) => g.fields).find((x) => `risk.${x.key}` === path);
+    if (f) return f.label;
+    const labels = {
+      markets: "Markten",
+      interval: "Candle-interval",
+      pollMs: "Ververs elke",
+      historyCandles: "Historie per analyse",
+      "ensemble.enabled": "Strategieën",
+      "ensemble.buyThreshold": "Koopdrempel",
+      "ensemble.sellThreshold": "Verkoopdrempel",
+      "ensemble.regimeFilter": "Regimefilter",
+    };
+    if (labels[path]) return labels[path];
+    const m = path.match(/^ensemble\.(weights|params)\.(.+)$/);
+    if (m) {
+      const name = state.strategies.find((x) => x.id === m[2])?.name || m[2];
+      return m[1] === "weights" ? `Gewicht ${name}` : `Parameters ${name}`;
+    }
+    return path;
+  }
+
+  function renderNotice() {
+    const box = el.querySelector(".st-notice");
+    if (!box) return;
+    const n = state.notice;
+    box.hidden = !n;
+    box.innerHTML = n
+      ? `<div class="pn-banner pn-banner-warn" role="status"><b>Instellingen zijn elders gewijzigd</b> (bijv. via Scanner/Backtest of een ander tabblad).
+          Die wijzigingen zijn overgenomen; ${
+            n.conflicts.length
+              ? `bij <b>${esc(n.conflicts.map(pathLabel).join(", "))}</b> is jouw (nog niet opgeslagen) waarde aangehouden. Controleer voor opslaan.`
+              : "controleer voor opslaan."
+          }</div>`
+      : "";
+  }
+
+  /** Opnieuw tekenen zonder de focus van het veld waarin je typt te verliezen */
+  function rerenderKeepFocus() {
+    const a = typeof document !== "undefined" ? document.activeElement : null;
+    const path = a && typeof el.contains === "function" && el.contains(a) ? a.dataset?.path : null;
+    renderAll();
+    if (path && typeof CSS !== "undefined") el.querySelector(`[data-path="${CSS.escape(path)}"]`)?.focus?.();
+  }
+
+  /**
+   * Nieuwe serverconfig (van dit paneel, Scanner, Backtest of een ander tabblad).
+   * Zonder eigen wijzigingen: gewoon overnemen. Met eigen wijzigingen: het concept
+   * erop overzetten, zodat Opslaan niets terugdraait wat elders is veranderd.
+   * @returns {{ conflicts: string[] }}
+   */
+  function applyServerConfig(cfg) {
+    const next = withDefaults(cfg);
+    if (!state.server || stable(next) === stable(state.server)) return { conflicts: [] };
+    if (!dirty()) {
+      state.server = next;
+      state.draft = clone(next);
+      state.notice = null;
+      renderAll();
+      return { conflicts: [] };
+    }
+    const r = rebaseDraft(state.draft, state.server, next);
+    state.server = next;
+    state.draft = r.draft;
+    if (r.conflicts.length) state.notice = { conflicts: r.conflicts };
+    if (r.changed || r.conflicts.length) rerenderKeepFocus();
+    else updateDirty();
+    return r;
+  }
+
   function updateDirty() {
     const d = dirty();
     const bar = el.querySelector(".st-savebar");
@@ -618,80 +634,9 @@ CAPITAL_LIMIT_EUR=50`;
 
   // ── Validatie (client) ──
   function validate() {
-    const errs = [];
-    const d = state.draft;
-    state.invalid.clear();
-    if (!d.markets?.length || d.markets.length > MAX_MARKETS) {
-      errs.push(`Kies 1 tot ${MAX_MARKETS} markten.`);
-      state.invalid.add("markets");
-    }
-    const check = (path, label, min, max, int) => {
-      const v = getPath(d, path);
-      if (!Number.isFinite(v)) {
-        errs.push(`${label}: vul een getal in.`);
-        state.invalid.add(path);
-      } else if ((min !== undefined && v < min - 1e-12) || (max !== undefined && v > max + 1e-12)) {
-        errs.push(`${label} moet tussen ${fmt.num(min, 4)} en ${fmt.num(max, 4)} liggen.`);
-        state.invalid.add(path);
-      } else if (int && !Number.isInteger(round(v, 6))) {
-        errs.push(`${label} moet een heel getal zijn.`);
-        state.invalid.add(path);
-      }
-    };
-    check("pollMs", "Verversen", 5000, 300000);
-    check("historyCandles", "Historie per analyse", 100, 1000, true);
-    for (const g of RISK_GROUPS) {
-      for (const f of g.fields) {
-        const s = f.scale || 1;
-        const v = d.risk[f.key];
-        if (f.zeroOff && v === 0) continue;
-        if (f.key === "trailingAtrMult") check(`risk.${f.key}`, f.label, 0.5, 10);
-        else check(`risk.${f.key}`, f.label, f.min / s, f.max / s, f.int);
-      }
-    }
-    if (!(d.ensemble.buyThreshold >= 0.05 && d.ensemble.buyThreshold <= 1)) {
-      errs.push("Koopdrempel moet tussen 0,05 en 1 liggen.");
-      state.invalid.add("ensemble.buyThreshold");
-    }
-    if (!(d.ensemble.sellThreshold >= -1 && d.ensemble.sellThreshold <= -0.05)) {
-      errs.push("Verkoopdrempel moet tussen −1 en −0,05 liggen.");
-      state.invalid.add("ensemble.sellThreshold");
-    }
-    if (!d.ensemble.enabled?.length) errs.push("Zet minstens één strategie aan.");
-    if (d.risk.maxTotalExposurePct < d.risk.maxPositionPct) {
-      errs.push("Max. totale blootstelling is kleiner dan de max. positiegrootte.");
-      state.invalid.add("risk.maxTotalExposurePct");
-    }
-    return errs;
-  }
-
-  function buildPatch() {
-    const d = state.draft;
-    const s = state.server;
-    const patch = {
-      markets: d.markets,
-      interval: d.interval,
-      pollMs: Math.round(d.pollMs),
-      historyCandles: Math.round(d.historyCandles),
-      ensemble: {
-        enabled: d.ensemble.enabled,
-        weights: d.ensemble.weights,
-        buyThreshold: round(d.ensemble.buyThreshold, 4),
-        sellThreshold: round(d.ensemble.sellThreshold, 4),
-        regimeFilter: !!d.ensemble.regimeFilter,
-      },
-      risk: Object.fromEntries(Object.entries(d.risk).map(([k, v]) => [k, round(v, 8)])),
-    };
-    // Parameter-overrides alleen meesturen als ze veranderd zijn (null = verwijderen)
-    const sp = s?.ensemble?.params || {};
-    const dp = d.ensemble.params || {};
-    if (stable(sp) !== stable(dp)) {
-      const params = {};
-      for (const id of Object.keys(sp)) if (!(id in dp)) params[id] = null;
-      for (const [id, p] of Object.entries(dp)) params[id] = p;
-      patch.ensemble.params = params;
-    }
-    return patch;
+    const { errors, invalid } = validateDraft(state.draft, { fmt, maxMarkets: MAX_MARKETS });
+    state.invalid = invalid;
+    return errors;
   }
 
   function markServerErrors(msg) {
@@ -704,6 +649,27 @@ CAPITAL_LIMIT_EUR=50`;
 
   async function save() {
     if (state.saving) return;
+    // Eerst de actuele serverconfig: is er intussen elders iets gewijzigd?
+    state.saving = true;
+    updateDirty();
+    let fresh = null;
+    try {
+      fresh = await api.getConfig();
+    } catch {
+      /* dan tegen de laatst bekende config */
+    }
+    state.saving = false;
+    if (fresh && applyServerConfig(fresh).conflicts.length) {
+      updateDirty();
+      el.querySelector(".st-notice")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      ctx.toast("Instellingen zijn intussen elders gewijzigd — controleer ze en klik opnieuw op Opslaan.", "warn");
+      return;
+    }
+    if (!dirty()) {
+      updateDirty();
+      ctx.toast("Geen wijzigingen om op te slaan.", "info");
+      return;
+    }
     const errs = validate();
     state.errors = errs;
     if (errs.length) {
@@ -714,9 +680,10 @@ CAPITAL_LIMIT_EUR=50`;
     state.saving = true;
     updateDirty();
     try {
-      const next = await api.putConfig(buildPatch());
-      state.server = clone(next);
-      state.draft = clone(next);
+      const next = await api.putConfig(buildPatch(state.draft, state.server));
+      state.server = withDefaults(next);
+      state.draft = clone(state.server);
+      state.notice = null;
       state.errors = [];
       state.invalid.clear();
       state.saving = false;
@@ -727,6 +694,8 @@ CAPITAL_LIMIT_EUR=50`;
       state.saving = false;
       const msg = err?.message || String(err);
       state.errors = msg.split(/(?<=[.!?)])\s+(?=[A-Z])/).filter(Boolean);
+      if (/\b(takerFee|makerFee|slippagePct)\b/.test(msg))
+        state.errors.push("Let op: de server noemt fees en slippage als fractie (0,0025 = 0,25%). In dit formulier vul je ze in als percentage.");
       renderAll();
       markServerErrors(msg);
       el.querySelector(".st-errors")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -806,6 +775,7 @@ CAPITAL_LIMIT_EUR=50`;
     } else if (t.dataset.act === "save") save();
     else if (t.dataset.act === "discard") {
       state.draft = clone(state.server);
+      state.notice = null;
       state.errors = [];
       state.invalid.clear();
       renderAll();
@@ -821,12 +791,7 @@ CAPITAL_LIMIT_EUR=50`;
 
   bus.on("config-changed", (cfg) => {
     if (!cfg || !state.server) return;
-    const wasDirty = dirty();
-    state.server = clone({ ...state.server, ...cfg });
-    if (!wasDirty) {
-      state.draft = clone(state.server);
-      renderAll();
-    } else updateDirty();
+    applyServerConfig({ ...state.server, ...cfg });
   });
   bus.on("app-info", (info) => {
     if (info && typeof info === "object") {
@@ -836,6 +801,8 @@ CAPITAL_LIMIT_EUR=50`;
   });
   let lastLive = "";
   bus.on("snapshot", (s) => {
+    // Config gewijzigd in een ander tabblad/venster: de engine stuurt hem mee in elke snapshot
+    if (s?.config && state.server && !state.saving) applyServerConfig(s.config);
     const sig = `${s?.mode}|${s?.liveArmed}`;
     if (sig === lastLive) return;
     lastLive = sig;
@@ -856,13 +823,9 @@ CAPITAL_LIMIT_EUR=50`;
       el.querySelector(".st-retry")?.addEventListener("click", load);
       return;
     }
-    state.server = clone(cfg.value);
-    state.draft = clone(cfg.value);
     // Zorg dat alle risicovelden bestaan (oudere configs)
-    state.draft.risk = { ...DEFAULTS.risk, ...(state.draft.risk || {}) };
-    state.draft.ensemble = { ...clone(DEFAULTS.ensemble), ...(state.draft.ensemble || {}) };
-    state.server.risk = { ...DEFAULTS.risk, ...(state.server.risk || {}) };
-    state.server.ensemble = { ...clone(DEFAULTS.ensemble), ...(state.server.ensemble || {}) };
+    state.server = withDefaults(cfg.value);
+    state.draft = clone(state.server);
     // Markten die de bot al gebruikt altijd tonen, ook als /api/markets faalt
     for (const m of state.draft.markets || []) if (!state.markets.some((x) => x.market === m)) state.markets.push({ market: m });
     state.loaded = true;

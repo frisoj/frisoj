@@ -17,6 +17,33 @@ const I = {
 
 let sparkSeq = 0;
 
+/** Bitvavo weigert orders (ook verkopen) onder dit bedrag */
+const MIN_ORDER_EUR = 5;
+
+const posValue = (p) => (Number(p && p.amount) || 0) * (Number(p && p.currentPrice) || 0);
+
+/**
+ * Uitkomst van een noodstop op basis van het antwoord van POST /api/engine/kill
+ * (EngineSnapshot). De engine stopt de bot óók als verkopen mislukken; posities
+ * die nog in `res.positions` staan zijn dus NIET verkocht en worden niet meer bewaakt.
+ * @returns {[string, "warn" | "error"]}
+ */
+export function killOutcome(res, fmt, minOrder = MIN_ORDER_EUR) {
+  const left = res && Array.isArray(res.positions) ? res.positions : [];
+  if (!left.length) return ["Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn"];
+  const list = left.map((p) => `${p.market} ≈ ${fmt.eur(posValue(p))}`).join(", ");
+  const dust = left.some((p) => posValue(p) < minOrder);
+  const n = left.length;
+  return [
+    `Noodstop: bot gestopt, maar ${n} ${n === 1 ? "positie" : "posities"} NIET verkocht (${list}). ` +
+      (dust
+        ? `Waarde onder het Bitvavo-minimum van ${fmt.eur(minOrder)}: die kan niet verkocht worden. Sluit handmatig of wacht tot de waarde weer boven ${fmt.eur(minOrder)} is. `
+        : "Controleer je account en sluit handmatig (of probeer de noodstop opnieuw). ") +
+      "Let op: de bot staat stil, stop-loss en take-profit worden NIET bewaakt.",
+    "error",
+  ];
+}
+
 export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
   const { fmt, esc, api, bus } = ctx;
   let snap = ctx.getState();
@@ -305,7 +332,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
         <ul>
           <li>Je kunt je <strong>volledige inzet verliezen</strong>. Dit is geen financieel advies.</li>
           <li>Test eerst in de oefenmodus en in het Backtest-lab.</li>
-          <li>Met <strong>Noodstop</strong> verkoop je direct alle posities.</li>
+          <li>Met <strong>Noodstop</strong> verkoop je direct alle posities (een positie onder het Bitvavo-minimum van €5 kan niet verkocht worden).</li>
         </ul>`,
       requireText: "IK BEGRIJP HET RISICO",
       confirmText: "Inschakelen",
@@ -370,7 +397,11 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
     btn("reset").disabled = busy || !snap;
   }
 
-  /** Voert een actie uit; vanuit een modal (`inModal`) wordt de fout in de modal getoond i.p.v. als toast. */
+  /**
+   * Voert een actie uit; vanuit een modal (`inModal`) wordt de fout in de modal getoond i.p.v. als toast.
+   * `okMsg` mag een functie `(res) => [bericht, soort]` zijn; soort "error" telt als mislukt
+   * (in een modal blijft die dan open met de melding).
+   */
   async function run(button, fn, okMsg, okKind = "success", inModal = false) {
     busy = true;
     button && button.classList.add("busy");
@@ -379,8 +410,12 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
       const res = await fn();
       if (res && typeof res === "object" && res.account) bus.emit("snapshot", res);
       else await refreshState();
-      okMsg && ctx.toast(okMsg, okKind);
+      const [msg, kind] = typeof okMsg === "function" ? okMsg(res) : [okMsg, okKind];
+      if (kind === "error" && inModal) throw new Error(msg);
+      msg && ctx.toast(msg, kind);
     } catch (err) {
+      // De actie kan deels gelukt zijn (bijv. noodstop: bot gestopt, verkoop mislukt): toon de echte staat
+      await refreshState();
       if (inModal) throw err;
       ctx.toast(`Mislukt: ${err.message}`, "error");
     } finally {
@@ -420,17 +455,31 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl }) {
       }
       run(button, api.stop, "Bot gestopt", "info");
     } else if (act === "kill") {
-      const total = positions.reduce((s, p) => s + (p.currentPrice * p.amount || 0), 0);
+      const total = positions.reduce((s, p) => s + posValue(p), 0);
+      const minOrder = Number(snap && snap.config && snap.config.risk && snap.config.risk.minOrderQuote) || MIN_ORDER_EUR;
+      const dust = positions.filter((p) => posValue(p) < minOrder);
       ctx.openModal({
         title: "Noodstop",
         danger: true,
         bodyHtml: positions.length
           ? `<p>Alle <strong>${positions.length} open ${positions.length === 1 ? "positie wordt" : "posities worden"}</strong> direct tegen marktprijs verkocht (ca. <strong>${esc(
               fmt.eur(total),
-            )}</strong>) en de bot stopt.</p><p class="muted">Bij een snelle markt kan de verkoopprijs afwijken.</p>`
+            )}</strong>) en de bot stopt.</p><p class="muted">Bij een snelle markt kan de verkoopprijs afwijken.</p>${
+              dust.length
+                ? `<p class="neg"><strong>Let op:</strong> ${esc(
+                    dust.map((p) => `${p.market} ≈ ${fmt.eur(posValue(p))}`).join(", "),
+                  )} ${dust.length === 1 ? "is" : "zijn"} minder waard dan het Bitvavo-minimum van ${esc(
+                    fmt.eur(minOrder),
+                  )} en ${dust.length === 1 ? "kan" : "kunnen"} waarschijnlijk <strong>niet verkocht</strong> worden. Die ${
+                    dust.length === 1 ? "positie blijft" : "posities blijven"
+                  } dan open terwijl de bot stopt (zonder stop-loss).</p>`
+                : ""
+            }`
           : `<p>Er zijn geen open posities. De bot wordt direct gestopt.</p>`,
         confirmText: "Noodstop uitvoeren",
-        onConfirm: () => run(button, api.kill, "Noodstop uitgevoerd — alles verkocht, bot gestopt", "warn", true),
+        // Antwoord = EngineSnapshot; is het iets anders, dan telt de ververste staat (`snap`)
+        onConfirm: () =>
+          run(button, api.kill, (res) => killOutcome(res && Array.isArray(res.positions) ? res : snap, fmt, minOrder), "warn", true),
       });
     } else if (act === "reset") {
       const start = snap && snap.account ? snap.account.startingEquity : null;

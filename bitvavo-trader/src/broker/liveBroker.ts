@@ -7,6 +7,13 @@
  * - Controleert minimale ordergroottes lokaal vóór verzending.
  * - Herhaalt POST /order NOOIT. Bij een netwerkfout/timeout (uitkomst onbekend)
  *   wordt de order eerst opgezocht via clientOrderId.
+ * - Laat nooit een order open staan: staat een market order na het pollen nog
+ *   open, dan wordt hij geannuleerd en de eindstatus opgehaald.
+ * - Is de uitkomst niet zeker (order niet teruggevonden, annuleren niet
+ *   bevestigd, status niet op te halen), dan begint `error` met
+ *   "UITKOMST ONBEKEND" (status "new", of "partiallyFilled" als er al iets
+ *   gevuld is), zodat de engine niet blind opnieuw handelt.
+ * - Schat de fee (taker-fee) als Bitvavo die nog niet heeft afgerekend.
  * - Waarschuwt (via `error`) als de gemiddelde vulprijs te ver van de
  *   referentiekoers afwijkt.
  */
@@ -34,6 +41,16 @@ export interface LiveBrokerOptions {
   pollDelayMs?: number;
   /** Aantal pogingen om een order met onbekende uitkomst op te zoeken (default 5) */
   lookupAttempts?: number;
+  /**
+   * Aantal pogingen om een order die na het pollen nog open staat te annuleren
+   * en de eindstatus op te halen (default 3)
+   */
+  cancelAttempts?: number;
+  /**
+   * Taker-fee (fractie) voor de schatting als Bitvavo de fee van een fill nog
+   * niet heeft afgerekend (default 0.0025). Bij te werken via `setCosts`.
+   */
+  takerFee?: number;
   /** Injecteerbare sleep (tests) */
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -44,6 +61,23 @@ const MARKET_CACHE_MS = 60 * 60_000;
 const PENDING_STATUSES = new Set(["new", "awaitingTrigger"]);
 /** Max. tekort (fractie) aan base-saldo dat bij een verkoop automatisch opgevangen wordt */
 const MAX_SELL_SHORTFALL = 0.05;
+const DEFAULT_TAKER_FEE = 0.0025;
+/** Annuleer-fouten waarbij de order al niet meer open is (niet gevonden / niet meer actief). */
+const CANCEL_NOT_OPEN_CODES = new Set([233, 240]);
+
+/**
+ * Eindstatus: de order kan niet meer (verder) vullen. Alles wat niet
+ * gevuld/geannuleerd/verlopen/geweigerd is (new, awaitingTrigger,
+ * partiallyFilled of een onbekende nieuwe status) staat mogelijk nog open.
+ */
+export function isFinalOrderStatus(status: string): boolean {
+  const mapped = mapOrderStatus(status);
+  return mapped === "filled" || mapped === "cancelled" || mapped === "expired" || mapped === "rejected";
+}
+
+function validTakerFee(fee: unknown): fee is number {
+  return typeof fee === "number" && Number.isFinite(fee) && fee >= 0 && fee < 0.1;
+}
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -81,6 +115,21 @@ function fmtNum(v: number): string {
 
 /** Zet een Bitvavo-order om naar een OrderResult (hoeveelheden, gemiddelde prijs, fee in quote). */
 export function orderToResult(order: BitvavoOrder, quoteCurrency?: string, nowMs = Date.now()): OrderResult {
+  return summarizeOrder(order, quoteCurrency, nowMs).result;
+}
+
+interface OrderSummary {
+  result: OrderResult;
+  /** Som van de bekende fill-fees (in quote) */
+  knownFillFeeQuote: number;
+  /**
+   * Gevulde waarde (quote) waarvan de fee nog NIET bekend is: fills die Bitvavo
+   * nog niet heeft afgerekend (geen `fee`) of met een onbekende fee-valuta.
+   */
+  unknownFeeFilledQuote: number;
+}
+
+function summarizeOrder(order: BitvavoOrder, quoteCurrency?: string, nowMs = Date.now()): OrderSummary {
   const [baseFromMarket, quoteFromMarket] = order.market.split("-");
   const quote = quoteCurrency ?? quoteFromMarket ?? "EUR";
   const base = baseFromMarket ?? "";
@@ -89,37 +138,47 @@ export function orderToResult(order: BitvavoOrder, quoteCurrency?: string, nowMs
   let filledQuote = 0;
   let feeQuote = 0;
   let feesKnown = true;
+  let unknownFeeFilledQuote = 0;
 
-  const convertFee = (fee: number, currency: string | undefined, price: number): number => {
+  /** Fee omgerekend naar quote, of null als de fee-valuta onbekend is. */
+  const convertFee = (fee: number, currency: string | undefined, price: number): number | null => {
     if (!Number.isFinite(fee) || fee === 0) return 0;
     if (!currency || currency === quote) return fee;
     if (currency === base) return fee * price;
     // Onbekende fee-valuta: niet om te rekenen, behandel als onbekend.
-    feesKnown = false;
-    return 0;
+    return null;
   };
 
   if (order.fills.length > 0) {
     for (const f of order.fills) {
       filledAmount += f.amount;
       filledQuote += f.amount * f.price;
-      if (f.fee === undefined) {
+      const converted = f.fee === undefined ? null : convertFee(f.fee, f.feeCurrency, f.price);
+      if (converted === null) {
         feesKnown = false;
+        unknownFeeFilledQuote += f.amount * f.price;
       } else {
-        feeQuote += convertFee(f.fee, f.feeCurrency, f.price);
+        feeQuote += converted;
       }
-    }
-    const avg = filledAmount > 0 ? filledQuote / filledAmount : 0;
-    // Fills zonder (settled) fee: val terug op feePaid van de order als dat hoger is.
-    if (!feesKnown && order.feePaid > 0) {
-      const paid = convertFee(order.feePaid, order.feeCurrency, avg);
-      if (paid > feeQuote) feeQuote = paid;
     }
   } else {
     filledAmount = order.filledAmount;
     filledQuote = order.filledAmountQuote;
     const avg = filledAmount > 0 ? filledQuote / filledAmount : 0;
-    feeQuote = convertFee(order.feePaid, order.feeCurrency, avg);
+    const converted = convertFee(order.feePaid, order.feeCurrency, avg);
+    if (converted === null) {
+      feesKnown = false;
+      unknownFeeFilledQuote = filledQuote;
+    } else {
+      feeQuote = converted;
+    }
+  }
+  const knownFillFeeQuote = feeQuote;
+  if (!feesKnown && order.fills.length > 0 && order.feePaid > 0) {
+    // Fills zonder (settled) fee: val terug op feePaid van de order als dat hoger is.
+    const avg = filledAmount > 0 ? filledQuote / filledAmount : 0;
+    const paid = convertFee(order.feePaid, order.feeCurrency, avg);
+    if (paid !== null && paid > feeQuote) feeQuote = paid;
   }
 
   const avgPrice = filledAmount > 0 ? filledQuote / filledAmount : 0;
@@ -135,7 +194,7 @@ export function orderToResult(order: BitvavoOrder, quoteCurrency?: string, nowMs
     timestamp: order.updated || order.created || nowMs,
   };
   if (order.clientOrderId) result.clientOrderId = order.clientOrderId;
-  return result;
+  return { result, knownFillFeeQuote, unknownFeeFilledQuote };
 }
 
 export class LiveBroker implements Broker {
@@ -147,8 +206,10 @@ export class LiveBroker implements Broker {
   readonly #pollAttempts: number;
   readonly #pollDelayMs: number;
   readonly #lookupAttempts: number;
+  readonly #cancelAttempts: number;
   readonly #sleep: (ms: number) => Promise<void>;
   readonly #now: () => number;
+  #takerFee: number;
   #marketCache: { at: number; byMarket: Map<string, MarketInfo> } | null = null;
 
   constructor(client: BitvavoClient, opts: LiveBrokerOptions = {}) {
@@ -159,8 +220,23 @@ export class LiveBroker implements Broker {
     this.#pollAttempts = Math.max(0, Math.trunc(opts.pollAttempts ?? 5));
     this.#pollDelayMs = Math.max(0, opts.pollDelayMs ?? 400);
     this.#lookupAttempts = Math.max(1, Math.trunc(opts.lookupAttempts ?? 5));
+    this.#cancelAttempts = Math.max(1, Math.trunc(opts.cancelAttempts ?? 3));
+    this.#takerFee = validTakerFee(opts.takerFee) ? opts.takerFee : DEFAULT_TAKER_FEE;
     this.#sleep = opts.sleep ?? defaultSleep;
     this.#now = opts.now ?? Date.now;
+  }
+
+  /** Huidige taker-fee (fractie) die gebruikt wordt om een nog niet afgerekende fee te schatten. */
+  get takerFee(): number {
+    return this.#takerFee;
+  }
+
+  /**
+   * Zelfde (duck-typed) hook als PaperBroker: houdt de fee-schatting gelijk aan
+   * `config.risk.takerFee`. Slippage speelt bij echte orders geen rol.
+   */
+  setCosts(takerFee: number, _slippagePct?: number): void {
+    if (validTakerFee(takerFee)) this.#takerFee = takerFee;
   }
 
   getBalances(): Promise<Balance[]> {
@@ -256,8 +332,12 @@ export class LiveBroker implements Broker {
         if (found.order) {
           order = found.order;
         } else if (found.notFound) {
+          // "Niet gevonden" is geen bewijs: na een timeout/109 kan de order nog in de
+          // wachtrij staan of is de lookup nog niet bijgewerkt. Dus NIET als afwijzing
+          // melden (dan zou de engine opnieuw kopen/verkopen), maar als onbekende uitkomst.
           return reject(
-            `Order niet bevestigd door Bitvavo (${err.message}); niet teruggevonden via clientOrderId ${clientOrderId}, dus waarschijnlijk niet geplaatst. Controleer je Bitvavo-account.`,
+            `UITKOMST ONBEKEND: ${err.message}. De order (clientOrderId ${clientOrderId}) is niet teruggevonden bij Bitvavo — waarschijnlijk niet geplaatst, maar dat is niet zeker. Controleer je Bitvavo-account voordat je opnieuw handelt.`,
+            "new",
           );
         } else {
           return reject(
@@ -270,27 +350,129 @@ export class LiveBroker implements Broker {
       }
     }
 
-    // ── Pollen tot de order gevuld is (market orders zijn meestal direct gevuld) ──
-    order = await this.#pollUntilSettled(order, market);
+    return this.#settleAndReport(order, {
+      market,
+      base: info.base,
+      quote: info.quote || undefined,
+      ref,
+      notes,
+      clientOrderId,
+    });
+  }
 
-    const result = orderToResult(order, info.quote || undefined, this.#now());
+  /**
+   * Zoekt een eerder geplaatste order op via de eigen clientOrderId (bijv. een
+   * order met een onbekende uitkomst). Optionele broker-uitbreiding die de
+   * engine duck-typed gebruikt.
+   * - `null`: Bitvavo meldt dat er geen order met deze clientOrderId is (code 240).
+   * - Anders een OrderResult zoals bij placeMarketOrder: een order die nog open
+   *   staat wordt eerst geannuleerd; lukt dat niet, dan begint `error` met
+   *   "UITKOMST ONBEKEND".
+   * Gooit bij andere fouten (netwerk, rate limit, ...): later opnieuw proberen.
+   */
+  async lookupOrder(market: string, clientOrderId: string): Promise<OrderResult | null> {
+    if (typeof market !== "string" || market === "" || typeof clientOrderId !== "string" || clientOrderId === "") {
+      throw new Error("Order opzoeken: markt en clientOrderId zijn verplicht");
+    }
+    const cid = toClientOrderUuid(clientOrderId);
+    let order: BitvavoOrder;
+    try {
+      order = await this.#client.getOrderByClientId(market, cid);
+    } catch (err) {
+      if (err instanceof BitvavoApiError && err.errorCode === 240) return null;
+      throw err;
+    }
+    let info: MarketInfo | undefined;
+    try {
+      info = await this.#getMarketInfo(market);
+    } catch {
+      info = undefined; // alleen nodig voor de valuta's; die volgen ook uit de marktnaam
+    }
+    const [baseFromMarket, quoteFromMarket] = market.split("-");
+    return this.#settleAndReport(order, {
+      market,
+      base: info?.base || baseFromMarket || "",
+      quote: info?.quote || quoteFromMarket || undefined,
+      ref: 0,
+      notes: [],
+      clientOrderId: cid,
+    });
+  }
+
+  // ─────────────── Intern ───────────────
+
+  /**
+   * Wacht tot een geplaatste order klaar is, annuleert hem als hij open blijft,
+   * en zet hem om naar een OrderResult met Nederlandse meldingen in `error`.
+   */
+  async #settleAndReport(
+    placed: BitvavoOrder,
+    ctx: { market: string; base: string; quote?: string; ref: number; notes: string[]; clientOrderId: string },
+  ): Promise<OrderResult> {
+    const { market, ref, notes, clientOrderId } = ctx;
+    const info = { base: ctx.base, quote: ctx.quote };
+    // ── Pollen tot de order gevuld is (market orders zijn meestal direct gevuld) ──
+    let order = await this.#pollUntilSettled(placed, market);
+
+    // ── Nog open (of status niet te controleren)? Annuleren en de eindstatus ophalen. ──
+    // Een open order mag nooit "vergeten" worden: hij kan later alsnog (verder) vullen
+    // terwijl de engine denkt dat hij afgewezen of maar deels gevuld is.
+    let stillOpen = false;
+    let cancelledByBot = false;
+    if (!isFinalOrderStatus(order.status)) {
+      const settled = await this.#cancelAndConfirm(order, market);
+      order = settled.order;
+      stillOpen = !settled.final;
+      cancelledByBot = settled.final && mapOrderStatus(order.status) === "cancelled";
+    }
+
+    const summary = summarizeOrder(order, info.quote, this.#now());
+    const result = summary.result;
     if (!result.clientOrderId) result.clientOrderId = clientOrderId;
     if (!result.market) result.market = market;
 
-    const messages: string[] = [...notes];
-    if ((result.status === "cancelled" || result.status === "expired") && result.filledAmount > 0) {
-      // Deels gevuld en daarna geannuleerd (bijv. canceledMarketProtection): de fill is echt,
-      // dus als gedeeltelijk gevuld rapporteren zodat de engine de positie niet mist.
-      messages.push(
-        `Order ${result.orderId} is deels gevuld (${fmtNum(result.filledAmount)}) en daarna door Bitvavo beëindigd (status: ${order.status})`,
-      );
+    // Een onbekende uitkomst moet VOORAAN in `error` staan: de engine herkent die aan het
+    // voorvoegsel "UITKOMST ONBEKEND" (en blokkeert dan de markt / controleert het saldo).
+    let unknownNote: string | null = null;
+    let statusNote: string | null = null;
+    if (stillOpen) {
+      const filledPart = result.filledAmount > 0 ? `${fmtNum(result.filledAmount)} ${info.base}` : "niets";
+      unknownNote =
+        `UITKOMST ONBEKEND: order ${result.orderId} is nog open of niet te controleren (status: ${order.status}, tot nu toe gevuld: ${filledPart}); ` +
+        `annuleren is niet bevestigd, dus de order kan nog (verder) uitgevoerd worden. Controleer je Bitvavo-account voordat je opnieuw handelt`;
+      result.status = result.filledAmount > 0 ? "partiallyFilled" : "new";
+    } else if (result.status === "filled" && result.filledAmount <= 0) {
+      // Volgens Bitvavo uitgevoerd, maar zonder gevulde hoeveelheid: niet als afwijzing behandelen.
+      unknownNote = `UITKOMST ONBEKEND: order ${result.orderId} is volgens Bitvavo gevuld, maar de gevulde hoeveelheid is niet bekend. Controleer je Bitvavo-account voordat je opnieuw handelt`;
+      result.status = "new";
+    } else if ((result.status === "cancelled" || result.status === "expired") && result.filledAmount > 0) {
+      // Deels gevuld en daarna beëindigd (bijv. canceledMarketProtection, of door de bot
+      // geannuleerd na het wachten): de fill is echt, dus als gedeeltelijk gevuld rapporteren
+      // zodat de engine de positie niet mist. De order is klaar; de rest wordt niet meer uitgevoerd.
+      statusNote = cancelledByBot
+        ? `Order ${result.orderId} was na het wachten nog niet volledig gevuld en is door de bot geannuleerd; alleen het gevulde deel (${fmtNum(result.filledAmount)} ${info.base}) is uitgevoerd`
+        : `Order ${result.orderId} is deels gevuld (${fmtNum(result.filledAmount)}) en daarna door Bitvavo beëindigd (status: ${order.status})`;
       result.status = "partiallyFilled";
     } else if (result.status === "rejected") {
-      messages.push(`Order ${result.orderId} is door Bitvavo geweigerd`);
+      statusNote = `Order ${result.orderId} is door Bitvavo geweigerd`;
     } else if (result.status === "cancelled" || result.status === "expired") {
-      messages.push(`Order ${result.orderId} is door Bitvavo geannuleerd zonder vulling (status: ${order.status})`);
-    } else if (result.status === "new" && result.filledAmount === 0) {
-      messages.push(`Order ${result.orderId} is geplaatst maar nog niet gevuld; controleer je Bitvavo-account`);
+      statusNote = cancelledByBot
+        ? `Order ${result.orderId} was na het wachten nog niet gevuld en is door de bot geannuleerd (status: ${order.status}); er is niets uitgevoerd`
+        : `Order ${result.orderId} is door Bitvavo geannuleerd zonder vulling (status: ${order.status})`;
+    }
+    const messages: string[] = [];
+    if (unknownNote) messages.push(unknownNote);
+    messages.push(...notes);
+    if (statusNote) messages.push(statusNote);
+    // Fee nog niet (volledig) afgerekend door Bitvavo: niet stil op €0 laten staan, maar schatten.
+    if (summary.unknownFeeFilledQuote > 0 && result.filledQuote > 0) {
+      const estimate = summary.knownFillFeeQuote + summary.unknownFeeFilledQuote * this.#takerFee;
+      if (estimate > result.feeQuote) {
+        result.feeQuote = estimate;
+        messages.push(
+          `fee nog niet door Bitvavo afgerekend; geschat op ${eur(estimate)} (${PCT_FMT.format(this.#takerFee * 100)}% taker-fee)`,
+        );
+      }
     }
     if (ref > 0 && result.avgPrice > 0) {
       const deviationPct = ((result.avgPrice - ref) / ref) * 100;
@@ -304,8 +486,6 @@ export class LiveBroker implements Broker {
     if (messages.length > 0) result.error = messages.join(". ");
     return result;
   }
-
-  // ─────────────── Intern ───────────────
 
   #needsPoll(order: BitvavoOrder): boolean {
     if (PENDING_STATUSES.has(order.status)) return true;
@@ -330,6 +510,40 @@ export class LiveBroker implements Broker {
       }
     }
     return order;
+  }
+
+  /**
+   * Annuleert een order die na het pollen nog open staat (of waarvan de status
+   * niet op te halen was) en haalt daarna de eindstatus op. Een annulering van
+   * een order die intussen al gevuld is geeft een fout; die is onschuldig, de
+   * opgehaalde status beslist. `final` = Bitvavo bevestigt een eindstatus.
+   */
+  async #cancelAndConfirm(initial: BitvavoOrder, market: string): Promise<{ order: BitvavoOrder; final: boolean }> {
+    let order = initial;
+    if (!order.orderId) return { order, final: false };
+    let cancelSettled = false;
+    for (let i = 0; i < this.#cancelAttempts; i++) {
+      if (!cancelSettled) {
+        try {
+          await this.#client.cancelOrder(market, order.orderId);
+          cancelSettled = true;
+        } catch (err) {
+          // Niet (meer) open (240/233): niet opnieuw annuleren. Andere fouten (netwerk,
+          // rate limit, 5xx): bij de volgende poging opnieuw annuleren als hij nog open is.
+          if (err instanceof BitvavoApiError && err.errorCode !== null && CANCEL_NOT_OPEN_CODES.has(err.errorCode)) {
+            cancelSettled = true;
+          }
+        }
+      }
+      await this.#sleep(this.#pollDelayMs);
+      try {
+        order = await this.#client.getOrder(market, order.orderId);
+      } catch {
+        continue; // tijdelijke fout: opnieuw proberen
+      }
+      if (isFinalOrderStatus(order.status)) return { order, final: true };
+    }
+    return { order, final: false };
   }
 
   async #clampSellToBalance(amount: number, info: MarketInfo): Promise<{ amount: number; note: string }> {

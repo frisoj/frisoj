@@ -687,7 +687,7 @@ describe("TradingEngine — start/stop, noodstop, events", () => {
 });
 
 describe("TradingEngine — updateConfig", () => {
-  it("merged risk/ensemble één niveau diep, maakt de risk manager opnieuw en reset de evaluatie bij marktwijziging", async () => {
+  it("merged risk/ensemble één niveau diep, maakt de risk manager opnieuw; bij marktwijziging alleen nieuwe markten direct beoordeeld", async () => {
     const h = setup();
     await h.engine.tick();
     expect(h.signals.decide).toHaveBeenCalledTimes(1);
@@ -716,11 +716,40 @@ describe("TradingEngine — updateConfig", () => {
     cfg.risk.takerFee = 0.5;
     expect(h.engine.snapshot().config.risk.takerFee).toBe(0.001);
 
-    // evaluatie gereset: dezelfde gesloten candle wordt opnieuw geëvalueerd
+    // BTC-EUR (bleef in de lijst) wordt NIET opnieuw beoordeeld op dezelfde candle
+    // (anders kan een al verhandeld signaal opnieuw gekocht worden); ETH-EUR (nieuw) wel.
     h.feed.setSeries("ETH-EUR", 3_000, T0);
     await h.engine.tick();
-    expect(h.signals.decide.mock.calls.filter((c) => c[0] === "BTC-EUR")).toHaveLength(2);
+    expect(h.signals.decide.mock.calls.filter((c) => c[0] === "BTC-EUR")).toHaveLength(1);
     expect(h.signals.decide.mock.calls.filter((c) => c[0] === "ETH-EUR")).toHaveLength(1);
+
+    // Een markt verwijderen en weer toevoegen: dan wel opnieuw beoordeeld
+    h.engine.updateConfig({ markets: ["ETH-EUR"] });
+    h.engine.updateConfig({ markets: ["ETH-EUR", "BTC-EUR"] });
+    await h.engine.tick();
+    expect(h.signals.decide.mock.calls.filter((c) => c[0] === "BTC-EUR")).toHaveLength(2);
+  });
+
+  it("zelfde koopsignaal wordt niet twee keer verhandeld na take-profit + marktwijziging (scanner/instellingen)", async () => {
+    const h = setup({ markets: ["BTC-EUR"] });
+    const pos = await openBtcPosition(h);
+    h.clock.advance(15_000);
+    h.feed.setLast("BTC-EUR", 52_100); // take-profit
+    await h.engine.tick();
+    expect(h.engine.snapshot().positions).toHaveLength(0);
+    expect(h.engine.snapshot().trades[0].exitReason).toBe("take-profit");
+
+    // Markt toevoegen, en ook BTC-EUR even verwijderen en terugzetten: nog steeds dezelfde candle
+    h.feed.setSeries("ETH-EUR", 3_000, T0);
+    h.engine.updateConfig({ markets: ["BTC-EUR", "ETH-EUR"] });
+    h.engine.updateConfig({ markets: ["ETH-EUR"] });
+    h.engine.updateConfig({ markets: ["ETH-EUR", "BTC-EUR"] });
+    h.clock.advance(15_000);
+    await h.engine.tick();
+    expect(h.broker.buys()).toHaveLength(2); // BTC eenmaal + ETH (nieuw, eigen signaal op dezelfde tijd)
+    expect(h.broker.buys().filter((o) => o.req.market === "BTC-EUR")).toHaveLength(1);
+    expect(h.logs().some((m) => m.startsWith("Geen koop BTC-EUR: het signaal van deze candle is al verhandeld"))).toBe(true);
+    expect(pos.market).toBe("BTC-EUR");
   });
 
   it("zonder markt/interval-wijziging blijft de evaluatie staan; ongeldige waarden gooien", async () => {

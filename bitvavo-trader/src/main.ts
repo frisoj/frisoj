@@ -3,9 +3,17 @@
  * start de trading-engine en het dashboard (HTTP + SSE).
  */
 import { join } from "node:path";
-import { ConfigError, loadConfig, type AppConfig } from "./config";
+import { ConfigError, loadConfig, repairRiskConfig, type AppConfig } from "./config";
 import { APP_VERSION, DEFAULT_ENGINE_CONFIG } from "./core/defaults";
-import type { Broker, EngineConfig, LogEntry, MarketDataFeed } from "./core/types";
+import type {
+  BacktestResult,
+  Broker,
+  EngineConfig,
+  LogEntry,
+  MarketDataFeed,
+  OptimizationResult,
+  WalkForwardResult,
+} from "./core/types";
 import { BitvavoClient } from "./exchange/bitvavoClient";
 import { LiveBroker } from "./broker/liveBroker";
 import { PaperBroker } from "./broker/paperBroker";
@@ -14,15 +22,14 @@ import { SimulatedFeed } from "./data/simulatedFeed";
 import { isBitvavoReachable } from "./data/reachability";
 import { StateStore } from "./engine/stateStore";
 import { TradingEngine } from "./engine/tradingEngine";
-import { runBacktest } from "./backtest/backtester";
-import { optimize } from "./backtest/optimizer";
-import { walkForward } from "./backtest/walkForward";
 import { listStrategies } from "./strategies";
 import { decisionsToMarkers, runEnsemble } from "./strategies/ensemble";
 import { detectRegimes } from "./strategies/regime";
 import { chartIndicators } from "./indicators";
 import { validateRiskConfig } from "./risk/riskManager";
 import { createApp, startHttpServer, isLoopbackHost, type RunningServer } from "./server/httpServer";
+import { HeavyRunner } from "./server/heavyRunner";
+import { createShutdown } from "./server/shutdown";
 import type { Services } from "./server/routes";
 
 class StartupError extends Error {}
@@ -100,6 +107,12 @@ function printBanner(config: AppConfig, feed: MarketDataFeed, engineCfg: EngineC
   } else {
     out.push(`  Modus:      LIVE — ECHT GELD (de bot gebruikt maximaal ${eur(config.capitalLimitQuote)})`);
     out.push("              Er worden pas echte orders geplaatst als je de bot in het dashboard 'armt'.");
+    const r = engineCfg.risk;
+    const pct = (n: number, d = 2) => `${n.toLocaleString("nl-NL", { maximumFractionDigits: d })}%`;
+    out.push(
+      `  Risico:     ${pct(r.riskPerTradePct)} per trade, max ${pct(r.maxPositionPct)} per positie, ` +
+        `dagverlieslimiet ${pct(r.dailyLossLimitPct)}, taker fee ${pct(r.takerFee * 100, 3)}`,
+    );
   }
   out.push(
     `  Marktdata:  ${feed.source === "bitvavo" ? "Bitvavo (echte koersen)" : "SIMULATIE (nep-koersen, geen echte markt)"}`,
@@ -137,6 +150,11 @@ async function main(): Promise<void> {
   const config = loadConfig();
   refuseLiveUntilReviewed(config.mode);
   const engineConfig = structuredClone(config.engine);
+  // Vóór het bouwen van een broker: de PaperBroker neemt fee/slippage over.
+  const fixedRisk = repairRiskConfig(engineConfig.risk);
+  if (fixedRisk.length > 0) {
+    console.warn(`⚠ Ongeldige risico-instellingen vervangen door standaardwaarden: ${fixedRisk.join(", ")}.`);
+  }
 
   const client = new BitvavoClient({
     apiKey: config.apiKey,
@@ -166,8 +184,11 @@ async function main(): Promise<void> {
     });
     try {
       const account = await client.account();
-      if (Number.isFinite(account.takerFee) && account.takerFee >= 0) engineConfig.risk.takerFee = account.takerFee;
-      if (Number.isFinite(account.makerFee) && account.makerFee >= 0) engineConfig.risk.makerFee = account.makerFee;
+      // Alleen fees binnen de grenzen van de risicomanager overnemen (anders keurt hij elke koop af).
+      if (validateRiskConfig({ takerFee: account.takerFee }).ok) engineConfig.risk.takerFee = account.takerFee;
+      else console.warn(`⚠ Onverwachte taker fee van Bitvavo (${account.takerFee}); de ingestelde waarde blijft in gebruik.`);
+      if (validateRiskConfig({ makerFee: account.makerFee }).ok) engineConfig.risk.makerFee = account.makerFee;
+      else console.warn(`⚠ Onverwachte maker fee van Bitvavo (${account.makerFee}); de ingestelde waarde blijft in gebruik.`);
       console.log(
         `Bitvavo-account gevonden. Jouw fees: taker ${(engineConfig.risk.takerFee * 100).toFixed(2)}%, ` +
           `maker ${(engineConfig.risk.makerFee * 100).toFixed(2)}%.`,
@@ -178,12 +199,6 @@ async function main(): Promise<void> {
           "Controleer je API-sleutel en IP-whitelist. Standaard-fees worden gebruikt.",
       );
     }
-  }
-
-  const riskCheck = validateRiskConfig(engineConfig.risk);
-  if (!riskCheck.ok) {
-    console.warn(`⚠ Opgeslagen risico-instellingen ongeldig (${riskCheck.errors.join(" ")}); standaardwaarden gebruikt.`);
-    engineConfig.risk = { ...DEFAULT_ENGINE_CONFIG.risk, takerFee: engineConfig.risk.takerFee, makerFee: engineConfig.risk.makerFee };
   }
 
   const store = new StateStore(join(config.dataDir, `state-${config.mode}.json`));
@@ -197,10 +212,12 @@ async function main(): Promise<void> {
   });
   engine.on("log", (entry: LogEntry) => printLogEntry(entry));
 
+  // Backtests/optimalisaties in een worker-thread: de engine en de noodstop blijven reageren.
+  const heavyRunner = new HeavyRunner({ log: (m) => console.warn(m) });
   const services: Services = {
-    runBacktest,
-    optimize,
-    walkForward,
+    runBacktest: (input) => heavyRunner.run<BacktestResult>("backtest", input),
+    optimize: (input, opts) => heavyRunner.run<OptimizationResult>("optimize", input, opts),
+    walkForward: (input, opts) => heavyRunner.run<WalkForwardResult>("walkForward", input, opts),
     listStrategies,
     chartIndicators,
     runEnsemble,
@@ -252,35 +269,35 @@ async function main(): Promise<void> {
   }
 
   // ── Netjes afsluiten ──
-  let shuttingDown = false;
-  const shutdown = async (signal: string, exitCode = 0) => {
-    if (shuttingDown) {
-      console.warn("Geforceerd afsluiten.");
-      process.exit(1);
-    }
-    shuttingDown = true;
-    console.log(`\n${signal} ontvangen — bot wordt netjes gestopt…`);
-    const force = setTimeout(() => {
-      console.warn("Afsluiten duurt te lang; geforceerd gestopt.");
-      process.exit(1);
-    }, 10_000);
-    force.unref();
-    try {
+  // In live mode wacht de noodrem langer zolang er (mogelijk) een order bij Bitvavo
+  // loopt; zie src/server/shutdown.ts.
+  const { shutdown } = createShutdown({
+    mode: config.mode,
+    stopEngine: async () => {
+      await heavyRunner.close().catch(() => undefined);
       await engine.stop();
-    } catch (err) {
-      console.error(`Fout bij stoppen van de engine: ${(err as Error).message}`);
-    }
-    try {
-      store.flush();
-    } catch (err) {
-      console.error(`Fout bij opslaan van de toestand: ${(err as Error).message}`);
-    }
-    await server.close().catch(() => undefined);
-    console.log("Tot ziens!");
-    process.exit(exitCode);
-  };
+    },
+    cleanup: async () => {
+      try {
+        store.flush();
+      } catch (err) {
+        console.error(`Fout bij opslaan van de toestand: ${(err as Error).message}`);
+      }
+      await server.close().catch(() => undefined);
+    },
+    // Optionele vlag van de engine; zonder vlag geldt "mogelijk" tot engine.stop() klaar is.
+    orderInFlight: () => {
+      const flag = (engine as unknown as { orderInFlight?: unknown }).orderInFlight;
+      return typeof flag === "boolean" ? flag : undefined;
+    },
+    exit: (code) => process.exit(code),
+    loud,
+  });
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  // Terminal/venster gesloten (en Ctrl+Break op Windows): ook netjes afsluiten.
+  process.on("SIGHUP", () => void shutdown("SIGHUP"));
+  if (process.platform === "win32") process.on("SIGBREAK", () => void shutdown("SIGBREAK"));
   process.on("unhandledRejection", (reason) => {
     console.error(`✖ Onverwachte fout (niet afgehandeld): ${reason instanceof Error ? reason.stack : String(reason)}`);
   });

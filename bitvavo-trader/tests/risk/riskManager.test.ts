@@ -9,6 +9,7 @@ import {
   type Position,
   type RiskConfig,
 } from "../../src/core/types";
+import { PaperBroker } from "../../src/broker/paperBroker";
 import { RiskManager, roundTripCostPct, validateRiskConfig } from "../../src/risk/riskManager";
 
 // ─────────────────────────────── Fixtures ───────────────────────────────
@@ -182,28 +183,76 @@ describe("planEntry — sizing", () => {
     expect(plan.quoteAmount).toBe(8);
   });
 
-  it("hoogt op naar het minimum als dat binnen alle caps past en risico ≤ 2× budget", () => {
+  it("hoogt NIET op naar het minimum als het risico dan boven het budget komt", () => {
+    // Vroeger: opgehoogd naar precies €5,00 met ~1,2× het risico. Die €5,00 is na
+    // fee en slippage ~€4,985 waard en kon dus zelfs zonder koersdaling niet
+    // verkocht worden (Bitvavo en PaperBroker weigeren verkopen < €5).
     const plan = rm().planEntry(decision({ atr: 9 }), account(), marketInfo(), NOW);
     const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 9, 50);
     expect(e.quoteByRisk).toBeLessThan(5);
     expect(e.quoteByRisk).toBeCloseTo(4.0443, 3);
-    expect(plan.approved).toBe(true);
-    expect(plan.quoteAmount).toBe(5);
-    expect(plan.riskQuote).toBeCloseTo(e.riskAt(5), 10);
-    expect(plan.riskQuote).toBeGreaterThan(e.riskBudget);
-    expect(plan.riskQuote).toBeLessThanOrEqual(2 * e.riskBudget);
-    expect(plan.reasons[0]).toContain("opgehoogd naar minimum");
+    expect(plan.approved).toBe(false);
+    expect(plan.quoteAmount).toBe(0);
+    expect(plan.riskQuote).toBe(0);
+    expect(plan.reasons).toContain("Te klein: €4,04 < minimum €5,00");
+    // Bij de stop (82,05) is minimaal €5 × 1,0025 × 100,05/82,05 × 1,03 = €6,30 nodig
+    expect(plan.reasons.some((x) => x.startsWith("Om bij de stop-loss") && x.includes("€6,30"))).toBe(true);
+    expect(plan.reasons.some((x) => x.includes("risicobudget (€0,75)"))).toBe(true);
+    expect(plan.reasons.join(" ")).not.toContain("opgehoogd");
   });
 
-  it("wijst af onder het minimum als het risico bij het minimum > 2× budget is", () => {
+  it("wijst af onder het minimum als het risico bij de minimale positie > budget is", () => {
     const plan = rm().planEntry(decision({ atr: 9 }), account({ equity: 20, cashQuote: 20 }), marketInfo(), NOW);
     const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 9, 20);
-    expect(e.riskAt(5)).toBeGreaterThan(2 * e.riskBudget);
+    expect(e.riskAt(5)).toBeGreaterThan(e.riskBudget);
     expect(plan.approved).toBe(false);
     expect(plan.quoteAmount).toBe(0);
     expect(plan.riskQuote).toBe(0);
     expect(plan.reasons).toContain("Te klein: €1,61 < minimum €5,00");
     expect(plan.reasons.some((x) => x.includes("risicobudget"))).toBe(true);
+  });
+
+  it("wijst een positie af die ≥ €5 is maar bij de stop-loss niet meer verkocht kan worden", () => {
+    // €50, ATR 6,5%: risk-sizing geeft €5,53, maar bij de stop (−13%) is dat ~€4,80.
+    const plan = rm().planEntry(decision({ atr: 6.5 }), account(), marketInfo(), NOW);
+    const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, 6.5, 50);
+    expect(Math.floor(e.quoteByRisk * 100) / 100).toBe(5.53);
+    const valueAtStop = (5.53 / (1 + DEFAULT_RISK_CONFIG.takerFee) / e.entry) * e.stop;
+    expect(valueAtStop).toBeLessThan(5);
+    expect(plan.approved).toBe(false);
+    expect(plan.quoteAmount).toBe(0);
+    expect(plan.reasons[0]).toBe(
+      "Positie van €5,53 zakt bij de stop-loss onder het beursminimum van €5,00 en kan dan niet verkocht worden (minimaal €5,94 nodig)",
+    );
+    expect(plan.reasons.some((x) => x.includes("risicobudget"))).toBe(true);
+    // Met iets meer risicoruimte past de verkoopbare positie wel
+    const ok = rm({ riskPerTradePct: 2 }).planEntry(decision({ atr: 6.5 }), account(), marketInfo(), NOW);
+    expect(ok.approved).toBe(true);
+    expect(ok.quoteAmount).toBeGreaterThanOrEqual(5.94);
+  });
+
+  it("gebruikt het minimum in base (minOrderBase) ook voor de verkoopbaarheid", () => {
+    // 0,2 BTC × 100,05 × 1,0025 × 1,03 ≈ €20,67 ≤ pos-cap €22,50 → past
+    const fits = rm().planEntry(decision(), account(), marketInfo({ minOrderBase: 0.2 }), NOW);
+    expect(fits.approved).toBe(true);
+    expect(fits.quoteAmount).toBe(22.5);
+    // 0,25 BTC × 100,05 × 1,0025 × 1,03 ≈ €25,83 > pos-cap €22,50 → afwijzen
+    const tooBig = rm().planEntry(decision(), account(), marketInfo({ minOrderBase: 0.25 }), NOW);
+    expect(tooBig.approved).toBe(false);
+    expect(tooBig.reasons[0]).toBe(
+      "Positie van €22,50 is minder dan het beursminimum van 0,25 BTC en kan dan niet verkocht worden (minimaal €25,83 nodig)",
+    );
+    expect(tooBig.reasons.some((x) => x.startsWith("Max. positiegrootte"))).toBe(true);
+    // Te klein voor de koop én onder het base-minimum
+    const both = rm().planEntry(
+      decision(),
+      account({ cashQuote: 4, equity: 50 }),
+      marketInfo({ minOrderBase: 0.25 }),
+      NOW,
+    );
+    expect(both.approved).toBe(false);
+    expect(both.reasons).toContain("Te klein: €3,98 < minimum €5,00");
+    expect(both.reasons).toContain("Om het beursminimum van 0,25 BTC te kunnen verkopen is minimaal €25,83 nodig");
   });
 
   it("wijst af als de cash te laag is voor de minimale order", () => {
@@ -221,7 +270,7 @@ describe("planEntry — sizing", () => {
     expect(plan.reasons.some((x) => x.startsWith("Max. positiegrootte"))).toBe(true);
   });
 
-  it("gebruikt minOrderQuote van de markt boven die van de config", () => {
+  it("minimale order: het strengste van markt-minimum en instelling telt", () => {
     // Markt-minimum €25 > pos-cap €22,50 → afwijzen
     const rejected = rm().planEntry(decision(), account(), marketInfo({ minOrderQuote: 25 }), NOW);
     expect(rejected.approved).toBe(false);
@@ -233,6 +282,128 @@ describe("planEntry — sizing", () => {
     // Config-minimum €30 zonder MarketInfo → afwijzen
     const cfgMin = rm({ minOrderQuote: 30 }).planEntry(decision(), account(), undefined, NOW);
     expect(cfgMin.approved).toBe(false);
+  });
+
+  it("instelling minOrderQuote werkt ook als MarketInfo een lager minimum heeft", () => {
+    // Vroeger won MarketInfo (€5) altijd, waardoor de instelling geen effect had.
+    // ATR 4: risk-sizing ≈ €8,74 → goed voor €5, te klein voor een ingesteld minimum van €10.
+    const atr = 4;
+    const e = expectedSizing(DEFAULT_RISK_CONFIG, 100, atr, 50);
+    expect(Math.floor(e.quoteByRisk * 100) / 100).toBe(8.74);
+    const base = rm().planEntry(decision({ atr }), account(), marketInfo({ minOrderQuote: 5 }), NOW);
+    expect(base.approved).toBe(true);
+    expect(base.quoteAmount).toBe(8.74);
+
+    const strict = rm({ minOrderQuote: 10 }).planEntry(
+      decision({ atr }),
+      account(),
+      marketInfo({ minOrderQuote: 5 }),
+      NOW,
+    );
+    expect(strict.approved).toBe(false);
+    expect(strict.quoteAmount).toBe(0);
+    expect(strict.reasons).toContain("Te klein: €8,74 < minimum €10,00");
+    expect(strict.reasons.some((x) => x.includes("risicobudget"))).toBe(true);
+
+    // Grote positie (ATR 1 → €22,50) voldoet ook aan €10
+    const big = rm({ minOrderQuote: 10 }).planEntry(decision(), account(), marketInfo({ minOrderQuote: 5 }), NOW);
+    expect(big.approved).toBe(true);
+    expect(big.quoteAmount).toBe(22.5);
+
+    // Pos-cap onder het ingestelde minimum (45% × €20 = €9) → afwijzen, ook met MarketInfo
+    const capped = rm({ minOrderQuote: 10 }).planEntry(
+      decision(),
+      account({ equity: 20, cashQuote: 20, dayStartEquity: 20 }),
+      marketInfo({ minOrderQuote: 5 }),
+      NOW,
+    );
+    expect(capped.approved).toBe(false);
+    expect(capped.reasons).toContain("Te klein: €9,00 < minimum €10,00");
+  });
+
+  it("verkoopbaarheid bij de stop rekent met het beursminimum, niet met de (hogere) instelling", () => {
+    // Stop −20% (ATR 10): beurs €5 → minimaal €5 × 1,0025 × 100,05/80,05 × 1,03 ≈ €6,46.
+    // Met instelling €10 is het minimum dus €10 (niet €10 × 1,29 ≈ €12,90):
+    // risk-sizing van €10,95 (risico 4,5%) wordt gewoon goedgekeurd.
+    const plan = rm({ minOrderQuote: 10, riskPerTradePct: 4.5 }).planEntry(
+      decision({ atr: 10 }),
+      account(),
+      marketInfo({ minOrderQuote: 5 }),
+      NOW,
+    );
+    expect(plan.approved).toBe(true);
+    expect(plan.quoteAmount).toBe(10.95);
+  });
+});
+
+// ─────────────────────────────── planEntry: verkoopbaarheid ───────────────────────────────
+
+describe("planEntry — positie blijft verkoopbaar (min. €5 bij verkopen)", () => {
+  /**
+   * Koopt het plan met de echte PaperBroker en verkoopt daarna alles op (en iets
+   * onder) de stop-loss. PaperBroker (net als Bitvavo en LiveBroker) weigert
+   * verkopen onder €5: een goedgekeurde positie moet dus bij de stop nog te
+   * verkopen zijn, anders werken stop-loss, handmatig sluiten en noodstop nooit.
+   */
+  async function sellResultsAtStop(c: RiskConfig, px: number, atr: number, equity: number) {
+    const plan = new RiskManager(c, "15m").planEntry(
+      decision({ price: px, atr }),
+      account({ equity, cashQuote: equity, dayStartEquity: equity }),
+      marketInfo(),
+      NOW,
+    );
+    if (!plan.approved) return { plan, results: [] as string[] };
+    const results: string[] = [];
+    // Gap tot 2,5% door de stop heen moet ook nog lukken (buffer 3%)
+    for (const ref of [px, plan.stopPrice, plan.stopPrice * 0.975]) {
+      const broker = new PaperBroker({
+        startingQuote: equity,
+        takerFee: c.takerFee,
+        slippagePct: c.slippagePct,
+        now: () => NOW,
+      });
+      const buy = await broker.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: plan.quoteAmount }, px);
+      expect(buy.status).toBe("filled");
+      const sell = await broker.placeMarketOrder({ market: "BTC-EUR", side: "sell", amount: buy.filledAmount }, ref);
+      results.push(sell.status === "filled" ? "ok" : `${sell.error} (atr ${atr}, equity ${equity}, ref ${ref})`);
+    }
+    return { plan, results };
+  }
+
+  it("de posities uit de review (€50, ATR 6,5–14,5%) worden niet meer goedgekeurd", async () => {
+    for (const atr of [6.5, 7, 7.5, 8, 10, 12, 14.5]) {
+      const { plan } = await sellResultsAtStop(DEFAULT_RISK_CONFIG, 100, atr, 50);
+      expect(plan.approved, `atr ${atr}: ${plan.reasons.join("; ")}`).toBe(false);
+      expect(plan.quoteAmount).toBe(0);
+    }
+    // SOL-EUR @ 150, ATR 8% → vroeger "Koop €5,00 (opgehoogd naar minimum)"
+    const sol = rm().planEntry(
+      decision({ market: "SOL-EUR", price: 150, atr: 12 }),
+      account(),
+      marketInfo({ market: "SOL-EUR", base: "SOL" }),
+      NOW,
+    );
+    expect(sol.approved).toBe(false);
+  });
+
+  it("elke goedgekeurde positie is op én iets onder de stop nog te verkopen, met risico ≤ budget", async () => {
+    let approved = 0;
+    for (const equity of [20, 30, 50, 100, 250]) {
+      for (const riskPerTradePct of [0.5, 1, 1.5, 3]) {
+        const c = cfg({ riskPerTradePct });
+        for (let atrPct = 0.5; atrPct <= 20; atrPct += 0.5) {
+          for (const px of [100, 61234.5, 0.01234]) {
+            const atr = (px * atrPct) / 100;
+            const { plan, results } = await sellResultsAtStop(c, px, atr, equity);
+            if (!plan.approved) continue;
+            approved++;
+            for (const r of results) expect(r).toBe("ok");
+            expect(plan.riskQuote).toBeLessThanOrEqual((equity * riskPerTradePct) / 100 + 1e-9);
+          }
+        }
+      }
+    }
+    expect(approved).toBeGreaterThan(100);
   });
 });
 
@@ -454,11 +625,16 @@ describe("updatePosition", () => {
     const below = r.updatePosition(position(), candle(101, 103.9, 100.5, 103), 1, true);
     expect(below.exit).toBe(false);
     expect(below.stopPrice).toBe(96);
-    // high 104 → break-even (ook op een niet-gesloten candle)
-    const at = r.updatePosition(position(), candle(101, 104, 101, 103), 1, false);
+    // high 104 op een gesloten candle → break-even
+    const at = r.updatePosition(position(), candle(101, 104, 101, 103), 1, true);
     expect(at.exit).toBe(false);
     expect(at.stopPrice).toBeCloseTo(100.6, 10);
     expect(at.highestPrice).toBe(104);
+    // Op een niet-gesloten candle (tick) nog niet: alleen highestPrice loopt op
+    const tick = r.updatePosition(position(), candle(101, 104, 101, 103), 1, false);
+    expect(tick.exit).toBe(false);
+    expect(tick.stopPrice).toBe(96);
+    expect(tick.highestPrice).toBe(104);
     // breakEvenAtR 0 → uit
     const off = rm({ trailingAtrMult: 0, breakEvenAtR: 0 }).updatePosition(position(), candle(101, 106, 101, 105), 1, true);
     expect(off.stopPrice).toBe(96);
@@ -466,9 +642,90 @@ describe("updatePosition", () => {
 
   it("break-even gebruikt highestPrice uit eerdere candles", () => {
     const r = rm({ trailingAtrMult: 0 });
-    const u = r.updatePosition(position({ highestPrice: 104.5 }), candle(102, 102.5, 101.5, 102), 1, false);
+    const u = r.updatePosition(position({ highestPrice: 104.5 }), candle(102, 102.5, 101.5, 102), 1, true);
     expect(u.stopPrice).toBeCloseTo(100.6, 10);
     expect(u.highestPrice).toBe(104.5);
+  });
+
+  it("break-even die tussen candles bereikt wordt, geldt niet met terugwerkende kracht voor die candle", () => {
+    // Engine-volgorde: ticks (closedCandle=false) tijdens de candle, daarna de
+    // gesloten candle (true) tegen de stop die dan geldt. Entry 100, stop 98
+    // (R = 2), break-even-niveau 100,6. De candle dipt eerst naar 100,2, loopt dan
+    // op naar 102,6 (+1,3R) en sluit op 101,8: de koers kwam na de stijging nooit
+    // meer op of onder 100,6, dus geen exit.
+    const r = rm({ trailingAtrMult: 0 });
+    const pos = position({ stopPrice: 98, initialStopPrice: 98, takeProfitPrice: 104, highestPrice: 100 });
+    for (const px of [100, 100.2, 101.5, 102.6, 102.1, 101.8]) {
+      const u = r.updatePosition({ ...pos }, candle(px, px, px, px), 1, false);
+      expect(u.exit).toBe(false);
+      pos.stopPrice = Math.max(pos.stopPrice, u.stopPrice);
+      pos.highestPrice = Math.max(pos.highestPrice, u.highestPrice);
+    }
+    expect(pos.stopPrice).toBe(98); // ticks verhogen de stop niet
+    expect(pos.highestPrice).toBe(102.6);
+
+    const closed = r.updatePosition({ ...pos }, candle(100, 102.6, 100.2, 101.8), 1, true);
+    expect(closed.exit).toBe(false);
+    // Pas na de slotkoers gaat de stop naar break-even, voor de volgende candles
+    expect(closed.stopPrice).toBeCloseTo(100.6, 10);
+
+    // Zelfde uitkomst als de backtester, die per gesloten candle rekent
+    const bt = r.updatePosition(
+      position({ stopPrice: 98, initialStopPrice: 98, takeProfitPrice: 104, highestPrice: 100 }),
+      candle(100, 102.6, 100.2, 101.8),
+      1,
+      true,
+    );
+    expect(bt).toEqual(closed);
+  });
+
+  it("break-even-stop komt nooit boven de slotkoers (kleine breakEvenAtR)", () => {
+    // Entry 100,05, R 0,5 → trigger bij 1R = 100,55; break-even-niveau 100,05 × 1,006 = 100,6503.
+    const r = rm({ trailingAtrMult: 0 });
+    const pos = position({
+      entryPrice: 100.05,
+      stopPrice: 99.55,
+      initialStopPrice: 99.55,
+      takeProfitPrice: 101.05,
+      highestPrice: 100.05,
+    });
+    // High 100,56 ≥ trigger, maar slot 100,53 < 100,6503 → stop blijft staan
+    const first = r.updatePosition(pos, candle(100.1, 100.56, 100.0, 100.53), 1, true);
+    expect(first.exit).toBe(false);
+    expect(first.stopPrice).toBe(99.55);
+    expect(first.highestPrice).toBe(100.56);
+    // Volgende candle sluit boven het break-even-niveau → nu wel verhogen
+    const next = r.updatePosition(
+      { ...pos, highestPrice: first.highestPrice },
+      candle(100.53, 100.85, 100.4, 100.8),
+      1,
+      true,
+    );
+    expect(next.exit).toBe(false);
+    expect(next.stopPrice).toBeCloseTo(100.05 * 1.006, 10);
+    expect(next.stopPrice).toBeLessThan(100.8);
+
+    // breakEvenAtR 0,5 (vroeger: stop 100,6503 terwijl de high 100,52 was → exit met verlies)
+    const half = rm({ trailingAtrMult: 0, breakEvenAtR: 0.5 }).updatePosition(
+      position({ entryPrice: 100, stopPrice: 99, initialStopPrice: 99, takeProfitPrice: 102, highestPrice: 100 }),
+      candle(100.1, 100.52, 100.05, 100.49),
+      1,
+      true,
+    );
+    expect(half.exit).toBe(false);
+    expect(half.stopPrice).toBe(99);
+  });
+
+  it("na een niet-exit ligt een verhoogde stop altijd onder de slotkoers", () => {
+    for (const breakEvenAtR of [0.1, 0.25, 0.5, 1, 2]) {
+      const r = rm({ trailingAtrMult: 0, breakEvenAtR });
+      for (let close = 100; close <= 104; close += 0.05) {
+        const high = close + 0.3;
+        const u = r.updatePosition(position(), candle(100, high, 99.9, close), 1, true);
+        if (u.exit) continue;
+        if (u.stopPrice > 96) expect(u.stopPrice).toBeLessThan(close);
+      }
+    }
   });
 
   it("trailing pas na 1R winst", () => {

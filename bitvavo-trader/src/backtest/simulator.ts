@@ -8,7 +8,19 @@
  *   (+ slippage, + taker fee);
  * - exits are checked on each candle's high/low, starting with the entry
  *   candle itself (the entry happened at its open);
- * - stop and take-profit in one candle → the risk manager assumes the stop.
+ * - `candlesHeld` counts only full candles AFTER the fill, like the engine
+ *   (which skips the entry candle): the entry candle's range is checked but
+ *   not counted, so time-stop and avgCandlesHeld match the live bot;
+ * - the loss cooldown runs from the exit moment: the candle's open for a
+ *   signal exit, its close for an intrabar exit (stop / TP / time-stop), just
+ *   like the engine, which books intrabar exits after the candle opened;
+ * - stop and take-profit in one candle → the risk manager assumes the stop;
+ * - an exit is only booked when the position is worth at least the minimum
+ *   order (Bitvavo and the brokers reject smaller sells). Otherwise the sell
+ *   stays pending, exactly like the engine: no stops / signals any more, just
+ *   a new attempt as soon as `amount × price >= minimum`;
+ * - slippage per side is never below half the market's bid/ask spread
+ *   (`spreadPct`, optional).
  */
 import type {
   AccountSnapshot,
@@ -25,8 +37,10 @@ import type {
   RiskConfig,
   RiskManagerLike,
   SignalMarker,
+  Ticker24h,
   Trade,
 } from "../core/types";
+import { INTERVAL_MS } from "../core/types";
 import { dayKey } from "../core/util";
 import { buyHoldFactor, computeMetrics, emptyMetrics } from "./metrics";
 
@@ -41,6 +55,41 @@ export interface BacktestInput {
   dataSource?: DataSource;
   /** Candles before this index are indicator warmup only: no trading, not in equity curve/metrics (default 0) */
   tradeFromIndex?: number;
+  /**
+   * Optional bid/ask spread of the market as a fraction of the mid price
+   * ((ask − bid) / mid). A market order pays about half of it per side, so the
+   * backtest uses max(risk.slippagePct, spreadPct / 2) as slippage (also for
+   * the risk manager's cost filter). Unknown → only risk.slippagePct.
+   */
+  spreadPct?: number;
+}
+
+/** Slippage per side the backtest uses: never less than half the market's bid/ask spread. */
+export function effectiveSlippagePct(risk: RiskConfig, spreadPct?: number): number {
+  const base = Number.isFinite(risk.slippagePct) && risk.slippagePct > 0 ? risk.slippagePct : 0;
+  const half = typeof spreadPct === "number" && Number.isFinite(spreadPct) && spreadPct > 0 ? spreadPct / 2 : 0;
+  return Math.max(base, half);
+}
+
+/**
+ * The input with `risk.slippagePct` raised to the effective slippage, so the
+ * simulation AND the risk manager (min-edge filter, break-even level) use the
+ * same costs. Idempotent.
+ */
+export function withSpreadCosts(input: BacktestInput): BacktestInput {
+  const slip = effectiveSlippagePct(input.risk, input.spreadPct);
+  if (slip === input.risk.slippagePct) return input;
+  return { ...input, risk: { ...input.risk, slippagePct: slip } };
+}
+
+/** Relative bid/ask spread ((ask − bid) / mid) from a 24h ticker, or undefined when unknown. */
+export function spreadFromTicker(t: Pick<Ticker24h, "bid" | "ask"> | undefined | null): number | undefined {
+  if (!t) return undefined;
+  const { bid, ask } = t;
+  if (typeof bid !== "number" || typeof ask !== "number" || !(bid > 0) || !(ask >= bid)) return undefined;
+  const mid = (bid + ask) / 2;
+  const s = (ask - bid) / mid;
+  return Number.isFinite(s) ? s : undefined;
 }
 
 export interface BacktestDeps {
@@ -59,6 +108,12 @@ export interface SimulationOutput {
   result: BacktestResult;
   /** Number of evaluated candles during which a position was in the market. */
   exposureCandles: number;
+  /** Slippage per side that was actually used (incl. half the spread). */
+  slippagePct: number;
+  /** Trades whose sell was first refused because the position was worth less than the minimum order. */
+  stuckTrades: number;
+  /** Candles spent waiting for such a refused sell (position open, no stops). */
+  stuckCandles: number;
 }
 
 /** Max number of candles returned for the chart. */
@@ -100,6 +155,35 @@ export function exitMarkerLabel(reason: ExitReason, pnlPct: number): string {
   return `${EXIT_LABEL[reason] ?? "VERKOOP"} ${fmtPctNl(pnlPct)}`;
 }
 
+/** Tolerance for the minimum-order check (same as the paper broker). */
+const MIN_ORDER_EPS = 1e-8;
+
+const EXIT_NL: Record<ExitReason, string> = {
+  "stop-loss": "stop-loss",
+  "take-profit": "take-profit",
+  "trailing-stop": "trailing stop",
+  "break-even": "break-even-stop",
+  signal: "verkoopsignaal",
+  "time-stop": "tijdstop",
+  manual: "handmatig",
+  "kill-switch": "noodstop",
+  "end-of-backtest": "einde test",
+};
+
+function eurNl(x: number): string {
+  return `€${x.toFixed(2).replace(".", ",")}`;
+}
+
+/** Dutch note for a trade whose sell was refused because the position was worth less than the minimum order. */
+function stuckNote(pe: { reason: ExitReason; candles: number }, minOrder: number, stillOpen: boolean): string {
+  const k = pe.candles;
+  const waited = `${k} ${k === 1 ? "candle" : "candles"}`;
+  const head = `LET OP: verkoop (${EXIT_NL[pe.reason] ?? pe.reason}) geweigerd, positie was minder waard dan het minimum van ${eurNl(minOrder)}`;
+  return stillOpen
+    ? `${head}; na ${waited} wachten aan het einde van de test nog steeds niet verkoopbaar`
+    : `${head}; pas na ${waited} wachten verkocht`;
+}
+
 function entryReasonOf(decision: EnsembleDecision, planReasons: string[]): string {
   const buyReasons = (decision.votes ?? []).filter((v) => v.action === "buy").map((v) => v.reason);
   const head = `Score ${decision.score.toFixed(2).replace(".", ",")}`;
@@ -132,6 +216,9 @@ function emptyResult(input: BacktestInput, startedAt: number): SimulationOutput 
   const c = input.candles;
   return {
     exposureCandles: 0,
+    slippagePct: effectiveSlippagePct(input.risk, input.spreadPct),
+    stuckTrades: 0,
+    stuckCandles: 0,
     result: {
       market: input.market,
       interval: input.interval,
@@ -177,8 +264,9 @@ export function simulate(
   if (n === 0 || evalStart >= n) return emptyResult(input, startedAt);
 
   const fee = input.risk.takerFee;
-  const slip = input.risk.slippagePct;
+  const slip = effectiveSlippagePct(input.risk, input.spreadPct);
   const minOrder = input.marketInfo?.minOrderQuote ?? input.risk.minOrderQuote ?? 0;
+  const intervalMs = INTERVAL_MS[interval] ?? 0;
   const dayKeys = dayKeysFor(candles);
   const loopStart = Math.max(evalStart, 1);
 
@@ -188,6 +276,14 @@ export function simulate(
   let posEntryIdx = -1;
   let posEntryScore = 0;
   let exposureCandles = 0;
+  /**
+   * An exit the exchange would refuse (position worth less than the minimum
+   * order). Like the engine's `pendingExit`: the position stays open, no more
+   * stops / take-profit / signals, the sell is retried until it is big enough.
+   */
+  let pendingExit = null as { reason: ExitReason; score: number; candles: number } | null;
+  let stuckTrades = 0;
+  let stuckCandles = 0;
 
   const trades: Trade[] = [];
   const tradeMeta: TradeMeta[] = [];
@@ -202,7 +298,16 @@ export function simulate(
   const eqValues = new Float64Array(curveLen);
   if (evalStart < loopStart) eqValues[0] = initialCapital; // candle 0 cannot trade (no prior decision)
 
-  const closePosition = (i: number, rawPrice: number, reason: ExitReason, score: number): void => {
+  /** Would the brokers accept a sell of the whole position at this (pre-slippage) price? */
+  const sellable = (p: Position, rawPrice: number): boolean =>
+    !(minOrder > 0) || p.amount * rawPrice >= minOrder - MIN_ORDER_EPS;
+
+  /**
+   * Book the exit. `exitAt` = moment of the exit for the loss cooldown: the
+   * candle's open for exits at the open, its close for intrabar exits (the
+   * engine only notices those after the candle opened).
+   */
+  const closePosition = (i: number, rawPrice: number, reason: ExitReason, score: number, exitAt = candles[i].time): void => {
     const p = pos!;
     const c = candles[i];
     const fillPrice = rawPrice * (1 - slip);
@@ -228,19 +333,50 @@ export function simulate(
       rMultiple: initialRisk > 0 ? pnl / initialRisk : 0,
       exitReason: reason,
       candlesHeld: p.candlesHeld,
-      entryReason: p.entryReason,
+      entryReason: pendingExit ? `${p.entryReason} · ${stuckNote(pendingExit, minOrder, reason === "end-of-backtest")}` : p.entryReason,
     });
     tradeMeta.push({ entryIdx: posEntryIdx, exitIdx: i, entryScore: posEntryScore, exitScore: score });
     realizedPnlToday += pnl;
-    if (pnl < 0) lastLossAt[market] = c.time;
+    if (pnl < 0) lastLossAt[market] = exitAt;
     pos = null;
+    pendingExit = null;
   };
 
-  /** Stop / take-profit / trailing / time-stop check on the full range of candle i. */
-  const rangeCheck = (i: number): void => {
+  /** The sell is refused (worth < minimum order): keep the position open and retry later. */
+  const refuseExit = (reason: ExitReason, score: number): void => {
+    if (!pendingExit) stuckTrades++;
+    pendingExit = { reason, score, candles: 0 };
+  };
+
+  /**
+   * Candle i while a refused sell is pending: only retry the sell (at the open,
+   * else as soon as the price reaches minimum / amount inside the candle).
+   */
+  const retryPendingExit = (i: number): void => {
     const p = pos!;
+    const pe = pendingExit!;
     const c = candles[i];
     p.candlesHeld += 1;
+    exposureCandles++;
+    pe.candles++;
+    stuckCandles++;
+    if (sellable(p, c.open)) {
+      closePosition(i, c.open, pe.reason, pe.score, c.time);
+    } else if (sellable(p, c.high)) {
+      const px = Math.min(c.high, Math.max(c.low, minOrder / p.amount));
+      closePosition(i, px, pe.reason, pe.score, c.time + intervalMs);
+    }
+  };
+
+  /**
+   * Stop / take-profit / trailing / time-stop check on the full range of candle i.
+   * `countHeld` = false for the entry candle: its range is checked (the entry
+   * happened at its open) but, like in the engine, it is not a held candle.
+   */
+  const rangeCheck = (i: number, countHeld = true): void => {
+    const p = pos!;
+    const c = candles[i];
+    if (countHeld) p.candlesHeld += 1;
     exposureCandles++;
     const upd = risk.updatePosition(p, c, decisions[i - 1].atr, true);
     if (upd.exit) {
@@ -248,7 +384,15 @@ export function simulate(
       if (px === undefined || !Number.isFinite(px)) px = c.close;
       // A fill can never be outside the candle's range.
       px = Math.min(c.high, Math.max(c.low, px));
-      closePosition(i, px, upd.exitReason ?? "stop-loss", decisions[i - 1].score);
+      const reason = upd.exitReason ?? "stop-loss";
+      const score = decisions[i - 1].score;
+      if (sellable(p, px)) {
+        // A gap through the stop / take-profit fills at the open; everything else happens inside the candle.
+        const atOpen = reason !== "time-stop" && px === c.open;
+        closePosition(i, px, reason, score, atOpen ? c.time : c.time + intervalMs);
+      } else {
+        refuseExit(reason, score); // stops stay where they are: the engine no longer evaluates them
+      }
     } else {
       if (Number.isFinite(upd.stopPrice)) p.stopPrice = Math.max(p.stopPrice, upd.stopPrice); // stops never go down
       if (Number.isFinite(upd.highestPrice)) p.highestPrice = Math.max(p.highestPrice, upd.highestPrice);
@@ -301,6 +445,7 @@ export function simulate(
     };
     posEntryIdx = i;
     posEntryScore = d.score;
+    pendingExit = null;
     return true;
   };
 
@@ -316,11 +461,22 @@ export function simulate(
     }
 
     if (pos) {
-      // Chronologically first: a sell decision from the previous close is executed at this open.
-      if (risk.shouldExitOnSignal(pos, prev)) closePosition(i, c.open, "signal", prev.score);
-      else rangeCheck(i);
+      if (pendingExit) {
+        // Like TradingEngine.managePosition: a pending sell is only retried (no stops, TP or signals).
+        retryPendingExit(i);
+      } else if (risk.shouldExitOnSignal(pos, prev)) {
+        // Chronologically first: a sell decision from the previous close is executed at this open.
+        if (sellable(pos, c.open)) {
+          closePosition(i, c.open, "signal", prev.score, c.time);
+        } else {
+          refuseExit("signal", prev.score);
+          retryPendingExit(i); // the engine keeps retrying during this candle
+        }
+      } else {
+        rangeCheck(i);
+      }
     } else if (prev.action === "buy") {
-      if (tryEntry(i, prev)) rangeCheck(i); // entry at the open → this candle's range counts
+      if (tryEntry(i, prev)) rangeCheck(i, false); // entry at the open → this candle's range is checked (not counted as held)
     }
 
     lastEquity = cash + (pos ? pos.amount * c.close : 0);
@@ -328,6 +484,7 @@ export function simulate(
   }
 
   if (pos) {
+    // Mark-to-market at the last close (not a real sell, so no minimum-order check).
     closePosition(n - 1, candles[n - 1].close, "end-of-backtest", decisions[n - 1].score);
     eqValues[curveLen - 1] = cash;
   }
@@ -382,6 +539,9 @@ export function simulate(
 
   return {
     exposureCandles,
+    slippagePct: slip,
+    stuckTrades,
+    stuckCandles,
     result: {
       market,
       interval,
@@ -403,8 +563,9 @@ export function simulate(
 /** runBacktest with fully resolved dependencies (no defaults from other modules). */
 export function runBacktestWith(input: BacktestInput, deps: ResolvedBacktestDeps, opts?: SimulationOptions): SimulationOutput {
   const startedAt = Date.now();
-  const decisions = deps.decide(input.market, input.candles, input.ensemble);
-  const out = simulate(input, decisions, deps.createRisk(input.risk, input.interval), opts);
+  const costed = withSpreadCosts(input);
+  const decisions = deps.decide(costed.market, costed.candles, costed.ensemble);
+  const out = simulate(costed, decisions, deps.createRisk(costed.risk, costed.interval), opts);
   out.result.durationMs = Date.now() - startedAt;
   return out;
 }

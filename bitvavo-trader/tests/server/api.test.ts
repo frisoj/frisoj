@@ -1,7 +1,20 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { INTERVAL_MS } from "../../src/core/types";
-import { BACKTEST_WARMUP_CANDLES } from "../../src/server/routes";
-import { FakeFeed, NOW, json, makePosition, startTestServer, type TestServer } from "./helpers";
+import { DEFAULT_ENGINE_CONFIG } from "../../src/core/defaults";
+import { INTERVAL_MS, type Candle, type Interval } from "../../src/core/types";
+import { BACKTEST_WARMUP_CANDLES, MIN_PERIOD_CANDLES } from "../../src/server/routes";
+import { backtestWarmupCandles } from "../../src/server/warmup";
+import { FakeFeed, NOW, json, makeCandles, makePosition, startTestServer, type TestServer } from "./helpers";
+
+/** Markt die pas `count` candles geleden genoteerd werd (historie begint ná `from`). */
+class RecentListingFeed extends FakeFeed {
+  constructor(private readonly count: number) {
+    super();
+  }
+  override async getHistory(m: string, interval: Interval, from: number, to: number): Promise<Candle[]> {
+    this.historyCalls.push({ market: m, interval, from, to });
+    return makeCandles(interval, this.count + 1, to).slice(0, -1);
+  }
+}
 
 let srv: TestServer | null = null;
 afterEach(async () => {
@@ -341,5 +354,173 @@ describe("API: backtest / optimize / walk-forward", () => {
     // daarna kan het weer
     const third = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "15m", days: 5 });
     expect(third.status).toBe(200);
+  });
+});
+
+describe("API: backtestperiode en warmup", () => {
+  it.each([
+    ["1d", 30],
+    ["4h", 5],
+    ["1h", 1],
+  ])("400 als de periode te kort is (%s, %d dagen) in plaats van stilletjes te verbreden", async (interval, days) => {
+    srv = await startTestServer();
+    const r = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval, days });
+    expect(r.status).toBe(400);
+    expect(r.data.error).toMatch(/Periode te kort/);
+    expect(r.data.error).toContain(`minimaal ${MIN_PERIOD_CANDLES}`);
+    expect(srv.calls.runBacktest).toHaveLength(0);
+  });
+
+  it.each([
+    ["1d", 31],
+    ["4h", 6],
+    ["1h", 2],
+  ])("net lang genoeg (%s, %d dagen) → de test begint op de gevraagde periode", async (interval, days) => {
+    srv = await startTestServer();
+    const r = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval, days });
+    expect(r.status).toBe(200);
+    const input = srv.calls.runBacktest[0];
+    const from = NOW - days * 86_400_000;
+    const idx = input.tradeFromIndex!;
+    expect(input.candles[idx].time).toBeGreaterThanOrEqual(from);
+    expect(input.candles[idx - 1].time).toBeLessThan(from);
+    expect(input.candles.length - idx).toBeGreaterThanOrEqual(MIN_PERIOD_CANDLES);
+    expect(r.data.note).toBeUndefined();
+  });
+
+  it("recente listing: handelt nooit tijdens de warmup en meldt de ingekorte periode", async () => {
+    const feed = new RecentListingFeed(200);
+    srv = await startTestServer({ feed });
+    const r = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "1h", days: 30 });
+    expect(r.status).toBe(200);
+    const input = srv.calls.runBacktest[0];
+    const required = backtestWarmupCandles(DEFAULT_ENGINE_CONFIG.ensemble);
+    expect(required).toBeGreaterThanOrEqual(101 + 1); // ema-trend (trend 100) + marge
+    expect(input.tradeFromIndex).toBeGreaterThanOrEqual(required);
+    expect(input.tradeFromIndex).toBe(required);
+    expect(r.data.note).toMatch(/Periode ingekort/);
+  });
+
+  it("recente listing met te weinig historie na de warmup → 400", async () => {
+    const feed = new RecentListingFeed(120);
+    srv = await startTestServer({ feed });
+    const r = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "1h", days: 30 });
+    expect(r.status).toBe(400);
+    expect(r.data.error).toMatch(/te weinig historie/);
+    expect(r.data.error).toMatch(/opwarmtijd/);
+    expect(srv.calls.runBacktest).toHaveLength(0);
+  });
+
+  it("haalt extra warmup op als de strategieparameters meer dan 250 candles nodig hebben", async () => {
+    srv = await startTestServer();
+    const r = await json(srv.base, "POST", "/api/backtest", {
+      market: "BTC-EUR",
+      interval: "1h",
+      days: 30,
+      ensemble: { params: { "ema-trend": { slow: 400 } } },
+    });
+    expect(r.status).toBe(200);
+    const required = backtestWarmupCandles({
+      ...DEFAULT_ENGINE_CONFIG.ensemble,
+      params: { "ema-trend": { slow: 400 } },
+    });
+    expect(required).toBeGreaterThan(BACKTEST_WARMUP_CANDLES);
+    const call = srv.feed.historyCalls[0];
+    expect(call.from).toBe(NOW - 30 * 86_400_000 - required * INTERVAL_MS["1h"]);
+    expect(srv.calls.runBacktest[0].tradeFromIndex).toBeGreaterThanOrEqual(required);
+  });
+
+  it("optimize met een strategie houdt rekening met de grootste parameters uit de zoekruimte", () => {
+    const base = backtestWarmupCandles(DEFAULT_ENGINE_CONFIG.ensemble);
+    const withSpace = backtestWarmupCandles(DEFAULT_ENGINE_CONFIG.ensemble, "ema-trend");
+    expect(withSpace).toBeGreaterThanOrEqual(201); // trend-EMA 200 in de zoekruimte
+    expect(withSpace).toBeGreaterThan(base);
+  });
+});
+
+describe("API: invoerfouten zijn 400, geen 500", () => {
+  it("walk-forward met te weinig candles voor de folds → 400", async () => {
+    srv = await startTestServer();
+    const r = await json(srv.base, "POST", "/api/walkforward", {
+      market: "BTC-EUR",
+      interval: "1h",
+      days: 2,
+      folds: 8,
+      objective: "sharpe",
+    });
+    expect(r.status).toBe(400);
+    expect(r.data.error).toMatch(/Te weinig candles voor een walk-forward met 8 folds/);
+    expect(srv.calls.walkForward).toHaveLength(0);
+    // en daarna is de server niet "bezet"
+    const ok = await json(srv.base, "POST", "/api/backtest", { market: "BTC-EUR", interval: "1h", days: 5 });
+    expect(ok.status).toBe(200);
+  });
+
+  it("extreem diep geneste JSON → 400", async () => {
+    srv = await startTestServer();
+    const depth = 200_000;
+    const deep = `{"ensemble":{"enabled":${"[".repeat(depth)}${"]".repeat(depth)}}}`;
+    const r = await json(srv.base, "PUT", "/api/config", deep, { "Content-Type": "application/json" });
+    expect(r.status).toBe(400);
+    expect(r.data.error).toMatch(/te diep genest/);
+    const mid = `{"ensemble":{"enabled":${"[".repeat(40)}${"]".repeat(40)}}}`;
+    const r2 = await json(srv.base, "PUT", "/api/config", mid, { "Content-Type": "application/json" });
+    expect(r2.status).toBe(400);
+    expect(srv.persisted).toHaveLength(0);
+  });
+
+  it("geneste lijsten in een strategielijst geven een nette foutmelding", async () => {
+    srv = await startTestServer();
+    const r = await json(srv.base, "PUT", "/api/config", { ensemble: { enabled: [[["ema-trend"]]] } });
+    expect(r.status).toBe(400);
+    expect(r.data.error).toMatch(/Onbekende strategie\(ën\): \[lijst\]/);
+    const o = await json(srv.base, "POST", "/api/optimize", {
+      market: "BTC-EUR",
+      interval: "15m",
+      days: 10,
+      strategy: [[1]],
+    });
+    expect(o.status).toBe(400);
+    expect(o.data.error).toMatch(/Onbekende strategie: \[lijst\]/);
+  });
+});
+
+describe("API: scanner-cache", () => {
+  it("een grotere scan bedient ook kleinere limits (geen extra Bitvavo-verzoeken)", async () => {
+    srv = await startTestServer();
+    const big = await json(srv.base, "GET", "/api/scanner?limit=4");
+    expect(big.status).toBe(200);
+    expect(big.data).toHaveLength(4);
+    const tickers = srv.feed.tickerCalls;
+    const candles = srv.feed.candleCalls.length;
+    for (let n = 1; n <= 4; n++) {
+      const r = await json(srv.base, "GET", `/api/scanner?limit=${n}`);
+      expect(r.status).toBe(200);
+      expect(r.data).toEqual(big.data.slice(0, n));
+    }
+    expect(srv.feed.tickerCalls).toBe(tickers);
+    expect(srv.feed.candleCalls.length).toBe(candles);
+  });
+
+  it("gelijktijdige verzoeken met verschillende limits delen de grootste lopende scan", async () => {
+    srv = await startTestServer();
+    const first = json(srv.base, "GET", "/api/scanner?limit=4");
+    // wacht tot de eerste scan loopt
+    for (let i = 0; i < 100 && srv.feed.tickerCalls === 0; i++) await new Promise((r) => setTimeout(r, 2));
+    const rest = await Promise.all([1, 2, 3].map((n) => json(srv!.base, "GET", `/api/scanner?limit=${n}`)));
+    const all = await first;
+    expect(all.data).toHaveLength(4);
+    rest.forEach((r, i) => expect(r.data).toEqual(all.data.slice(0, i + 1)));
+    expect(srv.feed.tickerCalls).toBe(1);
+  });
+
+  it("met een mislukte markt levert een kleinere limit dezelfde rangorde", async () => {
+    const feed = new FakeFeed();
+    feed.failCandlesFor.add("ETH-EUR");
+    srv = await startTestServer({ feed });
+    const all = await json(srv.base, "GET", "/api/scanner?limit=4");
+    expect(all.data.map((x: { market: string }) => x.market)).toEqual(["BTC-EUR", "SOL-EUR", "ADA-EUR"]);
+    const two = await json(srv.base, "GET", "/api/scanner?limit=2");
+    expect(two.data.map((x: { market: string }) => x.market)).toEqual(["BTC-EUR"]);
   });
 });

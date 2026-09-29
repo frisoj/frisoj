@@ -40,6 +40,18 @@ export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/**
+ * Korte, veilige weergave van een onbekende invoerwaarde in een foutmelding.
+ * Niet-recursief: String() op een diep geneste lijst kan de stack laten overlopen.
+ */
+export function inputLabel(v: unknown): string {
+  if (typeof v === "string") return v.length > 40 ? `${v.slice(0, 40)}…` : v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "[lijst]";
+  return typeof v;
+}
+
 export function fail(errors: string | string[]): never {
   const list = Array.isArray(errors) ? errors : [errors];
   throw new HttpError(400, list.join(" "));
@@ -126,7 +138,7 @@ export function mergeEnsemble(
       errors.push("Kies minstens één strategie (ensemble.enabled).");
     } else {
       const bad = patch.enabled.filter((s) => !isStrategyId(s));
-      if (bad.length > 0) errors.push(`Onbekende strategie(ën): ${bad.map(String).join(", ")}.`);
+      if (bad.length > 0) errors.push(`Onbekende strategie(ën): ${bad.map(inputLabel).join(", ")}.`);
       else out.enabled = [...new Set(patch.enabled as StrategyId[])];
     }
   }
@@ -330,7 +342,7 @@ export function parseOptimizeRequest(
   const errors: string[] = [];
   let strategy: StrategyId | undefined;
   if (b.strategy !== undefined && b.strategy !== null && b.strategy !== "") {
-    if (!isStrategyId(b.strategy)) errors.push(`Onbekende strategie: ${String(b.strategy)}.`);
+    if (!isStrategyId(b.strategy)) errors.push(`Onbekende strategie: ${inputLabel(b.strategy)}.`);
     else strategy = b.strategy;
   }
   let objective: OptimizeObjective = "sharpe";

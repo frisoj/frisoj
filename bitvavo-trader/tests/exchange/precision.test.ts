@@ -80,6 +80,39 @@ describe("roundAmount / roundQuote", () => {
     expect(roundQuote(19.99, btc)).toBe(19.99);
   });
 
+  it("rondt grote hoeveelheden (meer dan 15 significante cijfers) nooit naar boven af", () => {
+    // Voorheen: 12345678.1234568 (> saldo) → Bitvavo weigert de verkoop met 216.
+    expect(roundAmount(12345678.12345678, btc)).toBe(12345678.12345678);
+    expect(roundAmount(99999999.99999999, btc)).toBeLessThanOrEqual(99999999.99999999);
+    expect(roundAmount(99999999.99999999, btc)).toBeLessThan(100000000);
+    expect(roundAmount(10000000.99999999, btc)).toBe(10000000.99999999);
+    expect(roundAmount(95658278.50981535, btc)).toBeLessThanOrEqual(95658278.50981535);
+    expect(roundAmount(1234567.123456789, btc)).toBe(1234567.12345678);
+    expect(roundAmount(12345678.123456789, btc)).toBeLessThanOrEqual(12345678.123456789);
+  });
+
+  it("laat saldo's met 8 decimalen ongewijzigd (willekeurige steekproef tot 9e7)", () => {
+    let seed = 42;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    let above = 0;
+    let changed = 0;
+    for (const mag of [1e-4, 1, 1e4, 1e6, 1e7, 5e7, 9e7]) {
+      for (let k = 0; k < 4000; k++) {
+        const units = BigInt(Math.floor(rnd() * mag * 1e8));
+        const s = `${units / 100000000n}.${(units % 100000000n).toString().padStart(8, "0")}`;
+        const v = Number(s);
+        const r = roundAmount(v, btc);
+        if (r > v || Number(formatDecimal(r, 15)) > v) above++;
+        if (r !== v) changed++;
+      }
+    }
+    expect(above).toBe(0);
+    expect(changed).toBe(0);
+  });
+
   it("geeft 0 bij ongeldige invoer", () => {
     expect(roundAmount(Number.NaN, btc)).toBe(0);
     expect(roundAmount(-1, btc)).toBe(0);
@@ -109,6 +142,16 @@ describe("formatDecimal", () => {
     expect(formatDecimal(0.999, 2)).toBe("0.99");
     expect(formatDecimal(1e-9, 8)).toBe("0");
     expect(formatDecimal(-1.2399, 2)).toBe("-1.23");
+  });
+
+  it("schrijft getallen met 16-17 significante cijfers exact (niet naar boven afgerond)", () => {
+    expect(formatDecimal(12345678.12345678, 15)).toBe("12345678.12345678");
+    expect(formatDecimal(12345678.12345678, 8)).toBe("12345678.12345678");
+    expect(formatDecimal(12345678.12345678, 7)).toBe("12345678.1234567");
+    expect(formatDecimal(99999999.99999999, 15)).not.toBe("100000000");
+    expect(Number(formatDecimal(99999999.99999999, 15))).toBeLessThanOrEqual(99999999.99999999);
+    expect(toPlainString(12345678.12345678, true)).toBe("12345678.12345678");
+    expect(toPlainString(12345678.12345678)).toBe("12345678.1234568"); // 15 significante cijfers
   });
 
   it("gooit bij NaN/Infinity", () => {

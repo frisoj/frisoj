@@ -8,6 +8,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { DEFAULT_ENGINE_CONFIG, DEFAULT_PAPER_CAPITAL } from "./core/defaults";
+import { validateRiskConfig } from "./risk/riskManager";
 import {
   INTERVALS,
   STRATEGY_IDS,
@@ -47,6 +48,8 @@ export interface LoadConfigOptions {
    * `env === process.env`. `false` = nooit een .env-bestand lezen.
    */
   envFile?: string | false;
+  /** Waarschuwingen (standaard console.warn); handig om in tests op te vangen. */
+  warn?: (msg: string) => void;
 }
 
 export class ConfigError extends Error {
@@ -57,6 +60,21 @@ export class ConfigError extends Error {
 }
 
 export const OVERRIDES_FILE = "config.json";
+
+const LOOPBACK_NAMES = new Set(["localhost", "::1", "[::1]"]);
+const OCTET = "(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)";
+const LOOPBACK_V4 = new RegExp(`^127\\.${OCTET}\\.${OCTET}\\.${OCTET}$`);
+
+/**
+ * True als `host` (zonder poort) EXACT een loopback-adres is: localhost, ::1,
+ * [::1] of een IPv4-adres 127.x.y.z. Namen die alleen met "127." beginnen
+ * (bijv. "127.aanvaller.example" of "127.0.0.1.nip.io") zijn gewone
+ * domeinnamen en tellen NIET als loopback (bescherming tegen DNS-rebinding).
+ */
+export function isLoopbackHost(host: string): boolean {
+  const h = host.trim().toLowerCase();
+  return LOOPBACK_NAMES.has(h) || LOOPBACK_V4.test(h);
+}
 
 // ─────────────────────────────── helpers ───────────────────────────────
 
@@ -182,7 +200,9 @@ export function readEngineOverrides(
       for (const key of Object.keys(DEFAULT_ENGINE_CONFIG.risk) as (keyof RiskConfig)[]) {
         const v = raw.risk[key];
         if (v === undefined) continue;
-        if (isFiniteNumber(v) && v >= 0) risk[key] = v;
+        // Zelfde grenzen als de risicomanager: een ongeldige waarde (bijv. takerFee 0.05)
+        // valt terug op de standaardwaarde van alleen die instelling.
+        if (isFiniteNumber(v) && validateRiskConfig({ [key]: v }).ok) risk[key] = v;
         else skipped.push(`risk.${key}`);
       }
       out.risk = risk as RiskConfig;
@@ -266,6 +286,23 @@ export function mergeEngineConfig(base: EngineConfig, patch: Partial<EngineConfi
   return out;
 }
 
+/**
+ * Vervangt ongeldige risico-instellingen (bijv. een takerFee van 0.05 uit een
+ * oud config.json) per instelling door de standaardwaarde. Geldige waarden
+ * blijven staan. Muteert `risk`; geeft de vervangen sleutels terug.
+ */
+export function repairRiskConfig(risk: RiskConfig): (keyof RiskConfig)[] {
+  const fixed: (keyof RiskConfig)[] = [];
+  if (validateRiskConfig(risk).ok) return fixed;
+  for (const k of Object.keys(DEFAULT_ENGINE_CONFIG.risk) as (keyof RiskConfig)[]) {
+    if (!validateRiskConfig({ [k]: risk[k] }).ok) {
+      risk[k] = DEFAULT_ENGINE_CONFIG.risk[k];
+      fixed.push(k);
+    }
+  }
+  return fixed;
+}
+
 /** Slaat de huidige engine-instellingen op in `<dataDir>/config.json` (atomisch). */
 export function saveEngineOverrides(dataDir: string, cfg: EngineConfig): void {
   mkdirSync(dataDir, { recursive: true });
@@ -278,6 +315,7 @@ export function saveEngineOverrides(dataDir: string, cfg: EngineConfig): void {
 // ─────────────────────────────── loadConfig ───────────────────────────────
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfigOptions = {}): AppConfig {
+  const warn = opts.warn ?? ((m: string) => console.warn(m));
   const envFile = opts.envFile === undefined ? (env === process.env ? join(PROJECT_ROOT, ".env") : false) : opts.envFile;
   if (envFile) loadEnvFileInto(env, envFile);
 
@@ -342,7 +380,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
     }
     engine.interval = intervalRaw as Interval;
   }
-  engine = mergeEngineConfig(engine, readEngineOverrides(dataDir));
+  // Instellingen die in het dashboard zijn opgeslagen winnen van .env. Zeg dat
+  // hardop als ze MARKETS/INTERVAL uit .env overschrijven, anders lijkt .env kapot.
+  const overrides = readEngineOverrides(dataDir, warn);
+  const overridesFile = join(dataDir, OVERRIDES_FILE);
+  if (marketsRaw !== undefined && overrides.markets && overrides.markets.join(",") !== engine.markets.join(",")) {
+    warn(
+      `⚠ MARKETS uit .env (${engine.markets.join(", ")}) wordt genegeerd: in het dashboard is ` +
+        `${overrides.markets.join(", ")} opgeslagen (${overridesFile}). Wijzig de markten in het tabblad ` +
+        "Instellingen, of verwijder dat bestand om .env weer te laten gelden.",
+    );
+  }
+  if (intervalRaw !== undefined && overrides.interval && overrides.interval !== engine.interval) {
+    warn(
+      `⚠ INTERVAL uit .env (${engine.interval}) wordt genegeerd: in het dashboard is ${overrides.interval} ` +
+        `opgeslagen (${overridesFile}). Wijzig het interval in het tabblad Instellingen, of verwijder dat ` +
+        "bestand om .env weer te laten gelden.",
+    );
+  }
+  engine = mergeEngineConfig(engine, overrides);
 
   // Live-specifieke veiligheidscontroles
   if (mode === "live") {
@@ -357,6 +413,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
       throw new ConfigError(
         "Live trading kan niet met gesimuleerde marktdata (DATA_SOURCE=simulated). " +
           "Gebruik DATA_SOURCE=bitvavo of auto, of zet TRADING_MODE=paper.",
+      );
+    }
+    // Zonder token en buiten loopback kan iedereen op het netwerk de bot armen/starten.
+    if (!dashboardToken && !isLoopbackHost(host)) {
+      throw new ConfigError(
+        `Live trading met HOST=${host} maakt het dashboard bereikbaar vanaf het netwerk. ` +
+          "Zet een DASHBOARD_TOKEN (minstens 8 tekens) in .env, of gebruik HOST=127.0.0.1.",
       );
     }
   }

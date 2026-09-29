@@ -1685,6 +1685,14 @@
 .bt-apply-table td b {
   color: var(--accent);
 }
+.bt-apply-table td:first-child,
+.bt-apply-table td.bt-apply-list {
+  white-space: normal;
+}
+.bt-apply-table td.bt-apply-list {
+  min-width: 7em;
+  font-size: 12px;
+}
 
 /* Walk-forward */
 .bt-verdict {

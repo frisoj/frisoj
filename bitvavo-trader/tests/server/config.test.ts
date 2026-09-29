@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConfigError, PROJECT_ROOT, loadConfig, saveEngineOverrides } from "../../src/config";
+import { ConfigError, PROJECT_ROOT, loadConfig, repairRiskConfig, saveEngineOverrides } from "../../src/config";
 import { DEFAULT_ENGINE_CONFIG } from "../../src/core/defaults";
 
 function tmp(): string {
@@ -150,5 +150,92 @@ describe("loadConfig", () => {
     expect(cfg.engine.interval).toBe("1h");
     // niet-bestaand bestand is geen probleem
     expect(() => loadConfig({ DATA_DIR: dir }, { envFile: join(dir, "bestaat-niet") })).not.toThrow();
+  });
+
+  describe("live mode buiten loopback", () => {
+    const live = { TRADING_MODE: "live", BITVAVO_API_KEY: "k", BITVAVO_API_SECRET: "s" };
+
+    it.each(["0.0.0.0", "::", "192.168.1.20", "127.evil.example", "127.0.0.1.nip.io"])(
+      "weigert HOST=%s zonder DASHBOARD_TOKEN",
+      (host) => {
+        const load = () => loadConfig({ ...live, HOST: host, DATA_DIR: tmp() });
+        expect(load).toThrow(ConfigError);
+        expect(load).toThrow(/DASHBOARD_TOKEN/);
+      },
+    );
+
+    it("staat live toe met een token, of op loopback zonder token", () => {
+      expect(loadConfig({ ...live, HOST: "0.0.0.0", DASHBOARD_TOKEN: "lang-genoeg-1", DATA_DIR: tmp() }).host).toBe("0.0.0.0");
+      for (const host of ["127.0.0.1", "127.0.0.2", "localhost", "::1"]) {
+        expect(loadConfig({ ...live, HOST: host, DATA_DIR: tmp() }).host).toBe(host);
+      }
+      expect(loadConfig({ ...live, DATA_DIR: tmp() }).host).toBe("127.0.0.1");
+    });
+
+    it("paper op 0.0.0.0 zonder token mag (alleen een waarschuwing bij het starten)", () => {
+      const cfg = loadConfig({ HOST: "0.0.0.0", DATA_DIR: tmp() });
+      expect(cfg.mode).toBe("paper");
+      expect(cfg.host).toBe("0.0.0.0");
+    });
+  });
+
+  describe("dashboard-instellingen versus .env", () => {
+    it("waarschuwt als MARKETS/INTERVAL uit .env genegeerd worden", () => {
+      const dir = tmp();
+      saveEngineOverrides(dir, { ...structuredClone(DEFAULT_ENGINE_CONFIG), markets: ["BTC-EUR", "ETH-EUR"], interval: "15m" });
+      const warnings: string[] = [];
+      const cfg = loadConfig({ DATA_DIR: dir, MARKETS: "ADA-EUR", INTERVAL: "1h" }, { warn: (m) => warnings.push(m) });
+      expect(cfg.engine.markets).toEqual(["BTC-EUR", "ETH-EUR"]);
+      expect(cfg.engine.interval).toBe("15m");
+      expect(warnings).toHaveLength(2);
+      expect(warnings[0]).toMatch(/MARKETS uit \.env \(ADA-EUR\) wordt genegeerd/);
+      expect(warnings[0]).toContain(join(dir, "config.json"));
+      expect(warnings[1]).toMatch(/INTERVAL uit \.env \(1h\) wordt genegeerd.*15m/);
+    });
+
+    it("waarschuwt niet als .env niets zegt of hetzelfde zegt", () => {
+      const dir = tmp();
+      saveEngineOverrides(dir, { ...structuredClone(DEFAULT_ENGINE_CONFIG), markets: ["ETH-EUR"], interval: "1h" });
+      const warnings: string[] = [];
+      loadConfig({ DATA_DIR: dir }, { warn: (m) => warnings.push(m) });
+      loadConfig({ DATA_DIR: dir, MARKETS: "eth-eur", INTERVAL: "1h" }, { warn: (m) => warnings.push(m) });
+      expect(warnings).toEqual([]);
+      // Zonder config.json geldt .env gewoon
+      const fresh = loadConfig({ DATA_DIR: tmp(), MARKETS: "ADA-EUR", INTERVAL: "4h" }, { warn: (m) => warnings.push(m) });
+      expect(fresh.engine.markets).toEqual(["ADA-EUR"]);
+      expect(fresh.engine.interval).toBe("4h");
+      expect(warnings).toEqual([]);
+    });
+  });
+
+  describe("risico-instellingen uit config.json", () => {
+    it("vervangt alleen ongeldige waarden door de standaard (per instelling)", () => {
+      const dir = tmp();
+      writeFileSync(
+        join(dir, "config.json"),
+        JSON.stringify({ risk: { takerFee: 0.05, slippagePct: 0.5, makerFee: 0.001, riskPerTradePct: 1 } }),
+      );
+      const warnings: string[] = [];
+      const cfg = loadConfig({ DATA_DIR: dir }, { warn: (m) => warnings.push(m) });
+      expect(cfg.engine.risk.takerFee).toBe(DEFAULT_ENGINE_CONFIG.risk.takerFee);
+      expect(cfg.engine.risk.slippagePct).toBe(DEFAULT_ENGINE_CONFIG.risk.slippagePct);
+      expect(cfg.engine.risk.makerFee).toBe(0.001);
+      expect(cfg.engine.risk.riskPerTradePct).toBe(1);
+      expect(warnings.join(" ")).toMatch(/risk\.takerFee/);
+      expect(warnings.join(" ")).toMatch(/risk\.slippagePct/);
+    });
+
+    it("repairRiskConfig herstelt per sleutel en laat geldige waarden staan", () => {
+      const risk = { ...DEFAULT_ENGINE_CONFIG.risk, takerFee: 0.25, slippagePct: 0.5, makerFee: 0.001, stopAtrMult: 3 };
+      const fixed = repairRiskConfig(risk);
+      expect(fixed.sort()).toEqual(["slippagePct", "takerFee"]);
+      expect(risk.takerFee).toBe(DEFAULT_ENGINE_CONFIG.risk.takerFee);
+      expect(risk.slippagePct).toBe(DEFAULT_ENGINE_CONFIG.risk.slippagePct);
+      expect(risk.makerFee).toBe(0.001);
+      expect(risk.stopAtrMult).toBe(3);
+      const ok = { ...DEFAULT_ENGINE_CONFIG.risk };
+      expect(repairRiskConfig(ok)).toEqual([]);
+      expect(ok).toEqual(DEFAULT_ENGINE_CONFIG.risk);
+    });
   });
 });

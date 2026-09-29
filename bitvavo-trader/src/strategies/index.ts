@@ -13,3 +13,4 @@ export {
   runEnsemble,
   summarizeVotes,
 } from "./ensemble";
+export type { EnsembleDecisionWithExit } from "./ensemble";

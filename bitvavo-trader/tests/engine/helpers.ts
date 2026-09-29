@@ -159,6 +159,12 @@ export class FakeBroker implements Broker {
   throwOnOrder = false;
   orders: { req: MarketOrderRequest; ref: number; res: OrderResult }[] = [];
   balances = new Map<string, number>();
+  /** Saldo dat vastzit in openstaande orders (per symbool) */
+  inOrder = new Map<string, number>();
+  /** Optioneel: order opzoeken op clientOrderId (null = bevestigd niet gevonden, throw = onbekend) */
+  lookupOrder?: (market: string, clientOrderId: string) => Promise<OrderResult | null>;
+  /** Tijdelijk leeg antwoord van GET /balance simuleren */
+  emptyBalances = false;
   restored: Balance[] | null = null;
   resetTo: number | null = null;
   private seq = 0;
@@ -170,7 +176,13 @@ export class FakeBroker implements Broker {
   }
 
   async getBalances(): Promise<Balance[]> {
-    return [...this.balances.entries()].map(([symbol, available]) => ({ symbol, available, inOrder: 0 }));
+    if (this.emptyBalances) return [];
+    const symbols = new Set([...this.balances.keys(), ...this.inOrder.keys()]);
+    return [...symbols].map((symbol) => ({
+      symbol,
+      available: this.balances.get(symbol) ?? 0,
+      inOrder: this.inOrder.get(symbol) ?? 0,
+    }));
   }
 
   /** Gescripte antwoorden (FIFO) die voorrang krijgen op het standaardgedrag */

@@ -11,10 +11,19 @@ import {
   type BacktestDeps,
   type BacktestInput,
   type ResolvedBacktestDeps,
+  type SimulationOutput,
 } from "./simulator";
 
-export type { BacktestDeps, BacktestInput, ResolvedBacktestDeps } from "./simulator";
-export { MAX_CHART_CANDLES, aggregateCandles, exitMarkerLabel, fmtPctNl } from "./simulator";
+export type { BacktestDeps, BacktestInput, ResolvedBacktestDeps, SimulationOutput } from "./simulator";
+export {
+  MAX_CHART_CANDLES,
+  aggregateCandles,
+  effectiveSlippagePct,
+  exitMarkerLabel,
+  fmtPctNl,
+  spreadFromTicker,
+  withSpreadCosts,
+} from "./simulator";
 
 export function resolveBacktestDeps(deps?: BacktestDeps): ResolvedBacktestDeps {
   return {
@@ -25,4 +34,13 @@ export function resolveBacktestDeps(deps?: BacktestDeps): ResolvedBacktestDeps {
 
 export function runBacktest(input: BacktestInput, deps?: BacktestDeps): BacktestResult {
   return runBacktestWith(input, resolveBacktestDeps(deps)).result;
+}
+
+/**
+ * runBacktest plus simulation details that are not part of BacktestResult:
+ * the slippage actually used (incl. half the spread) and how many trades /
+ * candles were stuck because a sell below the minimum order was refused.
+ */
+export function runBacktestDetailed(input: BacktestInput, deps?: BacktestDeps): SimulationOutput {
+  return runBacktestWith(input, resolveBacktestDeps(deps));
 }

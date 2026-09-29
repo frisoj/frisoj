@@ -16,7 +16,7 @@ import type {
 } from "../core/types";
 import { STRATEGY_IDS } from "../core/types";
 import { hashString, mulberry32 } from "../core/util";
-import { simulate, type BacktestDeps, type BacktestInput, type ResolvedBacktestDeps } from "./simulator";
+import { simulate, withSpreadCosts, type BacktestDeps, type BacktestInput, type ResolvedBacktestDeps } from "./simulator";
 
 export interface OptimizeOptions {
   strategy?: StrategyId;
@@ -24,7 +24,19 @@ export interface OptimizeOptions {
   maxCombos?: number;
 }
 
-export type ClassifyFn = (score: number, regime: Regime, cfg: EnsembleConfig) => SignalAction;
+/**
+ * Score → action (the ensemble's `classify`). `exitScore` is the optional
+ * exit score of the decision (see `EnsembleDecision.exitScore` in the ensemble).
+ */
+export type ClassifyFn = (score: number, regime: Regime, cfg: EnsembleConfig, exitScore?: number) => SignalAction;
+
+/** A decision that may carry the ensemble's exit score (not part of the core contract yet). */
+type DecisionWithExit = EnsembleDecision & { exitScore?: number };
+
+function exitScoreOf(d: EnsembleDecision): number | undefined {
+  const v = (d as DecisionWithExit).exitScore;
+  return typeof v === "number" ? v : undefined;
+}
 export type ParamSpaceFn = (strategy: StrategyId) => Record<string, number[]>;
 
 /** BacktestDeps plus optional hooks for the optimizer (mainly for tests). */
@@ -187,11 +199,44 @@ function decodeCombo(index: number, keys: string[], grid: Record<string, number[
   return ordered;
 }
 
-/** Heatmap over the two params with the most distinct values; cell = best (non-penalised) score. */
+/**
+ * Heatmap with per-cell details. `values` = MEDIAN of the scored (non-penalised)
+ * combinations in the cell, so one lucky combination cannot paint a region
+ * green; the extra arrays let the UI show how robust a cell is.
+ * (Extra fields on top of the core `Heatmap` contract; JSON-safe.)
+ */
+export interface HeatmapDetail extends Heatmap {
+  /** Best score per cell (max over the other params), null = no combination with enough trades */
+  best: (number | null)[][];
+  /** Number of sampled combinations that fell into the cell */
+  tested: number[][];
+  /** Of those: number with at least MIN_TRADES_FOR_SCORE trades (score counts) */
+  scored: number[][];
+  /** Of the scored ones: number above the neutral point (profitFactor: 1, otherwise 0) */
+  positive: number[][];
+}
+
+/** Neutral score of an objective: profit factor 1, everything else 0. */
+export function objectivePivot(objective: OptimizeObjective | undefined): number {
+  return objective === "profitFactor" ? 1 : 0;
+}
+
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/**
+ * Heatmap over the two params with the most distinct values. Cell value =
+ * median score over the other (hidden) params; `best` keeps the maximum.
+ */
 export function buildHeatmap(
   grid: Record<string, number[]>,
   tested: { params: Record<string, number>; score: number }[],
-): Heatmap | null {
+  objective?: OptimizeObjective,
+): HeatmapDetail | null {
   const keys = Object.keys(grid);
   if (keys.length < 2) return null;
   const byCount = keys
@@ -201,24 +246,31 @@ export function buildHeatmap(
   const yParam = byCount[1].k;
   const xValues = [...grid[xParam]].sort((a, b) => a - b);
   const yValues = [...grid[yParam]].sort((a, b) => a - b);
-  const values: (number | null)[][] = yValues.map(() => xValues.map(() => null));
+  const pivot = objectivePivot(objective);
+  const scores: number[][][] = yValues.map(() => xValues.map(() => []));
+  const testedCount: number[][] = yValues.map(() => xValues.map(() => 0));
   for (const t of tested) {
-    if (!(t.score > PENALTY_SCORE)) continue; // too few trades → leave the cell empty
     const xi = xValues.indexOf(t.params[xParam]);
     const yi = yValues.indexOf(t.params[yParam]);
     if (xi < 0 || yi < 0) continue;
-    const cur = values[yi][xi];
-    if (cur === null || t.score > cur) values[yi][xi] = t.score;
+    testedCount[yi][xi]++;
+    if (t.score > PENALTY_SCORE) scores[yi][xi].push(t.score); // too few trades → does not count
   }
-  return { xParam, yParam, xValues, yValues, values };
+  const values = scores.map((row) => row.map((cell) => median(cell)));
+  const best = scores.map((row) => row.map((cell) => (cell.length > 0 ? Math.max(...cell) : null)));
+  const scored = scores.map((row) => row.map((cell) => cell.length));
+  const positive = scores.map((row) => row.map((cell) => cell.filter((v) => v > pivot).length));
+  return { xParam, yParam, xValues, yValues, values, best, tested: testedCount, scored, positive };
 }
 
 /** Grid-search optimisation with resolved dependencies. */
 export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: ResolvedOptimizerDeps): OptimizationResult {
   const startedAt = Date.now();
+  // Spread-aware costs once, so the risk manager of every combo sees them too.
+  const costed = withSpreadCosts(input);
   const base: BacktestInput = opts.strategy
-    ? { ...input, ensemble: forceEnableStrategy(input.ensemble, opts.strategy) }
-    : input;
+    ? { ...costed, ensemble: forceEnableStrategy(costed.ensemble, opts.strategy) }
+    : costed;
   const grid = buildParamGrid(opts.strategy, deps.paramSpace);
   const keys = Object.keys(grid);
   const total = keys.reduce((acc, k) => acc * grid[k].length, 1);
@@ -249,7 +301,7 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
         const overridden = new Uint8Array(computed.length);
         for (let i = 0; i < computed.length; i++) {
           const d = computed[i];
-          if (classify(d.score, d.regime, ens) !== d.action) overridden[i] = 1;
+          if (classify(d.score, d.regime, ens, exitScoreOf(d)) !== d.action) overridden[i] = 1;
         }
         entry = { decisions: computed, overridden };
         scoreCache.set(scoreKey, entry);
@@ -263,7 +315,7 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
             decisions[i] = d;
             continue;
           }
-          const action = classify(d.score, d.regime, ens);
+          const action = classify(d.score, d.regime, ens, exitScoreOf(d));
           decisions[i] = action === d.action ? d : { ...d, action };
         }
       }
@@ -293,7 +345,7 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
     rows,
     best,
     combosTested: tested.length,
-    heatmap: buildHeatmap(grid, tested),
+    heatmap: buildHeatmap(grid, tested, opts.objective),
     durationMs: Date.now() - startedAt,
   };
 }

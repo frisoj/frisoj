@@ -144,6 +144,13 @@ describe("BitvavoClient: authenticatie", () => {
     expect(b2.timeInForce).toBe("GTC");
   });
 
+  it("stuurt grote hoeveelheden met 16+ significante cijfers exact (nooit meer dan gevraagd)", async () => {
+    const { calls, fetchImpl } = mockFetch(() => ({ body: rawOrder }));
+    const client = makeClient(fetchImpl);
+    await client.placeOrder({ market: "SHIB-EUR", side: "sell", orderType: "market", amount: 12345678.12345678 });
+    expect(JSON.parse(calls[0].body!).amount).toBe("12345678.12345678");
+  });
+
   it("DELETE /order heeft operatorId als queryparameter en wordt ondertekend inclusief query", async () => {
     const { calls, fetchImpl } = mockFetch(() => ({ body: { orderId: "abc" } }));
     const client = makeClient(fetchImpl, { operatorId: 7 });

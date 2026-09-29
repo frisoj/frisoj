@@ -4,13 +4,27 @@
  *
  * - `load()` geeft de opgeslagen staat terug of `null`. Een kapot/ongeldig
  *   bestand wordt hernoemd naar `<bestand>.corrupt-<timestamp>` zodat het niet
- *   verloren gaat, en daarna wordt `null` teruggegeven (verse start).
+ *   verloren gaat, en daarna wordt `null` teruggegeven (verse start). Wat er
+ *   mis was staat in `lastLoadProblem`, zodat de engine het kan melden.
+ * - Is het bestand er wel maar onleesbaar (rechten, I/O-fout), of lukt het
+ *   hernoemen niet, dan wordt schrijven GEBLOKKEERD tot `unblockWrites()`:
+ *   anders zou een lege administratie het (mogelijk goede) bestand overschrijven.
  * - `save()` is gedebounced (~500 ms, "trailing throttle": de LAATSTE staat
  *   wordt geschreven, ook bij voortdurende saves).
  * - `flush()` schrijft een eventueel openstaande save direct (synchroon).
- * - Schrijven is atomair: eerst naar een tijdelijk bestand, dan `rename`.
+ * - Schrijven is atomair: eerst naar een tijdelijk bestand (met fsync), dan `rename`.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import type { PersistedState } from "../core/types";
 
@@ -21,6 +35,13 @@ export interface StateStoreOptions {
   now?: () => number;
 }
 
+/** Waarom `load()` geen bruikbare staat opleverde terwijl er wel een bestand was. */
+export interface LoadProblem {
+  reason: string;
+  /** Waar het kapotte bestand bewaard is (als hernoemen lukte) */
+  quarantinedTo?: string;
+}
+
 export class StateStore {
   readonly filePath: string;
   private readonly debounceMs: number;
@@ -29,6 +50,9 @@ export class StateStore {
   private timer: ReturnType<typeof setTimeout> | null = null;
   /** Laatste schrijffout (null als de laatste write lukte) */
   lastError: Error | null = null;
+  /** Probleem bij de laatste `load()` (null = geen bestand of alles in orde) */
+  lastLoadProblem: LoadProblem | null = null;
+  private writeBlocked = false;
 
   constructor(filePath: string, opts: StateStoreOptions = {}) {
     this.filePath = filePath;
@@ -37,22 +61,47 @@ export class StateStore {
   }
 
   load(): PersistedState | null {
+    this.lastLoadProblem = null;
     if (!existsSync(this.filePath)) return null;
     let raw: string;
     try {
       raw = readFileSync(this.filePath, "utf8");
-    } catch {
-      // Onleesbaar (rechten o.i.d.): niet hernoemen, gewoon vers beginnen.
+    } catch (err) {
+      // Onleesbaar (rechten o.i.d.): niet hernoemen, en ook NIET overschrijven
+      // met een lege administratie tot de gebruiker het bevestigd heeft.
+      this.writeBlocked = true;
+      this.lastLoadProblem = { reason: `bestand kon niet gelezen worden (${errText(err)})` };
       return null;
     }
+    let reason: string;
     try {
-      const parsed: unknown = JSON.parse(raw);
-      if (!isPersistedState(parsed)) throw new Error("Ongeldige staat");
+      if (raw.trim() === "") throw new Error("bestand is leeg");
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        throw new Error(`geen geldige JSON (${errText(err)})`);
+      }
+      if (!isPersistedState(parsed)) throw new Error("onbekende structuur of versie");
       return parsed;
-    } catch {
-      this.quarantine();
-      return null;
+    } catch (err) {
+      reason = errText(err);
     }
+    const quarantinedTo = this.quarantine();
+    // Hernoemen mislukt: het kapotte bestand niet stilletjes overschrijven.
+    if (!quarantinedTo) this.writeBlocked = true;
+    this.lastLoadProblem = quarantinedTo ? { reason, quarantinedTo } : { reason };
+    return null;
+  }
+
+  /** True zolang schrijven geblokkeerd is (zie `unblockWrites`). */
+  get writesBlocked(): boolean {
+    return this.writeBlocked;
+  }
+
+  /** Na bevestiging door de gebruiker: het bestaande bestand mag overschreven worden. */
+  unblockWrites(): void {
+    this.writeBlocked = false;
   }
 
   save(state: PersistedState): void {
@@ -76,6 +125,13 @@ export class StateStore {
     }
     const state = this.pending;
     if (!state) return;
+    if (this.writeBlocked) {
+      // Staat vasthouden; pas schrijven na `unblockWrites()`.
+      this.lastError = new Error(
+        `Opslaan geblokkeerd: het bestaande statusbestand (${this.filePath}) kon niet gelezen worden en wordt niet overschreven`,
+      );
+      throw this.lastError;
+    }
     this.pending = null;
     try {
       this.writeAtomic(state);
@@ -97,7 +153,13 @@ export class StateStore {
     mkdirSync(dirname(this.filePath), { recursive: true });
     const tmp = `${this.filePath}.tmp-${process.pid}`;
     try {
-      writeFileSync(tmp, JSON.stringify(state), "utf8");
+      const fd = openSync(tmp, "w");
+      try {
+        writeSync(fd, JSON.stringify(state));
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
       renameSync(tmp, this.filePath);
     } catch (err) {
       try {
@@ -107,16 +169,36 @@ export class StateStore {
       }
       throw err;
     }
+    // Best effort: ook de map-entry (rename) naar schijf, zodat een stroomstoring
+    // niet het oude bestand terugzet. Op Windows kan een map niet geopend worden.
+    if (process.platform !== "win32") {
+      try {
+        const d = openSync(dirname(this.filePath), "r");
+        try {
+          fsyncSync(d);
+        } finally {
+          closeSync(d);
+        }
+      } catch {
+        // negeren
+      }
+    }
   }
 
-  private quarantine(): void {
+  /** Hernoemt het kapotte bestand; geeft het nieuwe pad terug of null als dat niet lukte. */
+  private quarantine(): string | null {
     const target = `${this.filePath}.corrupt-${this.now()}`;
     try {
       renameSync(this.filePath, target);
+      return target;
     } catch {
-      // Als hernoemen niet lukt, laten we het bestand staan; de volgende save overschrijft het.
+      return null;
     }
   }
+}
+
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function isObj(v: unknown): v is Record<string, unknown> {

@@ -32,8 +32,19 @@ export function roundTripCostPct(cfg: RiskConfig): number {
 
 /** Deel van de cash dat maximaal gebruikt wordt (marge voor afronding/fees). */
 const CASH_USAGE = 0.995;
-/** Bij ophogen naar de minimale order mag het risico max. dit × het budget zijn. */
-const MAX_BUMP_RISK_MULTIPLE = 2;
+/**
+ * Bij ophogen naar de minimale positie mag het risico max. dit × het budget zijn.
+ * 1 = nooit meer risico dan "Risico per trade" (de README belooft max. 1,5%).
+ * Een positie die alleen met extra risico groot genoeg wordt, wordt overgeslagen
+ * (met 1 wordt een te kleine positie in de praktijk dus niet meer opgehoogd).
+ */
+const MAX_BUMP_RISK_MULTIPLE = 1;
+/**
+ * Marge bovenop de kleinste positie die bij de stop-loss nog verkocht kan
+ * worden: dekt een koers die door de stop heen gapt, een iets andere vulprijs
+ * dan gepland en het afronden van de hoeveelheid.
+ */
+const SELL_MIN_BUFFER = 1.03;
 /** Relatieve tolerantie voor het herkennen van stop-niveaus (initieel / break-even). */
 const LEVEL_REL_EPS = 1e-6;
 
@@ -75,6 +86,12 @@ function price(x: number): string {
   if (a >= 1) return nl(x, 4);
   if (a === 0) return "0";
   return x.toPrecision(5).replace(".", ",");
+}
+
+/** Hoeveelheid zonder exponent en zonder overbodige nullen: 0.00001234 → "0,00001234". */
+function qty(x: number): string {
+  if (!Number.isFinite(x)) return String(x);
+  return x.toFixed(10).replace(/\.?0+$/, "").replace(".", ",");
 }
 
 /** Getal zonder overbodige nullen, met komma: 0.5 → "0,5", 10 → "10". */
@@ -305,11 +322,29 @@ export class RiskManager implements RiskManagerLike {
         const raw = Math.min(quoteByRisk, posCap, exposureCap, cashCap);
         let q = floorCents(raw);
 
+        // Minimale orderwaarde. Het beursminimum (uit MarketInfo; zonder
+        // MarketInfo de instelling) geldt voor kopen ÉN verkopen: Bitvavo weigert
+        // ook verkopen onder €5. De instelling minOrderQuote is daarnaast een
+        // eigen ondergrens voor instappen; het strengste van de twee telt.
+        const cfgMin = isNum(cfg.minOrderQuote) && cfg.minOrderQuote >= 0 ? cfg.minOrderQuote : 0;
         const marketMin = market?.minOrderQuote;
-        const minOrder = isNum(marketMin) && marketMin >= 0 ? marketMin : cfg.minOrderQuote;
+        const hasMarketMin = isNum(marketMin) && marketMin >= 0;
+        const exchangeMin = hasMarketMin ? marketMin : cfgMin;
+        const minOrder = Math.max(exchangeMin, cfgMin);
 
-        if (!(q >= minOrder - 1e-9) || q <= 0) {
-          const bump = Math.max(ceilCents(minOrder), 0.01);
+        // De positie moet bij de stop-loss nog boven het beursminimum verkocht
+        // kunnen worden, anders werken stop-loss, handmatig sluiten en noodstop
+        // nooit. Hoeveelheid = q / (1 + fee) / entry, waarde bij de stop =
+        // hoeveelheid × stop. Ook het minimum in base (hoeveelheid) telt mee.
+        const minBase = market?.minOrderBase;
+        const sellMinByQuote = exchangeMin * (1 + cfg.takerFee) * (entry / stop) * SELL_MIN_BUFFER;
+        const sellMinByBase =
+          isNum(minBase) && minBase > 0 ? minBase * entry * (1 + cfg.takerFee) * SELL_MIN_BUFFER : 0;
+        const sellMin = ceilCents(Math.max(sellMinByQuote, sellMinByBase));
+        const required = Math.max(ceilCents(minOrder), sellMin, 0.01);
+
+        if (!(q >= required - 1e-9) || q <= 0) {
+          const bump = required;
           const eps = 1e-9;
           const fitsPos = bump <= posCap + eps;
           const fitsExposure = bump <= exposureCap + eps;
@@ -320,7 +355,26 @@ export class RiskManager implements RiskManagerLike {
             q = bump;
             bumped = true;
           } else {
-            reasons.push(`Te klein: ${eur(q)} < minimum ${eur(minOrder)}`);
+            const baseBinds = sellMinByBase > sellMinByQuote;
+            const exchLabel = `${hasMarketMin ? "beursminimum" : "minimum"} van ${eur(exchangeMin)}`;
+            const baseMin = `${qty(isNum(minBase) ? minBase : 0)} ${market?.base ?? ""}`.trimEnd();
+            if (q > 0 && q >= minOrder - 1e-9) {
+              // Groot genoeg om te kopen, maar (bij de stop) niet meer verkoopbaar.
+              reasons.push(
+                baseBinds
+                  ? `Positie van ${eur(q)} is minder dan het beursminimum van ${baseMin} en kan dan niet verkocht worden (minimaal ${eur(bump)} nodig)`
+                  : `Positie van ${eur(q)} zakt bij de stop-loss onder het ${exchLabel} en kan dan niet verkocht worden (minimaal ${eur(bump)} nodig)`,
+              );
+            } else {
+              reasons.push(`Te klein: ${eur(q)} < minimum ${eur(minOrder)}`);
+              if (bump > ceilCents(minOrder) + 1e-9) {
+                reasons.push(
+                  baseBinds
+                    ? `Om het beursminimum van ${baseMin} te kunnen verkopen is minimaal ${eur(bump)} nodig`
+                    : `Om bij de stop-loss (${price(stop)}) nog boven het ${exchLabel} te kunnen verkopen is minimaal ${eur(bump)} nodig`,
+                );
+              }
+            }
             if (!fitsCash) {
               reasons.push(
                 `Onvoldoende saldo: ${eur(cash)} beschikbaar (max. ${eur(cashCap)} bruikbaar), minimaal ${eur(bump)} nodig`,
@@ -337,9 +391,11 @@ export class RiskManager implements RiskManagerLike {
               );
             }
             if (!riskOk) {
-              reasons.push(
-                `Risico bij minimale order (${eur(bumpRisk)}) is meer dan ${MAX_BUMP_RISK_MULTIPLE}× het risicobudget (${eur(riskBudget)})`,
-              );
+              const limit =
+                MAX_BUMP_RISK_MULTIPLE === 1
+                  ? `het risicobudget (${eur(riskBudget)})`
+                  : `${num(MAX_BUMP_RISK_MULTIPLE)}× het risicobudget (${eur(riskBudget)})`;
+              reasons.push(`Risico bij de minimale positie van ${eur(bump)} (${eur(bumpRisk)}) is meer dan ${limit}`);
             }
             q = 0;
           }
@@ -420,14 +476,26 @@ export class RiskManager implements RiskManagerLike {
       };
     }
 
-    // 4. Stop verhogen voor volgende candles (nooit verlagen)
+    // 4. Stop verhogen voor volgende candles (nooit verlagen).
+    //    Alleen op gesloten candles, net als de backtester: een verhoging tijdens
+    //    een candle mag niet met terugwerkende kracht gelden voor de low van die
+    //    candle (die kan vóór de stijging gevallen zijn). Tussentijdse ticks
+    //    werken wel highestPrice bij en controleren de stop die al gold.
     let newStop = currentStop;
     const R = pos.entryPrice - pos.initialStopPrice;
-    if (isNum(R) && R > 0) {
-      if (cfg.breakEvenAtR > 0 && highest >= pos.entryPrice + cfg.breakEvenAtR * R) {
-        newStop = Math.max(newStop, pos.entryPrice * (1 + rtc));
+    if (closedCandle && isNum(R) && R > 0) {
+      // Break-even alleen als dat niveau onder de slotkoers ligt: een stop
+      // boven de markt zou meteen met verlies (als "break-even") verkopen.
+      const breakEven = pos.entryPrice * (1 + rtc);
+      if (
+        cfg.breakEvenAtR > 0 &&
+        highest >= pos.entryPrice + cfg.breakEvenAtR * R &&
+        isNum(candle.close) &&
+        candle.close > breakEven
+      ) {
+        newStop = Math.max(newStop, breakEven);
       }
-      if (closedCandle && cfg.trailingAtrMult > 0 && isNum(atr) && atr > 0 && highest >= pos.entryPrice + R) {
+      if (cfg.trailingAtrMult > 0 && isNum(atr) && atr > 0 && highest >= pos.entryPrice + R) {
         newStop = Math.max(newStop, highest - cfg.trailingAtrMult * atr);
       }
     }

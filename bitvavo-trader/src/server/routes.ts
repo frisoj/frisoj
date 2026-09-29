@@ -30,10 +30,12 @@ import type {
 import { APP_VERSION } from "../core/defaults";
 import { INTERVAL_MS } from "../core/types";
 import { closedCandles } from "../core/util";
+import { foldWindows } from "../backtest/walkForward";
 import type { AppConfig } from "../config";
 import { HttpError, Router, type RequestContext } from "./router";
 import { Scanner, SCANNER_MAX_LIMIT } from "./scanner";
 import type { SseHub } from "./sse";
+import { backtestWarmupCandles } from "./warmup";
 import {
   fail,
   isPlainObject,
@@ -82,10 +84,18 @@ export interface OptimizeOptsLike {
   maxCombos?: number;
 }
 
+/**
+ * De zware berekeningen mogen een Promise teruggeven: main.ts laat ze in een
+ * worker-thread draaien (heavyRunner.ts), zodat de engine, stop-losses,
+ * LiveBroker-polling, SSE en de noodstop blijven reageren.
+ */
 export interface Services {
-  runBacktest(input: BacktestInputLike): BacktestResult;
-  optimize(input: BacktestInputLike, opts: OptimizeOptsLike): OptimizationResult;
-  walkForward(input: BacktestInputLike, opts: OptimizeOptsLike & { folds: number; trainRatio: number }): WalkForwardResult;
+  runBacktest(input: BacktestInputLike): BacktestResult | Promise<BacktestResult>;
+  optimize(input: BacktestInputLike, opts: OptimizeOptsLike): OptimizationResult | Promise<OptimizationResult>;
+  walkForward(
+    input: BacktestInputLike,
+    opts: OptimizeOptsLike & { folds: number; trainRatio: number },
+  ): WalkForwardResult | Promise<WalkForwardResult>;
   listStrategies(): StrategyMeta[];
   chartIndicators(candles: Candle[]): ChartIndicators;
   runEnsemble(market: string, candles: Candle[], cfg: EnsembleConfig): EnsembleDecision[];
@@ -113,7 +123,9 @@ export const ARM_CONFIRM_TEXT = "IK BEGRIJP HET RISICO";
 
 /** Extra candles vóór de backtestperiode, alleen voor indicator-warmup. */
 export const BACKTEST_WARMUP_CANDLES = 250;
-const MIN_BACKTEST_CANDLES = 60;
+export const MIN_BACKTEST_CANDLES = 60;
+/** Minimaal aantal candles IN de gekozen periode (na de warmup) om te kunnen testen. */
+export const MIN_PERIOD_CANDLES = MIN_BACKTEST_CANDLES / 2;
 const MARKETS_CACHE_MS = 5 * 60_000;
 
 export function buildApiRouter(deps: ApiDeps): Router {
@@ -169,10 +181,24 @@ export function buildApiRouter(deps: ApiDeps): Router {
     }
   };
 
-  const loadHistory = async (p: ParsedBacktestRequest): Promise<BacktestInputLike> => {
+  const dateNl = (ms: number) =>
+    new Date(ms).toLocaleDateString("nl-NL", { timeZone: "Europe/Amsterdam", day: "numeric", month: "long", year: "numeric" });
+
+  /**
+   * Haalt de historie op (periode + warmup ervoor). Er wordt NOOIT gehandeld
+   * tijdens de warmup van de strategieën: bij een markt met korte historie
+   * (recente listing) schuift het begin op en komt er een `note` terug; een te
+   * korte periode geeft een 400 in plaats van stilletjes een andere periode.
+   */
+  const loadHistory = async (
+    p: ParsedBacktestRequest,
+    optimizeStrategy?: StrategyId,
+  ): Promise<{ input: BacktestInputLike; note?: string }> => {
     const to = now();
     const from = to - p.days * 86_400_000;
-    const warmupFrom = from - BACKTEST_WARMUP_CANDLES * INTERVAL_MS[p.interval];
+    const step = INTERVAL_MS[p.interval];
+    const required = backtestWarmupCandles(p.ensemble, optimizeStrategy);
+    const warmupFrom = from - Math.max(BACKTEST_WARMUP_CANDLES, required) * step;
     const candles = await feed.getHistory(p.market, p.interval, warmupFrom, to);
     if (candles.length < MIN_BACKTEST_CANDLES) {
       fail(
@@ -180,23 +206,52 @@ export function buildApiRouter(deps: ApiDeps): Router {
           "Kies meer dagen of een korter interval.",
       );
     }
-    let tradeFromIndex = candles.findIndex((c) => c.time >= from);
-    if (tradeFromIndex < 0) tradeFromIndex = 0;
-    // Zorg dat er altijd genoeg candles overblijven om te handelen
-    if (candles.length - tradeFromIndex < MIN_BACKTEST_CANDLES / 2) tradeFromIndex = 0;
+    const firstInPeriod = candles.findIndex((c) => c.time >= from);
+    if (firstInPeriod < 0) fail(`Geen candles in de gekozen periode voor ${p.market} op ${p.interval}.`);
+    // Recente listing: de historie begint ná `from` → eerst de warmup afwachten.
+    const tradeFromIndex = Math.max(firstInPeriod, required);
+    const periodCandles = Math.max(0, candles.length - tradeFromIndex);
+    if (periodCandles < MIN_PERIOD_CANDLES) {
+      if (tradeFromIndex > firstInPeriod) {
+        fail(
+          `${p.market} heeft te weinig historie op ${p.interval}: de strategieën hebben ${required} candles ` +
+            `opwarmtijd nodig en daarna blijven er maar ${periodCandles} candles over om te testen ` +
+            `(minimaal ${MIN_PERIOD_CANDLES}). Kies een korter interval of een andere markt.`,
+        );
+      }
+      fail(
+        `Periode te kort: maar ${periodCandles} candles van ${p.interval} om te testen ` +
+          `(minimaal ${MIN_PERIOD_CANDLES}). Kies meer dagen of een korter interval.`,
+      );
+    }
+    let note: string | undefined;
+    if (tradeFromIndex > firstInPeriod) {
+      const start = candles[tradeFromIndex].time;
+      const days = (to - start) / 86_400_000;
+      note =
+        `Periode ingekort: ${p.market} heeft pas historie vanaf ${dateNl(candles[0].time)}. Na ${required} candles ` +
+        `opwarmtijd begint de test op ${dateNl(start)} (${days.toLocaleString("nl-NL", { maximumFractionDigits: 1 })} ` +
+        `dagen in plaats van ${p.days}).`;
+    }
     const marketInfo = (await allMarkets()).find((m) => m.market === p.market);
     return {
-      market: p.market,
-      interval: p.interval,
-      candles,
-      initialCapital: p.initialCapital,
-      ensemble: p.ensemble,
-      risk: p.risk,
-      marketInfo,
-      dataSource: feed.source,
-      tradeFromIndex,
+      input: {
+        market: p.market,
+        interval: p.interval,
+        candles,
+        initialCapital: p.initialCapital,
+        ensemble: p.ensemble,
+        risk: p.risk,
+        marketInfo,
+        dataSource: feed.source,
+        tradeFromIndex,
+      },
+      note,
     };
   };
+
+  const withNote = <T extends object>(result: T, note: string | undefined): T =>
+    note ? { ...result, note } : result;
 
   const backtestDeps = async () => ({
     knownMarkets: new Set((await allMarkets()).map((m) => m.market)),
@@ -339,8 +394,8 @@ export function buildApiRouter(deps: ApiDeps): Router {
     const b = await body();
     const parsed = parseBacktestRequest(b, await backtestDeps());
     return heavy("backtest", async () => {
-      const input = await loadHistory(parsed);
-      return services.runBacktest(input);
+      const { input, note } = await loadHistory(parsed);
+      return withNote(await services.runBacktest(input), note);
     });
   });
 
@@ -348,12 +403,13 @@ export function buildApiRouter(deps: ApiDeps): Router {
     const b = await body();
     const parsed = parseOptimizeRequest(b, await backtestDeps());
     return heavy("optimalisatie", async () => {
-      const input = await loadHistory(parsed);
-      return services.optimize(input, {
+      const { input, note } = await loadHistory(parsed, parsed.strategy);
+      const result = await services.optimize(input, {
         strategy: parsed.strategy,
         objective: parsed.objective,
         maxCombos: parsed.maxCombos,
       });
+      return withNote(result, note);
     });
   });
 
@@ -361,14 +417,21 @@ export function buildApiRouter(deps: ApiDeps): Router {
     const b = await body();
     const parsed = parseWalkForwardRequest(b, await backtestDeps());
     return heavy("walk-forward", async () => {
-      const input = await loadHistory(parsed);
-      return services.walkForward(input, {
+      const { input, note } = await loadHistory(parsed, parsed.strategy);
+      // Te weinig candles voor de folds is een invoerfout (400), geen interne fout.
+      try {
+        foldWindows(input.tradeFromIndex ?? 0, input.candles.length, parsed.folds, parsed.trainRatio);
+      } catch (err) {
+        fail((err as Error).message);
+      }
+      const result = await services.walkForward(input, {
         strategy: parsed.strategy,
         objective: parsed.objective,
         maxCombos: parsed.maxCombos,
         folds: parsed.folds,
         trainRatio: parsed.trainRatio,
       });
+      return withNote(result, note);
     });
   });
 

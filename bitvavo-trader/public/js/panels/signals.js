@@ -199,7 +199,10 @@ export function mountSignals(ctx, el) {
         `Nog geen beslissing voor ${market}. De bot beoordeelt alleen gesloten candles — start de bot of wacht op de volgende candle.`,
       );
     }
-    const sig = `${market}|${d.time}|${d.score}|${d.action}|${d.regime}|${lastGaugeSig}|${Object.keys(names).length}`;
+    // Veroudering vóór de signatuurcheck: anders verschijnt "verouderd" nooit na de eerste render
+    const ivMs = INTERVAL_MS[config?.interval] || 0;
+    const stale = !!ivMs && Date.now() - d.time > ivMs * 3;
+    const sig = `${market}|${d.time}|${d.score}|${d.action}|${d.regime}|${lastGaugeSig}|${Object.keys(names).length}|${config?.interval || ""}|${stale}`;
     if (sig === lastSig) return;
     lastSig = sig;
     q.body.classList.remove("is-empty");
@@ -224,8 +227,6 @@ export function mountSignals(ctx, el) {
     q.regime.innerHTML = `${regimeIcon(d.regime)}<span>${esc(fmt.regime(d.regime))}</span>`;
     q.regime.title = REGIME_HELP[d.regime] || "";
 
-    const ivMs = INTERVAL_MS[config?.interval] || 0;
-    const stale = ivMs && Date.now() - d.time > ivMs * 3;
     q.price.innerHTML = `Slotkoers <span class="mono">${esc(fmt.price(d.price))}</span>` +
       (Number.isFinite(d.atr) ? ` · ATR <span class="mono">${esc(fmt.price(d.atr))}</span>` : "");
     q.time.innerHTML = `candle ${esc(fmt.dateTime(d.time))}${config?.interval ? ` · ${esc(config.interval)}` : ""}` +
@@ -262,7 +263,11 @@ export function mountSignals(ctx, el) {
     if (!s) return;
     snap = s;
     config = s.config || config;
-    Object.assign(decisions, s.decisions || {});
+    // snapshot.decisions is de volledige lijst van de engine: wat daar niet meer in staat
+    // (bijv. na een intervalwissel of een verwijderde markt) is vervallen.
+    const next = s.decisions || {};
+    for (const k of Object.keys(decisions)) if (!(k in next)) delete decisions[k];
+    Object.assign(decisions, next);
     if (!market) market = ctx.getSelectedMarket?.() || config?.markets?.[0] || null;
     schedule();
   });
@@ -295,4 +300,6 @@ export function mountSignals(ctx, el) {
     .catch(() => {});
 
   render();
+  // Ook zonder nieuwe events (bot gestopt) moet een oude beslissing als "verouderd" gemarkeerd worden
+  setInterval(schedule, 30_000);
 }

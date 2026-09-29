@@ -14,6 +14,28 @@ export class HttpError extends Error {
 }
 
 export const MAX_BODY_BYTES = 1024 * 1024;
+/** Geen enkel geldig verzoek is dieper genest dan dit (config: ensemble.params.<id>.<param>). */
+export const MAX_JSON_DEPTH = 32;
+
+/** Nestingsdiepte van een geparste JSON-waarde (iteratief: geen stack overflow bij extreme diepte). */
+export function jsonDepth(value: unknown, stopAbove = Infinity): number {
+  let max = 0;
+  const stack: [unknown, number][] = [[value, 0]];
+  while (stack.length > 0) {
+    const [v, depth] = stack.pop()!;
+    if (depth > max) {
+      max = depth;
+      if (max > stopAbove) return max;
+    }
+    if (v !== null && typeof v === "object") {
+      const children = Array.isArray(v) ? v : Object.values(v as Record<string, unknown>);
+      for (const child of children) {
+        if (child !== null && typeof child === "object") stack.push([child, depth + 1]);
+      }
+    }
+  }
+  return max;
+}
 
 export interface RequestContext {
   req: IncomingMessage;
@@ -160,9 +182,14 @@ export async function readJsonBody(req: IncomingMessage, limit = MAX_BODY_BYTES)
   if (!type.startsWith("application/json")) {
     throw new HttpError(415, "Stuur de gegevens als JSON (Content-Type: application/json).");
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch {
     throw new HttpError(400, "Ongeldige JSON in het verzoek.");
   }
+  if (jsonDepth(parsed, MAX_JSON_DEPTH) > MAX_JSON_DEPTH) {
+    throw new HttpError(400, `JSON te diep genest (maximaal ${MAX_JSON_DEPTH} niveaus).`);
+  }
+  return parsed;
 }
