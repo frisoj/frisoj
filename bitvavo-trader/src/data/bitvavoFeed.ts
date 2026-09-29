@@ -4,10 +4,13 @@
  * - `getMarkets` wordt 1 uur gecachet.
  * - `getHistory` pagineert achterwaarts (`end = oudste - 1`, limit 1440), ontdubbelt,
  *   sorteert oplopend en geeft ALLEEN gesloten candles terug. Bij een bijna
- *   uitgeputte rate limit wordt kort gepauzeerd.
+ *   uitgeputte (publieke) rate limit wordt kort gepauzeerd.
  * - Optionele schijfcache (`cacheDir/<markt>_<interval>.json`) met gesloten
  *   candles: alleen het ontbrekende nieuwere (en eventueel oudere) deel wordt
  *   opgehaald.
+ * - `getTickers24h` wordt ~30 s gecachet. Een verse lijst van ALLE markten
+ *   (gewicht 25 bij Bitvavo) wordt ook voor gefilterde verzoeken gebruikt; één
+ *   losse markt (gewicht 1) wordt apart opgehaald en gecachet.
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -25,6 +28,8 @@ import {
 import { isClosedCandle, sleep } from "../core/util";
 
 const MARKETS_TTL_MS = 3_600_000;
+/** 24h-tickers veranderen langzaam: 30 s hergebruiken spaart rate-limit gewicht (alle markten = 25). */
+const TICKERS_TTL_MS = 30_000;
 const PAGE_LIMIT = 1440;
 const LOW_RATE_LIMIT = 100;
 const VERY_LOW_RATE_LIMIT = 20;
@@ -38,7 +43,7 @@ export interface BitvavoFeedOptions {
   /** Map voor de schijfcache met gesloten candles (optioneel). */
   cacheDir?: string;
   now?: () => number;
-  /** Pauze (ms) als `client.rateLimitRemaining` < 100 (standaard 1000). */
+  /** Pauze (ms) als het publieke rate-limitbudget van de client < 100 is (standaard 1000). */
   rateLimitPauseMs?: number;
 }
 
@@ -80,6 +85,11 @@ function dedupeSort(candles: Iterable<Candle>): Candle[] {
   return [...byTime.values()].sort((a, b) => a.time - b.time);
 }
 
+/** Kopieën, zodat een aanroeper die de lijst of een ticker aanpast de cache niet verandert. */
+function copyTickers(list: readonly Ticker24h[]): Ticker24h[] {
+  return list.map((t) => ({ ...t }));
+}
+
 function intervalMs(interval: Interval): number {
   const ms = INTERVAL_MS[interval];
   if (!ms) throw new Error(`Ongeldig interval: ${String(interval)}`);
@@ -93,6 +103,11 @@ export class BitvavoFeed implements MarketDataFeed {
   private readonly pauseMs: number;
   private marketsCache: { at: number; data: MarketInfo[] } | null = null;
   private marketsInflight: Promise<MarketInfo[]> | null = null;
+  /** Laatste lijst met 24h-tickers van ALLE markten */
+  private tickersAll: { at: number; data: Ticker24h[] } | null = null;
+  private tickersAllInflight: Promise<Ticker24h[]> | null = null;
+  /** Losse 24h-tickers (verzoeken voor één markt) */
+  private readonly tickerOne = new Map<string, { at: number; data: Ticker24h[] }>();
   private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(
@@ -184,10 +199,20 @@ export class BitvavoFeed implements MarketDataFeed {
   }
 
   private async respectRateLimit(): Promise<void> {
-    const remaining = this.client.rateLimitRemaining;
+    const remaining = this.publicRateLimitRemaining();
     if (typeof remaining !== "number" || !Number.isFinite(remaining)) return;
     if (remaining < VERY_LOW_RATE_LIMIT) await sleep(this.pauseMs * 5);
     else if (remaining < LOW_RATE_LIMIT) await sleep(this.pauseMs);
+  }
+
+  /**
+   * Resterend budget voor PUBLIEKE verzoeken (de feed doet alleen publieke
+   * verzoeken; het private budget van orders/saldo telt hier niet mee).
+   */
+  private publicRateLimitRemaining(): number | null {
+    const client = this.client as Partial<Pick<BitvavoClient, "rateLimitFor">> & Pick<BitvavoClient, "rateLimitRemaining">;
+    if (typeof client.rateLimitFor === "function") return client.rateLimitFor("public").remaining;
+    return client.rateLimitRemaining;
   }
 
   // ─────────────── Schijfcache ───────────────
@@ -314,14 +339,42 @@ export class BitvavoFeed implements MarketDataFeed {
 
   async getTickers24h(markets?: string[]): Promise<Ticker24h[]> {
     if (markets && markets.length === 0) return [];
-    if (markets && markets.length === 1) {
-      const one = await this.client.ticker24h(markets[0]);
-      return one.filter((t) => t.market === markets[0]);
+    const now = this.nowFn();
+    const fresh = (entry: { at: number } | null | undefined): boolean =>
+      !!entry && now - entry.at >= 0 && now - entry.at < TICKERS_TTL_MS;
+    let all: Ticker24h[];
+    if (fresh(this.tickersAll)) {
+      all = this.tickersAll!.data;
+    } else if (markets && markets.length === 1) {
+      const market = markets[0];
+      const cached = this.tickerOne.get(market);
+      if (fresh(cached)) return copyTickers(cached!.data);
+      const one = (await this.client.ticker24h(market)).filter((t) => t.market === market);
+      this.tickerOne.set(market, { at: this.nowFn(), data: one });
+      return copyTickers(one);
+    } else {
+      all = await this.fetchAllTickers();
     }
-    const all = await this.client.ticker24h();
-    if (!markets) return all;
+    if (!markets) return copyTickers(all);
     const wanted = new Set(markets);
-    return all.filter((t) => wanted.has(t.market));
+    return copyTickers(all.filter((t) => wanted.has(t.market)));
+  }
+
+  /** Alle 24h-tickers; gelijktijdige verzoeken delen één API-call. */
+  private async fetchAllTickers(): Promise<Ticker24h[]> {
+    if (!this.tickersAllInflight) {
+      this.tickersAllInflight = (async () => {
+        try {
+          const data = await this.client.ticker24h();
+          this.tickersAll = { at: this.nowFn(), data };
+          this.tickerOne.clear(); // de volledige lijst is nu de meest actuele bron
+          return data;
+        } finally {
+          this.tickersAllInflight = null;
+        }
+      })();
+    }
+    return this.tickersAllInflight;
   }
 
   async getPrice(market: string): Promise<number> {

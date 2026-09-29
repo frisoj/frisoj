@@ -3,8 +3,13 @@
  *
  * - Publieke endpoints werken zonder API-sleutel; private endpoints worden
  *   ondertekend (HMAC-SHA256, zie signing.ts).
- * - Rate limit: `bitvavo-ratelimit-*` headers worden bijgehouden; bij < 20
- *   resterende weight wachten we tot `resetat`.
+ * - Rate limit: `bitvavo-ratelimit-*` headers worden APART bijgehouden voor
+ *   publieke verzoeken (zonder sleutel) en private (ondertekende) verzoeken,
+ *   net als de ban (code 105) en de backoff na een 429/103. Publieke verzoeken
+ *   wachten al tot `resetat` als er minder dan 50 weight over is; private
+ *   verzoeken (orders, saldo) mogen doorgaan tot er minder dan 10 over is. Zo
+ *   blijft er altijd budget over om een stop-loss te verkopen, ook als het
+ *   ophalen van koersen het budget opmaakt of een publieke ban oploopt.
  * - GET-verzoeken worden max. 2× herhaald bij netwerkfouten/5xx/429.
  *   POST /order wordt NOOIT automatisch herhaald (risico op dubbele order).
  * - Alle fouten zijn `BitvavoApiError` met een Nederlandse melding.
@@ -117,15 +122,32 @@ export interface BitvavoClientOptions {
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
+/** Soort verzoek voor de rate-limitadministratie: zonder sleutel of ondertekend. */
+export type RateLimitScope = "public" | "private";
+
+export interface RateLimitStatus {
+  /** Laatst gemelde resterende weight (header) voor deze soort verzoeken, of null */
+  remaining: number | null;
+  /** Tijdstip (ms) waarop de teller reset, of null */
+  resetAt: number | null;
+  /** Geblokkeerd (code 105) tot dit tijdstip (ms), of null */
+  bannedUntil: number | null;
+}
+
 interface RequestOptions {
   query?: Query;
   body?: Record<string, unknown>;
   auth?: boolean;
   /** Overschrijft het aantal herhalingen (alleen GET wordt ooit herhaald) */
   retries?: number;
+  /** Niet wachten op de rate limit maar meteen een "rate-limit"-fout gooien */
+  noWait?: boolean;
 }
 
-const LOW_RATE_LIMIT = 20;
+/** Publieke verzoeken wachten tot de reset als er minder dan dit over is (reserve voor private verzoeken). */
+export const PUBLIC_RATE_LIMIT_RESERVE = 50;
+/** Private (ondertekende) verzoeken wachten pas tot de reset als er minder dan dit over is. */
+export const PRIVATE_RATE_LIMIT_FLOOR = 10;
 const MAX_RATE_LIMIT_WAIT_MS = 65_000;
 const CLOCK_SKEW_THRESHOLD_MS = 1000;
 
@@ -328,9 +350,12 @@ function positiveFinite(v: number | undefined): v is number {
 
 export class BitvavoClient {
   readonly hasCredentials: boolean;
-  /** Laatst bekende resterende rate-limit weight (header), of null als onbekend */
+  /**
+   * Laatst bekende resterende rate-limit weight (header van het laatste
+   * antwoord, publiek of privé), of null als onbekend. Per soort: `rateLimitFor`.
+   */
   rateLimitRemaining: number | null = null;
-  /** Tijdstip (ms) waarop de rate-limit teller reset, of null */
+  /** Tijdstip (ms) waarop de rate-limit teller reset (laatste antwoord), of null */
   rateLimitResetAt: number | null = null;
   /** Correctie (ms) die bij de lokale klok opgeteld wordt voor timestamps */
   clockOffsetMs = 0;
@@ -351,7 +376,11 @@ export class BitvavoClient {
   readonly #autoTimeSync: boolean;
   #timeSynced = false;
   #timeSyncFailedAt = 0;
-  #bannedUntil = 0;
+  /** Rate-limit/ban/backoff-toestand, apart voor publieke en private verzoeken */
+  readonly #limits: Record<RateLimitScope, { remaining: number | null; resetAt: number | null; bannedUntil: number }> = {
+    public: { remaining: null, resetAt: null, bannedUntil: 0 },
+    private: { remaining: null, resetAt: null, bannedUntil: 0 },
+  };
 
   constructor(opts: BitvavoClientOptions = {}) {
     this.#apiKey = (opts.apiKey ?? "").trim();
@@ -378,11 +407,25 @@ export class BitvavoClient {
     this.#autoTimeSync = opts.autoTimeSync ?? true;
   }
 
+  /** Rate-limitstatus voor publieke (zonder sleutel) of private (ondertekende) verzoeken. */
+  rateLimitFor(scope: RateLimitScope): RateLimitStatus {
+    const st = this.#limits[scope];
+    return {
+      remaining: st.remaining,
+      resetAt: st.resetAt,
+      bannedUntil: st.bannedUntil > this.#now() ? st.bannedUntil : null,
+    };
+  }
+
   // ─────────────── Publieke endpoints ───────────────
 
   /** Servertijd van Bitvavo in ms. */
   async time(): Promise<number> {
-    const data = await this.#request<unknown>("GET", "/time", { retries: 0 });
+    return this.#serverTime(false);
+  }
+
+  async #serverTime(noWait: boolean): Promise<number> {
+    const data = await this.#request<unknown>("GET", "/time", { retries: 0, noWait });
     const t = isRecord(data) ? num(data.time) : Number.NaN;
     if (!Number.isFinite(t)) {
       throw new BitvavoApiError("Bitvavo gaf een ongeldige servertijd terug", 200, null, {
@@ -399,8 +442,12 @@ export class BitvavoClient {
    * timestamps als het verschil groter is dan 1 seconde. Geeft de offset (ms).
    */
   async syncTime(): Promise<number> {
+    return this.#syncTime(false);
+  }
+
+  async #syncTime(noWait: boolean): Promise<number> {
     const t0 = this.#now();
-    const server = await this.time();
+    const server = await this.#serverTime(noWait);
     const t1 = this.#now();
     const offset = server - (t0 + t1) / 2;
     this.clockOffsetMs = Math.abs(offset) > CLOCK_SKEW_THRESHOLD_MS ? Math.round(offset) : 0;
@@ -606,19 +653,39 @@ export class BitvavoClient {
     return s ? `?${s}` : "";
   }
 
-  #updateRateLimit(res: Response): void {
+  #updateRateLimit(res: Response, scope: RateLimitScope): void {
     const headers = res.headers;
     if (!headers || typeof headers.get !== "function") return;
+    const st = this.#limits[scope];
     const remaining = num(headers.get("bitvavo-ratelimit-remaining"));
-    if (Number.isFinite(remaining)) this.rateLimitRemaining = remaining;
+    if (Number.isFinite(remaining)) {
+      this.rateLimitRemaining = remaining;
+      st.remaining = remaining;
+    }
     const resetAt = num(headers.get("bitvavo-ratelimit-resetat"));
-    if (Number.isFinite(resetAt) && resetAt > 0) this.rateLimitResetAt = resetAt;
+    if (Number.isFinite(resetAt) && resetAt > 0) {
+      this.rateLimitResetAt = resetAt;
+      st.resetAt = resetAt;
+    }
   }
 
-  async #respectRateLimit(method: string, endpoint: string): Promise<void> {
+  /**
+   * Wacht (of weigert) voordat een verzoek verstuurd wordt:
+   * - Ban (105): private verzoeken worden alleen door een ban op private
+   *   verzoeken tegengehouden; publieke verzoeken door elke ban (niet riskeren
+   *   dat een ban op hetzelfde IP verlengd wordt).
+   * - Budget: publieke verzoeken wachten tot de reset bij < 50 resterend (ook als
+   *   het laatst gemelde private budget zo laag is: reserve voor orders);
+   *   private verzoeken pas bij < 10 resterend van hun eigen budget.
+   */
+  async #respectRateLimit(method: string, endpoint: string, scope: RateLimitScope, noWait = false): Promise<void> {
     const now = this.#now();
-    if (this.#bannedUntil > now) {
-      const sec = Math.ceil((this.#bannedUntil - now) / 1000);
+    const bannedUntil =
+      scope === "private"
+        ? this.#limits.private.bannedUntil
+        : Math.max(this.#limits.public.bannedUntil, this.#limits.private.bannedUntil);
+    if (bannedUntil > now) {
+      const sec = Math.ceil((bannedUntil - now) / 1000);
       throw new BitvavoApiError(
         `Bitvavo heeft ons tijdelijk geblokkeerd wegens te veel verzoeken; nog ${sec} s wachten`,
         0,
@@ -626,17 +693,30 @@ export class BitvavoClient {
         { kind: "rate-limit", method, endpoint },
       );
     }
-    if (
-      this.rateLimitRemaining !== null &&
-      this.rateLimitRemaining < LOW_RATE_LIMIT &&
-      this.rateLimitResetAt !== null &&
-      this.rateLimitResetAt > now
-    ) {
-      const wait = Math.min(MAX_RATE_LIMIT_WAIT_MS, this.rateLimitResetAt - now + 50);
-      await this.#sleep(wait);
-      // De eerstvolgende response zet de echte waarde weer.
-      this.rateLimitRemaining = null;
+    const floor = scope === "private" ? PRIVATE_RATE_LIMIT_FLOOR : PUBLIC_RATE_LIMIT_RESERVE;
+    const checked: RateLimitScope[] = scope === "private" ? ["private"] : ["public", "private"];
+    let waitUntil = 0;
+    const low: RateLimitScope[] = [];
+    for (const s of checked) {
+      const st = this.#limits[s];
+      if (st.remaining !== null && st.remaining < floor && st.resetAt !== null && st.resetAt > now) {
+        waitUntil = Math.max(waitUntil, st.resetAt);
+        low.push(s);
+      }
     }
+    if (low.length === 0) return;
+    if (noWait) {
+      throw new BitvavoApiError(
+        `Rate limit van Bitvavo bijna bereikt; ${method} ${endpoint} overgeslagen tot de reset`,
+        0,
+        null,
+        { kind: "rate-limit", method, endpoint },
+      );
+    }
+    await this.#sleep(Math.min(MAX_RATE_LIMIT_WAIT_MS, waitUntil - now + 50));
+    // De eerstvolgende response zet de echte waarde weer.
+    for (const s of low) this.#limits[s].remaining = null;
+    this.rateLimitRemaining = null;
   }
 
   async #maybeSyncTime(): Promise<void> {
@@ -644,7 +724,9 @@ export class BitvavoClient {
     const now = this.#now();
     if (this.#timeSyncFailedAt && now - this.#timeSyncFailedAt < 60_000) return;
     try {
-      await this.syncTime();
+      // /time is een publiek verzoek: niet laten wachten op de publieke reserve
+      // (dat zou de order vertragen); lukt het nu niet, dan de lokale klok.
+      await this.#syncTime(true);
     } catch {
       // Niet fataal: we gebruiken de lokale klok en proberen het later opnieuw.
       this.#timeSyncFailedAt = now || 1;
@@ -653,6 +735,7 @@ export class BitvavoClient {
 
   async #request<T>(method: "GET" | "POST" | "DELETE", endpoint: string, opts: RequestOptions = {}): Promise<T> {
     const retries = method === "GET" ? Math.max(0, opts.retries ?? this.#maxRetries) : 0;
+    const scope: RateLimitScope = opts.auth ? "private" : "public";
     let attempt = 0;
     for (;;) {
       try {
@@ -668,8 +751,9 @@ export class BitvavoClient {
         if (attempt >= retries || !(err.retryable || clockError)) throw err;
         attempt++;
         let delay = this.#retryBaseDelayMs * 2 ** (attempt - 1);
-        if (err.isRateLimit && this.rateLimitResetAt !== null) {
-          const untilReset = this.rateLimitResetAt - this.#now();
+        const resetAt = this.#limits[scope].resetAt;
+        if (err.isRateLimit && resetAt !== null) {
+          const untilReset = resetAt - this.#now();
           if (untilReset > 0) delay = Math.max(delay, Math.min(MAX_RATE_LIMIT_WAIT_MS, untilReset + 50));
         }
         await this.#sleep(delay);
@@ -686,7 +770,8 @@ export class BitvavoClient {
         { kind: "config", method, endpoint },
       );
     }
-    await this.#respectRateLimit(method, endpoint);
+    const scope: RateLimitScope = opts.auth ? "private" : "public";
+    await this.#respectRateLimit(method, endpoint, scope, opts.noWait);
     if (opts.auth) await this.#maybeSyncTime();
 
     const queryString = this.#buildQuery(opts.query);
@@ -747,7 +832,7 @@ export class BitvavoClient {
       clearTimeout(timer);
     }
 
-    this.#updateRateLimit(res);
+    this.#updateRateLimit(res, scope);
 
     let data: unknown = null;
     let parseFailed = false;
@@ -767,8 +852,13 @@ export class BitvavoClient {
           : parseFailed
             ? text.slice(0, 200)
             : null;
-      if (errorCode === 105) this.#registerBan(bitvavoMessage);
       const status = res.status || 0;
+      if (errorCode === 105) this.#registerBan(bitvavoMessage, scope);
+      else if (errorCode === 103 || (status === 429 && errorCode !== 104)) {
+        // Budget op (backoff voor alleen deze soort verzoeken): tot de reset wachten.
+        // (104 = alleen te veel nieuwe orders; saldo/annuleren mogen dan gewoon door.)
+        this.#limits[scope].remaining = 0;
+      }
       throw new BitvavoApiError(
         formatBitvavoHttpError(method, endpoint, status, errorCode, bitvavoMessage),
         status,
@@ -788,11 +878,11 @@ export class BitvavoClient {
     return data as T;
   }
 
-  #registerBan(message: string | null): void {
+  #registerBan(message: string | null, scope: RateLimitScope): void {
     const now = this.#now();
     const m = message?.match(/(\d{12,})/);
     let until = m ? Number(m[1]) : Number.NaN;
     if (!Number.isFinite(until) || until <= now) until = now + 60_000;
-    this.#bannedUntil = Math.min(until, now + 15 * 60_000);
+    this.#limits[scope].bannedUntil = Math.min(until, now + 15 * 60_000);
   }
 }

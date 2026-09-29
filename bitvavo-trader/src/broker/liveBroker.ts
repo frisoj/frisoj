@@ -4,7 +4,10 @@
  * Veiligheidsprincipes:
  * - Gooit nooit bij een afwijzing: geeft status "rejected" + Nederlandse `error`.
  * - Rondt bedragen altijd naar BENEDEN af (nooit meer uitgeven dan gevraagd).
- * - Controleert minimale ordergroottes lokaal vóór verzending.
+ * - Controleert minimale ordergroottes lokaal vóór verzending. Een verkoop onder
+ *   het beursminimum (ook na het verlagen naar het beschikbare saldo) wordt
+ *   niet verstuurd: status "rejected" met een `error` die begint met
+ *   "ONVERKOOPBAAR:".
  * - Herhaalt POST /order NOOIT. Bij een netwerkfout/timeout (uitkomst onbekend)
  *   wordt de order eerst opgezocht via clientOrderId.
  * - Laat nooit een order open staan: staat een market order na het pollen nog
@@ -64,6 +67,12 @@ const MAX_SELL_SHORTFALL = 0.05;
 const DEFAULT_TAKER_FEE = 0.0025;
 /** Annuleer-fouten waarbij de order al niet meer open is (niet gevonden / niet meer actief). */
 const CANCEL_NOT_OPEN_CODES = new Set([233, 240]);
+/**
+ * Voorvoegsel van `error` als een verkoop lokaal geweigerd is omdat hij onder
+ * het beursminimum zou uitkomen (niets verstuurd; opnieuw proberen bij deze
+ * koers heeft geen zin).
+ */
+export const UNSELLABLE_PREFIX = "ONVERKOOPBAAR:";
 
 /**
  * Eindstatus: de order kan niet meer (verder) vullen. Alles wat niet
@@ -102,6 +111,7 @@ export function mapOrderStatus(status: string): OrderStatus {
 
 const EUR_FMT = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" });
 const NUM_FMT = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 8 });
+const SIG_FMT = new Intl.NumberFormat("nl-NL", { maximumSignificantDigits: 8 });
 const PCT_FMT = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 2 });
 
 /** Nederlandse notatie voor meldingen, bijv. "€ 4,50". */
@@ -111,6 +121,11 @@ function eur(v: number): string {
 
 function fmtNum(v: number): string {
   return NUM_FMT.format(v);
+}
+
+/** Orderwaarde naar beneden op centen (een waarde onder het minimum mag niet als "€ 5,00" verschijnen). */
+function eurFloor(v: number): string {
+  return eur(Math.floor(v * 100 + 1e-9) / 100);
 }
 
 /** Zet een Bitvavo-order om naar een OrderResult (hoeveelheden, gemiddelde prijs, fee in quote). */
@@ -305,12 +320,18 @@ export class LiveBroker implements Broker {
       const problem = sellProblem(amount, req.amount, info, ref);
       if (problem) return reject(problem);
       // Iets minder saldo dan verwacht (afronding/fee in base)? Verkoop wat er is,
-      // zodat een stop-loss niet vastloopt op "onvoldoende saldo".
+      // zodat een stop-loss niet vastloopt op "onvoldoende saldo". Maar NOOIT onder
+      // het beursminimum: zo'n order weigert Bitvavo toch, dus niets versturen.
       const clamped = await this.#clampSellToBalance(amount, info);
       if (clamped.amount !== amount) {
+        const again = sellProblem(clamped.amount, clamped.amount, info, ref);
+        if (again) {
+          return reject(
+            `${UNSELLABLE_PREFIX} op Bitvavo staat maar ${fmtNum(clamped.amount)} ${info.base} beschikbaar ` +
+              `(gevraagd: ${fmtNum(amount)} ${info.base}); ${again.slice(UNSELLABLE_PREFIX.length).trim()}`,
+          );
+        }
         amount = clamped.amount;
-        const again = sellProblem(amount, amount, info, ref);
-        if (again) return reject(`${again} (${clamped.note})`);
         notes.push(clamped.note);
       }
     }
@@ -362,13 +383,17 @@ export class LiveBroker implements Broker {
 
   /**
    * Zoekt een eerder geplaatste order op via de eigen clientOrderId (bijv. een
-   * order met een onbekende uitkomst). Optionele broker-uitbreiding die de
-   * engine duck-typed gebruikt.
-   * - `null`: Bitvavo meldt dat er geen order met deze clientOrderId is (code 240).
-   * - Anders een OrderResult zoals bij placeMarketOrder: een order die nog open
-   *   staat wordt eerst geannuleerd; lukt dat niet, dan begint `error` met
-   *   "UITKOMST ONBEKEND".
-   * Gooit bij andere fouten (netwerk, rate limit, ...): later opnieuw proberen.
+   * order met een onbekende uitkomst); contract: `Broker.lookupOrder`.
+   * - `null`: Bitvavo meldt dat er geen order met deze clientOrderId is (code
+   *   240, één poging).
+   * - Gooit als de uitkomst nog onbekend is (netwerk, timeout, rate limit, ...):
+   *   later opnieuw proberen.
+   * - Anders een OrderResult met de BEVESTIGDE eindtoestand: een order die nog
+   *   open staat wordt eerst geannuleerd. Status is dan "filled", "cancelled",
+   *   "expired" of "rejected" (ook bij een deels gevulde, daarna beëindigde
+   *   order: `filledAmount` > 0 met status "cancelled"/"expired"). Is annuleren
+   *   niet bevestigd (of de gevulde hoeveelheid onbekend), dan begint `error`
+   *   met "UITKOMST ONBEKEND" en is de status "new" of "partiallyFilled".
    */
   async lookupOrder(market: string, clientOrderId: string): Promise<OrderResult | null> {
     if (typeof market !== "string" || market === "" || typeof clientOrderId !== "string" || clientOrderId === "") {
@@ -396,6 +421,7 @@ export class LiveBroker implements Broker {
       ref: 0,
       notes: [],
       clientOrderId: cid,
+      keepFinalStatus: true,
     });
   }
 
@@ -407,7 +433,20 @@ export class LiveBroker implements Broker {
    */
   async #settleAndReport(
     placed: BitvavoOrder,
-    ctx: { market: string; base: string; quote?: string; ref: number; notes: string[]; clientOrderId: string },
+    ctx: {
+      market: string;
+      base: string;
+      quote?: string;
+      ref: number;
+      notes: string[];
+      clientOrderId: string;
+      /**
+       * lookupOrder: een deels gevulde, daarna beëindigde order houdt zijn
+       * eindstatus ("cancelled"/"expired") i.p.v. "partiallyFilled", zodat de
+       * aanroeper ziet dat hij klaar is (placeMarketOrder meldt "partiallyFilled").
+       */
+      keepFinalStatus?: boolean;
+    },
   ): Promise<OrderResult> {
     const { market, ref, notes, clientOrderId } = ctx;
     const info = { base: ctx.base, quote: ctx.quote };
@@ -452,7 +491,7 @@ export class LiveBroker implements Broker {
       statusNote = cancelledByBot
         ? `Order ${result.orderId} was na het wachten nog niet volledig gevuld en is door de bot geannuleerd; alleen het gevulde deel (${fmtNum(result.filledAmount)} ${info.base}) is uitgevoerd`
         : `Order ${result.orderId} is deels gevuld (${fmtNum(result.filledAmount)}) en daarna door Bitvavo beëindigd (status: ${order.status})`;
-      result.status = "partiallyFilled";
+      if (!ctx.keepFinalStatus) result.status = "partiallyFilled";
     } else if (result.status === "rejected") {
       statusNote = `Order ${result.orderId} is door Bitvavo geweigerd`;
     } else if (result.status === "cancelled" || result.status === "expired") {
@@ -591,16 +630,22 @@ export class LiveBroker implements Broker {
   }
 }
 
-/** Nederlandse reden waarom een verkoop van `amount` niet kan, of null. */
+/**
+ * Nederlandse reden waarom een verkoop van `amount` niet kan (onder het
+ * beursminimum of na afronden 0), of null. Begint altijd met
+ * "ONVERKOOPBAAR:": de engine herkent daaraan dat opnieuw proberen bij deze
+ * koers geen zin heeft (er is niets naar Bitvavo gestuurd).
+ */
 function sellProblem(amount: number, requested: number, info: MarketInfo, ref: number): string | null {
+  const advice = "er is niets naar Bitvavo gestuurd. Wacht tot de waarde boven het minimum komt of schrijf de positie af";
   if (amount <= 0) {
-    return `Order geweigerd: hoeveelheid ${fmtNum(requested)} ${info.base} is na afronden op ${info.quantityDecimals} decimalen 0`;
+    return `${UNSELLABLE_PREFIX} hoeveelheid ${SIG_FMT.format(requested)} ${info.base} is na afronden op ${info.quantityDecimals} decimalen 0 (te klein om te verkopen); ${advice}`;
   }
   if (info.minOrderBase > 0 && amount < info.minOrderBase) {
-    return `Order geweigerd: hoeveelheid ${fmtNum(amount)} ${info.base} is lager dan het minimum van ${fmtNum(info.minOrderBase)} ${info.base}`;
+    return `${UNSELLABLE_PREFIX} hoeveelheid ${fmtNum(amount)} ${info.base} is lager dan het beursminimum van ${fmtNum(info.minOrderBase)} ${info.base} voor ${info.market}; ${advice}`;
   }
   if (ref > 0 && info.minOrderQuote > 0 && amount * ref < info.minOrderQuote) {
-    return `Order geweigerd: orderwaarde ca. ${eur(amount * ref)} is lager dan het minimum van ${eur(info.minOrderQuote)} voor ${info.market}`;
+    return `${UNSELLABLE_PREFIX} orderwaarde ca. ${eurFloor(amount * ref)} is lager dan het beursminimum van ${eur(info.minOrderQuote)} voor ${info.market}; ${advice}`;
   }
   return null;
 }

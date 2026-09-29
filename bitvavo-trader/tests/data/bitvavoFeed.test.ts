@@ -312,8 +312,80 @@ describe("BitvavoFeed — overige methodes", () => {
       "SOL-EUR",
     ]);
     expect((await feed.getTickers24h(["ETH-EUR"])).map((t) => t.market)).toEqual(["ETH-EUR"]);
-    expect(counters.ticker24h.at(-1)).toBe("ETH-EUR");
+    // Binnen 30 s komen gefilterde verzoeken uit de verse lijst van alle markten (was: losse API-call per markt).
+    expect(counters.ticker24h).toEqual([undefined]);
     expect(await feed.getTickers24h([])).toEqual([]);
+  });
+
+  it("getTickers24h cachet ~30 s; één markt zonder verse volledige lijst wordt los opgehaald", async () => {
+    let now = NOW;
+    const { client, counters } = fakeClient({ now: () => now });
+    const feed = new BitvavoFeed(client, { now: () => now });
+
+    // Eén markt zonder cache: los ophalen (gewicht 1 i.p.v. 25), daarna 30 s hergebruiken.
+    expect((await feed.getTickers24h(["ETH-EUR"])).map((t) => t.market)).toEqual(["ETH-EUR"]);
+    expect((await feed.getTickers24h(["ETH-EUR"])).map((t) => t.market)).toEqual(["ETH-EUR"]);
+    expect(counters.ticker24h).toEqual(["ETH-EUR"]);
+
+    // Alle markten: één call, ook bij gelijktijdige verzoeken; daarna ook voor filters.
+    const [a, b] = await Promise.all([feed.getTickers24h(), feed.getTickers24h(["BTC-EUR", "SOL-EUR"])]);
+    expect(a.length).toBe(3);
+    expect(b.map((t) => t.market).sort()).toEqual(["BTC-EUR", "SOL-EUR"]);
+    expect(counters.ticker24h).toEqual(["ETH-EUR", undefined]);
+    now += 29_000;
+    expect((await feed.getTickers24h(["SOL-EUR"])).map((t) => t.market)).toEqual(["SOL-EUR"]);
+    expect((await feed.getTickers24h()).length).toBe(3);
+    expect(counters.ticker24h).toEqual(["ETH-EUR", undefined]);
+
+    // Verlopen: opnieuw ophalen.
+    now += 2_000;
+    await feed.getTickers24h();
+    expect(counters.ticker24h).toEqual(["ETH-EUR", undefined, undefined]);
+    now += 31_000;
+    await feed.getTickers24h(["BTC-EUR"]);
+    expect(counters.ticker24h).toEqual(["ETH-EUR", undefined, undefined, "BTC-EUR"]);
+
+    // De cache is niet via het resultaat te wijzigen.
+    const list = await feed.getTickers24h(["BTC-EUR"]);
+    list[0].last = -1;
+    list.push({ ...list[0], market: "XXX-EUR" });
+    expect((await feed.getTickers24h(["BTC-EUR"]))).toHaveLength(1);
+    expect((await feed.getTickers24h(["BTC-EUR"]))[0].last).toBe(100);
+    expect(counters.ticker24h).toHaveLength(4);
+  });
+
+  it("getTickers24h: een fout wordt niet gecachet", async () => {
+    let fail = true;
+    const { client, raw, counters } = fakeClient({ now: () => NOW });
+    const orig = raw.ticker24h;
+    raw.ticker24h = async (market?: string) => {
+      if (fail) {
+        counters.ticker24h.push(market);
+        throw new Error("netwerkfout");
+      }
+      return orig(market);
+    };
+    const feed = new BitvavoFeed(client, { now: () => NOW });
+    await expect(feed.getTickers24h()).rejects.toThrow("netwerkfout");
+    fail = false;
+    expect((await feed.getTickers24h()).length).toBe(3);
+    expect(counters.ticker24h).toEqual([undefined, undefined]);
+  });
+
+  it("pauzeert paginering op het PUBLIEKE budget van de client (niet op het private)", async () => {
+    const fake = fakeClient({ now: () => NOW, rateLimit: 5 }); // laatst gemeld (privé): bijna op
+    const withScopes = Object.assign(fake.raw, {
+      rateLimitFor: (scope: "public" | "private") => ({
+        remaining: scope === "public" ? 900 : 5,
+        resetAt: NOW + 30_000,
+        bannedUntil: null,
+      }),
+    });
+    const feed = new BitvavoFeed(withScopes as unknown as BitvavoClient, { now: () => NOW, rateLimitPauseMs: 5000 });
+    const t0 = Date.now();
+    await feed.getHistory("BTC-EUR", "1m", NOW - 1.5 * DAY, NOW);
+    expect(fake.calls.length).toBeGreaterThanOrEqual(2);
+    expect(Date.now() - t0).toBeLessThan(1000);
   });
 
   it("getPrice via tickerPrice, met Nederlandse fout als er geen prijs is", async () => {

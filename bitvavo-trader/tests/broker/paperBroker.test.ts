@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PaperBroker } from "../../src/broker/paperBroker";
-import type { Balance, OrderResult } from "../../src/core/types";
+import type { Balance, MarketInfo, OrderResult } from "../../src/core/types";
 
 const NOW = Date.UTC(2026, 8, 28, 12, 0, 0);
 const FEE = 0.0025;
@@ -111,7 +111,76 @@ describe("PaperBroker", () => {
     expect(buy.status).toBe("filled");
     const res = await b.placeMarketOrder({ market: "ADA-EUR", side: "sell", amount: buy.filledAmount / 3 }, 1);
     expectRejected(res, /minimum/);
+    // Zelfde voorvoegsel als de LiveBroker: de engine herkent een onverkoopbare positie.
+    expect(res.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
     expect(await bal(b, "ADA")).toBe(buy.filledAmount);
+  });
+
+  it("setCosts (Broker-contract): past fee/slippage aan, negeert ongeldige waarden, laat het beursminimum ongemoeid", async () => {
+    const b = broker(100);
+    b.setCosts(0.001, 0.002);
+    const buy = await b.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50_000);
+    expect(buy.feeQuote).toBeCloseTo(20 - 20 / 1.001, 12);
+    expect(buy.avgPrice).toBeCloseTo(50_000 * 1.002, 9);
+
+    // Ongeldig → vorige waarden blijven gelden.
+    b.setCosts(Number.NaN, -0.01);
+    b.setCosts(0.5, Number.POSITIVE_INFINITY);
+    const buy2 = await b.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 20 }, 50_000);
+    expect(buy2.feeQuote).toBeCloseTo(buy.feeQuote, 12);
+    expect(buy2.avgPrice).toBeCloseTo(buy.avgPrice, 9);
+
+    // Het minimum is het beursminimum (€5), ook na setCosts.
+    expectRejected(await b.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 4.99 }, 50_000), /minimum van €5,00/);
+    expect((await b.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 5 }, 50_000)).status).toBe("filled");
+  });
+
+  it("gebruikt het beursminimum per markt als er marktinfo is (nooit de risico-instelling)", async () => {
+    const info = (market: string): MarketInfo | undefined =>
+      market === "ETH-EUR"
+        ? {
+            market,
+            base: "ETH",
+            quote: "EUR",
+            status: "trading",
+            minOrderQuote: 10,
+            minOrderBase: 0.004,
+            pricePrecision: 5,
+            quantityDecimals: 4,
+            notionalDecimals: 2,
+          }
+        : market === "XRP-EUR"
+          ? { ...(info("ETH-EUR") as MarketInfo), market, base: "XRP", minOrderQuote: 0, minOrderBase: 0 }
+          : undefined;
+    const b = new PaperBroker({ startingQuote: 100, takerFee: FEE, slippagePct: SLIP, now: () => NOW, getMarketInfo: async (m) => info(m) });
+    // ETH: minimum €10
+    expectRejected(await b.placeMarketOrder({ market: "ETH-EUR", side: "buy", amountQuote: 8 }, 3000), /minimum van €10,00/);
+    const buy = await b.placeMarketOrder({ market: "ETH-EUR", side: "buy", amountQuote: 30 }, 3000);
+    expect(buy.status).toBe("filled");
+    // Verkoop onder het minimum in base (0,003 ETH ≈ €9 < €10 én < 0,004 ETH)
+    const small = await b.placeMarketOrder({ market: "ETH-EUR", side: "sell", amount: 0.003 }, 3000);
+    expectRejected(small, /beursminimum/);
+    expect(small.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    const lowBase = await b.placeMarketOrder({ market: "ETH-EUR", side: "sell", amount: 0.0035 }, 4000); // €14 maar < 0,004 ETH
+    expectRejected(lowBase, /0\.004 ETH/);
+    expect(lowBase.error?.startsWith("ONVERKOOPBAAR:")).toBe(true);
+    // Markt zonder (bruikbaar) minimum in de info, of zonder info: standaard €5
+    expectRejected(await b.placeMarketOrder({ market: "XRP-EUR", side: "buy", amountQuote: 4 }, 2), /minimum van €5,00/);
+    expectRejected(await b.placeMarketOrder({ market: "SOL-EUR", side: "buy", amountQuote: 4 }, 150), /minimum van €5,00/);
+    expect((await b.placeMarketOrder({ market: "SOL-EUR", side: "buy", amountQuote: 5 }, 150)).status).toBe("filled");
+
+    // Marktinfo niet op te halen: standaard beursminimum, geen crash.
+    const failing = new PaperBroker({
+      startingQuote: 50,
+      takerFee: FEE,
+      slippagePct: SLIP,
+      now: () => NOW,
+      getMarketInfo: () => {
+        throw new Error("offline");
+      },
+    });
+    expect((await failing.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 5 }, 50_000)).status).toBe("filled");
+    expectRejected(await failing.placeMarketOrder({ market: "BTC-EUR", side: "buy", amountQuote: 4.5 }, 50_000), /minimum van €5,00/);
   });
 
   it("precies het hele saldo kopen/verkopen laat geen negatief stof achter", async () => {

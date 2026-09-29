@@ -514,3 +514,156 @@ describe("BitvavoClient: fouten, retries, rate limit", () => {
     expect(err.message).toContain("ongeldige handtekening");
   });
 });
+
+describe("BitvavoClient: rate limit apart voor publiek en privé (reserve voor orders)", () => {
+  const path = (c: Call) => new URL(c.url).pathname;
+  const limitHeaders = (remaining: number, resetAt = NOW + 30_000) => ({
+    "bitvavo-ratelimit-remaining": String(remaining),
+    "bitvavo-ratelimit-resetat": String(resetAt),
+    "bitvavo-ratelimit-limit": "1000",
+  });
+
+  it("publiek wacht al bij < 50 resterend; privé (saldo/order) gaat door tot < 10", async () => {
+    sleeps.length = 0;
+    let publicLeft = 40;
+    let privateLeft = 40;
+    const { calls, fetchImpl } = mockFetch((c) => {
+      if (path(c) === "/v2/markets") return { body: [], headers: limitHeaders(publicLeft) };
+      if (path(c) === "/v2/order") return { body: rawOrder, headers: limitHeaders(privateLeft) };
+      return { body: [], headers: limitHeaders(privateLeft) };
+    });
+    const client = makeClient(fetchImpl);
+
+    await client.markets(); // publiek: 40 over
+    expect(client.rateLimitFor("public")).toMatchObject({ remaining: 40, resetAt: NOW + 30_000, bannedUntil: null });
+    expect(sleeps).toEqual([]);
+
+    // Privé: nog geen eigen meting → meteen versturen; daarna 40 over → nog steeds meteen.
+    await client.balance();
+    await client.placeOrder({ market: "BTC-EUR", side: "sell", orderType: "market", amount: 0.001 });
+    await client.getOrder("BTC-EUR", "x");
+    expect(sleeps).toEqual([]);
+    expect(client.rateLimitFor("private").remaining).toBe(40);
+
+    // Publiek wacht tot de reset (reserve voor private verzoeken).
+    await client.markets();
+    expect(sleeps).toEqual([30_050]);
+    expect(calls.map(path).at(-1)).toBe("/v2/markets");
+
+    // Privé onder de 10: dan wacht ook privé tot de reset.
+    privateLeft = 9;
+    await client.balance();
+    expect(sleeps).toEqual([30_050]);
+    await client.balance();
+    expect(sleeps).toEqual([30_050, 30_050]);
+  });
+
+  it("publiek wacht ook als het laatst gemelde PRIVATE budget onder de reserve zit", async () => {
+    sleeps.length = 0;
+    const { fetchImpl } = mockFetch((c) =>
+      path(c) === "/v2/balance" ? { body: [], headers: limitHeaders(30) } : { body: [], headers: limitHeaders(900) },
+    );
+    const client = makeClient(fetchImpl);
+    await client.balance(); // privé: 30 over (bij een gedeeld budget moet publiek dit sparen)
+    await client.markets();
+    expect(sleeps).toEqual([30_050]);
+    await client.balance(); // privé zelf mag nog (30 >= 10)
+    expect(sleeps).toEqual([30_050]);
+  });
+
+  it("een publieke ban (105) houdt orders en saldo NIET tegen", async () => {
+    let ban = true;
+    const { calls, fetchImpl } = mockFetch((c) => {
+      if (path(c) === "/v2/markets" && ban) {
+        return { status: 429, body: { errorCode: 105, error: `The ban expires at ${NOW + 120_000}.` } };
+      }
+      if (path(c) === "/v2/order") return { body: rawOrder };
+      return { body: [] };
+    });
+    const client = makeClient(fetchImpl);
+    const e1 = await client.markets().catch((e) => e);
+    expect(e1.errorCode).toBe(105);
+    expect(client.rateLimitFor("public").bannedUntil).toBe(NOW + 120_000);
+    expect(client.rateLimitFor("private").bannedUntil).toBeNull();
+
+    ban = false;
+    const e2 = await client.ticker24h().catch((e) => e);
+    expect(e2).toBeInstanceOf(BitvavoApiError);
+    expect(e2.kind).toBe("rate-limit"); // publiek: lokaal geweigerd, niets verstuurd
+    expect(calls).toHaveLength(1);
+
+    await expect(client.balance()).resolves.toEqual([]);
+    const order = await client.placeOrder({ market: "BTC-EUR", side: "sell", orderType: "market", amount: 0.001 });
+    expect(order.orderId).toBe(rawOrder.orderId);
+    expect(calls.map(path)).toEqual(["/v2/markets", "/v2/balance", "/v2/order"]);
+  });
+
+  it("een private ban blokkeert privé én publiek (niet riskeren dat hij verlengd wordt)", async () => {
+    const { calls, fetchImpl } = mockFetch((c) => {
+      if (path(c) === "/v2/balance") {
+        return { status: 429, body: { errorCode: 105, error: `The ban expires at ${NOW + 90_000}.` } };
+      }
+      return { body: [] };
+    });
+    const client = makeClient(fetchImpl);
+    await expect(client.balance()).rejects.toMatchObject({ errorCode: 105 });
+    expect(client.rateLimitFor("private").bannedUntil).toBe(NOW + 90_000);
+    await expect(client.balance()).rejects.toMatchObject({ kind: "rate-limit" });
+    await expect(client.placeOrder({ market: "BTC-EUR", side: "buy", orderType: "market", amountQuote: 10 })).rejects.toMatchObject({
+      kind: "rate-limit",
+    });
+    await expect(client.markets()).rejects.toMatchObject({ kind: "rate-limit" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("backoff na een 429 geldt alleen voor die soort verzoeken (publiek → privé gaat door)", async () => {
+    sleeps.length = 0;
+    let publicCalls = 0;
+    const { calls, fetchImpl } = mockFetch((c) => {
+      if (path(c) === "/v2/markets") {
+        publicCalls++;
+        if (publicCalls === 1) return { status: 429, body: { errorCode: 103, error: "Rate limit exceeded." } };
+        return { body: [] };
+      }
+      return { body: [] };
+    });
+    const client = makeClient(fetchImpl, { maxRetries: 0 });
+    // Geen headers: tijdstip van de reset onbekend, dus niets om op te wachten maar wel "op".
+    await expect(client.markets()).rejects.toMatchObject({ errorCode: 103 });
+    expect(client.rateLimitFor("public").remaining).toBe(0);
+    await client.balance();
+    expect(sleeps).toEqual([]);
+    expect(calls.map(path)).toEqual(["/v2/markets", "/v2/balance"]);
+
+    // Met een bekende reset: publiek wacht tot de reset, privé niet.
+    sleeps.length = 0;
+    const two = mockFetch((c) => {
+      if (path(c) === "/v2/markets" && two.calls.length === 1) {
+        return { status: 429, body: { errorCode: 103, error: "Rate limit exceeded." }, headers: { "bitvavo-ratelimit-resetat": String(NOW + 20_000) } };
+      }
+      return { body: [] };
+    });
+    const c2 = makeClient(two.fetchImpl, { maxRetries: 0 });
+    await expect(c2.markets()).rejects.toMatchObject({ errorCode: 103 });
+    await c2.balance();
+    await c2.getOrder("BTC-EUR", "x").catch(() => undefined);
+    expect(sleeps).toEqual([]);
+    await c2.markets();
+    expect(sleeps).toEqual([20_050]);
+  });
+
+  it("de klok-synchronisatie vóór een privé-verzoek wacht niet op de publieke reserve", async () => {
+    sleeps.length = 0;
+    const { calls, fetchImpl } = mockFetch((c) => {
+      if (path(c) === "/v2/markets") return { body: [], headers: limitHeaders(20) };
+      if (path(c) === "/v2/time") return { body: { time: NOW + 5000 } };
+      return { body: [] };
+    });
+    const client = makeClient(fetchImpl, { autoTimeSync: true });
+    await client.markets(); // publiek bijna op
+    await client.balance(); // /time overgeslagen, saldo meteen
+    expect(sleeps).toEqual([]);
+    expect(calls.map(path)).toEqual(["/v2/markets", "/v2/balance"]);
+    expect(client.clockOffsetMs).toBe(0);
+  });
+});
