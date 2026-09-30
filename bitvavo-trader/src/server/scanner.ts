@@ -23,6 +23,7 @@ import type {
   Ticker24h,
 } from "../core/types";
 import { closedCandles, hashString } from "../core/util";
+import { EXCLUDED_BASES } from "../engine/universe";
 
 export interface ScannerServices {
   chartIndicators(candles: Candle[]): ChartIndicators;
@@ -163,7 +164,13 @@ export class Scanner {
   private async compute(limit: number, interval: Interval, ensemble: EnsembleConfig): Promise<ScanResult> {
     const { feed } = this.opts;
     const markets = await feed.getMarkets();
-    const tradable = new Set(markets.filter((m) => m.quote === "EUR" && m.status === "trading").map((m) => m.market));
+    // Stablecoins, goud-tokens en verpakte BTC/ETH (zelfde lijst als de automatische muntkeuze)
+    // bewegen niet of dubbel: die nemen alleen een plek in de lijst in.
+    const tradable = new Set(
+      markets
+        .filter((m) => m.quote === "EUR" && m.status === "trading" && !EXCLUDED_BASES.has((m.base || m.market.split("-")[0]).toUpperCase()))
+        .map((m) => m.market),
+    );
     const tickers = await feed.getTickers24h();
     const candidates = tickers
       .filter((t) => tradable.has(t.market) && Number.isFinite(t.volumeQuote))

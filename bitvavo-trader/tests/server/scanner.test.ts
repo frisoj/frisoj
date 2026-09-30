@@ -318,3 +318,19 @@ describe("API: /api/scanner met oplopende limits", () => {
     expect(feed.candleCalls).toHaveLength(90);
   });
 });
+
+describe("Scanner: stablecoins en verpakte munten", () => {
+  it("slaat USDC, USDT, PAXG en WBTC over, ook al hebben ze veel volume", async () => {
+    class StableFeed extends ManyMarketsFeed {
+      constructor() {
+        super(5);
+        this.names.unshift("USDC-EUR", "USDT-EUR", "PAXG-EUR", "WBTC-EUR");
+      }
+    }
+    const feed = new StableFeed();
+    const clock = { now: NOW };
+    const rows = await makeScanner(feed, clock).scan(30, "15m", ENS);
+    const markets = rows.map((r) => r.market);
+    expect(markets).toEqual(["M00-EUR", "M01-EUR", "M02-EUR", "M03-EUR", "M04-EUR"]);
+  });
+});
