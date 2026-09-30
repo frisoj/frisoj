@@ -195,6 +195,35 @@ minder zwaar meetellen, en blokkeert nieuwe aankopen in een dalende trend.
 - **Had je al een eigen muntenlijst opgeslagen** in een eerdere versie, dan blijft die
   staan. Automatisch kiezen zet je aan in **Instellingen → Munten**.
 
+### Bot-wedstrijd: vier bots, elk met €25
+
+Standaard draaien er **vier bots tegelijk**, elk met **€25 oefengeld** (samen €100) en
+een eigen manier van handelen. Zo zie je met echte koersen welke aanpak het best werkt.
+
+| Bot | Hoe hij handelt | Candles |
+|---|---|---|
+| **Snelle scalper** | Korte uitbraken en momentum in de 60 meest verhandelde munten; kleine winsten, krappe stop, ook in een dalende markt. Koopt alleen als de verwachte winst minstens 3× de kosten is. | 5 min |
+| **Trendvolger** | Alleen als Bitcoin én de munt in een stijgende trend zitten; laat winnaars lang lopen (koersdoel 3× het risico). | 1 uur |
+| **Dip-koper** | Koopt kort oververkochte munten en verkoopt bij het herstel; niet als Bitcoin daalt. | 15 min |
+| **Allrounder** | Alle vijf strategieën samen, met een krappere stop-loss (1,5× ATR) en max. 20 trades per dag. | 15 min |
+
+- Het tabblad **Wedstrijd** zet ze naast elkaar: ranglijst, één grafiek met vier lijnen,
+  resultaat vóór en na kosten, en een uitleg in gewone taal. Knoppen: alles starten,
+  alles stoppen en een noodstop voor alle bots.
+- Elke bot heeft een **eigen dashboard** (bovenin wisselen, of `/bot/scalper/`,
+  `/bot/trend/`, `/bot/dip/`, `/bot/allround/`) met eigen instellingen, posities en trades.
+  Wat je daar opslaat, geldt alleen voor die bot.
+- In `.env`: `BOTS=trend,dip` (alleen die bots), `BOTS=allround` (één bot, zoals vroeger),
+  `PAPER_CAPITAL_PER_BOT=25` (oefengeld per bot).
+- **Echt geld:** er mag maar **één** bot live handelen, de rest blijft oefenen op echte
+  koersen. Kies die met `LIVE_BOT=trend` (zie "Live handelen"). Wissel je later van live-bot
+  terwijl de vorige nog echte posities open had, dan weigert de nieuwe te starten tot je
+  die eerst hebt afgehandeld (anders zouden die munten zonder stop-loss blijven staan).
+- **Eerlijk:** in een test van 3 maanden met de simulator verloren alle vier (Trendvolger
+  −2,8%, Scalper −3,9%, Dip-koper −5,2%, Allrounder −8,6%); alleen de Trendvolger verdiende
+  vóór kosten iets. Zonder kostenfilter verloor de Scalper 40%. De wedstrijd met échte
+  koersen laat zien hoe het echt zit.
+
 ### Risicobeheer (standaardinstellingen voor €50)
 
 - **Positiegrootte op basis van risico**: je verliest maximaal 1,5% van je kapitaal
@@ -327,9 +356,10 @@ Alleen in live-modus:
 2. Maak bij Bitvavo een API-sleutel aan (Instellingen → API):
    - rechten: **alleen "Bekijken" en "Handelen"**, **NOOIT "Opnemen"**;
    - stel een **IP-whitelist** in met je eigen IP-adres.
-3. Zet in `.env`:
+3. Zet in `.env` (met meerdere bots ook `LIVE_BOT=`: de ene bot die echt handelt):
    ```env
    TRADING_MODE=live
+   LIVE_BOT=trend
    BITVAVO_API_KEY=...
    BITVAVO_API_SECRET=...
    CAPITAL_LIMIT_EUR=50

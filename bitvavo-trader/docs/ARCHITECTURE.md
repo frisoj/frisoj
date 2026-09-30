@@ -1041,3 +1041,19 @@ result is reused for 5 s — several bots on the same interval then cost one req
   (profile colours); a plain-Dutch analysis (who leads, whether any bot earns more than its costs, how much of the
   gross result went to fees); buttons "Alles starten", "Alles stoppen", "Noodstop alle bots" (confirm modal).
   Polls `/api/bots` every 10 s while visible. Works at 390 px and 1440 px.
+
+### v3 — implementation notes (server)
+* Per-bot build is shared by main.ts and the integration test: `src/bots/assemble.ts`. Summaries: `src/bots/summary.ts`
+  (stats over the last ≤ 1000 closed trades via the read-only `TradingEngine.allTrades()`).
+* Live guard (`src/bots/liveGuard.ts`): a live bot refuses to start while another bot's live state (the old
+  `<DATA_DIR>/state-live.json` or `bots/*/state-live.json`) still has open positions or unknown orders — switching
+  `LIVE_BOT` must never leave real coins without a stop-loss.
+* `POST /api/bots/kill-all`: `ok: true` only when the kill switch ran AND `killResult.failed` is empty; one failing
+  or hanging bot never stops the others (all bots are acted on at the same time). `/api/bots…` also answers under
+  `/bot/<id>/api/bots…`. The 301/404 answers of the multi-bot router go through the same Host/token/cross-site checks
+  (`guardRequest` in httpServer.ts); `..` is normalised before routing.
+* Backtest / optimize / walk-forward share one "one calculation at a time" lock across all bots (one worker).
+* Single bot (`BOTS=<id>`): profile → `.env` MARKETS/INTERVAL → the old `<DATA_DIR>/config.json`, old state paths,
+  `PAPER_STARTING_CAPITAL`. Paper bots in a live process never get the API key.
+* `BitvavoFeed.getCandles`: identical concurrent requests share one call only when their `fast`/`priority` options
+  match; a successful result is reused for 5 s (copies per caller); empty results are not cached.
