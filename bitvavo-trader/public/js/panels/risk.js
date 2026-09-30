@@ -80,7 +80,7 @@ export function mountRisk(ctx, el) {
     const sig = JSON.stringify([
       dayLossPct.toFixed(2), dayPnl.toFixed(2), exposurePct.toFixed(1), tradesToday, openCount, s.halted, a.feesPaid,
       rc.dailyLossLimitPct, rc.maxTotalExposurePct, rc.maxTradesPerDay, rc.maxOpenPositions, rc.riskPerTradePct,
-      equity.toFixed(2), s.mode, s.liveArmed, rc.dailyProfitTargetPct, dayRet.toFixed(2),
+      equity.toFixed(2), s.mode, s.liveArmed, rc.dailyProfitTargetPct, dayRet.toFixed(2), a.dayTargetReached,
     ]);
     if (sig === lastSig) return;
     lastSig = sig;
@@ -127,8 +127,8 @@ export function mountRisk(ctx, el) {
     const banner = halted && s.halted.dailyTarget === true
       ? `<div class="pn-banner pn-banner-good pn-banner-ico risk-target" role="status">
           <svg class="pn-ico pn-ico-lg" viewBox="0 0 15 15" aria-hidden="true"><polyline points="2.5,8 6,11.5 12.5,3.5"/></svg>
-          <div><b>Dagdoel gehaald</b><div>${esc(s.halted.reason || "Het dagdoel is gehaald.")}</div>
-          <div class="muted">De winst is vastgezet: open posities zijn verkocht. Morgen gaat de bot weer verder.</div></div>
+          <div><b>Winst vastgezet</b><div>${esc(s.halted.reason || "De dagwinst is vastgezet.")}</div>
+          <div class="muted">De dagwinst viel terug tot je winstgrens: open posities zijn verkocht. Morgen gaat de bot weer verder.</div></div>
         </div>`
       : halted
       ? `<div class="pn-banner pn-banner-bad pn-banner-ico risk-halt" role="alert">
@@ -156,8 +156,12 @@ export function mountRisk(ctx, el) {
         <div title="Resultaat sinds de start van de dag (incl. open posities)"><span class="muted">Dagresultaat</span><b class="mono ${fmt.pnlClass(dayPnl)}">${esc(fmt.eurSigned(dayPnl))} <small>(${esc(fmt.pct(dayRet, 2))})</small></b></div>
         ${
           target > 0
-            ? `<div title="Staat je vandaag zoveel in de plus (na verkoopkosten), dan zet de bot de winst vast en stopt hij tot morgen. Aanpassen bij Instellingen → Risicobeheer."><span class="muted">Dagdoel</span><b class="mono">${
-                s.halted?.dailyTarget === true ? `<span class="pos">gehaald ✓</span>` : `${esc(fmt.pct(dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
+            ? `<div title="Haal je vandaag dit % (na verkoopkosten), dan handelt de bot door; zakt de dagwinst daarna terug tot deze grens, dan zet hij de winst vast en stopt hij tot morgen. Aanpassen bij Instellingen → Risicobeheer."><span class="muted">Dagdoel</span><b class="mono">${
+                s.halted?.dailyTarget === true
+                  ? `<span class="pos">winst vastgezet ✓</span>`
+                  : a.dayTargetReached === true
+                    ? `<span class="pos">gehaald ✓</span> <small class="muted">grens ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
+                    : `${esc(fmt.pct(dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
               }</b></div>`
             : ""
         }

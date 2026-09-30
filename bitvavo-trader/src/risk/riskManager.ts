@@ -78,6 +78,28 @@ function pct(x: number, decimals = 1): string {
   return `${nl(x, decimals)}%`;
 }
 
+function signedPct(x: number, decimals = 2): string {
+  return `${x >= 0 ? "+" : ""}${pct(x, decimals)}`;
+}
+
+/** Marge boven de winstgrens die een nieuwe trade (na zijn kosten) moet overhouden */
+export const TARGET_FLOOR_MARGIN_PCT = 0.05;
+
+/**
+ * Resultaat van vandaag in % na de geschatte verkoopkosten van de open posities
+ * (`exitCostQuote`), of null als dat niet te berekenen is. Basis van het dagdoel.
+ */
+export function netDayPct(account: Pick<AccountSnapshot, "equity" | "dayStartEquity" | "exitCostQuote">): number | null {
+  const { equity, dayStartEquity: dayStart } = account;
+  if (!isNum(equity) || !isNum(dayStart) || dayStart <= 0) return null;
+  const exitCost = isNum(account.exitCostQuote) && account.exitCostQuote > 0 ? account.exitCostQuote : 0;
+  return ((equity - exitCost - dayStart) / dayStart) * 100;
+}
+
+function targetText(target: number): string {
+  return `+${pct(target, Number.isInteger(target) ? 0 : 2)}`;
+}
+
 /** Leesbare prijs voor zowel BTC (60000) als SHIB (0,00001234). */
 function price(x: number): string {
   if (!Number.isFinite(x)) return String(x);
@@ -417,6 +439,23 @@ export class RiskManager implements RiskManagerLike {
       }
     }
 
+    // Winstgrens actief: een nieuwe trade kost meteen fee + slippage (in en uit). Zou dat
+    // de dagwinst op of onder de grens duwen, dan werd de winst direct weer vastgezet.
+    const target = cfg.dailyProfitTargetPct;
+    if (reasons.length === 0 && isNum(target) && target > 0 && account.dayTargetReached === true && quoteAmount > 0) {
+      const netPct = netDayPct(account);
+      const dayStart = account.dayStartEquity;
+      if (netPct !== null && isNum(dayStart) && dayStart > 0) {
+        const costPct = ((quoteAmount * 2 * (cfg.takerFee + cfg.slippagePct)) / dayStart) * 100;
+        if (netPct - costPct <= target + TARGET_FLOOR_MARGIN_PCT) {
+          reasons.push(
+            `Dagwinst ${signedPct(netPct)} ligt te dicht bij de winstgrens van ${targetText(target)}: ` +
+              `deze trade kost ongeveer ${pct(costPct, 2)} en zou de grens raken`,
+          );
+        }
+      }
+    }
+
     const approved = reasons.length === 0;
     if (approved) {
       const stopPct = ((stop - entry) / entry) * 100;
@@ -548,14 +587,14 @@ export class RiskManager implements RiskManagerLike {
           dailyLimit: true,
         };
       }
-      // Dagdoel: pas gehaald als de winst ook na het verkopen van de open posities er is.
+      // Winstgrens: het dagdoel is vandaag gehaald en de dagwinst (na verkoopkosten)
+      // is teruggevallen tot de grens → winst vastzetten, geen nieuwe trades meer.
       const target = this.cfg.dailyProfitTargetPct;
-      const exitCost = isNum(account.exitCostQuote) && account.exitCostQuote > 0 ? account.exitCostQuote : 0;
-      const netPct = ((equity - exitCost - dayStart) / dayStart) * 100;
-      if (isNum(target) && target > 0 && netPct >= target - 1e-9) {
+      const netPct = netDayPct(account);
+      if (isNum(target) && target > 0 && account.dayTargetReached === true && netPct !== null && netPct <= target + 1e-9) {
         return {
           halted: true,
-          reason: `Dagdoel gehaald (+${pct(netPct, 2)} vandaag, doel +${pct(target, Number.isInteger(target) ? 0 : 2)}): geen nieuwe trades meer tot morgen`,
+          reason: `Dagwinst teruggevallen naar ${signedPct(netPct)} (winstgrens ${targetText(target)}): winst vastgezet, geen nieuwe trades tot morgen`,
           dailyTarget: true,
         };
       }

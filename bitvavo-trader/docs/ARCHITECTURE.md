@@ -954,19 +954,23 @@ seen excluding it.
   at startup. In live mode the "coins the bot does not manage" check covers the auto-selected markets too.
 * **Scanner**: skips `EXCLUDED_BASES` (stablecoins, gold, wrapped BTC/ETH), like the automatic selection.
 
-### Daily profit target (`RiskConfig.dailyProfitTargetPct`, default 1)
+### Daily profit target as a profit floor (`RiskConfig.dailyProfitTargetPct`, default 1)
 
-* `RiskManager.haltStatus` returns `{ halted: true, dailyTarget: true }` when the day result **net of the estimated
-  cost of selling all open positions** (`AccountSnapshot.exitCostQuote` = Σ amount × price × (takerFee + slippage),
-  filled by the engine) reaches the target (percent; 0 or missing = off). The daily loss limit is checked first.
-* Engine: the target halt is sticky until the day rollover (`targetDayKey`, persisted like `haltedDayKey`), so
-  selling costs or a price drop after it cannot re-open trading that day. `lockInDailyTarget()` runs after the held
-  markets / bulk prices and at the end of every tick: it sells every open position without a pending exit with
-  exit reason `"daily-target"` (a refused sell stays a pending exit and is retried). Radar note for candidates:
-  "Koopsignaal, maar het dagdoel is vandaag al gehaald — morgen koopt de bot weer". The dashboard shows the halt in
-  green ("DAGDOEL ✓", risk panel "Dagdoel gehaald") and the progress "x% van 1%".
-* Backtest (`simulate`): per candle, when cash + position × close × (1 − slippage) × (1 − fee) reaches the target
-  vs the day start, the position is sold at that close (`"daily-target"`, exit time = candle close) and no entries
-  follow that day (the engine notices it within a tick; the backtest at the candle close).
+* The day result **net of the estimated cost of selling all open positions** (`netDayPct(account)` in
+  `src/risk/riskManager.ts`; `AccountSnapshot.exitCostQuote` = Σ amount × price × (takerFee + slippage), filled by the
+  engine) is compared with the target (percent; 0 or missing = off).
+* Reaching the target does **not** stop trading: it arms a floor for the rest of the day
+  (`AccountSnapshot.dayTargetReached` / `AccountState.dayTargetReached`; engine `targetArmedDayKey`, persisted).
+* `RiskManager.haltStatus` returns `{ halted: true, dailyTarget: true }` only when the floor is armed and the net day
+  result has fallen back to the target (the daily loss limit is checked first). The engine then sells every open
+  position without a pending exit (`lockInDailyTarget`, exit reason `"daily-target"`; a refused sell stays pending and
+  is retried) and keeps the halt until the day rollover (`targetDayKey`, persisted). The step runs after the held
+  markets / bulk prices and at the end of every tick and can never abort a tick (`safeLockInDailyTarget`).
+* While the floor is armed, `planEntry` rejects a buy whose own round-trip cost (quote × 2 × (takerFee + slippage))
+  would bring the net day result to within `TARGET_FLOOR_MARGIN_PCT` (0.05) of the floor.
+* Backtest (`simulate`): the same rule per candle on the close (arm at ≥ target, lock at ≤ target, sell at that close,
+  no entries for the rest of the day); `dayTargetReached` is passed to `planEntry`.
 * `BacktestResult.dailyStats` (`dailyStatsFrom`): per calendar day (Europe/Amsterdam) the day-end equity vs the
   previous day end — days, days ≥ target (1% when the target is off), win / loss days, average / best / worst day.
+* Dashboard: risk panel row "Dagdoel" (progress → "gehaald ✓ grens +1%" → "winst vastgezet ✓"), a green
+  "Winst vastgezet" banner and a green "WINST VAST ✓" badge in the header instead of the red halt.

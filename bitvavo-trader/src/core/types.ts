@@ -303,10 +303,11 @@ export interface RiskConfig {
    */
   maxSpreadPct?: number;
   /**
-   * Optioneel: dagdoel in PROCENT (1 = +1%; 0 of ontbreekt = uit). Zodra het
-   * resultaat van vandaag (incl. open posities) dit haalt, verkoopt de bot de open
-   * posities om de winst vast te zetten en doet hij tot de volgende dag geen
-   * nieuwe aankopen.
+   * Optioneel: dagdoel / winstgrens in PROCENT (1 = +1%; 0 of ontbreekt = uit).
+   * Haalt het resultaat van vandaag (na verkoopkosten, incl. open posities) dit,
+   * dan handelt de bot gewoon door. Zakt de dagwinst daarna terug tot deze grens,
+   * dan verkoopt hij de open posities (winst vastzetten) en doet hij tot de
+   * volgende dag geen nieuwe aankopen.
    */
   dailyProfitTargetPct?: number;
 }
@@ -389,6 +390,8 @@ export interface AccountSnapshot {
    * verkopen. Het dagdoel telt pas als het ook NA die kosten gehaald is.
    */
   exitCostQuote?: number;
+  /** Optioneel: het dagdoel is vandaag al gehaald (de winstgrens is actief) */
+  dayTargetReached?: boolean;
 }
 
 export interface EntryPlan {
@@ -420,7 +423,7 @@ export interface HaltStatus {
   reason?: string;
   /** True als de stop komt door de dagelijkse verlieslimiet (blijft de hele dag gelden) */
   dailyLimit?: boolean;
-  /** True als de stop komt doordat het dagdoel gehaald is (blijft de hele dag gelden) */
+  /** True als de stop komt doordat de dagwinst na het dagdoel terugviel tot de winstgrens (blijft de hele dag gelden) */
   dailyTarget?: boolean;
 }
 
@@ -564,6 +567,8 @@ export interface AccountState {
   totalReturnPct?: number;
   /** Rendement vandaag in % (idem) */
   dayReturnPct?: number;
+  /** Het dagdoel is vandaag gehaald: zakt de dagwinst terug tot de grens, dan wordt de winst vastgezet */
+  dayTargetReached?: boolean;
   /**
    * Totale winst/verlies in EUR sinds de start (door de engine berekend: incl.
    * afgeroomde winst, en niet vertekend door wijzigingen van de kapitaallimiet)
@@ -767,8 +772,10 @@ export interface PersistedState {
   stateRecovery?: { reason: string; quarantinedTo?: string; at: number };
   /** Laatste automatische muntkeuze (gebruikt bij een herstart zolang hij < 24 uur oud is) */
   autoUniverse?: { markets: string[]; at: number };
-  /** Dag (YYYY-MM-DD, Europe/Amsterdam) waarop het dagdoel gehaald is */
+  /** Dag (YYYY-MM-DD, Europe/Amsterdam) waarop de dagwinst is vastgezet (geen aankopen meer) */
   targetDayKey?: string;
+  /** Dag waarop het dagdoel gehaald is (de winstgrens is actief) */
+  targetArmedDayKey?: string;
 }
 
 /**

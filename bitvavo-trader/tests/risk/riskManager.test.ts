@@ -955,19 +955,38 @@ describe("haltStatus", () => {
     expect(r.haltStatus(account({ equity: 55, dayStartEquity: 50 })).halted).toBe(false);
   });
 
-  it("dagdoel: stopt nieuwe trades zodra de dag het doel haalt; 0 of ontbrekend = uit", () => {
+  it("winstgrens: pas na het dagdoel actief; terugval tot de grens (na verkoopkosten) stopt de handel", () => {
     const r = rm({ dailyProfitTargetPct: 1 });
-    expect(r.haltStatus(account({ equity: 50.49, dayStartEquity: 50 }))).toEqual({ halted: false });
-    const hit = r.haltStatus(account({ equity: 50.5, dayStartEquity: 50 }));
+    // Doel nog niet gehaald: ook +10% stopt niets
+    expect(r.haltStatus(account({ equity: 55, dayStartEquity: 50 }))).toEqual({ halted: false });
+    // Doel gehaald en ruim erboven: doorhandelen
+    expect(r.haltStatus(account({ equity: 51, dayStartEquity: 50, dayTargetReached: true }))).toEqual({ halted: false });
+    // Teruggevallen tot de grens
+    const hit = r.haltStatus(account({ equity: 50.5, dayStartEquity: 50, dayTargetReached: true }));
     expect(hit).toMatchObject({ halted: true, dailyTarget: true });
     expect(hit.dailyLimit).toBeUndefined();
-    expect(hit.reason).toBe("Dagdoel gehaald (+1,00% vandaag, doel +1%): geen nieuwe trades meer tot morgen");
-    expect(rm({ dailyProfitTargetPct: 1.5 }).haltStatus(account({ equity: 51, dayStartEquity: 50 })).reason).toContain("doel +1,50%");
-    expect(rm({ dailyProfitTargetPct: 0 }).haltStatus(account({ equity: 60, dayStartEquity: 50 })).halted).toBe(false);
+    expect(hit.reason).toBe("Dagwinst teruggevallen naar +1,00% (winstgrens +1%): winst vastgezet, geen nieuwe trades tot morgen");
+    // De verkoopkosten van open posities tellen mee: +1,2% op papier, +0,8% na kosten
+    expect(r.haltStatus(account({ equity: 50.6, dayStartEquity: 50, dayTargetReached: true, exitCostQuote: 0.2 })).halted).toBe(true);
+    expect(rm({ dailyProfitTargetPct: 1.5 }).haltStatus(account({ equity: 50.7, dayStartEquity: 50, dayTargetReached: true })).reason).toContain("winstgrens +1,50%");
+    expect(r.haltStatus(account({ equity: 49.9, dayStartEquity: 50, dayTargetReached: true })).reason).toContain("teruggevallen naar -0,20%");
+    expect(rm({ dailyProfitTargetPct: 0 }).haltStatus(account({ equity: 50, dayStartEquity: 50, dayTargetReached: true })).halted).toBe(false);
     const { dailyProfitTargetPct: _t, ...noTarget } = DEFAULT_RISK_CONFIG;
-    expect(new RiskManager(noTarget as RiskConfig, "15m").haltStatus(account({ equity: 60, dayStartEquity: 50 })).halted).toBe(false);
+    expect(new RiskManager(noTarget as RiskConfig, "15m").haltStatus(account({ equity: 50, dayStartEquity: 50, dayTargetReached: true })).halted).toBe(false);
     // de verlieslimiet gaat altijd voor
-    expect(rm({ dailyProfitTargetPct: 1, dailyLossLimitPct: 5 }).haltStatus(account({ equity: 47, dayStartEquity: 50 })).dailyLimit).toBe(true);
+    expect(rm({ dailyProfitTargetPct: 1, dailyLossLimitPct: 5 }).haltStatus(account({ equity: 47, dayStartEquity: 50, dayTargetReached: true })).dailyLimit).toBe(true);
+  });
+
+  it("winstgrens: geen nieuwe trade die de dagwinst (met zijn kosten) tot de grens zou duwen", () => {
+    const r = rm({ dailyProfitTargetPct: 1 });
+    // +1,2% vandaag; een trade van ~€22 kost ~0,26% van €50 → zou op +0,94% uitkomen → afwijzen
+    const close = r.planEntry(decision(), account({ equity: 50.6, cashQuote: 50.6, dayStartEquity: 50, dayTargetReached: true }), marketInfo(), NOW);
+    expect(close.approved).toBe(false);
+    expect(close.reasons.join(" ")).toMatch(/^Dagwinst \+1,20% ligt te dicht bij de winstgrens van \+1%: deze trade kost ongeveer 0,\d\d% en zou de grens raken$/);
+    // Ruim boven de grens: gewoon kopen
+    expect(r.planEntry(decision(), account({ equity: 52, cashQuote: 52, dayStartEquity: 50, dayTargetReached: true }), marketInfo(), NOW).approved).toBe(true);
+    // Doel nog niet gehaald: deze regel speelt niet
+    expect(r.planEntry(decision(), account({ equity: 50.6, cashQuote: 50.6, dayStartEquity: 50 }), marketInfo(), NOW).approved).toBe(true);
   });
 
   it("dagdoel: grenzen in de validatie (0 = uit, anders 0,1–50)", () => {

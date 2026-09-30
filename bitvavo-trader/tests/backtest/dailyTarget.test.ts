@@ -1,5 +1,5 @@
 /**
- * Dagdoel in de backtest (risk.dailyProfitTargetPct) en de dagtelling (result.dailyStats).
+ * Dagdoel als winstgrens in de backtest (risk.dailyProfitTargetPct) en de dagtelling (result.dailyStats).
  */
 import { describe, expect, it } from "vitest";
 import { dailyStatsFrom, runBacktestWith } from "../../src/backtest/simulator";
@@ -9,44 +9,52 @@ import { SLIP, STEP, T0, candle, decisionsFrom, flatCandles, input, riskCfg, stu
 
 // T0 = maandag 00:00 UTC = 01:00 in Amsterdam: de dag wisselt bij candle 92 (23:00 UTC).
 const N = 200;
-function prices(): Candle[] {
-  const c = flatCandles(N);
-  c[5] = candle(5, 100, 103.1, 99.9, 103); // de dag staat na deze candle > +1%, ook na verkoopkosten
+/** Candle 5 sluit op 103 (dag > +1% na kosten: grens actief); candle 6 op `fallTo`. */
+function prices(fallTo: number | null = 101.5): Candle[] {
+  const c = flatCandles(N, 100);
+  c[5] = candle(5, 100, 103.1, 99.9, 103);
+  if (fallTo !== null) {
+    c[6] = candle(6, 103, 103, fallTo - 0.1, fallTo);
+    for (let i = 7; i < N; i++) c[i] = candle(i, fallTo, fallTo + 0.1, fallTo - 0.1, fallTo);
+  } else {
+    for (let i = 6; i < N; i++) c[i] = candle(i, 103, 103.1, 102.9, 103);
+  }
   return c;
 }
 function acts(...buyAt: number[]): string {
   return Array.from({ length: N }, (_, i) => (buyAt.includes(i) ? "B" : ".")).join("");
 }
-function run(targetPct: number, buyAt: number[]) {
-  const candles = prices();
+function run(targetPct: number, buyAt: number[], candles = prices()) {
   const decisions = decisionsFrom(candles, acts(...buyAt));
   return runBacktestWith(input(candles, { risk: riskCfg({ dailyProfitTargetPct: targetPct, maxSpreadPct: 0 }) }), {
     decide: () => decisions,
-    createRisk: () => stubRisk({ quote: 50 }),
+    createRisk: () => stubRisk({ quote: 50, tpDist: 20 }),
   }).result;
 }
 
-describe("Dagdoel in de backtest", () => {
-  it("verkoopt op de slotkoers zodra de dag het doel haalt en koopt die dag niet meer; de dag erna wel", () => {
+describe("Dagdoel als winstgrens in de backtest", () => {
+  it("grens actief na +1%; terugval → verkopen op de slotkoers en die dag niet meer kopen; de dag erna wel", () => {
     const r = run(1, [0, 10, 100]);
     expect(dayKey(T0 + 92 * STEP)).not.toBe(dayKey(T0 + 91 * STEP));
     expect(r.trades).toHaveLength(2);
     expect(r.trades[0]).toMatchObject({ exitReason: "daily-target" });
-    expect(r.trades[0].exitPrice).toBeCloseTo(103 * (1 - SLIP), 8);
+    expect(r.trades[0].exitPrice).toBeCloseTo(101.5 * (1 - SLIP), 8); // de slotkoers van candle 6, niet die van 5
     expect(r.trades[0].pnlQuote).toBeGreaterThan(0);
     // het koopsignaal van candle 10 (zelfde dag) werd genegeerd; dat van candle 100 (volgende dag) niet
     expect(r.trades[1].entryTime).toBe(T0 + 101 * STEP);
     expect(r.markers.some((m) => m.label.startsWith("DAGDOEL"))).toBe(true);
   });
 
-  it("telt pas NA verkoopkosten: +1,1% op papier maar minder na fee en slippage → niet verkopen", () => {
-    const candles = prices();
-    candles[5] = candle(5, 100, 102.6, 99.9, 102.5);
-    const decisions = decisionsFrom(candles, acts(0));
-    const r = runBacktestWith(input(candles, { risk: riskCfg({ dailyProfitTargetPct: 1, maxSpreadPct: 0 }) }), {
-      decide: () => decisions,
-      createRisk: () => stubRisk({ quote: 50 }),
-    }).result;
+  it("blijft de koers boven de grens, dan wordt er niets verkocht (doorhandelen)", () => {
+    const r = run(1, [0], prices(null));
+    expect(r.trades.some((t) => t.exitReason === "daily-target")).toBe(false);
+  });
+
+  it("telt pas NA verkoopkosten: +1,1% op papier maar minder na fee en slippage → grens niet actief", () => {
+    const c = flatCandles(N, 100);
+    c[5] = candle(5, 100, 102.6, 99.9, 102.5);
+    for (let i = 6; i < N; i++) c[i] = candle(i, 100.5, 100.6, 100.4, 100.5);
+    const r = run(1, [0], c);
     expect(r.trades.some((t) => t.exitReason === "daily-target")).toBe(false);
   });
 
@@ -55,10 +63,11 @@ describe("Dagdoel in de backtest", () => {
     expect(r.trades.some((t) => t.exitReason === "daily-target")).toBe(false);
   });
 
-  it("dailyStats telt de dagen met ≥ doel, winst en verlies", () => {
+  it("dailyStats telt de dagen", () => {
     const r = run(1, [0, 10, 100]);
-    expect(r.dailyStats).toMatchObject({ days: 3, targetPct: 1, targetDays: 1, winDays: 1 });
-    expect(r.dailyStats!.bestDayPct).toBeGreaterThan(1);
+    expect(r.dailyStats).toMatchObject({ days: 3, targetPct: 1 });
+    expect(r.dailyStats!.bestDayPct).toBeGreaterThan(0);
+    expect(r.dailyStats!.targetDays).toBe(0); // dag 1 eindigde na het vastzetten net onder +1%
   });
 });
 

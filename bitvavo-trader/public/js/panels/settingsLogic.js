@@ -112,7 +112,7 @@ export const RISK_GROUPS = [
     title: "Dagelijkse limieten",
     fields: [
       { key: "dailyProfitTargetPct", label: "Dagdoel", unit: "%", step: 0.1, min: 0.1, max: 50, zeroOff: true, optional: true,
-        help: "Staat je vandaag zoveel % in de plus (ná verkoopkosten), dan verkoopt de bot de open posities om de winst vast te zetten en doet hij tot morgen niets meer. Het doel zorgt er niet voor dat de bot vaker wint: het beschermt een goede dag. 0 = uit." },
+        help: "Winstgrens: haal je vandaag dit % (ná verkoopkosten), dan handelt de bot gewoon door. Zakt je dagwinst daarna terug tot dit %, dan verkoopt hij alles om de winst vast te zetten en doet hij tot morgen niets meer. Het maakt de bot niet vaker winstgevend: het beschermt een goede dag. 0 = uit." },
       { key: "dailyLossLimitPct", label: "Max. dagverlies", unit: "%", step: 0.5, min: 0.5, max: 50,
         help: "Verlies je vandaag dit % van je saldo, dan stopt de bot met nieuwe trades tot morgen." },
       { key: "maxTradesPerDay", label: "Max. trades per dag", unit: "trades", step: 1, min: 1, max: 100, int: true,

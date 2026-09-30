@@ -450,10 +450,12 @@ export function simulate(
   let tradesToday = 0;
   let realizedPnlToday = 0;
   let lastEquity = initialCapital;
-  // Dagdoel (risk.dailyProfitTargetPct): zodra het resultaat van de dag (incl. de open
-  // positie, op de slotkoers) het doel haalt, wordt de positie verkocht en wordt er
-  // die dag niet meer gekocht — zoals de engine (die kijkt elke tick, hier per candle).
+  // Dagdoel / winstgrens (risk.dailyProfitTargetPct), zoals de engine (die kijkt elke
+  // tick, hier per candle op de slotkoers): haalt de dag (na verkoopkosten) het doel,
+  // dan wordt de grens actief; valt de dag daarna terug tot de grens, dan wordt de
+  // positie verkocht en wordt er die dag niet meer gekocht.
   const targetPct = dailyTargetPct(input.risk);
+  let targetArmedDay: string | null = null;
   let targetDay: string | null = null;
 
   const curveLen = n - evalStart;
@@ -571,6 +573,7 @@ export function simulate(
       realizedPnlToday,
       openPositions: [],
       lastLossAt: { ...lastLossAt },
+      dayTargetReached: targetArmedDay === currentDay,
     };
     if (risk.haltStatus(account).halted) return false;
     const plan = risk.planEntry(d, account, input.marketInfo, c.time);
@@ -652,13 +655,18 @@ export function simulate(
       }
     }
 
-    if (targetPct > 0 && dayStartEquity > 0) {
-      // Na verkoopkosten (fee + slippage), zoals de engine: de dag moet het doel ook ná het verkopen halen.
+    if (targetPct > 0 && dayStartEquity > 0 && targetDay !== currentDay) {
+      // Na verkoopkosten (fee + slippage), zoals de engine.
       const eqNow = cash + (pos ? pos.amount * c.close * (1 - slip) * (1 - fee) : 0);
-      if (targetDay !== currentDay && ((eqNow - dayStartEquity) / dayStartEquity) * 100 >= targetPct - 1e-9) {
+      const netPct = ((eqNow - dayStartEquity) / dayStartEquity) * 100;
+      if (targetArmedDay !== currentDay) {
+        if (netPct >= targetPct - 1e-9) targetArmedDay = currentDay;
+      } else if (netPct <= targetPct + 1e-9) {
         targetDay = currentDay;
       }
-      if (targetDay === currentDay && pos && !pendingExit) {
+    }
+    if (targetPct > 0 && targetDay === currentDay) {
+      if (pos && !pendingExit) {
         // Winst vastzetten op de slotkoers van deze candle (de engine merkt het binnen een tick).
         if (sellable(pos, c.close)) closePosition(i, c.close, "daily-target", prev.score, c.time + intervalMs);
         else refuseExit("daily-target", prev.score);

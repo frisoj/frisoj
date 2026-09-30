@@ -81,19 +81,32 @@ describe("risicopaneel: dagdoel", () => {
     expect(off.html()).not.toContain(">Dagdoel<");
   });
 
-  it("gehaald: groene melding in plaats van 'Handel gepauzeerd'", async () => {
+  it("gehaald: de grens is actief, de bot handelt door", async () => {
     const p = await mount({
       mode: "paper",
       config: withTarget,
       positions: [],
-      halted: { halted: true, dailyTarget: true, reason: "Dagdoel vandaag gehaald: geen nieuwe trades tot morgen" },
-      account: { ...account, equity: 50.6, dayPnlQuote: 0.6, dayReturnPct: 1.2 },
+      halted: { halted: false },
+      account: { ...account, equity: 51, dayPnlQuote: 1, dayReturnPct: 2, dayTargetReached: true },
+    });
+    const html = p.html();
+    expect(html).toContain('<span class="muted">Dagdoel</span><b class="mono"><span class="pos">gehaald ✓</span> <small class="muted">grens +1%</small></b>');
+    expect(html).not.toContain("pn-banner-good");
+  });
+
+  it("teruggevallen tot de grens: groene melding 'Winst vastgezet' in plaats van 'Handel gepauzeerd'", async () => {
+    const p = await mount({
+      mode: "paper",
+      config: withTarget,
+      positions: [],
+      halted: { halted: true, dailyTarget: true, reason: "Dagwinst vandaag vastgezet: geen nieuwe trades tot morgen" },
+      account: { ...account, equity: 50.5, dayPnlQuote: 0.5, dayReturnPct: 1, dayTargetReached: true },
     });
     const html = p.html();
     expect(html).toContain('class="pn-banner pn-banner-good pn-banner-ico risk-target"');
-    expect(html).toContain("<b>Dagdoel gehaald</b>");
+    expect(html).toContain("<b>Winst vastgezet</b>");
     expect(html).not.toContain("Handel gepauzeerd");
-    expect(html).toContain('<span class="pos">gehaald ✓</span>');
+    expect(html).toContain('<span class="pos">winst vastgezet ✓</span>');
   });
 });
 

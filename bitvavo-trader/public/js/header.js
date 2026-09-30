@@ -399,7 +399,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     if (bs) bs.textContent = snap.running ? "Actief" : "Gestopt";
     if (halt) {
       halt.hidden = !halted;
-      halt.textContent = target ? "DAGDOEL ✓" : "HALTED";
+      halt.textContent = target ? "WINST VAST ✓" : "HALTED";
       halt.className = `badge ${target ? "badge-green" : "badge-red"}`;
       halt.title = halted ? snap.halted.reason || "Handel gepauzeerd door risicobeheer" : "";
     }
