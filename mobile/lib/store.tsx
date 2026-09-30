@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { analyzeImage } from './api';
+import { analyzeImage, ApiError } from './api';
 import { cancelReminder, scheduleReminder } from './notifications';
 import { initPurchases, isPro } from './purchases';
 import { FREE_SCANS_PER_WEEK, scansLeft } from './quota';
@@ -63,7 +63,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const scan: Store['scan'] = useCallback(
     async (base64, mediaType) => {
       if (!pro && scansLeft(scanTimes) <= 0) return 'paywall';
-      const analysis = await analyzeImage(base64, mediaType, installId);
+      let analysis;
+      try {
+        analysis = await analyzeImage(base64, mediaType, installId);
+      } catch (e) {
+        if (e instanceof ApiError && e.code === 'quota') return 'paywall';
+        throw e;
+      }
       const item: Item = { ...analysis, id: Crypto.randomUUID(), createdAt: new Date().toISOString(), done: false, notificationId: null };
       item.notificationId = await scheduleReminder(item).catch(() => null);
       await recordScan();

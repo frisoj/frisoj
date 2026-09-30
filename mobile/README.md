@@ -39,7 +39,7 @@ Dit kan ik niet voor je regelen; het vereist jouw accounts en betalingen:
 7. Vul App Privacy (iOS) en Data Safety (Android) in: foto's worden verzonden voor analyse, niet bewaard.
 
 ## Bekende beperkingen / volgende stappen
-- Gratis-limiet staat client-side; de backend heeft alleen een burst-limiet per installatie. Voor productie: server-side quota + RevenueCat-check (zie TODO in `analyze.ts`).
+- De gratis limiet en de Pro-check draaien server-side (Upstash Redis + RevenueCat secret key, zie `backend/.env.example`). Zonder Upstash valt de server terug op geheugen per instantie (alleen voor dev). Een herinstallatie krijgt een nieuw install-id en dus weer 3 gratis scans.
 - Alleen Nederlands in de UI; de backend ondersteunt al `language`.
 - Geen cloud-sync of accounts (bewust: privacy); back-up/sync is een logische Pro-feature.
 - De AI-uitleg is geen juridisch of financieel advies (disclaimer staat in de app).

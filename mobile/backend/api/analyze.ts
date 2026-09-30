@@ -1,12 +1,14 @@
 // Vercel serverless function. The Anthropic key lives only here, never in the app.
 // Nothing is logged or stored: the image is forwarded to the model and discarded.
 
+import { hasPro, makeCounter, reserveScan } from './_entitlement';
+
 const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5-5';
 const MAX_IMAGE_B64 = 7_000_000; // ~5 MB binary
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-// Per-instance burst limiter. TODO before scale: move to Upstash/KV and verify the
-// RevenueCat entitlement server-side so the free quota cannot be bypassed.
+// Burst limiter per instance; the weekly free quota and Pro check live in _entitlement.ts.
+const counter = makeCounter();
 const hits = new Map<string, number[]>();
 function limited(key: string, max = 10, windowMs = 60_000) {
   const now = Date.now();
@@ -53,6 +55,15 @@ export default async function handler(req: any, res: any) {
   const lang = language === 'en' ? 'English' : 'Dutch';
   const day = /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : new Date().toISOString().slice(0, 10);
 
+  const pro = await hasPro(installId, process.env.REVENUECAT_SECRET_KEY);
+  let release: (() => Promise<void>) | null;
+  try {
+    release = await reserveScan(installId, pro, counter);
+  } catch {
+    return res.status(503).json({ error: 'quota_unavailable' });
+  }
+  if (!release) return res.status(402).json({ error: 'quota' });
+
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY ?? '', 'anthropic-version': '2023-06-01' },
@@ -68,10 +79,10 @@ export default async function handler(req: any, res: any) {
       ] }],
     }),
   });
-  if (!upstream.ok) return res.status(502).json({ error: 'upstream' });
+  if (!upstream.ok) { await release(); return res.status(502).json({ error: 'upstream' }); }
 
   const data: any = await upstream.json();
   const out = data.content?.find((b: any) => b.type === 'tool_use')?.input;
-  if (!out || out.is_document === false) return res.status(422).json({ error: 'unreadable' });
+  if (!out || out.is_document === false) { await release(); return res.status(422).json({ error: 'unreadable' }); }
   return res.status(200).json({ ...out, replyDraft: out.reply_draft ?? null });
 }
