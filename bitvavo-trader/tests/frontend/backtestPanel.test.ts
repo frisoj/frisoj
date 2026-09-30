@@ -45,12 +45,21 @@ const LAB: Form = {
   trainRatio: "0.7",
 };
 
-async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; backtest?: Fake }) {
+async function mount(opts: {
+  form?: Form;
+  strats?: string[];
+  optimize?: Fake;
+  backtest?: Fake;
+  markets?: string[];
+  activeMarkets?: string[];
+  config?: Fake;
+}) {
   const { mountBacktest } = await loadPublic("js/panels/backtest.js");
   const { fmt, esc } = await loadPublic("js/format.js");
   const form: Form = { ...LAB, ...(opts.form || {}) };
   const strats = opts.strats || [...DEFAULT_ENGINE_CONFIG.ensemble.enabled];
-  let config = structuredClone(DEFAULT_ENGINE_CONFIG);
+  let config = structuredClone(opts.config ?? DEFAULT_ENGINE_CONFIG);
+  const reqs: Fake[] = [];
   const puts: Fake[] = [];
   const modals: Fake[] = [];
   const toasts: string[] = [];
@@ -84,12 +93,12 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
   const el = fakeNode({ querySelector: (sel: string) => (nodes[sel] ||= fakeNode()) });
   const calls: string[] = [];
   const api = {
-    getMarkets: async () => [{ market: "BTC-EUR" }],
+    getMarkets: async () => (opts.markets ?? ["BTC-EUR"]).map((market) => ({ market })),
     getStrategies: async () => listStrategies(),
     getConfig: async () => structuredClone(config),
     info: async () => ({ dataSource: "simulated" }),
-    optimize: async () => (calls.push("optimize"), structuredClone(opts.optimize)),
-    backtest: async () => (calls.push("backtest"), structuredClone(opts.backtest)),
+    optimize: async (req: Fake) => (calls.push("optimize"), reqs.push(structuredClone(req)), structuredClone(opts.optimize)),
+    backtest: async (req: Fake) => (calls.push("backtest"), reqs.push(structuredClone(req)), structuredClone(opts.backtest)),
     putConfig: async (p: Fake) => {
       puts.push(structuredClone(p));
       config = structuredClone({
@@ -98,6 +107,7 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
         ensemble: { ...config.ensemble, ...(p.ensemble || {}), params: { ...config.ensemble.params, ...(p.ensemble?.params || {}) } },
         risk: { ...config.risk, ...(p.risk || {}) },
       });
+      if (p.ensemble?.trendFilter) config.ensemble.trendFilter = { ...(config.ensemble.trendFilter || {}), ...p.ensemble.trendFilter };
       return structuredClone(config);
     },
   };
@@ -112,7 +122,7 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
       modals.push(o);
       return () => {};
     },
-    getState: () => ({ config: structuredClone(config) }),
+    getState: () => ({ config: structuredClone(config), ...(opts.activeMarkets ? { activeMarkets: opts.activeMarkets } : {}) }),
     getSelectedMarket: () => "BTC-EUR",
   };
   mountBacktest(ctx, el);
@@ -123,6 +133,9 @@ async function mount(opts: { form?: Form; strats?: string[]; optimize?: Fake; ba
     out: outEl,
     outNodes,
     calls,
+    reqs,
+    inputs,
+    bus: ctx.bus,
     formEl,
     puts,
     modals,
@@ -355,5 +368,133 @@ describe("heatmap: mediaan en de beste combinatie", () => {
       target: { closest: () => ({ dataset: { x: "1", y: "1" } }) },
     });
     expect(String(tip.innerHTML)).toContain("★ hier zit de beste combinatie");
+  });
+});
+
+// ── v2: trendfilter-schakelaar, tegengehouden koopsignalen, ~400 markten ──
+
+const flat = (h: unknown) => String(h).replace(/\s+/g, " ");
+const text = (h: unknown) => flat(String(h).replace(/<[^>]+>/g, ""));
+const btResult = (over: Fake = {}) => ({
+  market: "BTC-EUR",
+  interval: "1h",
+  dataSource: "bitvavo",
+  from: Date.UTC(2026, 8, 1),
+  to: Date.UTC(2026, 8, 30),
+  candlesCount: 700,
+  initialCapital: 50,
+  durationMs: 10,
+  metrics: metrics(),
+  trades: [],
+  equityCurve: [],
+  candles: [],
+  markers: [],
+  ...over,
+});
+
+describe("v2 Backtest-lab: trendfilter vergelijken met / zonder", () => {
+  it("standaard zoals de bot (aan): het filter van de bot gaat mee in de backtest", async () => {
+    const p = await mount({ backtest: btResult() });
+    expect(p.inputs.trendFilter.checked).toBe(true);
+    await p.run("backtest");
+    expect(p.reqs[0].ensemble.trendFilter).toEqual({ market: true, coin: false, interval: "1d", period: 50 });
+  });
+
+  it("uit: ensemble.trendFilter met beide vlaggen uit (zelfde tijdschaal en periode)", async () => {
+    const p = await mount({ backtest: btResult() });
+    p.inputs.trendFilter.checked = false;
+    await p.run("backtest");
+    expect(p.reqs[0].ensemble.trendFilter).toEqual({ market: false, coin: false, interval: "1d", period: 50 });
+  });
+
+  it("bot zonder filter: schakelaar staat uit; aan = het standaard marktfilter; ook bij optimaliseren", async () => {
+    const config = structuredClone(DEFAULT_ENGINE_CONFIG) as Fake;
+    config.ensemble.trendFilter = { market: false, coin: false, interval: "4h", period: 30 };
+    const best = { params: { "ensemble.buyThreshold": 0.45 }, score: 1, metrics: metrics() };
+    const p = await mount({ config, optimize: { objective: "sharpe", rows: [best], best, combosTested: 1, heatmap: null, durationMs: 1 } });
+    expect(p.inputs.trendFilter.checked).toBe(false);
+    p.inputs.trendFilter.checked = true;
+    await p.run("optimize");
+    expect(p.reqs[0].ensemble.trendFilter).toEqual({ market: true, coin: false, interval: "4h", period: 30 });
+    expect(flat(p.out.innerHTML)).toContain(">trendfilter aan</span>");
+  });
+
+  it("toont hoeveel koopsignalen het trendfilter en de spread tegenhielden", async () => {
+    const p = await mount({ backtest: btResult({ blockedEntries: { trend: 12, spread: 1 } }) });
+    await p.run("backtest");
+    const t = text(p.out.innerHTML);
+    expect(t).toContain("Filters in deze test");
+    expect(t).toContain("Tegengehouden door trendfilter: 12 koopsignalen");
+    expect(t).toContain("Tegengehouden door spread: 1 koopsignaal");
+    expect(t).toContain("Trendfilter aan: alleen kopen als Bitcoin boven het gemiddelde van 50 dagen staat.");
+    expect(t).toContain("zet het trendfilter links uit en test opnieuw");
+  });
+
+  it("zonder blockedEntries (filter uit, geen spreadlimiet): wel de stand van het filter, geen aantallen", async () => {
+    const p = await mount({ backtest: btResult() });
+    p.inputs.trendFilter.checked = false;
+    await p.run("backtest");
+    const t = text(p.out.innerHTML);
+    expect(t).toContain("Trendfilter uit: de test kocht ook in een dalende markt.");
+    expect(t).not.toContain("Tegengehouden door");
+  });
+
+  it("een filteruitleg van de server heet niet 'Periode aangepast.'", async () => {
+    const note = "Trendfilter niet toegepast: geen koersdata voor het filter.";
+    const p = await mount({ backtest: btResult({ note }) });
+    await p.run("backtest");
+    const html = flat(p.out.innerHTML);
+    expect(html).toContain(`<b>Let op.</b> ${note}`);
+    expect(html).not.toContain("Periode aangepast.");
+  });
+
+  it("toepassen met het trendfilter uit: in de bevestiging staat het, en de bot krijgt het geteste filter", async () => {
+    const best = { params: { "ensemble.buyThreshold": 0.45 }, score: 1, metrics: metrics() };
+    const p = await mount({ optimize: { objective: "sharpe", rows: [best], best, combosTested: 1, heatmap: null, durationMs: 1 } });
+    p.inputs.trendFilter.checked = false;
+    await p.run("optimize");
+    p.applyButtons().find((b: Fake) => b.dataset.row === "best").fire("click", {});
+    await settle();
+    const modal = p.modals[p.modals.length - 1];
+    const body = flat(modal.bodyHtml);
+    expect(body).toContain("<td>Trendfilter</td>");
+    expect(body).toContain("Bitcoin boven het gemiddelde van 50 dagen");
+    expect(body).toContain("In deze test stond het trendfilter <b>uit</b>; na toepassen staat het ook in de bot <b>uit</b>.");
+    await modal.onConfirm();
+    expect(p.puts[0].ensemble.trendFilter).toEqual({ market: false, coin: false, interval: "1d", period: 50 });
+  });
+});
+
+describe("v2 Backtest-lab: marktkeuze met ~400 markten", () => {
+  // BTC-EUR = de markt die in de live grafiek geselecteerd is (getSelectedMarket)
+  const all = ["BTC-EUR", ...Array.from({ length: 399 }, (_, i) => `C${String(i).padStart(3, "0")}-EUR`)];
+
+  it("de munten die de bot nu volgt (activeMarkets) staan bovenaan; een zoekveld filtert de lijst", async () => {
+    const active = ["C200-EUR", "C007-EUR", "C350-EUR"];
+    const p = await mount({ markets: all, activeMarkets: active, form: { market: "C007-EUR" } });
+    const sel = p.inputs.market;
+    const html = flat(sel.innerHTML);
+    expect(html).toMatch(/^<optgroup label="In de bot \(3\)"><option value="C200-EUR">C200-EUR<\/option><option value="C007-EUR">/);
+    expect((html.match(/<option /g) || []).length).toBe(400);
+    expect(p.inputs.marketSearch.hidden).toBe(false);
+
+    p.formEl.fire("input", { target: { name: "marketSearch", value: "c35" } });
+    const filtered = flat(sel.innerHTML);
+    expect(filtered).toContain('<optgroup label="In de bot (3)"><option value="C350-EUR">');
+    expect((filtered.match(/<option /g) || []).length).toBe(10); // C350 … C359
+    expect(sel.value).toBe("C350-EUR"); // C007 past niet meer: eerste treffer
+
+    p.formEl.fire("input", { target: { name: "marketSearch", value: "zzz" } });
+    expect(flat(sel.innerHTML)).toContain('<option disabled>Geen munt met "zzz"</option>');
+    expect(sel.value).toBe("C350-EUR");
+  });
+
+  it("nieuwe automatische keuze in de snapshot → groep 'In de bot' bijgewerkt, gekozen markt blijft", async () => {
+    const p = await mount({ markets: all, activeMarkets: ["C001-EUR"], form: { market: "C123-EUR" } });
+    p.inputs.market.value = "C123-EUR";
+    p.bus.emit("snapshot", { config: structuredClone(DEFAULT_ENGINE_CONFIG), activeMarkets: ["C123-EUR", "C005-EUR"] });
+    const html = flat(p.inputs.market.innerHTML);
+    expect(html).toMatch(/^<optgroup label="In de bot \(2\)"><option value="C123-EUR">/);
+    expect(p.inputs.market.value).toBe("C123-EUR");
   });
 });

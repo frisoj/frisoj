@@ -2833,3 +2833,260 @@
     text-overflow: clip;
   }
 }
+
+/* ── v2: munten, trendfilter ── */
+/* Instellingen → Munten (automatisch / zelf kiezen), Trendfilter; Backtest-lab:
+   trendfilter-schakelaar, zoekveld markt, filters in het resultaat; Scanner: uitleg
+   bij automatische muntkeuze. Alleen contract-variabelen. */
+
+.st-uni-seg {
+  display: flex;
+  width: 100%;
+  margin-bottom: 10px;
+}
+.st-uni-seg button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: auto;
+  min-height: 30px;
+  padding: 5px 10px;
+  line-height: 1.25;
+  white-space: normal;
+}
+.st-uni-status:empty {
+  display: none;
+}
+.st-uni-status {
+  margin-bottom: 12px;
+}
+.st-uni-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12.5px;
+}
+.st-uni-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-bg);
+}
+.st-uni-list {
+  font-size: 12px;
+}
+.st-uni-list summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+.st-uni-names {
+  max-height: 140px;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.st-uni-note {
+  margin: 6px 0 0;
+}
+.st-uni-pending {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--yellow);
+}
+.st-uni-explain {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.st-uni-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.st-uni-count .st-input-wrap {
+  flex: 0 1 180px;
+  min-width: 130px;
+}
+.st-uni-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.st-uni-preset {
+  min-width: 44px;
+  height: 28px;
+}
+.st-uni-preset.is-active {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+.st-sec-markets .st-msel {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.st-mcount-inline {
+  font-size: 11px;
+  font-weight: 500;
+}
+.st-chips-more {
+  border-style: solid;
+  color: var(--accent);
+}
+.st-uni-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.st-uni-pos {
+  margin: 4px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+/* Trendfilter */
+.st-tf-params {
+  transition: opacity 0.15s;
+}
+.st-tf-params.is-off {
+  opacity: 0.55;
+}
+.st-tf-seg {
+  align-self: flex-start;
+}
+.st-tf-now {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.st-tf-now .st-uni-dot {
+  margin-top: 4px;
+}
+.st-tf-now.is-block {
+  border-color: color-mix(in srgb, var(--yellow) 45%, transparent);
+}
+.st-tf-now.is-block .st-uni-dot {
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yellow) 18%, transparent);
+}
+.st-tf-now.is-unknown .st-uni-dot {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+/* Backtest-lab */
+.bt-msearch {
+  margin-bottom: 6px;
+}
+.bt-tf {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  cursor: pointer;
+}
+.bt-tf-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.bt-tf-state {
+  font-size: 11px;
+  font-weight: 500;
+}
+.bt-tf-desc {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.bt-tf-chip {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.bt-filters-tf {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.bt-filters-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+.bt-fstat {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  font-size: 12.5px;
+}
+.bt-fstat.is-hit {
+  border-color: color-mix(in srgb, var(--yellow) 45%, transparent);
+}
+
+/* Scanner: uitleg bij de automatische muntkeuze */
+.sc-pop .sc-pop-auto {
+  padding-left: 8px;
+  border-left: 3px solid var(--accent);
+  color: var(--text);
+}
+.sc-pop-actions .btn[data-act="switch"] {
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+@media (max-width: 600px) {
+  .st-uni-seg button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .st-uni-count .st-input-wrap {
+    flex: 1 1 100%;
+  }
+  .st-uni-presets {
+    width: 100%;
+  }
+  .st-uni-preset {
+    flex: 1 1 0;
+    height: 34px;
+  }
+  .st-uni-bulk .btn {
+    flex: 1 1 auto;
+  }
+  .st-tf-params {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bt-filters-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

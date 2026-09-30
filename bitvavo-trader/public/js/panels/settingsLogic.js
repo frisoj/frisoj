@@ -2,6 +2,79 @@
 // (tests/frontend/settingsLogic.test.ts): velddefinities, validatie, de PUT-patch
 // en het samenvoegen van een concept met instellingen die elders zijn gewijzigd.
 
+/** Zelfde als MAX_MARKETS in src/core/defaults.ts: maximaal aantal munten dat de bot volgt */
+export const MAX_MARKETS = 400;
+/** Snelkeuzes voor het aantal munten bij "Automatisch" */
+export const UNIVERSE_COUNT_PRESETS = [10, 30, 100, 400];
+/** Tot zoveel gekozen munten worden als chips getoond; daarboven ingeklapt ("+N meer tonen") */
+export const CHIPS_COLLAPSE_AT = 30;
+/** Tijdschalen van het trendfilter (TREND_FILTER_INTERVALS in src/core/types.ts) */
+export const TREND_INTERVALS = ["1d", "4h"];
+
+/**
+ * Kopie van DEFAULT_ENGINE_CONFIG (src/core/defaults.ts) voor de knop
+ * "Standaardwaarden". Een test bewaakt dat ze gelijk blijven.
+ */
+export const FACTORY_DEFAULTS = {
+  markets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
+  interval: "15m",
+  pollMs: 15000,
+  historyCandles: 300,
+  ensemble: {
+    enabled: ["ema-trend", "rsi-reversion", "breakout", "macd-momentum", "vwap-reversion"],
+    weights: { "ema-trend": 1.2, "rsi-reversion": 1, breakout: 1, "macd-momentum": 1, "vwap-reversion": 0.8 },
+    params: {},
+    buyThreshold: 0.35,
+    sellThreshold: -0.3,
+    regimeFilter: true,
+    trendFilter: { market: true, coin: false, interval: "1d", period: 50 },
+  },
+  risk: {
+    riskPerTradePct: 1.5,
+    maxPositionPct: 45,
+    maxOpenPositions: 2,
+    maxTotalExposurePct: 90,
+    stopAtrMult: 2,
+    takeProfitR: 2,
+    trailingAtrMult: 2.5,
+    breakEvenAtR: 1,
+    dailyLossLimitPct: 5,
+    maxTradesPerDay: 6,
+    cooldownCandlesAfterLoss: 4,
+    minEdgeFeeMultiple: 3,
+    takerFee: 0.0025,
+    makerFee: 0.0015,
+    slippagePct: 0.0005,
+    minOrderQuote: 5,
+    timeStopCandles: 48,
+    maxSpreadPct: 0.3,
+  },
+  universe: { mode: "auto", count: 30, minVolumeEur: 250_000 },
+};
+
+/**
+ * Wat een ontbrekend veld BETEKENT (contract v2): een config zonder `universe` is
+ * "zelf kiezen", een ensemble zonder `trendFilter` heeft geen trendfilter en een
+ * risicoconfig zonder `maxSpreadPct` geen spreadlimiet. Dus niet de fabriekswaarden
+ * invullen, maar deze "uit"-waarden (met nette standaarden voor de overige velden).
+ */
+const UNIVERSE_WHEN_MISSING = { mode: "manual", count: 30, minVolumeEur: 250_000 };
+const TREND_WHEN_MISSING = { market: false, coin: false, interval: "1d", period: 50 };
+
+/** Oudere/onvolledige configs aanvullen, zodat het concept altijd dezelfde vorm heeft. */
+export function withDefaults(cfg) {
+  const c = clone(cfg) || {};
+  c.risk = { ...FACTORY_DEFAULTS.risk, maxSpreadPct: 0, ...(c.risk || {}) };
+  const tf = c.ensemble?.trendFilter;
+  c.ensemble = { ...clone(FACTORY_DEFAULTS.ensemble), ...(c.ensemble || {}) };
+  c.ensemble.trendFilter = { ...TREND_WHEN_MISSING, ...(tf && typeof tf === "object" ? tf : {}) };
+  c.universe = { ...UNIVERSE_WHEN_MISSING, ...(c.universe && typeof c.universe === "object" ? c.universe : {}) };
+  return c;
+}
+
+/** Staat er een trendfilter aan (markt of munt)? */
+export const trendFilterActive = (tf) => !!tf && (tf.market === true || tf.coin === true);
+
 // Alle RiskConfig-velden met Nederlandse uitleg. scale = weergavefactor (fractie → %).
 export const RISK_GROUPS = [
   {
@@ -56,6 +129,8 @@ export const RISK_GROUPS = [
         help: "Verwacht verschil tussen de koers en je werkelijke vulprijs, per kant." },
       { key: "minEdgeFeeMultiple", label: "Min. winstruimte", unit: "× kosten", step: 0.5, min: 0, max: 20,
         help: "Het winstdoel moet minstens zoveel keer de totale kosten zijn, anders slaat de bot de trade over." },
+      { key: "maxSpreadPct", label: "Max. spread", unit: "%", step: 0.05, min: 0, max: 5, zeroOff: true, optional: true,
+        help: "De spread is het verschil tussen de koop- en verkoopprijs: een verborgen kostenpost, vooral bij kleine munten. Is hij groter dan dit, dan koopt de bot die munt niet. De automatische muntkeuze slaat zulke munten ook over. 0 = uit." },
     ],
   },
 ];
@@ -103,11 +178,17 @@ function rangeText(fmt, min, max, unit) {
  * maar in de meldingen in de eenheid van het veld getoond (%, sec).
  * @returns {{ errors: string[], invalid: Set<string> }}
  */
-export function validateDraft(d, { fmt, maxMarkets = 8 }) {
+export function validateDraft(d, { fmt, maxMarkets = MAX_MARKETS }) {
   const errs = [];
   const invalid = new Set();
-  if (!d.markets?.length || d.markets.length > maxMarkets) {
-    errs.push(`Kies 1 tot ${maxMarkets} markten.`);
+  const mode = d.universe?.mode ?? "manual";
+  const nMarkets = Array.isArray(d.markets) ? d.markets.length : 0;
+  if (nMarkets > maxMarkets) {
+    errs.push(`Je kunt hoogstens ${maxMarkets} munten kiezen (nu ${nMarkets}).`);
+    invalid.add("markets");
+  } else if (!nMarkets && mode !== "auto") {
+    // Bij "Automatisch" mag de eigen lijst leeg zijn: dan blijft de opgeslagen lijst staan (zie buildPatch)
+    errs.push("Kies minstens één munt, of zet Munten op Automatisch.");
     invalid.add("markets");
   }
   const check = (path, label, min, max, { int = false, scale = 1, unit = "", range = "" } = {}) => {
@@ -130,6 +211,7 @@ export function validateDraft(d, { fmt, maxMarkets = 8 }) {
       const s = f.scale || 1;
       const v = d.risk?.[f.key];
       if (f.zeroOff && v === 0) continue;
+      if (f.optional && v === undefined) continue;
       if (f.key === "trailingAtrMult") {
         check(`risk.${f.key}`, f.label, 0.5, 10, {
           unit: f.unit,
@@ -147,6 +229,25 @@ export function validateDraft(d, { fmt, maxMarkets = 8 }) {
     invalid.add("ensemble.sellThreshold");
   }
   if (!d.ensemble?.enabled?.length) errs.push("Zet minstens één strategie aan.");
+  if (d.universe) {
+    if (d.universe.mode !== "auto" && d.universe.mode !== "manual") {
+      errs.push("Kies hoe de bot zijn munten kiest: Automatisch of Zelf kiezen.");
+      invalid.add("universe.mode");
+    }
+    check("universe.count", "Aantal munten", 1, maxMarkets, { int: true, unit: "munten" });
+    check("universe.minVolumeEur", "Minimaal 24u-volume", 0, 1e12, { unit: "€" });
+  }
+  const tf = d.ensemble?.trendFilter;
+  if (tf) {
+    if (!TREND_INTERVALS.includes(tf.interval)) {
+      errs.push("Kies voor het trendfilter de tijdschaal Dag of 4 uur.");
+      invalid.add("ensemble.trendFilter.interval");
+    }
+    check("ensemble.trendFilter.period", "Periode van het trendfilter", 5, 200, {
+      int: true,
+      unit: tf.interval === "4h" ? "blokken van 4 uur" : "dagen",
+    });
+  }
   if (d.risk?.maxTotalExposurePct < d.risk?.maxPositionPct) {
     errs.push("Max. totale blootstelling is kleiner dan de max. positiegrootte.");
     invalid.add("risk.maxTotalExposurePct");
@@ -178,7 +279,9 @@ export function buildPatch(d, base) {
   const b = base || {};
   const changed = (x, y) => stable(x) !== stable(y);
   const patch = {};
-  if (changed(d.markets, b.markets)) patch.markets = d.markets;
+  const auto = d.universe?.mode === "auto";
+  // Bij "Automatisch" een leeggemaakte eigen lijst niet meesturen: de opgeslagen lijst blijft dan staan
+  if (changed(d.markets, b.markets) && !(auto && !d.markets?.length)) patch.markets = d.markets;
   if (d.interval !== b.interval) patch.interval = d.interval;
   if (Math.round(d.pollMs) !== Math.round(b.pollMs)) patch.pollMs = Math.round(d.pollMs);
   if (Math.round(d.historyCandles) !== Math.round(b.historyCandles)) patch.historyCandles = Math.round(d.historyCandles);
@@ -192,6 +295,16 @@ export function buildPatch(d, base) {
   if (Object.keys(weights).length) ens.weights = weights;
   for (const k of ["buyThreshold", "sellThreshold"]) if (round(de[k], 4) !== round(be[k], 4)) ens[k] = round(de[k], 4);
   if (!!de.regimeFilter !== !!be.regimeFilter) ens.regimeFilter = !!de.regimeFilter;
+  // Trendfilter: alleen de gewijzigde velden (de server voegt per veld samen)
+  if (de.trendFilter) {
+    const dt = de.trendFilter;
+    const bt = be.trendFilter || {};
+    const tf = {};
+    for (const k of ["market", "coin"]) if (!!dt[k] !== !!bt[k] || bt[k] === undefined) tf[k] = !!dt[k];
+    if (dt.interval !== bt.interval) tf.interval = dt.interval;
+    if (Math.round(dt.period) !== Math.round(bt.period)) tf.period = Math.round(dt.period);
+    if (Object.keys(tf).length) ens.trendFilter = tf;
+  }
   // Parameter-overrides: alleen gewijzigde strategieën; null = verwijderen
   const bp = be.params || {};
   const dp = de.params || {};
@@ -204,6 +317,17 @@ export function buildPatch(d, base) {
   const risk = {};
   for (const [k, v] of Object.entries(d.risk || {})) if (round(v, 8) !== round(b.risk?.[k], 8)) risk[k] = round(v, 8);
   if (Object.keys(risk).length) patch.risk = risk;
+
+  // Muntkeuze: alleen de gewijzigde velden
+  if (d.universe) {
+    const du = d.universe;
+    const bu = b.universe || {};
+    const uni = {};
+    if (du.mode !== bu.mode) uni.mode = du.mode;
+    if (Math.round(du.count) !== Math.round(bu.count)) uni.count = Math.round(du.count);
+    if (round(du.minVolumeEur, 2) !== round(bu.minVolumeEur, 2)) uni.minVolumeEur = round(du.minVolumeEur, 2);
+    if (Object.keys(uni).length) patch.universe = uni;
+  }
   return patch;
 }
 
@@ -246,6 +370,8 @@ export function rebaseDraft(draft, base, server) {
   for (const id of keysOf("ensemble.weights")) units.push(`ensemble.weights.${id}`);
   for (const id of keysOf("ensemble.params")) units.push(`ensemble.params.${id}`);
   for (const k of keysOf("risk")) units.push(`risk.${k}`);
+  for (const k of keysOf("ensemble.trendFilter")) units.push(`ensemble.trendFilter.${k}`);
+  for (const k of keysOf("universe")) units.push(`universe.${k}`);
 
   for (const path of units) {
     const dv = getPath(draft, path);
@@ -261,3 +387,86 @@ export function rebaseDraft(draft, base, server) {
   }
   return { draft: out, conflicts, changed };
 }
+
+// ── Munten (v2) ──
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+
+/**
+ * Korte Nederlandse status van de muntkeuze uit de snapshot, bijv.
+ * "Nu actief: 30 munten, gekozen om 14:05". `draftMode` = de stand in het
+ * formulier: wijkt die af van de server, dan staat in `pending` wat er na
+ * Opslaan gebeurt.
+ * @returns {{ text: string, detail: string, note: string, pending: string }}
+ */
+export function universeStatus(snap, draftMode, fmt, now = Date.now()) {
+  const u = snap?.universe;
+  const active = Array.isArray(snap?.activeMarkets) ? snap.activeMarkets : null;
+  const serverMode = snap?.config?.universe?.mode ?? u?.mode ?? (snap?.config ? "manual" : null);
+  const out = { text: "", detail: "", note: "", pending: "" };
+  const count = Number.isFinite(u?.count) ? u.count : active ? active.length : null;
+  if (count !== null) {
+    if ((u?.mode ?? serverMode) === "auto") {
+      if (Number.isFinite(u?.updatedAt)) {
+        const at = sameDay(u.updatedAt, now) ? fmt.time(u.updatedAt) : fmt.dateTime(u.updatedAt);
+        out.text = `Nu actief: ${plural(count, "munt", "munten")}, gekozen om ${at}`;
+        if (Number.isFinite(u.requested) && u.requested > count)
+          out.detail = `Je vroeg er ${u.requested}, maar er voldoen er nu maar ${count} aan het minimale volume en de spread.`;
+      } else {
+        out.text = `Nu actief: ${plural(count, "munt", "munten")}`;
+        out.detail = "De bot maakt zijn eerste automatische keuze zodra hij draait.";
+      }
+    } else {
+      out.text = `Nu actief: ${plural(count, "zelfgekozen munt", "zelfgekozen munten")}`;
+    }
+  }
+  if (u?.note) {
+    // Nog geen automatische keuze: de uitleg van de server is dan gewone status, geen waarschuwing
+    if ((u.mode ?? serverMode) === "auto" && !Number.isFinite(u.updatedAt)) out.detail = String(u.note);
+    else out.note = String(u.note);
+  }
+  if (serverMode && draftMode && draftMode !== serverMode) {
+    out.pending =
+      draftMode === "auto"
+        ? "Nog niet opgeslagen. Na Opslaan kiest de bot binnen een paar minuten zelf zijn munten."
+        : "Nog niet opgeslagen. Na Opslaan volgt de bot precies jouw eigen lijst.";
+  }
+  return out;
+}
+
+/**
+ * Welke gekozen munten als chip getoond worden. Boven `limit` ingeklapt, tenzij
+ * uitgeklapt of er gezocht wordt (dan alle treffers).
+ * @returns {{ shown: string[], hidden: number, total: number }}
+ */
+export function chipsView(selected, { query = "", expanded = false, limit = CHIPS_COLLAPSE_AT } = {}) {
+  const list = Array.isArray(selected) ? selected : [];
+  const q = String(query || "").trim().toUpperCase();
+  const matches = q ? list.filter((m) => m.toUpperCase().includes(q)) : list;
+  if (q || expanded || matches.length <= limit) return { shown: matches, hidden: 0, total: matches.length };
+  return { shown: matches.slice(0, limit), hidden: matches.length - limit, total: matches.length };
+}
+
+/**
+ * "Alle markten toevoegen": de eigen lijst plus alle nog niet gekozen markten
+ * (in de volgorde van `all`), tot hoogstens `max`.
+ * @returns {{ markets: string[], added: number }}
+ */
+export function addAllMarkets(selected, all, max = MAX_MARKETS) {
+  const cur = Array.isArray(selected) ? [...selected] : [];
+  const have = new Set(cur);
+  const room = Math.max(0, max - cur.length);
+  const extra = [];
+  for (const m of all || []) {
+    if (extra.length >= room) break;
+    if (!have.has(m)) {
+      have.add(m);
+      extra.push(m);
+    }
+  }
+  return { markets: [...cur, ...extra], added: extra.length };
+}
+
+/** Eenheid van de trendfilter-periode zoals de gebruiker hem ziet */
+export const trendPeriodUnit = (interval) => (interval === "4h" ? "× 4 uur" : "dagen");

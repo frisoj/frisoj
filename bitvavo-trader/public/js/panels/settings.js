@@ -1,60 +1,34 @@
-// Instellingen: markten & interval, risicobeheer, strategieën, live handel
-// (inschakelen/uitschakelen) en het dashboard-token. Opslaan via PUT /api/config.
+// Instellingen: munten (automatisch of zelf gekozen), interval, trendfilter,
+// risicobeheer, strategieën, live handel (inschakelen/uitschakelen) en het
+// dashboard-token. Opslaan via PUT /api/config.
 
 import { setToken } from "../api.js";
 import {
   RISK_GROUPS,
+  MAX_MARKETS,
+  UNIVERSE_COUNT_PRESETS,
+  FACTORY_DEFAULTS,
   clone,
   stable,
   getPath,
   setPath,
   round,
   parseNum,
+  withDefaults,
+  trendFilterActive,
   validateDraft,
   feeWarnings,
   buildPatch,
   rebaseDraft,
+  universeStatus,
+  chipsView,
+  addAllMarkets,
+  trendPeriodUnit,
 } from "./settingsLogic.js";
 
 const TOKEN_KEY = "bvt-dashboard-token";
 const ARM_TEXT = "IK BEGRIJP HET RISICO";
-const MAX_MARKETS = 8;
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
-
-// Kopie van src/core/defaults.ts (DEFAULT_ENGINE_CONFIG) voor "Standaardwaarden"
-const DEFAULTS = {
-  markets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
-  interval: "15m",
-  pollMs: 15000,
-  historyCandles: 300,
-  ensemble: {
-    enabled: ["ema-trend", "rsi-reversion", "breakout", "macd-momentum", "vwap-reversion"],
-    weights: { "ema-trend": 1.2, "rsi-reversion": 1, breakout: 1, "macd-momentum": 1, "vwap-reversion": 0.8 },
-    params: {},
-    buyThreshold: 0.35,
-    sellThreshold: -0.3,
-    regimeFilter: true,
-  },
-  risk: {
-    riskPerTradePct: 1.5,
-    maxPositionPct: 45,
-    maxOpenPositions: 2,
-    maxTotalExposurePct: 90,
-    stopAtrMult: 2,
-    takeProfitR: 2,
-    trailingAtrMult: 2.5,
-    breakEvenAtR: 1,
-    dailyLossLimitPct: 5,
-    maxTradesPerDay: 6,
-    cooldownCandlesAfterLoss: 4,
-    minEdgeFeeMultiple: 3,
-    takerFee: 0.0025,
-    makerFee: 0.0015,
-    slippagePct: 0.0005,
-    minOrderQuote: 5,
-    timeStopCandles: 48,
-  },
-};
 
 const FALLBACK_STRATEGIES = [
   { id: "ema-trend", name: "EMA-trend", description: "Volgt de trend met twee voortschrijdende gemiddelden.", preferredRegimes: ["trend-up"] },
@@ -110,19 +84,16 @@ export function mountSettings(ctx, el) {
     invalid: new Set(),
     saving: false,
     search: "",
+    /** Gekozen munten boven de 30 uitgeklapt tonen */
+    chipsExpanded: false,
+    /** Laatste snapshot (muntkeuze, actieve munten, marktfilter) */
+    snap: ctx.getState?.() || null,
     loaded: false,
   };
 
   el.innerHTML = `<div class="panel st-loading"><span class="spinner"></span> Instellingen laden…</div>`;
 
   const dirty = () => state.server && state.draft && stable(normalize(state.draft)) !== stable(normalize(state.server));
-  /** Oudere configs aanvullen met standaardwaarden (zelfde vorm als het concept) */
-  function withDefaults(cfg) {
-    const c = clone(cfg);
-    c.risk = { ...DEFAULTS.risk, ...(c.risk || {}) };
-    c.ensemble = { ...clone(DEFAULTS.ensemble), ...(c.ensemble || {}) };
-    return c;
-  }
   function normalize(c) {
     return {
       markets: c.markets,
@@ -136,8 +107,10 @@ export function mountSettings(ctx, el) {
         buyThreshold: c.ensemble?.buyThreshold,
         sellThreshold: c.ensemble?.sellThreshold,
         regimeFilter: c.ensemble?.regimeFilter,
+        trendFilter: c.ensemble?.trendFilter || null,
       },
       risk: c.risk,
+      universe: c.universe || null,
     };
   }
 
@@ -180,8 +153,12 @@ export function mountSettings(ctx, el) {
       <div class="st-grid">
         <div class="st-col">
           <section class="panel st-sec st-sec-markets">
-            <div class="pn-head"><div class="panel-title">Markten &amp; interval</div><span class="pn-chip st-mcount"></span></div>
-            <div class="st-markets"></div>
+            <div class="pn-head"><div class="panel-title">Munten</div><span class="pn-chip st-mcount">${mcountHtml()}</span></div>
+            <div class="st-uni">${universeHtml()}</div>
+          </section>
+
+          <section class="panel st-sec st-sec-interval">
+            <div class="pn-head"><div class="panel-title">Interval &amp; verversen</div></div>
             <div class="bt-row2 st-row2">
               <div class="st-field" data-field="interval">
                 <label for="st-interval">Candle-interval</label>
@@ -195,6 +172,11 @@ export function mountSettings(ctx, el) {
             </div>
             ${numField({ path: "historyCandles", key: "historyCandles", label: "Historie per analyse", unit: "candles", step: 50, min: 100, max: 1000,
               help: "Aantal candles dat de strategieën per analyse bekijken. Is dat minder dan de opwarmtijd die een strategie nodig heeft (bijv. voor de EMA 200), dan haalt de bot die extra candles zelf op." })}
+          </section>
+
+          <section class="panel st-sec st-sec-trend">
+            <div class="pn-head"><div class="panel-title">Trendfilter</div><span class="st-tf-chip">${trendChipHtml()}</span></div>
+            <div class="st-tf">${trendHtml()}</div>
           </section>
 
           <section class="panel st-sec st-sec-strats">
@@ -222,7 +204,6 @@ export function mountSettings(ctx, el) {
         <button type="button" class="btn btn-ghost" data-act="discard">Annuleren</button>
         <button type="button" class="btn btn-primary" data-act="save">Opslaan</button>
       </div>`;
-    renderMarkets();
     renderThresholds();
     renderStrategies();
     renderRiskExample();
@@ -233,50 +214,247 @@ export function mountSettings(ctx, el) {
     updateDirty();
   }
 
-  function renderMarkets() {
-    const box = el.querySelector(".st-markets");
-    if (!box) return;
-    const sel = state.draft.markets || [];
-    el.querySelector(".st-mcount").innerHTML = `<b class="mono">${sel.length}</b>/${MAX_MARKETS}`;
-    const all = state.markets.map((m) => m.market);
-    const q = state.search.trim().toUpperCase();
+  // ── Munten (automatisch of zelf kiezen) ──
+  const base = (m) => String(m).split("-")[0];
+  const uniMode = () => (state.draft?.universe?.mode === "auto" ? "auto" : "manual");
+  const activeMarkets = () => {
+    const s = state.snap;
+    return Array.isArray(s?.activeMarkets) ? s.activeMarkets : Array.isArray(s?.config?.markets) ? s.config.markets : null;
+  };
+
+  function mcountHtml() {
+    if (uniMode() === "auto") {
+      const n = Number(state.draft.universe?.count);
+      return `automatisch · <b class="mono">${Number.isFinite(n) ? esc(String(n)) : "–"}</b>`;
+    }
+    return `<b class="mono">${(state.draft.markets || []).length}</b>/${MAX_MARKETS}`;
+  }
+
+  function statusHtml() {
+    const st = universeStatus(state.snap, uniMode(), fmt);
+    const act = activeMarkets();
+    const list =
+      act?.length && st.text
+        ? `<details class="st-uni-list"><summary>Welke munten?</summary><div class="st-uni-names mono">${esc(act.map(base).join(", "))}</div></details>`
+        : "";
+    return (
+      (st.text ? `<div class="st-uni-now"><span class="st-uni-dot" aria-hidden="true"></span><b>${esc(st.text)}</b>${list}</div>` : "") +
+      (st.detail ? `<div class="st-help">${esc(st.detail)}</div>` : "") +
+      (st.note ? `<div class="pn-banner pn-banner-warn st-uni-note">${esc(st.note)}</div>` : "") +
+      (st.pending ? `<div class="st-uni-pending">${esc(st.pending)}</div>` : "")
+    );
+  }
+
+  function posHintHtml() {
+    const n = Number(state.draft.risk?.maxOpenPositions);
+    return `Met een klein saldo heeft de bot maar een paar posities tegelijk open (nu max. <b>${Number.isFinite(n) ? esc(String(n)) : "–"}</b>, zie Risicobeheer).
+      Meer munten = meer keus, niet meer posities: de bot koopt de beste kansen.`;
+  }
+
+  function presetsHtml() {
+    const n = Number(state.draft.universe?.count);
+    return UNIVERSE_COUNT_PRESETS.map(
+      (p) => `<button type="button" class="st-mopt st-uni-preset ${p === n ? "is-active" : ""}" data-uni-count="${p}" aria-pressed="${p === n}">${p}</button>`,
+    ).join("");
+  }
+
+  function autoHtml() {
+    const u = state.draft.universe || {};
+    const n = Number(u.count);
+    const vol = Number(u.minVolumeEur);
+    const inv = (p) => (state.invalid.has(p) ? "is-invalid" : "");
+    return `
+      <p class="st-uni-explain">Elk uur kiest de bot de <b class="mono st-uni-n">${Number.isFinite(n) ? esc(String(n)) : "–"}</b> munten met de meeste handel op Bitvavo, zonder stablecoins en met een kleine spread.</p>
+      <div class="st-field ${inv("universe.count")}" data-field="universe.count">
+        <label for="st-universe-count">Aantal munten</label>
+        <div class="st-uni-count">
+          <div class="st-input-wrap"><input id="st-universe-count" class="input mono ${state.invalid.has("universe.count") ? "invalid" : ""}" type="number" inputmode="numeric"
+            data-path="universe.count" data-key="count" data-scale="1" step="1" min="1" max="${MAX_MARKETS}" value="${Number.isFinite(n) ? esc(String(n)) : ""}"><span class="st-unit">munten</span></div>
+          <div class="st-uni-presets" role="group" aria-label="Snelkeuze aantal munten">${presetsHtml()}</div>
+        </div>
+        <div class="st-help">1 tot ${MAX_MARKETS}. Met meer munten vindt de bot vaker een goede kans, maar een ronde langs alle munten duurt dan wat langer.</div>
+      </div>
+      <div class="st-field ${inv("universe.minVolumeEur")}" data-field="universe.minVolumeEur">
+        <label for="st-universe-minVolumeEur">Minimaal 24u-volume</label>
+        <div class="st-input-wrap"><input id="st-universe-minVolumeEur" class="input mono ${state.invalid.has("universe.minVolumeEur") ? "invalid" : ""}" type="text" inputmode="numeric"
+          data-path="universe.minVolumeEur" data-key="minVolumeEur" data-scale="1" data-grouped="1" autocomplete="off" value="${Number.isFinite(vol) ? esc(fmt.num(vol, 2)) : ""}"><span class="st-unit">€</span></div>
+        <div class="st-help">Munten waarin de afgelopen 24 uur minder is verhandeld, slaat de bot over: die zijn lastig te kopen en te verkopen voor een eerlijke prijs.</div>
+      </div>`;
+  }
+
+  /** Alle bekende markten, populairste eerst (zelfde volgorde als de knoppen om toe te voegen) */
+  function orderedMarkets() {
     const rank = (m) => {
-      const i = POPULAR.indexOf(m.split("-")[0]);
+      const i = POPULAR.indexOf(base(m));
       return i < 0 ? 999 : i;
     };
-    const avail = all
-      .filter((m) => !sel.includes(m) && (!q || m.includes(q)))
-      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    return state.markets.map((m) => m.market).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  }
+
+  function chipsHtml() {
+    const sel = state.draft.markets || [];
+    if (!sel.length) return '<span class="neg">Nog geen munten gekozen. Kies er minstens één.</span>';
+    const v = chipsView(sel, { query: state.search, expanded: state.chipsExpanded });
+    const chips = v.shown
+      .map((m) => `<span class="st-mchip"><b>${esc(base(m))}</b><span class="muted">-EUR</span>
+        <button type="button" data-remove="${esc(m)}" aria-label="${esc(m)} verwijderen" title="Verwijderen">×</button></span>`)
+      .join("");
+    const q = state.search.trim();
+    const more = v.hidden
+      ? `<button type="button" class="st-mopt st-chips-more" data-act="chips-more">+${v.hidden} meer tonen</button>`
+      : !q && state.chipsExpanded && sel.length > 30
+        ? '<button type="button" class="st-mopt st-chips-more" data-act="chips-less">Minder tonen</button>'
+        : "";
+    const none = q && !v.shown.length ? `<span class="muted">Geen gekozen munt met "${esc(q)}".</span>` : "";
+    return chips + none + more;
+  }
+
+  function availHtml() {
+    if (state.marketsError) return `<span class="neg">Markten laden mislukt: ${esc(state.marketsError)}</span>`;
+    const sel = new Set(state.draft.markets || []);
+    const q = state.search.trim().toUpperCase();
+    const avail = orderedMarkets().filter((m) => !sel.has(m) && (!q || m.includes(q)));
     const shown = avail.slice(0, q ? 60 : 24);
-    const full = sel.length >= MAX_MARKETS;
-    box.innerHTML = `
+    const full = sel.size >= MAX_MARKETS;
+    return (
+      shown.map((m) => `<button type="button" class="st-mopt" data-add="${esc(m)}" ${full ? "disabled" : ""}>+ ${esc(base(m))}</button>`).join("") +
+      (avail.length > shown.length ? `<span class="muted st-more">+${avail.length - shown.length} meer — typ om te zoeken</span>` : "") +
+      (!avail.length ? `<span class="muted">${q ? "Geen markten gevonden." : "Alle markten zitten al in je lijst."}</span>` : "")
+    );
+  }
+
+  function bulkHtml() {
+    const sel = state.draft.markets || [];
+    const n = addAllMarkets(sel, orderedMarkets(), MAX_MARKETS).added;
+    const act = activeMarkets();
+    const serverAuto = state.server?.universe?.mode === "auto";
+    const copyN = act ? Math.min(act.length, MAX_MARKETS) : 0;
+    const canCopy = serverAuto && copyN > 0 && stable(act.slice(0, MAX_MARKETS)) !== stable(sel);
+    return `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-all" ${n ? "" : "disabled"}>Alle markten toevoegen (${n})</button>
+      <button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-clear" ${sel.length ? "" : "disabled"}>Alles wissen</button>
+      ${canCopy ? `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-copy-active" title="Vervang je lijst door de munten die de bot nu automatisch volgt">Neem de ${copyN} munten van de automatische keuze over</button>` : ""}`;
+  }
+
+  function manualHtml() {
+    const sel = state.draft.markets || [];
+    return `
       <div class="st-field ${state.invalid.has("markets") ? "is-invalid" : ""}" data-field="markets">
-        <label>Markten waarop de bot handelt</label>
-        <div class="st-msel">${
-          sel.length
-            ? sel.map((m) => `<span class="st-mchip"><b>${esc(m.split("-")[0])}</b><span class="muted">-EUR</span>
-                <button type="button" data-remove="${esc(m)}" aria-label="${esc(m)} verwijderen" title="Verwijderen">×</button></span>`).join("")
-            : '<span class="neg">Kies minstens één markt.</span>'
-        }</div>
-        <div class="st-help">Maximaal ${MAX_MARKETS}. Met een klein saldo zijn 2–4 liquide markten (BTC, ETH, SOL) verstandig: minder spreiding van je €5-orders.
-          Opgeslagen markten en interval gaan vóór <span class="mono">MARKETS</span>/<span class="mono">INTERVAL</span> in <span class="mono">.env</span>.</div>
+        <label>Jouw munten <span class="muted st-mcount-inline">${sel.length}/${MAX_MARKETS}</span></label>
+        <div class="st-msel">${chipsHtml()}</div>
+        <div class="st-help">De bot volgt precies deze munten (maximaal ${MAX_MARKETS}).</div>
       </div>
       <div class="st-madd">
-        <input class="input st-msearch" type="search" placeholder="Zoek markt om toe te voegen…" value="${esc(state.search)}" aria-label="Zoek markt">
-        <div class="st-mavail ${full ? "is-full" : ""}">${
-          state.marketsError
-            ? `<span class="neg">Markten laden mislukt: ${esc(state.marketsError)}</span>`
-            : shown.map((m) => `<button type="button" class="st-mopt" data-add="${esc(m)}" ${full ? "disabled" : ""}>+ ${esc(m.split("-")[0])}</button>`).join("") +
-              (avail.length > shown.length ? `<span class="muted st-more">+${avail.length - shown.length} meer — typ om te zoeken</span>` : "") +
-              (!avail.length ? '<span class="muted">Geen markten gevonden.</span>' : "")
-        }</div>
+        <input class="input st-msearch" type="search" placeholder="Zoek munt, bijv. XRP…" value="${esc(state.search)}" aria-label="Zoek munt">
+        <div class="st-mavail">${availHtml()}</div>
+        <div class="st-uni-bulk">${bulkHtml()}</div>
       </div>`;
-    const input = box.querySelector(".st-msearch");
-    if (input && state._focusSearch) {
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-      state._focusSearch = false;
+  }
+
+  function universeHtml() {
+    const mode = uniMode();
+    const seg = (m, label) =>
+      `<button type="button" data-uni-mode="${m}" role="radio" aria-checked="${mode === m}" class="${mode === m ? "is-active" : ""}">${label}</button>`;
+    return `
+      <div class="pn-seg st-uni-seg" role="radiogroup" aria-label="Hoe kiest de bot zijn munten?">
+        ${seg("auto", "Automatisch (meest verhandeld)")}${seg("manual", "Zelf kiezen")}
+      </div>
+      <div class="st-uni-status" aria-live="polite">${(lastStatus = statusHtml())}</div>
+      ${mode === "auto" ? autoHtml() : manualHtml()}
+      <p class="st-help st-uni-pos">${posHintHtml()}</p>`;
+  }
+
+  /** Alleen de lijsten van "Zelf kiezen" (het zoekveld blijft staan en houdt de focus) */
+  function renderMarketLists() {
+    const set = (sel, html) => {
+      const n = el.querySelector(sel);
+      if (n) n.innerHTML = html;
+    };
+    if (uniMode() !== "manual") return;
+    set(".st-msel", chipsHtml());
+    set(".st-mavail", availHtml());
+    set(".st-uni-bulk", bulkHtml());
+    set(".st-mcount-inline", `${(state.draft.markets || []).length}/${MAX_MARKETS}`);
+    set(".st-mcount", mcountHtml());
+  }
+
+  /** Na typen in de automatische velden: uitleg, snelkeuzes en teller bijwerken zonder de invoer te vervangen */
+  function updateUniverseLive() {
+    const n = Number(state.draft.universe?.count);
+    const t = el.querySelector(".st-uni-n");
+    if (t) t.textContent = Number.isFinite(n) ? String(n) : "–";
+    const p = el.querySelector(".st-uni-presets");
+    if (p) p.innerHTML = presetsHtml();
+    const c = el.querySelector(".st-mcount");
+    if (c) c.innerHTML = mcountHtml();
+  }
+
+  let lastStatus = "";
+  function updateStatus() {
+    const box = el.querySelector(".st-uni-status");
+    if (box) {
+      const html = statusHtml();
+      if (html !== lastStatus) {
+        const open = !!box.querySelector?.(".st-uni-list")?.open;
+        box.innerHTML = html;
+        if (open) {
+          const d = box.querySelector?.(".st-uni-list");
+          if (d) d.open = true;
+        }
+        lastStatus = html;
+      }
     }
+    const tf = el.querySelector(".st-tf-status");
+    if (tf) tf.innerHTML = marketFilterHtml();
+  }
+
+  // ── Trendfilter ──
+  function trendChipHtml() {
+    const on = trendFilterActive(state.draft.ensemble?.trendFilter);
+    return `<span class="pn-chip ${on ? "pn-chip-acc" : ""}">${on ? "aan" : "uit"}</span>`;
+  }
+
+  function marketFilterHtml() {
+    const mf = state.snap?.marketFilter;
+    if (!mf || !mf.note) return "";
+    const cls = mf.ok === true ? "is-ok" : mf.ok === false ? "is-block" : "is-unknown";
+    return `<div class="st-tf-now ${cls}" title="Stand van het marktfilter nu"><span class="st-uni-dot" aria-hidden="true"></span><span>${esc(mf.note)}</span></div>`;
+  }
+
+  function trendHtml() {
+    const tf = state.draft.ensemble?.trendFilter || {};
+    const on = trendFilterActive(tf);
+    const sw = (key, title, help) => `<label class="st-switch-row">
+        <span class="pn-switch"><input type="checkbox" data-path="ensemble.trendFilter.${key}" ${tf[key] ? "checked" : ""}><i></i></span>
+        <span><b>${title}</b><span class="st-help">${help}</span></span>
+      </label>`;
+    const iv = tf.interval === "4h" ? "4h" : "1d";
+    const seg = (v, label) =>
+      `<button type="button" data-tf-interval="${v}" role="radio" aria-checked="${iv === v}" class="${iv === v ? "is-active" : ""}">${label}</button>`;
+    return `
+      <p class="pn-hint">Het trendfilter houdt alleen <b>nieuwe aankopen</b> tegen; verkopen, stop-losses en winstdoelen gaan altijd gewoon door.
+        In ons onderzoek op echte dagkoersen (2016–2026) was dit het enige idee dat ook buiten de testperiode standhield, vooral doordat het grote dalingen ontweek.
+        Let op: in een dalende markt koopt de bot daardoor soms <b>wekenlang niets</b>. Dat is dan precies de bedoeling.</p>
+      ${sw("market", "Marktfilter: alleen kopen als Bitcoin boven zijn gemiddelde staat",
+        "Zakt Bitcoin onder zijn gemiddelde, dan koopt de bot geen enkele munt: als Bitcoin daalt, dalen de meeste munten mee. Aanbevolen: aan.")}
+      ${sw("coin", "Muntfilter: alleen kopen als de munt zelf boven zijn gemiddelde staat",
+        "Strenger: de munt moet zelf ook in een stijgende trend zitten. Dat geeft minder aankopen.")}
+      <div class="bt-row2 st-row2 st-tf-params ${on ? "" : "is-off"}">
+        <div class="st-field ${state.invalid.has("ensemble.trendFilter.interval") ? "is-invalid" : ""}" data-field="ensemble.trendFilter.interval">
+          <label>Tijdschaal</label>
+          <div class="pn-seg st-tf-seg" role="radiogroup" aria-label="Tijdschaal van het trendfilter">${seg("1d", "Dag")}${seg("4h", "4 uur")}</div>
+          <div class="st-help">Dag is rustig; 4 uur reageert sneller, maar geeft vaker vals alarm.</div>
+        </div>
+        ${numField({ path: "ensemble.trendFilter.period", key: "period", label: "Gemiddelde over", unit: trendPeriodUnit(iv), step: 1, min: 5, max: 200,
+          help: iv === "4h" ? "Aantal blokken van 4 uur (5–200)." : "Aantal dagen (5–200). 50 dagen is gebruikelijk." })}
+      </div>
+      <div class="st-tf-status">${marketFilterHtml()}</div>`;
+  }
+
+  function renderTrend() {
+    const box = el.querySelector(".st-tf");
+    if (box) box.innerHTML = trendHtml();
+    const chip = el.querySelector(".st-tf-chip");
+    if (chip) chip.innerHTML = trendChipHtml();
   }
 
   function thrPos(v) {
@@ -542,7 +720,7 @@ CAPITAL_LIMIT_EUR=50`;
     const f = RISK_GROUPS.flatMap((g) => g.fields).find((x) => `risk.${x.key}` === path);
     if (f) return f.label;
     const labels = {
-      markets: "Markten",
+      markets: "Munten",
       interval: "Candle-interval",
       pollMs: "Ververs elke",
       historyCandles: "Historie per analyse",
@@ -550,6 +728,13 @@ CAPITAL_LIMIT_EUR=50`;
       "ensemble.buyThreshold": "Koopdrempel",
       "ensemble.sellThreshold": "Verkoopdrempel",
       "ensemble.regimeFilter": "Regimefilter",
+      "ensemble.trendFilter.market": "Marktfilter (Bitcoin)",
+      "ensemble.trendFilter.coin": "Muntfilter",
+      "ensemble.trendFilter.interval": "Tijdschaal trendfilter",
+      "ensemble.trendFilter.period": "Periode trendfilter",
+      "universe.mode": "Muntkeuze (automatisch / zelf kiezen)",
+      "universe.count": "Aantal munten",
+      "universe.minVolumeEur": "Minimaal 24u-volume",
     };
     if (labels[path]) return labels[path];
     const m = path.match(/^ensemble\.(weights|params)\.(.+)$/);
@@ -711,15 +896,19 @@ CAPITAL_LIMIT_EUR=50`;
     const t = e.target;
     if (t.classList.contains("st-msearch")) {
       state.search = t.value;
-      state._focusSearch = true;
-      renderMarkets();
+      renderMarketLists();
       return;
     }
     const path = t.dataset?.path;
     if (!path || !state.draft) return;
     if (t.type === "checkbox") setPath(state.draft, path, t.checked);
     else if (t.tagName === "SELECT") setPath(state.draft, path, t.value);
-    else {
+    else if (t.dataset.grouped) {
+      // Bedrag in hele euro's; punten en spaties zijn duizendtallen (250.000), een komma is de decimaal
+      const raw = String(t.value).replace(/[.\s€]/g, "").replace(",", ".");
+      const n = raw === "" ? NaN : Number(raw);
+      setPath(state.draft, path, Number.isFinite(n) ? n : NaN);
+    } else {
       const scale = Number(t.dataset.scale) || 1;
       const n = parseNum(t.value);
       setPath(state.draft, path, Number.isFinite(n) ? round(n / scale, 10) : NaN);
@@ -742,6 +931,17 @@ CAPITAL_LIMIT_EUR=50`;
       }
     }
     if (path.startsWith("risk.")) renderRiskExample();
+    if (path === "risk.maxOpenPositions") {
+      const h = el.querySelector(".st-uni-pos");
+      if (h) h.innerHTML = posHintHtml();
+    }
+    if (path.startsWith("universe.")) updateUniverseLive();
+    if (path.startsWith("ensemble.trendFilter.")) {
+      const on = trendFilterActive(state.draft.ensemble.trendFilter);
+      el.querySelector(".st-tf-params")?.classList.toggle("is-off", !on);
+      const chip = el.querySelector(".st-tf-chip");
+      if (chip) chip.innerHTML = trendChipHtml();
+    }
     if (path === "interval") {
       const h = el.querySelector(".st-interval-help");
       if (h) h.textContent = INTERVAL_HELP[t.value] || "";
@@ -764,18 +964,57 @@ CAPITAL_LIMIT_EUR=50`;
   el.addEventListener("click", (e) => {
     const t = e.target.closest("button");
     if (!t || !state.draft) return;
-    if (t.dataset.remove) {
-      state.draft.markets = state.draft.markets.filter((m) => m !== t.dataset.remove);
+    const d = t.dataset;
+    const setMarkets = (list) => {
+      state.draft.markets = list;
       setInvalid("markets", false);
-      renderMarkets();
+      renderMarketLists();
       updateDirty();
-    } else if (t.dataset.add) {
-      if (state.draft.markets.length >= MAX_MARKETS) return ctx.toast(`Maximaal ${MAX_MARKETS} markten.`, "warn");
-      state.draft.markets = [...state.draft.markets, t.dataset.add];
+    };
+    if (d.remove) {
+      setMarkets((state.draft.markets || []).filter((m) => m !== d.remove));
+    } else if (d.add) {
+      const cur = state.draft.markets || [];
+      if (cur.length >= MAX_MARKETS) return ctx.toast(`Maximaal ${MAX_MARKETS} munten.`, "warn");
+      if (!cur.includes(d.add)) setMarkets([...cur, d.add]);
+    } else if (d.uniMode) {
+      if (d.uniMode === uniMode()) return;
+      state.draft.universe = { ...(state.draft.universe || {}), mode: d.uniMode === "auto" ? "auto" : "manual" };
       setInvalid("markets", false);
-      renderMarkets();
+      renderAll();
+      // Focus terug op de schakelaar (toetsenbord), niet naar boven springen
+      el.querySelector(`[data-uni-mode="${uniMode()}"]`)?.focus?.({ preventScroll: true });
+    } else if (d.uniCount) {
+      const n = Number(d.uniCount);
+      state.draft.universe = { ...(state.draft.universe || {}), count: n };
+      const input = el.querySelector("#st-universe-count");
+      if (input) input.value = String(n);
+      setInvalid("universe.count", false);
+      updateUniverseLive();
       updateDirty();
-    } else if (t.dataset.act === "save") save();
+    } else if (d.tfInterval) {
+      state.draft.ensemble.trendFilter = { ...(state.draft.ensemble.trendFilter || {}), interval: d.tfInterval === "4h" ? "4h" : "1d" };
+      setInvalid("ensemble.trendFilter.interval", false);
+      renderTrend();
+      updateDirty();
+    } else if (d.act === "chips-more" || d.act === "chips-less") {
+      state.chipsExpanded = d.act === "chips-more";
+      renderMarketLists();
+    } else if (d.act === "markets-all") {
+      const r = addAllMarkets(state.draft.markets, orderedMarkets(), MAX_MARKETS);
+      if (!r.added) return;
+      setMarkets(r.markets);
+      ctx.toast(`${r.added} ${r.added === 1 ? "munt" : "munten"} toegevoegd (${r.markets.length}/${MAX_MARKETS}). Klik op Opslaan om het te bewaren.`, "info");
+    } else if (d.act === "markets-clear") {
+      state.chipsExpanded = false;
+      setMarkets([]);
+      ctx.toast("Lijst gewist. Kies minstens één munt voordat je opslaat.", "info");
+    } else if (d.act === "markets-copy-active") {
+      const act = activeMarkets();
+      if (!act?.length) return;
+      setMarkets([...new Set(act)].slice(0, MAX_MARKETS));
+      ctx.toast("De munten van de automatische keuze staan nu in je eigen lijst. Klik op Opslaan om het te bewaren.", "info");
+    } else if (d.act === "save") save();
     else if (t.dataset.act === "discard") {
       state.draft = clone(state.server);
       state.notice = null;
@@ -784,7 +1023,7 @@ CAPITAL_LIMIT_EUR=50`;
       renderAll();
       ctx.toast("Wijzigingen ongedaan gemaakt.", "info");
     } else if (t.dataset.act === "defaults") {
-      state.draft = clone(DEFAULTS);
+      state.draft = clone(FACTORY_DEFAULTS);
       state.errors = [];
       state.invalid.clear();
       renderAll();
@@ -804,8 +1043,10 @@ CAPITAL_LIMIT_EUR=50`;
   });
   let lastLive = "";
   bus.on("snapshot", (s) => {
+    if (s && typeof s === "object") state.snap = s;
     // Config gewijzigd in een ander tabblad/venster: de engine stuurt hem mee in elke snapshot
     if (s?.config && state.server && !state.saving) applyServerConfig(s.config);
+    if (state.draft) updateStatus();
     const sig = `${s?.mode}|${s?.liveArmed}`;
     if (sig === lastLive) return;
     lastLive = sig;

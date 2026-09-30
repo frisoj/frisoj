@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { maxDrawdownPct } from "../../src/backtest/metrics";
+import { DEFAULT_TREND_FILTER } from "../../src/core/defaults";
 import { loadPublic, type Fake } from "./helpers";
 
 let L: Fake;
@@ -265,5 +266,79 @@ describe("zijbalk sticky alleen als hij in beeld past (ronde 4)", () => {
     expect(sideFitsViewport(822, 900, 66)).toBe(true); // 822 + 66 + 12 = 900
     expect(sideFitsViewport(823, 900, 66)).toBe(false);
     expect(sideFitsViewport(0, 900, 66)).toBe(false);
+  });
+});
+
+// ── v2: trendfilter in het lab, tegengehouden koopsignalen ──
+
+describe("v2: trendfilter in het Backtest-lab", () => {
+  const botTf = { market: true, coin: false, interval: "1d", period: 50 };
+
+  it("aan = het filter van de bot; uit = beide vlaggen uit met dezelfde tijdschaal en periode", () => {
+    expect(L.labTrendFilter(true, botTf)).toEqual(botTf);
+    expect(L.labTrendFilter(false, botTf)).toEqual({ market: false, coin: false, interval: "1d", period: 50 });
+    const coin4h = { market: false, coin: true, interval: "4h", period: 20 };
+    expect(L.labTrendFilter(true, coin4h)).toEqual(coin4h);
+    expect(L.labTrendFilter(false, coin4h)).toEqual({ market: false, coin: false, interval: "4h", period: 20 });
+    // bot zonder (actief) filter: "aan" = het standaard marktfilter
+    expect(L.labTrendFilter(true, undefined)).toEqual(L.DEFAULT_TREND_FILTER);
+    expect(L.labTrendFilter(true, { market: false, coin: false, interval: "4h", period: 30 })).toEqual({
+      market: true,
+      coin: false,
+      interval: "4h",
+      period: 30,
+    });
+  });
+
+  it("DEFAULT_TREND_FILTER = src/core/defaults.ts; twee uitgeschakelde filters zijn gelijk", () => {
+    expect(L.DEFAULT_TREND_FILTER).toEqual(DEFAULT_TREND_FILTER);
+    expect(L.sameTrendFilter(undefined, { market: false, coin: false, interval: "4h", period: 9 })).toBe(true);
+    expect(L.sameTrendFilter(botTf, { ...botTf })).toBe(true);
+    expect(L.sameTrendFilter(botTf, { ...botTf, period: 60 })).toBe(false);
+    expect(L.sameTrendFilter(botTf, undefined)).toBe(false);
+  });
+
+  it("korte omschrijving in gewone taal", () => {
+    expect(L.describeTrendFilter(botTf)).toBe("Bitcoin boven het gemiddelde van 50 dagen");
+    expect(L.describeTrendFilter({ market: true, coin: true, interval: "4h", period: 20 })).toBe(
+      "Bitcoin én de munt zelf boven het gemiddelde van 20 blokken van 4 uur",
+    );
+    expect(L.describeTrendFilter({ market: false, coin: false })).toBe("uit");
+  });
+
+  it("toepassen: het trendfilter gaat alleen mee als de test een ander filter had dan de bot", () => {
+    const cfg = { ...botConfig(), ensemble: { ...botConfig().ensemble, trendFilter: botTf } };
+    const row = { params: { "ensemble.buyThreshold": 0.45 }, score: 1, metrics: {} };
+    const same = { ensemble: { enabled: cfg.ensemble.enabled, trendFilter: { ...botTf } }, risk: {} };
+    expect(L.testedPartial(row, same, cfg, IDS).ensemble.trendFilter).toBeUndefined();
+
+    const off = { ensemble: { enabled: cfg.ensemble.enabled, trendFilter: L.labTrendFilter(false, botTf) }, risk: {} };
+    const p = L.testedPartial(row, off, cfg, IDS);
+    expect(p.ensemble.trendFilter).toEqual({ market: false, coin: false, interval: "1d", period: 50 });
+    const d = L.describeApply(p, row, cfg, STRATS);
+    const tfRow = d.rows.find((r: Fake) => r.key === "ensemble.trendFilter");
+    expect(tfRow).toMatchObject({ cur: botTf, next: p.ensemble.trendFilter, same: false });
+
+    // bot zonder filter, test zonder filter → niets mee
+    const plain = botConfig();
+    expect(L.testedPartial(row, off, plain, IDS).ensemble.trendFilter).toBeUndefined();
+  });
+});
+
+describe("v2: filters in het backtestresultaat", () => {
+  it("blockedEntries: aantallen of null (niet meegestuurd)", () => {
+    expect(L.blockedEntriesView({ blockedEntries: { trend: 12, spread: 0 } })).toEqual({ trend: 12, spread: 0, total: 12 });
+    expect(L.blockedEntriesView({ blockedEntries: { trend: 0, spread: 3 } })).toEqual({ trend: 0, spread: 3, total: 3 });
+    expect(L.blockedEntriesView({})).toBeNull();
+    expect(L.blockedEntriesView(null)).toBeNull();
+  });
+
+  it("noteKind: periode, filter of beide", () => {
+    expect(L.noteKind("Periode ingekort: NEW-EUR heeft pas historie vanaf 15 september 2026.")).toBe("period");
+    expect(L.noteKind("Trendfilter niet toegepast: geen koersdata voor het filter.")).toBe("filter");
+    expect(L.noteKind("Spread van XYZ-EUR (0,80%) is groter dan de max. spread (0,30%): geen aankopen.")).toBe("filter");
+    expect(L.noteKind("Periode ingekort tot 12 dagen. Trendfilter: Bitcoin (BTC-EUR) niet geladen: timeout — voor de zekerheid geen aankopen.")).toBe(
+      "mixed",
+    );
   });
 });

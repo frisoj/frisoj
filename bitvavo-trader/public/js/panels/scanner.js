@@ -2,8 +2,9 @@
 // score, RSI, volatiliteit en een mini-grafiek. Twee weergaven: tabel en
 // heatmap (tegels gekleurd op 24u-verandering, grootte ≈ volume).
 
+import { MAX_MARKETS, isAutoUniverse, botMarketsOf, addPlan, planPatch } from "./scannerLogic.js";
+
 const REFRESH_MS = 60_000;
-const MAX_MARKETS = 8;
 
 function ensureCss() {
   if (document.querySelector('link[href$="panels.css"]')) return;
@@ -150,6 +151,8 @@ export function mountScanner(ctx, el) {
     filter: "",
     activeTab: ctx.getActiveTab?.() || null,
     config: ctx.getState?.()?.config || null,
+    /** Laatste snapshot: `activeMarkets` = de munten die de bot nu volgt */
+    snapshot: ctx.getState?.() || null,
   };
   try {
     const v = localStorage.getItem("bvt-scanner-view");
@@ -186,8 +189,9 @@ export function mountScanner(ctx, el) {
   const pop = $(".sc-pop");
   const summary = $(".sc-summary");
 
+  /** De munten die de bot nu volgt (automatische keuze of eigen lijst) */
   function botMarkets() {
-    return state.config?.markets || ctx.getState?.()?.config?.markets || [];
+    return botMarketsOf(state.snapshot || ctx.getState?.(), state.config);
   }
 
   function isVisible() {
@@ -302,7 +306,9 @@ export function mountScanner(ctx, el) {
     body.innerHTML = `<div class="sc-table-wrap"><table class="table sc-table"><thead><tr>${head}</tr></thead><tbody>${
       bodyRows || `<tr><td colspan="${COLUMNS.length}" class="pn-empty">Geen markten gevonden.</td></tr>`
     }</tbody></table></div>
-    <p class="pn-hint sc-foot">Klik op een kolomkop om te sorteren. De score en het signaal zijn berekend op het interval van de bot (${esc(state.config?.interval || "–")}). Een koopsignaal hier betekent niet dat de bot koopt: alleen markten die in de bot staan worden verhandeld.</p>`;
+    <p class="pn-hint sc-foot">Klik op een kolomkop om te sorteren. De score en het signaal zijn berekend op het interval van de bot (${esc(state.config?.interval || "–")}). Een koopsignaal hier betekent niet dat de bot koopt: alleen markten die in de bot staan worden verhandeld.${
+      isAutoUniverse(state.config) ? " De bot kiest zijn munten nu automatisch (de meest verhandelde); het label \"in bot\" staat bij de munten die hij op dit moment volgt." : ""
+    }</p>`;
   }
 
   function renderHeatmap(rows) {
@@ -406,12 +412,35 @@ export function mountScanner(ctx, el) {
     delete pop.dataset.market;
   }
 
+  function popHint(plan, market) {
+    const n = plan.count;
+    if (plan.kind === "in-bot")
+      return plan.auto
+        ? "De bot volgt deze munt nu automatisch (hij hoort bij de meest verhandelde). Bekijk hem live in de grafiek."
+        : "Deze markt wordt al verhandeld. Bekijk hem live in de grafiek.";
+    if (plan.kind === "full")
+      return plan.auto
+        ? `De bot volgt al het maximum van ${MAX_MARKETS} munten. Er kan er geen meer bij.`
+        : `De bot volgt al het maximum van ${MAX_MARKETS} munten. Verwijder er eerst één bij Instellingen.`;
+    if (plan.kind === "switch") {
+      const want = Number(state.config?.universe?.count);
+      return `De bot kiest zijn munten nu <b>automatisch</b>: elk uur de ${
+        Number.isFinite(want) ? esc(String(want)) : ""
+      } munten met de meeste handel. ${esc(market)} hoort daar nu niet bij. Wil je hem er toch bij? Schakel dan over naar <b>Zelf kiezen</b>: de bot houdt de ${n} munten die hij nu volgt en krijgt ${esc(market)} erbij.`;
+    }
+    return `Na toevoegen gaat de bot deze munt ook verhandelen (${n}/${MAX_MARKETS} munten). De live grafiek is beschikbaar zodra de munt in de bot zit.`;
+  }
+
   function openPop(market, anchor) {
     const r = state.rows.find((x) => x.market === market);
     if (!r) return;
-    const markets = botMarkets();
-    const inBot = markets.includes(market);
-    const full = markets.length >= MAX_MARKETS;
+    const plan = addPlan(market, { snapshot: state.snapshot || ctx.getState?.(), config: state.config });
+    const inBot = plan.kind === "in-bot";
+    const addBtn =
+      plan.kind === "switch"
+        ? `<button type="button" class="btn btn-primary" data-act="switch" title="Schakelt over naar Zelf kiezen (je krijgt eerst een bevestiging)">+ Toevoegen…</button>`
+        : `<button type="button" class="btn btn-primary" data-act="add" ${plan.kind === "add" ? "" : "disabled"}>
+          ${inBot ? "✓ Zit al in de bot" : "+ Toevoegen aan bot"}</button>`;
     pop.dataset.market = market;
     pop.innerHTML = `
       <div class="sc-pop-head">
@@ -426,17 +455,10 @@ export function mountScanner(ctx, el) {
       </div>
       <div class="sc-pop-spark">${sparkline(r.sparkline, 260, 54)}</div>
       <div class="sc-pop-actions">
-        <button type="button" class="btn btn-primary" data-act="add" ${inBot || full ? "disabled" : ""}>
-          ${inBot ? "✓ Zit al in de bot" : "+ Toevoegen aan bot"}</button>
+        ${addBtn}
         <button type="button" class="btn" data-act="chart" ${inBot ? "" : "disabled"}>Bekijk grafiek</button>
       </div>
-      <p class="pn-hint">${
-        inBot
-          ? "Deze markt wordt al verhandeld. Bekijk hem live in de grafiek."
-          : full
-            ? `De bot volgt al het maximum van ${MAX_MARKETS} markten. Verwijder er eerst één bij Instellingen.`
-            : `Na toevoegen gaat de bot deze markt ook verhandelen (${markets.length}/${MAX_MARKETS} markten). De live grafiek is beschikbaar zodra de markt in de bot zit.`
-      }</p>`;
+      <p class="pn-hint ${plan.kind === "switch" ? "sc-pop-auto" : ""}">${popHint(plan, market)}</p>`;
     pop.hidden = false;
     const host = el.getBoundingClientRect();
     const a = anchor.getBoundingClientRect();
@@ -451,24 +473,25 @@ export function mountScanner(ctx, el) {
     pop.querySelector("[data-act]:not([disabled])")?.focus();
   }
 
-  async function addMarket(market) {
-    let cfg = state.config;
+  async function freshConfig() {
     try {
-      cfg = await api.getConfig();
+      const cfg = await api.getConfig();
+      if (cfg) state.config = cfg;
     } catch {
       /* val terug op bekende config */
     }
-    const markets = cfg?.markets || [];
-    if (markets.includes(market)) {
-      ctx.toast(`${market} zit al in de bot.`, "info");
-      return;
-    }
-    if (markets.length >= MAX_MARKETS) {
-      ctx.toast(`Maximaal ${MAX_MARKETS} markten. Verwijder er eerst één bij Instellingen.`, "warn");
-      return;
-    }
+    return state.config;
+  }
+
+  async function addMarket(market) {
+    const cfg = await freshConfig();
+    const plan = addPlan(market, { snapshot: state.snapshot || ctx.getState?.(), config: cfg });
+    if (plan.kind === "in-bot") return ctx.toast(`${market} zit al in de bot.`, "info");
+    if (plan.kind === "full") return ctx.toast(`Maximaal ${MAX_MARKETS} munten. Verwijder er eerst één bij Instellingen.`, "warn");
+    // Intussen (elders) op Automatisch gezet: eerst uitleggen en bevestigen
+    if (plan.kind === "switch") return confirmSwitch(market);
     try {
-      const next = await api.putConfig({ markets: [...markets, market] });
+      const next = await api.putConfig(planPatch(plan));
       state.config = next;
       bus.emit("config-changed", next);
       ctx.toast(`${market} toegevoegd aan de bot.`, "success");
@@ -476,6 +499,55 @@ export function mountScanner(ctx, el) {
     } catch (err) {
       ctx.toast(`Toevoegen mislukt: ${err?.message || err}`, "error");
     }
+  }
+
+  /**
+   * Automatische muntkeuze: overschakelen naar "Zelf kiezen" met de munten die de
+   * bot nu volgt plus deze, na bevestiging.
+   */
+  async function confirmSwitch(market) {
+    const cfg = await freshConfig();
+    const snap = () => state.snapshot || ctx.getState?.();
+    const plan = addPlan(market, { snapshot: snap(), config: cfg });
+    if (plan.kind !== "switch") {
+      if (plan.kind === "add") return addMarket(market);
+      if (plan.kind === "in-bot") return ctx.toast(`${market} zit al in de bot.`, "info");
+      return ctx.toast(`Maximaal ${MAX_MARKETS} munten.`, "warn");
+    }
+    const names = plan.markets.slice(0, -1).map((m) => m.split("-")[0]);
+    const shown = names.slice(0, 12).join(", ") + (names.length > 12 ? ` en nog ${names.length - 12}` : "");
+    ctx.openModal({
+      title: "Zelf munten kiezen?",
+      confirmText: `Overschakelen en ${market} toevoegen`,
+      cancelText: "Annuleren",
+      bodyHtml: `<p>De bot kiest zijn munten nu <strong>automatisch</strong> (de munten met de meeste handel). Om ${esc(market)} toe te voegen,
+          schakel je over naar <strong>Zelf kiezen</strong>.</p>
+        <ul>
+          <li>De bot houdt de <strong>${plan.count}</strong> munten die hij nu volgt${shown ? ` (${esc(shown)})` : ""} en krijgt <strong>${esc(market)}</strong> erbij.</li>
+          <li>Daarna kiest hij niet meer elk uur zelf: jij bepaalt de lijst.</li>
+          <li>Terug naar automatisch kan altijd bij <strong>Instellingen → Munten</strong>.</li>
+        </ul>`,
+      onConfirm: async () => {
+        // Op het moment van bevestigen opnieuw bepalen (de automatische keuze kan intussen veranderd zijn)
+        const now = addPlan(market, { snapshot: snap(), config: state.config });
+        const patch = planPatch(now);
+        if (!patch) {
+          ctx.toast(now.kind === "in-bot" ? `${market} zit al in de bot.` : `Maximaal ${MAX_MARKETS} munten.`, "info");
+          return true;
+        }
+        try {
+          const next = await api.putConfig(patch);
+          state.config = next;
+          bus.emit("config-changed", next);
+          ctx.toast(`Je kiest nu zelf de munten: ${now.markets.length} munten, met ${market} erbij.`, "success");
+          render();
+        } catch (err) {
+          ctx.toast(`Overschakelen mislukt: ${err?.message || err}`, "error");
+          return false;
+        }
+        return true;
+      },
+    });
   }
 
   function viewChart(market) {
@@ -507,6 +579,7 @@ export function mountScanner(ctx, el) {
       const m = pop.dataset.market;
       closePop();
       if (act.dataset.act === "add") addMarket(m);
+      else if (act.dataset.act === "switch") confirmSwitch(m);
       else viewChart(m);
       return;
     }
@@ -582,6 +655,7 @@ export function mountScanner(ctx, el) {
     if (state.rows.length && isVisible()) render();
   });
   bus.on("snapshot", (s) => {
+    if (s && typeof s === "object") state.snapshot = s;
     if (s?.config) state.config = s.config;
   });
   document.addEventListener("visibilitychange", () => {

@@ -21,6 +21,12 @@ import {
   shortMarkerText,
   paddedRange,
   sideFitsViewport,
+  trendFilterActive,
+  sameTrendFilter,
+  labTrendFilter,
+  describeTrendFilter,
+  blockedEntriesView,
+  noteKind,
 } from "./backtestLogic.js";
 
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
@@ -54,7 +60,10 @@ const PARAM_LABELS = {
   "risk.breakEvenAtR": "Break-even (R)",
   "risk.timeStopCandles": "Tijdslimiet (candles)",
   "risk.maxPositionPct": "Max. positie (%)",
+  "ensemble.trendFilter": "Trendfilter",
 };
+/** Boven dit aantal markten krijgt de marktkeuze een zoekveld */
+const MARKET_SEARCH_FROM = 30;
 const PARAM_SHORT = {
   "ensemble.buyThreshold": "koop",
   "ensemble.sellThreshold": "verkoop",
@@ -184,6 +193,9 @@ export function mountBacktest(ctx, el) {
     markets: [],
     strategies: FALLBACK_STRATEGIES,
     config: ctx.getState?.()?.config || null,
+    /** De munten die de bot nu volgt (snapshot.activeMarkets), voor de groep "In de bot" */
+    activeMarkets: Array.isArray(ctx.getState?.()?.activeMarkets) ? ctx.getState().activeMarkets : null,
+    marketQuery: "",
     info: null,
     running: null,
     results: { backtest: null, optimize: null, walkforward: null },
@@ -202,7 +214,12 @@ export function mountBacktest(ctx, el) {
     if (head === "ensemble" && rest.startsWith("weights.")) return `Gewicht ${stratName(rest.slice(8))}`;
     return `${stratName(head)} · ${rest}`;
   };
-  const fmtParam = (v) => (typeof v === "boolean" ? (v ? "aan" : "uit") : fmt.num(v, 4));
+  const fmtParam = (v) =>
+    typeof v === "boolean"
+      ? v ? "aan" : "uit"
+      : v && typeof v === "object" && ("market" in v || "coin" in v)
+        ? describeTrendFilter(v)
+        : fmt.num(v, 4);
   const fmtScore = (v, objective) => {
     if (!Number.isFinite(v)) return "–";
     if (objective === "return") return fmt.pct(v, 2);
@@ -218,6 +235,7 @@ export function mountBacktest(ctx, el) {
         <p class="pn-hint">Test de bot op koersen uit het verleden — zonder risico. Je ziet wat de instellingen gedaan zouden hebben, inclusief alle kosten.</p>
 
         <div class="form-row"><label for="bt-market">Markt</label>
+          <input class="input bt-msearch" type="search" name="marketSearch" placeholder="Zoek munt… (bijv. XRP)" aria-label="Zoek munt" autocomplete="off" hidden>
           <select id="bt-market" class="select" name="market"><option>Laden…</option></select></div>
         <div class="bt-row2">
           <div class="form-row"><label for="bt-interval">Interval</label>
@@ -230,6 +248,11 @@ export function mountBacktest(ctx, el) {
         <div class="form-row"><label for="bt-capital">Startkapitaal (€)</label>
           <input id="bt-capital" class="input" type="number" name="capital" min="5" step="5" value="50"></div>
         <div class="bt-est"></div>
+        <label class="bt-tf">
+          <span class="pn-switch"><input type="checkbox" name="trendFilter" checked><i></i></span>
+          <span class="bt-tf-txt"><b>Trendfilter</b> <span class="bt-tf-state muted"></span>
+            <span class="bt-tf-desc"></span></span>
+        </label>
 
         <details class="bt-adv">
           <summary>Geavanceerd <span class="muted">— drempels, risico, strategieën</span></summary>
@@ -360,6 +383,10 @@ export function mountBacktest(ctx, el) {
     F("stopAtrMult").value = r.stopAtrMult ?? FALLBACK_DEFAULTS.stopAtrMult;
     F("takeProfitR").value = r.takeProfitR ?? FALLBACK_DEFAULTS.takeProfitR;
     F("riskPerTradePct").value = r.riskPerTradePct ?? FALLBACK_DEFAULTS.riskPerTradePct;
+    // Trendfilter: standaard zoals de bot nu staat
+    const tfBox = F("trendFilter");
+    if (tfBox) tfBox.checked = trendFilterActive(e.trendFilter);
+    updateTrendToggle();
     const enabled = new Set(e.enabled || state.strategies.map((s) => s.id));
     $(".bt-strats").innerHTML = state.strategies
       .map(
@@ -369,20 +396,49 @@ export function mountBacktest(ctx, el) {
       .join("");
   }
 
+  /** De munten die de bot nu volgt: snapshot.activeMarkets, anders de eigen lijst uit de config */
+  function botMarketList() {
+    return state.activeMarkets || state.config?.markets || [];
+  }
+
+  /**
+   * Marktkeuze: eerst de munten die de bot nu volgt (in hun eigen volgorde), dan alle
+   * andere EUR-markten op alfabet. Met veel markten (tot ~400) een zoekveld dat de
+   * lijst filtert; de gekozen markt blijft staan zolang hij bij de zoekterm past.
+   */
+  function fillMarketSelect(preferred) {
+    const sel = F("market");
+    if (!sel) return;
+    const cfg = state.config;
+    const current = preferred || sel.value || cfg?.markets?.[0] || "BTC-EUR";
+    const all = state.markets.length ? state.markets.map((m) => m.market) : [...(cfg?.markets || ["BTC-EUR"])];
+    for (const m of [...botMarketList(), current]) if (m && !all.includes(m)) all.push(m);
+    const inBot = botMarketList().filter((m, i, a) => all.includes(m) && a.indexOf(m) === i);
+    const botSet = new Set(inBot);
+    const rest = all.filter((m) => !botSet.has(m)).sort((a, b) => a.localeCompare(b));
+    const q = state.marketQuery.trim().toUpperCase();
+    const match = (m) => !q || m.toUpperCase().includes(q);
+    const top = inBot.filter(match);
+    const others = rest.filter(match);
+    const opt = (m) => `<option value="${esc(m)}">${esc(m)}</option>`;
+    let html =
+      (top.length ? `<optgroup label="In de bot (${inBot.length})">${top.map(opt).join("")}</optgroup>` : "") +
+      (others.length ? `<optgroup label="Alle EUR-markten">${others.map(opt).join("")}</optgroup>` : "");
+    let value = current;
+    if (!top.length && !others.length) {
+      // Geen treffers: de huidige keuze blijft staan
+      html = `${opt(current)}<option disabled>Geen munt met "${esc(state.marketQuery.trim())}"</option>`;
+    } else if (!match(current)) value = top[0] || others[0];
+    sel.innerHTML = html;
+    sel.value = value;
+    const search = F("marketSearch");
+    if (search) search.hidden = all.length <= MARKET_SEARCH_FROM;
+  }
+
   function fillSelects() {
     const saved = loadSavedForm() || {};
     const cfg = state.config;
-    const preferred = saved.market || ctx.getSelectedMarket?.() || cfg?.markets?.[0] || "BTC-EUR";
-    const list = state.markets.length ? state.markets.map((m) => m.market) : cfg?.markets || ["BTC-EUR"];
-    if (!list.includes(preferred)) list.unshift(preferred);
-    const botMarkets = new Set(cfg?.markets || []);
-    const top = list.filter((m) => botMarkets.has(m));
-    const rest = list.filter((m) => !botMarkets.has(m));
-    const sel = F("market");
-    sel.innerHTML =
-      (top.length ? `<optgroup label="In de bot">${top.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}</optgroup>` : "") +
-      `<optgroup label="Alle EUR-markten">${rest.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}</optgroup>`;
-    sel.value = preferred;
+    fillMarketSelect(saved.market || ctx.getSelectedMarket?.() || cfg?.markets?.[0] || "BTC-EUR");
     F("interval").value = saved.interval || cfg?.interval || "15m";
     if (saved.days) F("days").value = saved.days;
     if (saved.capital) F("capital").value = saved.capital;
@@ -395,6 +451,24 @@ export function mountBacktest(ctx, el) {
     if (saved.strategy !== undefined) F("strategy").value = saved.strategy;
     fillAdvanced(cfg);
     updateEstimate();
+  }
+
+  /** Uitleg naast de trendfilter-schakelaar: wat "aan" betekent en of het afwijkt van de bot */
+  function updateTrendToggle() {
+    const box = F("trendFilter");
+    const botTf = state.config?.ensemble?.trendFilter;
+    const on = !!box?.checked;
+    const stateEl = $(".bt-tf-state");
+    const desc = $(".bt-tf-desc");
+    if (stateEl) {
+      const same = on === trendFilterActive(botTf);
+      stateEl.textContent = `${on ? "aan" : "uit"} · ${same ? "zoals de bot" : "anders dan de bot"}`;
+    }
+    if (desc) {
+      desc.textContent = on
+        ? `Alleen kopen als ${describeTrendFilter(labTrendFilter(true, botTf))} staat. Zet uit om te zien wat het filter scheelt.`
+        : "Uit: de test koopt ook in een dalende markt. Zet aan om te vergelijken met het filter.";
+    }
   }
 
   function updateEstimate() {
@@ -457,7 +531,13 @@ export function mountBacktest(ctx, el) {
       interval,
       days,
       initialCapital,
-      ensemble: { buyThreshold: buy, sellThreshold: sell, enabled },
+      ensemble: {
+        buyThreshold: buy,
+        sellThreshold: sell,
+        enabled,
+        // Aan = het filter van de bot; uit = beide vlaggen uit (vergelijken met/zonder)
+        trendFilter: labTrendFilter(!!F("trendFilter")?.checked, state.config?.ensemble?.trendFilter),
+      },
       risk: { stopAtrMult: stop, takeProfitR: tp, riskPerTradePct: risk },
     };
     if (kind !== "backtest") {
@@ -988,7 +1068,43 @@ export function mountBacktest(ctx, el) {
 
   /** Server-uitleg als de periode is aangepast (bijv. ingekort door te weinig historie) */
   function noteBanner(note) {
-    return note ? `<div class="pn-banner pn-banner-warn bt-note" role="status"><b>Periode aangepast.</b> ${esc(note)}</div>` : "";
+    if (!note) return "";
+    const title = noteKind(note) === "period" ? "Periode aangepast." : "Let op.";
+    return `<div class="pn-banner pn-banner-warn bt-note" role="status"><b>${title}</b> ${esc(note)}</div>`;
+  }
+
+  /** "(ingekort)" in de kop alleen als de server de periode aanpaste (niet bij een filteruitleg) */
+  const shortened = (note) => (note && noteKind(note) !== "filter" ? " (ingekort)" : "");
+
+  /** Korte tekst over het trendfilter van een test, bijv. "trendfilter aan" */
+  function trendTag(req) {
+    const tf = req?.ensemble?.trendFilter;
+    if (!tf) return "";
+    const on = trendFilterActive(tf);
+    return `<span class="pn-chip bt-tf-chip ${on ? "pn-chip-acc" : ""}" title="${esc(on ? describeTrendFilter(tf) : "Trendfilter stond uit in deze test")}">trendfilter ${on ? "aan" : "uit"}</span>`;
+  }
+
+  /** Filters in deze test: trendfilter aan/uit en hoeveel koopsignalen erdoor tegengehouden werden */
+  function filtersCard(req, res) {
+    const tf = req?.ensemble?.trendFilter;
+    const b = blockedEntriesView(res);
+    if (!tf && !b) return "";
+    const on = trendFilterActive(tf);
+    const sig = (n) => `<b class="mono">${esc(fmt.num(n, 0))}</b> ${n === 1 ? "koopsignaal" : "koopsignalen"}`;
+    return `<div class="panel bt-card bt-filters">
+      <div class="pn-head"><div class="panel-title">Filters in deze test</div>${trendTag(req)}</div>
+      ${tf ? `<p class="bt-filters-tf">${on ? `Trendfilter <b>aan</b>: alleen kopen als ${esc(describeTrendFilter(tf))} staat.` : "Trendfilter <b>uit</b>: de test kocht ook in een dalende markt."}</p>` : ""}
+      ${
+        b
+          ? `<div class="bt-filters-stats">
+              <div class="bt-fstat ${b.trend ? "is-hit" : ""}">Tegengehouden door trendfilter: ${sig(b.trend)}</div>
+              <div class="bt-fstat ${b.spread ? "is-hit" : ""}">Tegengehouden door spread: ${sig(b.spread)}</div>
+            </div>`
+          : ""
+      }
+      <p class="pn-hint">Een tegengehouden koopsignaal werd geen aankoop. Verkopen en stop-losses tegenhouden doet een filter nooit.
+        Vergelijk: zet het trendfilter links ${on ? "uit" : "aan"} en test opnieuw.</p>
+    </div>`;
   }
 
   function stuckWarning(n) {
@@ -1006,7 +1122,7 @@ export function mountBacktest(ctx, el) {
   }
 
   // ── Backtest-weergave ──
-  function renderBacktest({ res }) {
+  function renderBacktest({ req, res }) {
     const m = res.metrics || {};
     const trades = res.trades || [];
     const exitCounts = {};
@@ -1023,6 +1139,7 @@ export function mountBacktest(ctx, el) {
       ${simWarning(res.dataSource === "simulated")}
       ${stuckWarning(res.stuckTrades)}
       ${kpiCards(m, res.initialCapital)}
+      ${filtersCard(req, res)}
       <div class="panel bt-card">
         <div class="pn-head"><div class="panel-title">Koers &amp; trades</div>
           <div class="pn-legend"><span><i class="lg-arrow up"></i>koop</span><span><i class="lg-arrow down pos"></i>verkoop met winst</span><span><i class="lg-arrow down neg"></i>met verlies</span></div></div>
@@ -1095,7 +1212,7 @@ export function mountBacktest(ctx, el) {
     const bm = best?.metrics;
     out.innerHTML = `
       <div class="bt-res-head">
-        <h3>Optimalisatie <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen${res.note ? " (ingekort)" : ""}</span></h3>
+        <h3>Optimalisatie <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen${shortened(res.note)}</span> ${trendTag(req)}</h3>
         <div class="muted">Doel: ${esc(OBJECTIVES[obj] || obj)} · ${esc(req.strategy ? `parameters van ${stratName(req.strategy)}` : "ensemble-drempels & risico")} · ${esc(fmt.num(res.combosTested, 0))} combinaties in ${esc(fmt.duration(res.durationMs))}</div>
       </div>
       ${noteBanner(res.note)}
@@ -1294,8 +1411,15 @@ export function mountBacktest(ctx, el) {
     const warn = [];
     if (cfg && req.interval !== cfg.interval)
       warn.push(`De bot draait op interval <b>${esc(cfg.interval)}</b>, maar deze waarden zijn getest op <b>${esc(req.interval)}</b>.`);
-    if (cfg && !cfg.markets?.includes(req.market))
-      warn.push(`<b>${esc(req.market)}</b> staat niet in de markten van de bot.`);
+    if (cfg && !(state.activeMarkets || cfg.markets || []).includes(req.market))
+      warn.push(`De bot volgt <b>${esc(req.market)}</b> op dit moment niet.`);
+    const tfNext = partial.ensemble?.trendFilter;
+    if (tfNext && !sameTrendFilter(tfNext, cfg?.ensemble?.trendFilter))
+      warn.push(
+        trendFilterActive(tfNext)
+          ? `In deze test stond het trendfilter <b>aan</b> (${esc(describeTrendFilter(tfNext))}); na toepassen staat het ook in de bot aan.`
+          : "In deze test stond het trendfilter <b>uit</b>; na toepassen staat het ook in de bot <b>uit</b>. Het filter beschermt tegen grote dalingen: zet de schakelaar links weer aan en test opnieuw als je het wilt houden.",
+      );
     if (enabled?.removed.length)
       warn.push(`Strategieën die in het lab uit stonden, worden ook in de bot <b>uitgezet</b>: ${esc(names(enabled.removed))}.`);
     if (row.metrics?.totalReturnPct <= 0) warn.push("Deze combinatie was verliesgevend in de test.");
@@ -1345,7 +1469,7 @@ export function mountBacktest(ctx, el) {
     const initial = req.initialCapital || 50;
     out.innerHTML = `
       <div class="bt-res-head">
-        <h3>Walk-forward <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen${res.note ? " (ingekort)" : ""}</span></h3>
+        <h3>Walk-forward <span class="muted">· ${esc(req.market)} · ${esc(req.interval)} · ${esc(String(req.days))} dagen${shortened(res.note)}</span> ${trendTag(req)}</h3>
         <div class="muted">${esc(String(folds.length))} folds · ${esc(fmt.num(req.trainRatio * 100, 0))}% train / ${esc(fmt.num((1 - req.trainRatio) * 100, 0))}% test · doel ${esc(OBJECTIVE_SHORT[req.objective] || req.objective)} · berekend in ${esc(fmt.duration(res.durationMs))}</div>
       </div>
       ${noteBanner(res.note)}
@@ -1462,9 +1586,14 @@ export function mountBacktest(ctx, el) {
   }
   form.addEventListener("input", (e) => {
     if (["days", "interval", "folds", "trainRatio"].includes(e.target.name)) updateEstimate();
+    if (e.target.name === "marketSearch") {
+      state.marketQuery = String(e.target.value || "");
+      fillMarketSelect(F("market").value);
+    }
   });
   form.addEventListener("change", (e) => {
     if (e.target.name === "interval") updateEstimate();
+    if (e.target.name === "trendFilter") updateTrendToggle();
   });
   $(".bt-adv-reset").addEventListener("click", () => {
     fillAdvanced(state.config);
@@ -1477,11 +1606,25 @@ export function mountBacktest(ctx, el) {
 
   bus.on("config-changed", (c) => {
     if (c) state.config = c;
+    updateTrendToggle();
   });
+  let activeSig = (state.activeMarkets || []).join(",");
   bus.on("snapshot", (s) => {
     if (s?.config && !state.config) {
       state.config = s.config;
+      if (Array.isArray(s.activeMarkets)) state.activeMarkets = s.activeMarkets;
       fillSelects();
+      return;
+    }
+    // Andere munten in de bot (automatische keuze): groep "In de bot" bijwerken, keuze behouden
+    if (Array.isArray(s?.activeMarkets)) {
+      const sig = s.activeMarkets.join(",");
+      if (sig !== activeSig) {
+        activeSig = sig;
+        state.activeMarkets = s.activeMarkets;
+        const sel = F("market");
+        if (sel && typeof document !== "undefined" && document.activeElement !== sel) fillMarketSelect(sel.value);
+      }
     }
   });
   bus.on("tab-changed", () => {

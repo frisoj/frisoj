@@ -200,7 +200,9 @@ export function testedPartial(row, req, cfg, strategyIds) {
   }
   for (const [k, v] of Object.entries(reqEns)) {
     if (k === "enabled" || k === "weights" || k === "params" || v === undefined || k in p.ensemble) continue;
-    p.ensemble[k] = v;
+    // Trendfilter alleen meesturen als de test een ander filter had dan de bot nu heeft
+    if (k === "trendFilter" && sameTrendFilter(v, cfg?.ensemble?.trendFilter)) continue;
+    p.ensemble[k] = k === "trendFilter" ? { ...v } : v;
   }
   for (const [k, v] of Object.entries(reqRisk)) {
     if (v === undefined || k in p.risk) continue;
@@ -263,7 +265,8 @@ export function describeApply(partial, row, cfg, strategies) {
   const rows = keys.map((key) => {
     const cur = currentValue(key, cfg, strategies);
     const next = nextValue(key, partial, row);
-    return { key, cur, next, same: cur === next };
+    const same = key === "ensemble.trendFilter" ? sameTrendFilter(cur, next) : cur === next;
+    return { key, cur, next, same };
   });
   let enabled = null;
   if (Array.isArray(e.enabled)) {
@@ -313,4 +316,68 @@ export function paddedRange(n, widthPx, padPx = 32) {
  */
 export function sideFitsViewport(sideHeight, viewportHeight, topOffset, bottomGap = 12) {
   return sideHeight > 0 && viewportHeight > 0 && sideHeight + topOffset + bottomGap <= viewportHeight;
+}
+
+// ── Trendfilter & filters in het resultaat (v2) ──
+
+/** Standaard trendfilter (DEFAULT_TREND_FILTER in src/core/defaults.ts) */
+export const DEFAULT_TREND_FILTER = { market: true, coin: false, interval: "1d", period: 50 };
+
+/** Staat er een trendfilter aan (markt of munt)? */
+export const trendFilterActive = (tf) => !!tf && (tf.market === true || tf.coin === true);
+
+/** Hetzelfde filter? Twee filters die allebei uit staan zijn gelijk, ongeacht tijdschaal/periode. */
+export function sameTrendFilter(a, b) {
+  const aa = trendFilterActive(a);
+  const bb = trendFilterActive(b);
+  if (!aa || !bb) return aa === bb;
+  return !!a.market === !!b.market && !!a.coin === !!b.coin && a.interval === b.interval && Number(a.period) === Number(b.period);
+}
+
+/**
+ * Het trendfilter voor een test in het lab. Aan: het filter van de bot (staat dat
+ * uit, dan het standaard marktfilter). Uit: beide vlaggen uit, met dezelfde
+ * tijdschaal en periode (zodat je eerlijk met/zonder vergelijkt).
+ */
+export function labTrendFilter(on, botTf) {
+  const interval = botTf?.interval === "4h" || botTf?.interval === "1d" ? botTf.interval : DEFAULT_TREND_FILTER.interval;
+  const p = Math.round(Number(botTf?.period));
+  const period = p >= 5 && p <= 200 ? p : DEFAULT_TREND_FILTER.period;
+  if (!on) return { market: false, coin: false, interval, period };
+  if (trendFilterActive(botTf)) return { market: !!botTf.market, coin: !!botTf.coin, interval, period };
+  return { market: true, coin: false, interval, period };
+}
+
+/** Korte samenvatting, bijv. "Bitcoin boven het gemiddelde van 50 dagen" (of "uit"). */
+export function describeTrendFilter(tf) {
+  if (!trendFilterActive(tf)) return "uit";
+  const who = tf.market && tf.coin ? "Bitcoin én de munt zelf" : tf.market ? "Bitcoin" : "de munt zelf";
+  const n = Math.round(Number(tf.period));
+  const span = tf.interval === "4h" ? `${n} blokken van 4 uur` : `${n} dagen`;
+  return `${who} boven het gemiddelde van ${span}`;
+}
+
+/**
+ * Koopsignalen die door een filter geen aankoop werden (BacktestResult.blockedEntries).
+ * Null als de server ze niet meestuurt (geen filter actief, of een oudere server).
+ * @returns {null | { trend: number, spread: number, total: number }}
+ */
+export function blockedEntriesView(res) {
+  const b = res?.blockedEntries;
+  if (!b || typeof b !== "object") return null;
+  const trend = isNum(b.trend) && b.trend > 0 ? Math.round(b.trend) : 0;
+  const spread = isNum(b.spread) && b.spread > 0 ? Math.round(b.spread) : 0;
+  return { trend, spread, total: trend + spread };
+}
+
+/**
+ * Soort serveruitleg (`note`): "period" (periode aangepast/ingekort), "filter"
+ * (trendfilter/spread) of "mixed" (beide). Bepaalt de kop van de melding.
+ */
+export function noteKind(note) {
+  const s = String(note || "");
+  const filter = /trendfilter|marktfilter|muntfilter|spread/i.test(s);
+  const period = /periode|ingekort|historie/i.test(s);
+  if (filter && period) return "mixed";
+  return filter ? "filter" : "period";
 }
