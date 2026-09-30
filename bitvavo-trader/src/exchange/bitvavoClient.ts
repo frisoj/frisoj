@@ -135,14 +135,39 @@ export interface RateLimitStatus {
   bannedUntil: number | null;
 }
 
-interface RequestOptions {
+/**
+ * Optioneel per publiek verzoek (candles, koersen, tickers, orderboek, markten): hoe hard
+ * de client zijn best doet. Zonder opties gelden de standaardwaarden van de client.
+ */
+export interface PublicRequestOptions {
+  /** Overschrijft het aantal herhalingen (alleen GET wordt ooit herhaald) */
+  retries?: number;
+  /** Niet wachten op de rate limit maar meteen een "rate-limit"-fout gooien (er wordt niets verstuurd) */
+  noWait?: boolean;
+  /** Timeout voor dit verzoek in ms (standaard `timeoutMs` van de client) */
+  timeoutMs?: number;
+  /**
+   * Belangrijk verzoek (bijv. de koers van een open positie): mag de publieke reserve
+   * gebruiken, tot dezelfde ondergrens als private verzoeken ({@link PRIVATE_RATE_LIMIT_FLOOR}).
+   */
+  priority?: boolean;
+}
+
+interface RequestOptions extends PublicRequestOptions {
   query?: Query;
   body?: Record<string, unknown>;
   auth?: boolean;
-  /** Overschrijft het aantal herhalingen (alleen GET wordt ooit herhaald) */
-  retries?: number;
-  /** Niet wachten op de rate limit maar meteen een "rate-limit"-fout gooien */
-  noWait?: boolean;
+}
+
+/** Alleen de bekende per-verzoek-opties overnemen (nooit query/body/auth van buiten). */
+function publicOpts(req: PublicRequestOptions | undefined): PublicRequestOptions {
+  if (!req || typeof req !== "object") return {};
+  const out: PublicRequestOptions = {};
+  if (typeof req.retries === "number" && Number.isFinite(req.retries)) out.retries = req.retries;
+  if (req.noWait === true) out.noWait = true;
+  if (typeof req.timeoutMs === "number" && Number.isFinite(req.timeoutMs) && req.timeoutMs > 0) out.timeoutMs = req.timeoutMs;
+  if (req.priority === true) out.priority = true;
+  return out;
 }
 
 /** Publieke verzoeken wachten tot de reset als er minder dan dit over is (reserve voor private verzoeken). */
@@ -457,8 +482,8 @@ export class BitvavoClient {
     return offset;
   }
 
-  async markets(): Promise<MarketInfo[]> {
-    const data = await this.#request<unknown>("GET", "/markets");
+  async markets(req?: PublicRequestOptions): Promise<MarketInfo[]> {
+    const data = await this.#request<unknown>("GET", "/markets", publicOpts(req));
     return asArray(data)
       .map(parseMarket)
       .filter((m): m is MarketInfo => m !== null);
@@ -469,12 +494,14 @@ export class BitvavoClient {
     market: string,
     interval: Interval,
     opts: { limit?: number; start?: number; end?: number } = {},
+    req?: PublicRequestOptions,
   ): Promise<Candle[]> {
     const limit =
       opts.limit === undefined
         ? undefined
         : Math.min(MAX_CANDLES_PER_REQUEST, Math.max(1, Math.trunc(opts.limit)));
     const data = await this.#request<unknown>("GET", `/${encodeURIComponent(market)}/candles`, {
+      ...publicOpts(req),
       query: {
         interval,
         limit,
@@ -485,8 +512,8 @@ export class BitvavoClient {
     return parseCandles(data);
   }
 
-  async ticker24h(market?: string): Promise<Ticker24h[]> {
-    const data = await this.#request<unknown>("GET", "/ticker/24h", { query: { market } });
+  async ticker24h(market?: string, req?: PublicRequestOptions): Promise<Ticker24h[]> {
+    const data = await this.#request<unknown>("GET", "/ticker/24h", { ...publicOpts(req), query: { market } });
     const now = this.#now();
     return asArray(data)
       .map((r) => parseTicker24h(r, now))
@@ -494,8 +521,8 @@ export class BitvavoClient {
   }
 
   /** Laatste prijs per markt (markten zonder geldige prijs worden weggelaten). */
-  async tickerPrice(market?: string): Promise<{ market: string; price: number }[]> {
-    const data = await this.#request<unknown>("GET", "/ticker/price", { query: { market } });
+  async tickerPrice(market?: string, req?: PublicRequestOptions): Promise<{ market: string; price: number }[]> {
+    const data = await this.#request<unknown>("GET", "/ticker/price", { ...publicOpts(req), query: { market } });
     const out: { market: string; price: number }[] = [];
     for (const r of asArray(data)) {
       const m = str(r.market);
@@ -505,8 +532,9 @@ export class BitvavoClient {
     return out;
   }
 
-  async book(market: string, depth?: number): Promise<OrderBook> {
+  async book(market: string, depth?: number, req?: PublicRequestOptions): Promise<OrderBook> {
     const data = await this.#request<unknown>("GET", `/${encodeURIComponent(market)}/book`, {
+      ...publicOpts(req),
       query: { depth: depth !== undefined ? Math.max(1, Math.trunc(depth)) : undefined },
     });
     const raw = isRecord(data) ? data : {};
@@ -678,9 +706,16 @@ export class BitvavoClient {
    *   dat een ban op hetzelfde IP verlengd wordt).
    * - Budget: publieke verzoeken wachten tot de reset bij < 50 resterend (ook als
    *   het laatst gemelde private budget zo laag is: reserve voor orders);
-   *   private verzoeken pas bij < 10 resterend van hun eigen budget.
+   *   private verzoeken pas bij < 10 resterend van hun eigen budget, net als
+   *   publieke verzoeken met `priority` (koersen van open posities).
    */
-  async #respectRateLimit(method: string, endpoint: string, scope: RateLimitScope, noWait = false): Promise<void> {
+  async #respectRateLimit(
+    method: string,
+    endpoint: string,
+    scope: RateLimitScope,
+    noWait = false,
+    priority = false,
+  ): Promise<void> {
     const now = this.#now();
     const bannedUntil =
       scope === "private"
@@ -695,7 +730,7 @@ export class BitvavoClient {
         { kind: "rate-limit", method, endpoint },
       );
     }
-    const floor = scope === "private" ? PRIVATE_RATE_LIMIT_FLOOR : PUBLIC_RATE_LIMIT_RESERVE;
+    const floor = scope === "private" || priority ? PRIVATE_RATE_LIMIT_FLOOR : PUBLIC_RATE_LIMIT_RESERVE;
     const checked: RateLimitScope[] = scope === "private" ? ["private"] : ["public", "private"];
     let waitUntil = 0;
     const low: RateLimitScope[] = [];
@@ -773,8 +808,9 @@ export class BitvavoClient {
       );
     }
     const scope: RateLimitScope = opts.auth ? "private" : "public";
-    await this.#respectRateLimit(method, endpoint, scope, opts.noWait);
+    await this.#respectRateLimit(method, endpoint, scope, opts.noWait, opts.priority === true);
     if (opts.auth) await this.#maybeSyncTime();
+    const timeoutMs = positiveFinite(opts.timeoutMs) ? opts.timeoutMs : this.#timeoutMs;
 
     const queryString = this.#buildQuery(opts.query);
     const url = `${this.#baseUrl}${endpoint}${queryString}`;
@@ -802,7 +838,7 @@ export class BitvavoClient {
     const timer = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, this.#timeoutMs);
+    }, timeoutMs);
 
     let res: Response;
     let text: string;
@@ -817,7 +853,7 @@ export class BitvavoClient {
     } catch (cause) {
       if (timedOut) {
         throw new BitvavoApiError(
-          `Geen antwoord van Bitvavo binnen ${Math.round(this.#timeoutMs / 1000)} s bij ${method} ${endpoint} (timeout)`,
+          `Geen antwoord van Bitvavo binnen ${Math.round(timeoutMs / 1000)} s bij ${method} ${endpoint} (timeout)`,
           0,
           null,
           { kind: "timeout", method, endpoint, cause },

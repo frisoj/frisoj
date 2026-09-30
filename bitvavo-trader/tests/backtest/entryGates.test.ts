@@ -154,6 +154,42 @@ describe("trend gate — coin filter and fail-closed", () => {
     expect(short.result.trades).toHaveLength(0);
   });
 
+  it("stale trend data (the newest closed trend candle is missing) counts as unknown → blocked, like the engine", () => {
+    // Rising coin closes; at T0 + ~5 h the newest closed day is the one that opened at T0 − 1 day.
+    // Without it (a day without trades on Bitvavo, or data that stops early) the backtest may not buy.
+    const acts1 = actions(N, { 20: "B", 30: "S" });
+    const endingAt = (lastOpen: number) => daily([100, 110, 120, 130, 140, 150], lastOpen - 5 * DAY);
+    for (const lastOpen of [T0 - 3 * DAY, T0 - 2 * DAY]) {
+      const stale = run(candles, acts1, { ensemble: ensembleWith(COIN3), trendCandles: { coin: endingAt(lastOpen) } });
+      expect(stale.result.trades).toHaveLength(0);
+      expect(stale.result.blockedEntries).toEqual({ trend: 1, spread: 0 });
+    }
+    const fresh = run(candles, acts1, { ensemble: ensembleWith(COIN3), trendCandles: { coin: endingAt(T0 - DAY) } });
+    expect(fresh.result.trades).toHaveLength(1);
+    // A gap in the middle: blocked while the missing day would have been the newest closed one.
+    const withGap = daily([100, 110, 120, 130, 140, 150, 160], T0 - 5 * DAY).filter((c) => c.time !== T0 - DAY);
+    const gapRun = run(candles, actions(N, { 20: "B", 30: "S", 150: "B", 160: "S" }), {
+      ensemble: ensembleWith(COIN3),
+      trendCandles: { coin: withGap },
+    });
+    expect(gapRun.result.trades.map((t) => t.entryTime)).toEqual([candles[151].time]);
+    expect(gapRun.result.blockedEntries).toEqual({ trend: 1, spread: 0 });
+    // Data that stops in the middle of the test: buys after it are blocked (market filter too).
+    const stops = daily([100, 110, 120, 130, 140, 150], T0 - 5 * DAY); // newest opens at T0, closes at T0 + 1 day
+    const late = run(candles, actions(N, { 20: "B", 30: "S", 150: "B", 160: "S" }), {
+      ensemble: ensembleWith(TF3),
+      trendCandles: { market: stops },
+    });
+    expect(late.result.trades.map((t) => t.entryTime)).toEqual([candles[21].time, candles[151].time]);
+    const longer = flatCandles(4 * 96); // 4 days: at T0 + 3 days + x the newest trend candle (T0) is 2 days behind
+    const beyond = run(longer, actions(longer.length, { 20: "B", 30: "S", 300: "B", 310: "S" }), {
+      ensemble: ensembleWith(TF3),
+      trendCandles: { market: stops },
+    });
+    expect(beyond.result.trades.map((t) => t.entryTime)).toEqual([longer[21].time]);
+    expect(beyond.result.blockedEntries).toEqual({ trend: 1, spread: 0 });
+  });
+
   it("partial data: blocks while fewer than `period` candles have closed, decides normally afterwards", () => {
     // Candles from T0 - 2 days: before T0 + 1 day only 2 have closed; from then on 3 (rising) → allowed.
     const partial = run(candles, acts, { ensemble: ensembleWith(TF3), trendCandles: { market: daily([100, 110, 120], T0 - 2 * DAY) } });
@@ -269,6 +305,18 @@ describe("entry-gate helpers", () => {
   it("spreadBlockedNote shows more decimals when the rounded values would look equal", () => {
     expect(spreadBlockedNote(0.62, 0.3)).toBe("Geen aankopen: de spread van deze markt (0,62%) is groter dan je maximum (0,30%).");
     expect(spreadBlockedNote(0.3004, 0.3)).toBe("Geen aankopen: de spread van deze markt (0,3004%) is groter dan je maximum (0,3000%).");
+  });
+
+  it("spreadBlockedNote never shows two equal numbers, and never a small limit as 0,00%", () => {
+    // bid 3,3283 / ask 3,3383 → 0,300003%: still equal at 4 decimals → "net groter", no contradictory numbers.
+    expect(spreadBlockedNote(0.300003, 0.3)).toBe("Geen aankopen: de spread van deze markt is net groter dan je maximum (0,30%).");
+    const r = run(candles, actions(N, { 20: "B", 30: "S" }), { ensemble: ensembleWith(OFF), spreadPct: (3.3383 - 3.3283) / ((3.3383 + 3.3283) / 2), risk: riskCfg({ maxSpreadPct: 0.3 }) });
+    expect(r.result.trades).toHaveLength(0);
+    expect(r.result.note).toBe("Geen aankopen: de spread van deze markt is net groter dan je maximum (0,30%).");
+    // A limit of 0,001% (allowed: 0..5) is shown as such, not as "0,00%" (which would read as "off").
+    expect(spreadBlockedNote(0.03, 0.001)).toBe("Geen aankopen: de spread van deze markt (0,030%) is groter dan je maximum (0,001%).");
+    expect(spreadBlockedNote(0.0012, 0.001)).toBe("Geen aankopen: de spread van deze markt (0,0012%) is groter dan je maximum (0,0010%).");
+    expect(spreadBlockedNote(0.5, 0.25)).toBe("Geen aankopen: de spread van deze markt (0,50%) is groter dan je maximum (0,25%).");
   });
 
   it("appendNote joins non-empty, distinct notes", () => {

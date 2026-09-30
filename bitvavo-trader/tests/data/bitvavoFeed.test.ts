@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { BitvavoFeed } from "../../src/data/bitvavoFeed";
+import { BitvavoFeed, FAST_REQUEST_TIMEOUT_MS } from "../../src/data/bitvavoFeed";
 import type { BitvavoClient } from "../../src/exchange/bitvavoClient";
 import { INTERVAL_MS, type Candle, type Interval, type MarketInfo, type Ticker24h } from "../../src/core/types";
 
@@ -482,5 +482,64 @@ describe("BitvavoFeed — overige methodes", () => {
     expect(book.bids[0]).toEqual([99, 1]);
     expect(counters.book).toEqual([["BTC-EUR", 10]]);
     expect(feed.source).toBe("bitvavo");
+  });
+});
+
+describe("BitvavoFeed — opties per verzoek (ronde 5)", () => {
+  function recordingClient() {
+    const seen: { method: string; req: unknown }[] = [];
+    const client = {
+      rateLimitRemaining: 1000,
+      async candles(_m: string, _i: Interval, _o: unknown, req?: unknown) {
+        seen.push({ method: "candles", req });
+        return [];
+      },
+      async markets(req?: unknown) {
+        seen.push({ method: "markets", req });
+        return [];
+      },
+      async ticker24h(_m?: string, req?: unknown) {
+        seen.push({ method: "ticker24h", req });
+        return [];
+      },
+      async tickerPrice(m?: string, req?: unknown) {
+        seen.push({ method: "tickerPrice", req });
+        return [{ market: m ?? "BTC-EUR", price: 1 }];
+      },
+      async book(market: string, _d?: number, req?: unknown) {
+        seen.push({ method: "book", req });
+        return { market, bids: [], asks: [], timestamp: NOW };
+      },
+    };
+    return { client: client as unknown as BitvavoClient, seen };
+  }
+
+  it("fast → geen herhalingen, korte timeout, niet wachten; priority → voorrang; zonder opties de standaard van de client", async () => {
+    const fast = { retries: 0, noWait: true, timeoutMs: FAST_REQUEST_TIMEOUT_MS };
+    let now = NOW;
+    const { client, seen } = recordingClient();
+    const feed = new BitvavoFeed(client, { now: () => now });
+    await feed.getCandles("BTC-EUR", "15m", 10, { fast: true });
+    await feed.getCandles("BTC-EUR", "15m", 10, { fast: true, priority: true });
+    await feed.getCandles("BTC-EUR", "15m", 10);
+    await feed.getMarkets({ fast: true });
+    await feed.getTickers24h(undefined, { fast: true });
+    now += 60_000;
+    await feed.getTickers24h(["ETH-EUR"], { priority: true });
+    await feed.getPrice("ETH-EUR", { fast: true, priority: true });
+    await feed.getPrices({ fast: true });
+    await feed.getOrderBook("BTC-EUR", 1, { fast: true });
+    expect(seen).toEqual([
+      { method: "candles", req: fast },
+      { method: "candles", req: { ...fast, priority: true } },
+      { method: "candles", req: undefined },
+      { method: "markets", req: fast },
+      { method: "ticker24h", req: fast },
+      { method: "ticker24h", req: { priority: true } },
+      { method: "tickerPrice", req: { ...fast, priority: true } },
+      { method: "tickerPrice", req: fast },
+      { method: "book", req: fast },
+    ]);
+    expect(FAST_REQUEST_TIMEOUT_MS).toBe(5_000);
   });
 });

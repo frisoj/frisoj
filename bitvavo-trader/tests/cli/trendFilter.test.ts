@@ -85,7 +85,7 @@ describe("prepareTrendFilter (laden voor de CLI's)", () => {
     ]);
     expect(setup.trendCandles?.coin?.length).toBeGreaterThan(20);
     expect(setup.lines[0]).toBe(
-      "Trendfilter: alleen kopen als Bitcoin (BTC-EUR) en de munt zelf boven het gemiddelde van 20 candles van 4 uur staat",
+      "Trendfilter: alleen kopen als Bitcoin (BTC-EUR) en de munt zelf boven het gemiddelde van 20 blokken van 4 uur staat",
     );
   });
 
@@ -121,6 +121,32 @@ describe("prepareTrendFilter (laden voor de CLI's)", () => {
     }).result;
     expect(res.trades).toHaveLength(0);
     expect(res.blockedEntries).toEqual({ trend: 3, spread: 0 });
+  });
+});
+
+describe("prepareTrendFilter — uitleg bij lege of te oude data", () => {
+  const from = NOW - 30 * DAY;
+
+  it("lege data: note (geen stilte), en 'Nu:' zegt dat er te weinig data is", async () => {
+    const empty: Pick<MarketDataFeed, "getHistory"> = { getHistory: async () => [] };
+    const setup = await prepareTrendFilter(empty, "ETH-EUR", DEFAULT_ENSEMBLE_CONFIG, from, NOW);
+    expect(setup.note).toBe("Trendfilter: Koersdata voor het marktfilter (BTC-EUR): niets gevonden — voor de zekerheid geen aankopen.");
+    expect(setup.lines[1]).toBe("Nu: Bitcoin (BTC-EUR): te weinig koersdata voor het gemiddelde van 50 dagen (0/50)");
+  });
+
+  it("data die te vroeg stopt: note, en 'Nu:' noemt de data verouderd (zoals de backtest en de engine)", async () => {
+    const { feed } = fakeHistoryFeed();
+    const cut = Math.floor(NOW / DAY) * DAY - 5 * DAY;
+    const stops: Pick<MarketDataFeed, "getHistory"> = {
+      getHistory: async (...a) => (await feed.getHistory(...a)).filter((c) => c.time <= cut),
+    };
+    const setup = await prepareTrendFilter(stops, "ETH-EUR", DEFAULT_ENSEMBLE_CONFIG, from, NOW);
+    expect(setup.note).toBe(
+      "Trendfilter: Koersdata voor het marktfilter (BTC-EUR) loopt maar tot 25 september 2026 — daarna koopt de test niet (voor de zekerheid).",
+    );
+    expect(setup.lines[1]).toBe(
+      "Nu: Bitcoin (BTC-EUR): koersdata verouderd (laatste koers van 24 september 2026), gemiddelde van 50 dagen onbekend",
+    );
   });
 });
 

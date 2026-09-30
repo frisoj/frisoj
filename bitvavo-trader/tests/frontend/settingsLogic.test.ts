@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_ENGINE_CONFIG, MAX_MARKETS } from "../../src/core/defaults";
+import { EXCLUDED_BASES } from "../../src/engine/universe";
 import { loadPublic, type Fake } from "./helpers";
 
 let L: Fake;
@@ -370,6 +374,60 @@ describe("v2: status van de muntkeuze", () => {
   });
 });
 
+describe("ronde 5: mislukte automatische muntkeuze is een waarschuwing (UI-3)", () => {
+  const at = new Date(2026, 8, 30, 14, 5).getTime();
+  const fail =
+    "Automatische muntkeuze mislukt: Bitvavo-fout bij GET /ticker/24h: fake — de bot gebruikt je eigen lijst (3 markten)";
+  const snap = (universe: Fake) => ({
+    config: { ...cfg(), universe: { mode: "auto", count: 30, minVolumeEur: 250_000 } },
+    activeMarkets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
+    universe,
+  });
+
+  it("mislukt vóór de eerste keuze (updatedAt null): waarschuwing, geen 'zodra hij draait'", () => {
+    const s = L.universeStatus(snap({ mode: "auto", count: 3, requested: 30, updatedAt: null, note: fail }), "auto", fmt, at);
+    expect(s.text).toBe("Nu actief: 3 munten");
+    expect(s.note).toBe(fail);
+    expect(s.detail).toBe("");
+  });
+
+  it("opgeslagen keuze na een herstart: gewone status (ook met updatedAt), 'Je vroeg er …' blijft staan", () => {
+    const saved = "Opgeslagen automatische keuze; de bot kiest opnieuw zodra hij draait";
+    const s = L.universeStatus(snap({ mode: "auto", count: 20, requested: 30, updatedAt: at, note: saved }), "auto", fmt, at);
+    expect(s.note).toBe("");
+    expect(s.detail).toContain("Je vroeg er 30, maar er voldoen er nu maar 20");
+    expect(s.detail).toContain(saved);
+    const first = "Nog geen automatische keuze gemaakt: de bot gebruikt voorlopig je eigen lijst";
+    expect(L.universeStatus(snap({ mode: "auto", count: 3, requested: 30, updatedAt: null, note: first }), "auto", fmt, at)).toMatchObject({
+      detail: first,
+      note: "",
+    });
+  });
+
+  it("isPlainUniverseNote kent precies de twee statuszinnen van de engine", () => {
+    expect(L.isPlainUniverseNote("Nog geen automatische keuze gemaakt: de bot gebruikt voorlopig je eigen lijst")).toBe(true);
+    expect(L.isPlainUniverseNote("  Opgeslagen automatische keuze; de bot kiest opnieuw zodra hij draait")).toBe(true);
+    expect(L.isPlainUniverseNote(fail)).toBe(false);
+    expect(L.isPlainUniverseNote("Maar 12 munten voldoen aan de filters (…); gevraagd: 30")).toBe(false);
+    expect(L.isPlainUniverseNote("")).toBe(false);
+    expect(L.isPlainUniverseNote(undefined)).toBe(false);
+  });
+
+  it("zelfde teksten als de engine (src/engine/tradingEngine.ts)", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../src/engine/tradingEngine.ts"), "utf8");
+    // de statuszinnen van universeView → gewone status
+    for (const lead of ["Opgeslagen automatische keuze", "Nog geen automatische keuze gemaakt"]) {
+      const m = new RegExp(`"(${lead}[^"]*)"`).exec(src);
+      expect(m, lead).not.toBeNull();
+      expect(L.isPlainUniverseNote(m![1])).toBe(true);
+    }
+    // de andere uitleg (mislukt / te weinig munten) → waarschuwing
+    const other = [...src.matchAll(/this\.universeNote\s*=[^;`"]*[`"]([^`"$]+)/g)].map((m) => m[1]);
+    expect(other).toEqual(expect.arrayContaining(["Maar ", "Automatische muntkeuze mislukt: "]));
+    for (const t of other) expect(L.isPlainUniverseNote(t), t).toBe(false);
+  });
+});
+
 describe("v2: chips en 'Alle markten toevoegen'", () => {
   const many = Array.from({ length: 45 }, (_, i) => `C${String(i).padStart(2, "0")}-EUR`);
 
@@ -390,5 +448,51 @@ describe("v2: chips en 'Alle markten toevoegen'", () => {
     expect(r.markets.slice(0, 3)).toEqual(["A5-EUR", "X-EUR", "A0-EUR"]);
     expect(new Set(r.markets).size).toBe(400);
     expect(L.addAllMarkets(["A0-EUR"], ["A0-EUR", "A1-EUR"])).toEqual({ markets: ["A0-EUR", "A1-EUR"], added: 1 });
+  });
+});
+
+describe("ronde 5: 'Alle markten toevoegen' zoals de automatische keuze (UI-6)", () => {
+  it("EXCLUDED_BASES is gelijk aan die van de engine (src/engine/universe.ts)", () => {
+    expect([...L.EXCLUDED_BASES].sort()).toEqual([...EXCLUDED_BASES].sort());
+    expect(L.isExcludedMarket("USDC-EUR")).toBe(true);
+    expect(L.isExcludedMarket("paxg-eur")).toBe(true);
+    expect(L.isExcludedMarket("WBTC-EUR")).toBe(true);
+    expect(L.isExcludedMarket("BTC-EUR")).toBe(false);
+  });
+
+  it("slaat stablecoins, goud en verpakte munten over; al gekozen exemplaren blijven staan", () => {
+    const all = ["BTC-EUR", "USDC-EUR", "ETH-EUR", "PAXG-EUR", "WBTC-EUR", "EURC-EUR", "SOL-EUR"];
+    expect(L.addAllMarkets([], all)).toEqual({ markets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"], added: 3 });
+    expect(L.addAllMarkets(["USDT-EUR"], all)).toEqual({ markets: ["USDT-EUR", "BTC-EUR", "ETH-EUR", "SOL-EUR"], added: 3 });
+  });
+
+  it("volgorde: meeste handel eerst, dan onbekend (populair, naam), dan te weinig handel, stablecoins achteraan", () => {
+    const markets = ["AAA-EUR", "ILQ-EUR", "USDC-EUR", "ZZZ-EUR", "ETH-EUR", "BTC-EUR", "MID-EUR", "PAXG-EUR", "NEW-EUR"];
+    const volumes = { "ZZZ-EUR": 9e6, "MID-EUR": 1e6, "ILQ-EUR": 20_000, "BTC-EUR": 5e8, "USDC-EUR": 5e7 };
+    const order = L.orderMarketsForAdding(markets, { volumes, popular: ["BTC", "ETH"], minVolume: 250_000 });
+    expect(order).toEqual(["BTC-EUR", "ZZZ-EUR", "MID-EUR", "ETH-EUR", "AAA-EUR", "NEW-EUR", "ILQ-EUR", "PAXG-EUR", "USDC-EUR"]);
+    // ook met een Map; zonder minimum telt elk bekend volume; de rest op naam
+    expect(L.orderMarketsForAdding(markets.slice(0, 6), { volumes: new Map([["ILQ-EUR", 5]]) })).toEqual([
+      "ILQ-EUR",
+      "AAA-EUR",
+      "BTC-EUR",
+      "ETH-EUR",
+      "ZZZ-EUR",
+      "USDC-EUR",
+    ]);
+    expect(L.orderMarketsForAdding(null)).toEqual([]);
+  });
+
+  it("met 435 markten en de 400-grens vallen de minst verhandelde munten af, niet de laatste in het alfabet", () => {
+    const liquid = Array.from({ length: 420 }, (_, i) => `Z${String(i + 1).padStart(3, "0")}X-EUR`);
+    const illiquid = Array.from({ length: 10 }, (_, i) => `ILQ${i + 1}-EUR`);
+    const stable = ["USDC-EUR", "USDT-EUR", "EURC-EUR", "PAXG-EUR", "WBTC-EUR"];
+    const volumes: Record<string, number> = {};
+    liquid.forEach((m, i) => (volumes[m] = 8e8 / (i + 1)));
+    illiquid.forEach((m) => (volumes[m] = 20_000));
+    const all = L.orderMarketsForAdding([...stable, ...illiquid, ...liquid].sort(), { volumes, minVolume: 250_000 });
+    const r = L.addAllMarkets([], all);
+    expect(r.added).toBe(400);
+    expect(r.markets).toEqual(liquid.slice(0, 400));
   });
 });

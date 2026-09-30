@@ -14,6 +14,11 @@ export function unsellableWhy(p) {
 
 /** Beursminimum per order als de server geen bedrag noemt (EXCHANGE_MIN_ORDER_QUOTE) */
 const EXCHANGE_MIN_EUR = 5;
+/**
+ * Zoveel tekens (stop + doel samen) passen naast elkaar onder de balk van 124 px
+ * (monospace 10,5 px ≈ 6,3 px per teken, met wat ruimte ertussen); meer → doel op een tweede regel.
+ */
+export const RANGE_LABEL_CHARS = 17;
 
 const posValue = (p) => (Number(p && p.amount) || 0) * (Number(p && p.currentPrice) || 0);
 
@@ -146,16 +151,21 @@ export function mountTables(ctx, { positionsEl, tradesEl }) {
   function rangeBar(p, trailing) {
     const stop = p.stopPrice;
     const tp = p.takeProfitPrice;
+    const stopTxt = `${fmt.price(stop)}${trailing ? " ↑" : ""}`;
+    const tpTxt = fmt.price(tp);
     const labels = `<span class="lbl l neg" title="${trailing ? "Stop is meegeschoven (trailing/break-even)" : "Stop-loss"}">${esc(
-      fmt.price(stop),
-    )}${trailing ? " ↑" : ""}</span><span class="lbl r pos" title="Doel (take-profit)">${esc(fmt.price(tp))}</span>`;
-    if (!isNum(stop) || !isNum(tp) || tp <= stop) return `<div class="rangebar no-bar">${labels}</div>`;
+      stopTxt,
+    )}</span><span class="lbl r pos" title="Doel (take-profit)">${esc(tpTxt)}</span>`;
+    // Passen de twee getallen niet naast elkaar (kleine munten: 0,00104874 en 0,00114085), dan het
+    // doel op een tweede regel; anders lopen ze in elkaar over
+    const tight = stopTxt.length + tpTxt.length > RANGE_LABEL_CHARS ? " tight" : "";
+    if (!isNum(stop) || !isNum(tp) || tp <= stop) return `<div class="rangebar no-bar${tight}">${labels}</div>`;
     const span = tp - stop;
     const clamp = (x) => Math.max(0, Math.min(100, x));
     const now = clamp(((p.currentPrice - stop) / span) * 100);
     const entry = clamp(((p.entryPrice - stop) / span) * 100);
     const cls = p.currentPrice >= p.entryPrice ? "pos" : "neg";
-    return `<div class="rangebar" title="Koers tussen stop (${esc(fmt.price(stop))}) en doel (${esc(fmt.price(tp))}): ${Math.round(now)}%">
+    return `<div class="rangebar${tight}" title="Koers tussen stop (${esc(fmt.price(stop))}) en doel (${esc(fmt.price(tp))}): ${Math.round(now)}%">
       <div class="track"></div>
       <div class="entry" style="left:${entry.toFixed(1)}%" title="Entry"></div>
       <div class="now ${cls}" style="left:${now.toFixed(1)}%"></div>

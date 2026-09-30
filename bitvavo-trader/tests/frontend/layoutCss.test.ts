@@ -101,3 +101,41 @@ describe("panels.css (ronde 4: zijbalk Backtest-lab)", () => {
     expect(sticky).toContain("top: calc(var(--header-h) + 12px)");
   });
 });
+
+describe("base.css (ronde 5: kopbalk tussen 901 en 1279 px, bijv. iPad liggend) — UI-9", () => {
+  const MID = "(min-width: 901px) and (max-width: 1279px)";
+  const NARROW = "(min-width: 901px) and (max-width: 1120px)";
+
+  it("901–1279 px: menu zonder iconen, 'Reset oefengeld' alleen als icoon (Noodstop blijft in beeld)", () => {
+    expect(rule(".nav-tabs button svg", MID)).toContain("display: none");
+    expect(rule(".nav-tabs button", MID)).toContain("padding: 0 8px");
+    expect(rule(".bot-controls .btn .lbl-long", MID)).toContain("display: none");
+  });
+
+  it("901–1120 px: ook de merknaam weg en van de verbinding alleen de stip (tekst blijft voor schermlezers)", () => {
+    expect(rule(".brand-text", NARROW)).toContain("display: none");
+    const conn = rule(".conn .conn-text", NARROW);
+    expect(conn).toContain("position: absolute");
+    expect(conn).toContain("clip-path: inset(50%)");
+    expect(conn).not.toContain("display: none");
+  });
+
+  it("de knop 'Reset oefengeld' heeft een aria-label (het label kan verborgen zijn)", () => {
+    const header = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../public/js/header.js"), "utf8");
+    expect(header).toMatch(/data-act="reset"[^>]*aria-label="Reset oefengeld"/);
+  });
+
+  it("stop/doel onder de balk: klasse tight zet het doel op een tweede regel (niet in de kaartweergave)", () => {
+    expect(rule(".rangebar.tight")).toContain("height: 46px");
+    expect(rule(".rangebar.tight .lbl.r")).toContain("top: 31px");
+    expect(css).toMatch(/@media \(max-width: 600px\) \{[^@]*\.rangebar\.tight \.lbl\.r \{\s*top: 18px;/);
+  });
+});
+
+describe("panels.css (ronde 5)", () => {
+  const panels = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../public/css/panels.css"), "utf8");
+  it("mislukte muntkeuze: gele stip; lange eenheid ('blokken van 4 uur') krijgt ruimte naast de pijltjes", () => {
+    expect(panels).toMatch(/\.st-uni-now\.is-warn \.st-uni-dot \{[^}]*background: var\(--yellow\)/);
+    expect(panels).toMatch(/\.st-input-wrap\.has-long-unit \.input \{[^}]*padding-right: 132px/);
+  });
+});

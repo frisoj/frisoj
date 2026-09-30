@@ -664,7 +664,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
       <button type="button" class="btn btn-success" data-act="start" title="Start de bot">${I.play}<span>Start</span></button>
       <button type="button" class="btn" data-act="stop" title="Stop de bot (posities blijven open)">${I.pause}<span>Stop</span></button>
       <button type="button" class="btn btn-danger" data-act="kill" title="Verkoop alles direct en stop de bot">${I.kill}<span>Noodstop</span></button>
-      <button type="button" class="btn btn-ghost" data-act="reset" title="Zet het oefenaccount terug naar het startkapitaal">${I.reset}<span class="lbl-long">Reset oefengeld</span></button>`;
+      <button type="button" class="btn btn-ghost" data-act="reset" title="Zet het oefenaccount terug naar het startkapitaal" aria-label="Reset oefengeld">${I.reset}<span class="lbl-long">Reset oefengeld</span></button>`;
     controlsEl.addEventListener("click", (e) => {
       const b = e.target.closest("[data-act]");
       if (!b || b.disabled || busy) return;

@@ -2356,6 +2356,10 @@
 .st-input-wrap .input {
   padding-right: 72px;
 }
+/* Lange eenheid ("blokken van 4 uur"): meer ruimte, zodat de pijltjes van het getalveld er niet overheen vallen */
+.st-input-wrap.has-long-unit .input {
+  padding-right: 132px;
+}
 .st-input-wrap .select {
   width: 100%;
 }
@@ -2873,6 +2877,11 @@
   border-radius: 50%;
   background: var(--green);
   box-shadow: 0 0 0 3px var(--green-bg);
+}
+/* Automatische muntkeuze met een waarschuwing (bijv. mislukt): geel, niet groen */
+.st-uni-now.is-warn .st-uni-dot {
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yellow) 18%, transparent);
 }
 .st-uni-list {
   font-size: 12px;

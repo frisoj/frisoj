@@ -516,3 +516,37 @@ describe("afschrijven: bezig-status en weigering omdat de positie weer verkoopba
     expect(h.body()).not.toContain("disabled");
   });
 });
+
+describe("open posities: stop en doel lopen niet in elkaar over (ronde 5, UI-8)", () => {
+  it("kleine munt (0,00104874 / 0,00114085): doel op een tweede regel (klasse tight); gewone munt niet", async () => {
+    const tiny = pos({
+      id: "pos_t",
+      market: "PEPE-EUR",
+      entryPrice: 0.00108,
+      currentPrice: 0.00107,
+      stopPrice: 0.00104874,
+      initialStopPrice: 0.00104874,
+      takeProfitPrice: 0.00114085,
+      highestPrice: 0.00109,
+    });
+    const h = await mount({ mode: "paper", running: true, positions: [pos(), tiny], trades: [] });
+    const html = norm(h.body());
+    const bars = [...html.matchAll(/<div class="(rangebar[^"]*)"/g)].map((m) => m[1]);
+    expect(bars).toEqual(["rangebar", "rangebar tight"]);
+    expect(html).toMatch(/<span class="lbl l neg"[^>]*>0,00104874<\/span><span class="lbl r pos"[^>]*>0,00114085<\/span>/);
+    // de grens past bij de balk van 124 px (monospace 10,5 px ≈ 6,3 px per teken)
+    const { RANGE_LABEL_CHARS } = await loadPublic("js/tables.js");
+    expect(RANGE_LABEL_CHARS * 6.3 + 6).toBeLessThanOrEqual(124);
+    expect("0,12345 ↑".length + "0,13456".length).toBeLessThanOrEqual(RANGE_LABEL_CHARS); // centmunt met ↑: naast elkaar
+  });
+
+  it("zonder balk (doel ontbreekt of ligt onder de stop) werkt het ook", async () => {
+    const h = await mount({
+      mode: "paper",
+      running: true,
+      positions: [pos({ stopPrice: 0.00104874, takeProfitPrice: 0.00101, entryPrice: 0.00108, currentPrice: 0.00107 })],
+      trades: [],
+    });
+    expect(norm(h.body())).toContain('<div class="rangebar no-bar tight">');
+  });
+});

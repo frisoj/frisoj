@@ -28,7 +28,9 @@
  *   before the risk manager: the trend filter (`ensemble.trendFilter`, only
  *   with `trendCandles`; evaluated at the moment the entry would be executed,
  *   `decision.time + interval` — only trend candles CLOSED at that moment
- *   count, so no lookahead), then the spread limit (`risk.maxSpreadPct`).
+ *   count, so no lookahead; when the trend candle that closed last before
+ *   that moment is missing, the data is stale = unknown = blocked, the
+ *   engine's rule), then the spread limit (`risk.maxSpreadPct`).
  *   Blocked buys are counted in `result.blockedEntries`. The trend filter is
  *   the one pure helper imported from the strategy modules
  *   (`src/strategies/trendFilter.ts`, shared with the live engine).
@@ -110,10 +112,25 @@ function pctNl(v: number, decimals: number): string {
   return `${v.toFixed(decimals).replace(".", ",")}%`;
 }
 
-/** Dutch `note` when the spread limit blocks every entry, e.g. "… (0,62%) is groter dan je maximum (0,30%)." */
+/** Fewest decimals (2..6) that show `v` exactly, so a small limit like 0.001 is not shown as "0,00%". */
+function decimalsFor(v: number): number {
+  for (let d = 2; d < 6; d++) if (Math.abs(Number(v.toFixed(d)) - v) < 1e-12) return d;
+  return 6;
+}
+
+/**
+ * Dutch `note` when the spread limit blocks every entry, e.g. "… (0,62%) is groter dan je maximum (0,30%)."
+ * The maximum is shown exactly (never "0,00%" for a small nonzero limit); the spread gets extra decimals
+ * while both would look equal, and when they still do, the sentence says "net groter" without a spread number.
+ */
 export function spreadBlockedNote(spreadPercent: number, maxSpreadPct: number): string {
-  let d = 2;
-  while (d < 4 && spreadPercent.toFixed(d) === maxSpreadPct.toFixed(d)) d++;
+  const base = decimalsFor(maxSpreadPct);
+  const cap = Math.max(4, base + 2);
+  let d = base;
+  while (d < cap && spreadPercent.toFixed(d) === maxSpreadPct.toFixed(d)) d++;
+  if (spreadPercent.toFixed(d) === maxSpreadPct.toFixed(d)) {
+    return `Geen aankopen: de spread van deze markt is net groter dan je maximum (${pctNl(maxSpreadPct, base)}).`;
+  }
   return `Geen aankopen: de spread van deze markt (${pctNl(spreadPercent, d)}) is groter dan je maximum (${pctNl(maxSpreadPct, d)}).`;
 }
 
@@ -615,8 +632,10 @@ export function simulate(
       // Gates first (like the engine): trend filter, then spread, then the risk plan in tryEntry.
       // The trend is judged at the moment this entry would be executed: the close of the
       // signal candle = the open of this candle (only trend candles closed by then count).
+      // Trend data without the trend candle that closed last before that moment (a gap
+      // without trades, data that stops early) counts as unknown → no buy, like the engine.
       const atMs = (Number.isFinite(prev.time) ? prev.time : candles[i - 1].time) + intervalMs;
-      if (gates.trend && !trendGate(gates.trend, trendData, atMs, market).allowed) {
+      if (gates.trend && !trendGate(gates.trend, trendData, atMs, market, { rejectStale: true }).allowed) {
         blocked.trend++;
       } else if (gates.spreadBlocks) {
         blocked.spread++;

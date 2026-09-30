@@ -23,6 +23,8 @@ import {
   universeStatus,
   chipsView,
   addAllMarkets,
+  orderMarketsForAdding,
+  isExcludedMarket,
   trendPeriodUnit,
 } from "./settingsLogic.js";
 
@@ -121,7 +123,7 @@ export function mountSettings(ctx, el) {
     const id = `st-${path.replace(/\./g, "-")}`;
     return `<div class="st-field ${state.invalid.has(path) ? "is-invalid" : ""}" data-field="${esc(path)}">
       <label for="${id}">${esc(label)}${zeroOff ? ' <span class="muted st-off">0 = uit</span>' : ""}</label>
-      <div class="st-input-wrap">
+      <div class="st-input-wrap${String(unit || "").length > 10 ? " has-long-unit" : ""}">
         <input id="${id}" class="input mono ${state.invalid.has(path) ? "invalid" : ""}" type="number" inputmode="decimal"
           data-path="${esc(path)}" data-key="${esc(key || path.split(".").pop())}" data-scale="${scale}"
           step="${step}" ${min !== undefined ? `min="${min}"` : ""} ${max !== undefined ? `max="${max}"` : ""} value="${esc(String(shown))}">
@@ -238,7 +240,9 @@ export function mountSettings(ctx, el) {
         ? `<details class="st-uni-list"><summary>Welke munten?</summary><div class="st-uni-names mono">${esc(act.map(base).join(", "))}</div></details>`
         : "";
     return (
-      (st.text ? `<div class="st-uni-now"><span class="st-uni-dot" aria-hidden="true"></span><b>${esc(st.text)}</b>${list}</div>` : "") +
+      (st.text
+        ? `<div class="st-uni-now${st.note ? " is-warn" : ""}"><span class="st-uni-dot" aria-hidden="true"></span><b>${esc(st.text)}</b>${list}</div>`
+        : "") +
       (st.detail ? `<div class="st-help">${esc(st.detail)}</div>` : "") +
       (st.note ? `<div class="pn-banner pn-banner-warn st-uni-note">${esc(st.note)}</div>` : "") +
       (st.pending ? `<div class="st-uni-pending">${esc(st.pending)}</div>` : "")
@@ -282,13 +286,24 @@ export function mountSettings(ctx, el) {
       </div>`;
   }
 
-  /** Alle bekende markten, populairste eerst (zelfde volgorde als de knoppen om toe te voegen) */
+  /** 24u-volume per markt voor zover bekend: uit /api/markets (als de server het meestuurt) en de radar */
+  function knownVolumes() {
+    const v = new Map();
+    for (const m of state.markets) if (m && Number.isFinite(m.volumeQuote24h)) v.set(m.market, m.volumeQuote24h);
+    const radar = Array.isArray(state.snap?.radar) ? state.snap.radar : [];
+    for (const r of radar) if (r && typeof r.market === "string" && Number.isFinite(r.volumeQuote24h)) v.set(r.market, r.volumeQuote24h);
+    return v;
+  }
+
+  /**
+   * Alle bekende markten, meeste handel eerst (waar bekend), dan de bekende grote munten;
+   * stablecoins, goud en verpakte munten achteraan (zelfde volgorde als de knoppen om toe te voegen)
+   */
   function orderedMarkets() {
-    const rank = (m) => {
-      const i = POPULAR.indexOf(base(m));
-      return i < 0 ? 999 : i;
-    };
-    return state.markets.map((m) => m.market).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    return orderMarketsForAdding(
+      state.markets.map((m) => m.market),
+      { volumes: knownVolumes(), popular: POPULAR, minVolume: Number(state.draft?.universe?.minVolumeEur) || 0 },
+    );
   }
 
   function chipsHtml() {
@@ -330,7 +345,8 @@ export function mountSettings(ctx, el) {
     const serverAuto = state.server?.universe?.mode === "auto";
     const copyN = act ? Math.min(act.length, MAX_MARKETS) : 0;
     const canCopy = serverAuto && copyN > 0 && stable(act.slice(0, MAX_MARKETS)) !== stable(sel);
-    return `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-all" ${n ? "" : "disabled"}>Alle markten toevoegen (${n})</button>
+    return `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-all" ${n ? "" : "disabled"}
+        title="Meeste handel eerst; zonder stablecoins, goud- en verpakte munten (net als Automatisch)">Alle markten toevoegen (${n})</button>
       <button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-clear" ${sel.length ? "" : "disabled"}>Alles wissen</button>
       ${canCopy ? `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-copy-active" title="Vervang je lijst door de munten die de bot nu automatisch volgt">Neem de ${copyN} munten van de automatische keuze over</button>` : ""}`;
   }
@@ -1001,10 +1017,20 @@ CAPITAL_LIMIT_EUR=50`;
       state.chipsExpanded = d.act === "chips-more";
       renderMarketLists();
     } else if (d.act === "markets-all") {
-      const r = addAllMarkets(state.draft.markets, orderedMarkets(), MAX_MARKETS);
+      const all = orderedMarkets();
+      const r = addAllMarkets(state.draft.markets, all, MAX_MARKETS);
       if (!r.added) return;
+      const had = new Set(state.draft.markets || []);
+      const skipped = all.filter((m) => !had.has(m) && isExcludedMarket(m)).length;
       setMarkets(r.markets);
-      ctx.toast(`${r.added} ${r.added === 1 ? "munt" : "munten"} toegevoegd (${r.markets.length}/${MAX_MARKETS}). Klik op Opslaan om het te bewaren.`, "info");
+      ctx.toast(
+        `${r.added} ${r.added === 1 ? "munt" : "munten"} toegevoegd (${r.markets.length}/${MAX_MARKETS}), meeste handel eerst.` +
+          (skipped
+            ? ` Overgeslagen, net als bij Automatisch: ${skipped} ${skipped === 1 ? "stablecoin, goud- of verpakte munt" : "stablecoins, goud- en verpakte munten"}.`
+            : "") +
+          " Klik op Opslaan om het te bewaren.",
+        "info",
+      );
     } else if (d.act === "markets-clear") {
       state.chipsExpanded = false;
       setMarkets([]);

@@ -698,3 +698,84 @@ describe("BitvavoClient: rate limit apart voor publiek en privé (reserve voor o
     expect(client.clockOffsetMs).toBe(0);
   });
 });
+
+describe("BitvavoClient: opties per publiek verzoek (ronde 5: snel opgeven, voorrang voor posities)", () => {
+  const path = (c: Call) => new URL(c.url).pathname;
+  const limitHeaders = (remaining: number, resetAt = NOW + 30_000) => ({
+    "bitvavo-ratelimit-remaining": String(remaining),
+    "bitvavo-ratelimit-resetat": String(resetAt),
+    "bitvavo-ratelimit-limit": "1000",
+  });
+
+  it("retries: 0 → geen herhaling bij een serverfout (standaard wel twee)", async () => {
+    const { calls, fetchImpl } = mockFetch(() => ({ status: 503, raw: "" }));
+    const client = makeClient(fetchImpl);
+    await expect(client.candles("BTC-EUR", "15m", { limit: 5 }, { retries: 0 })).rejects.toBeInstanceOf(BitvavoApiError);
+    expect(calls).toHaveLength(1);
+    await expect(client.candles("BTC-EUR", "15m", { limit: 5 })).rejects.toBeInstanceOf(BitvavoApiError);
+    expect(calls).toHaveLength(4);
+  });
+
+  it("noWait: bij een bijna lege publieke reserve meteen een rate-limit-fout, zonder verzoek en zonder te wachten", async () => {
+    sleeps.length = 0;
+    const { calls, fetchImpl } = mockFetch(() => ({ body: [], headers: limitHeaders(30) }));
+    const client = makeClient(fetchImpl);
+    await client.markets(); // publiek: 30 over (< 50)
+    const err = await client.tickerPrice(undefined, { noWait: true }).catch((e) => e);
+    expect(err).toBeInstanceOf(BitvavoApiError);
+    expect(err.isRateLimit).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(sleeps).toEqual([]);
+    // Ook book / ticker24h / candles / markets kennen de optie
+    for (const call of [
+      () => client.book("BTC-EUR", 1, { noWait: true }),
+      () => client.ticker24h(undefined, { noWait: true }),
+      () => client.candles("BTC-EUR", "15m", { limit: 3 }, { noWait: true }),
+      () => client.markets({ noWait: true }),
+    ]) {
+      await expect(call()).rejects.toMatchObject({ kind: "rate-limit" });
+    }
+    expect(calls).toHaveLength(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("priority: mag de publieke reserve gebruiken tot de privé-ondergrens (10)", async () => {
+    sleeps.length = 0;
+    let left = 30;
+    const { calls, fetchImpl } = mockFetch(() => ({ body: [{ market: "BTC-EUR", price: "1" }], headers: limitHeaders(left) }));
+    const client = makeClient(fetchImpl);
+    await client.tickerPrice("BTC-EUR"); // 30 over
+    // Gewoon publiek verzoek zou wachten; met voorrang gaat hij meteen.
+    expect(await client.tickerPrice("BTC-EUR", { priority: true, noWait: true })).toEqual([{ market: "BTC-EUR", price: 1 }]);
+    expect(calls).toHaveLength(2);
+    expect(sleeps).toEqual([]);
+    left = 5;
+    await client.tickerPrice("BTC-EUR", { priority: true }); // 5 over (< 10)
+    await expect(client.tickerPrice("BTC-EUR", { priority: true, noWait: true })).rejects.toMatchObject({ kind: "rate-limit" });
+    expect(calls).toHaveLength(3);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("timeoutMs per verzoek (de melding noemt die tijd)", async () => {
+    const fetchImpl = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      })) as unknown as typeof fetch;
+    const client = makeClient(fetchImpl, { timeoutMs: 60_000 });
+    const started = Date.now();
+    const err = await client.tickerPrice(undefined, { timeoutMs: 20, retries: 0 }).catch((e) => e);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(err).toBeInstanceOf(BitvavoApiError);
+    expect(err.kind).toBe("timeout");
+    expect(err.message).toBe("Geen antwoord van Bitvavo binnen 0 s bij GET /ticker/price (timeout)");
+  });
+
+  it("de opties kunnen query, body of authenticatie niet overschrijven", async () => {
+    const { calls, fetchImpl } = mockFetch(() => ({ body: [] }));
+    const client = makeClient(fetchImpl);
+    await client.tickerPrice("ETH-EUR", { auth: true, query: { market: "X" } } as never);
+    expect(calls[0].url).toBe("https://api.bitvavo.com/v2/ticker/price?market=ETH-EUR");
+    expect(calls[0].headers["Bitvavo-Access-Key"]).toBeUndefined();
+    expect(path(calls[0])).toBe("/v2/ticker/price");
+  });
+});

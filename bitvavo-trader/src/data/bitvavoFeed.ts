@@ -15,10 +15,13 @@
  *   zonder markt (gewicht 1). Gelijktijdige aanroepen delen één verzoek en het
  *   resultaat wordt ~2 s hergebruikt. Fouten worden niet gecachet en gaan door
  *   naar de aanroeper.
+ * - Optioneel (buiten het MarketDataFeed-contract): een laatste argument
+ *   {@link FeedRequestOptions} per verzoek. De engine geeft dat mee; andere feeds
+ *   negeren het.
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BitvavoClient } from "../exchange/bitvavoClient";
+import type { BitvavoClient, PublicRequestOptions } from "../exchange/bitvavoClient";
 import {
   INTERVAL_MS,
   type Candle,
@@ -44,6 +47,35 @@ const MAX_PAGES = 2000;
 /** Is het gat tussen cache en verzoek groter dan dit aantal candles, dan niet overbruggen. */
 const MAX_GAP_CANDLES = 5 * PAGE_LIMIT;
 const CACHE_VERSION = 1;
+
+/** Timeout (ms) voor een `fast`-verzoek */
+export const FAST_REQUEST_TIMEOUT_MS = 5_000;
+
+/**
+ * Optioneel per verzoek (buiten het MarketDataFeed-contract; andere feeds negeren het):
+ * - `fast`: gegevens die ook een tick later kunnen, of waarvoor de bot een terugval heeft —
+ *   niet herhalen, korte timeout ({@link FAST_REQUEST_TIMEOUT_MS}) en niet wachten op de
+ *   rate limit (dan meteen een fout, zonder verzoek);
+ * - `priority`: koersen en candles van open posities (stop-loss) — mag een deel van de
+ *   publieke reserve gebruiken.
+ */
+export interface FeedRequestOptions {
+  fast?: boolean;
+  priority?: boolean;
+}
+
+/** Vertaalt de feed-opties naar client-opties (undefined = standaard van de client). */
+function clientOpts(req: FeedRequestOptions | undefined): PublicRequestOptions | undefined {
+  if (!req || typeof req !== "object") return undefined;
+  const out: PublicRequestOptions = {};
+  if (req.fast === true) {
+    out.retries = 0;
+    out.noWait = true;
+    out.timeoutMs = FAST_REQUEST_TIMEOUT_MS;
+  }
+  if (req.priority === true) out.priority = true;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 export interface BitvavoFeedOptions {
   /** Map voor de schijfcache met gesloten candles (optioneel). */
@@ -130,13 +162,13 @@ export class BitvavoFeed implements MarketDataFeed {
 
   // ─────────────── Markten ───────────────
 
-  async getMarkets(): Promise<MarketInfo[]> {
+  async getMarkets(req?: FeedRequestOptions): Promise<MarketInfo[]> {
     const now = this.nowFn();
     if (this.marketsCache && now - this.marketsCache.at < MARKETS_TTL_MS) return [...this.marketsCache.data];
     if (!this.marketsInflight) {
       this.marketsInflight = (async () => {
         try {
-          const data = await this.client.markets();
+          const data = await this.client.markets(clientOpts(req));
           this.marketsCache = { at: this.nowFn(), data };
           return data;
         } finally {
@@ -155,11 +187,11 @@ export class BitvavoFeed implements MarketDataFeed {
 
   // ─────────────── Candles ───────────────
 
-  async getCandles(market: string, interval: Interval, limit: number): Promise<Candle[]> {
+  async getCandles(market: string, interval: Interval, limit: number, req?: FeedRequestOptions): Promise<Candle[]> {
     intervalMs(interval);
     const n = Math.min(PAGE_LIMIT, Math.floor(Number(limit)));
     if (!(n >= 1)) return [];
-    const candles = await this.client.candles(market, interval, { limit: n });
+    const candles = await this.client.candles(market, interval, { limit: n }, clientOpts(req));
     const sorted = dedupeSort(candles ?? []);
     return sorted.length > n ? sorted.slice(sorted.length - n) : sorted;
   }
@@ -346,7 +378,7 @@ export class BitvavoFeed implements MarketDataFeed {
 
   // ─────────────── Tickers, prijs, orderboek ───────────────
 
-  async getTickers24h(markets?: string[]): Promise<Ticker24h[]> {
+  async getTickers24h(markets?: string[], req?: FeedRequestOptions): Promise<Ticker24h[]> {
     if (markets && markets.length === 0) return [];
     const now = this.nowFn();
     const fresh = (entry: { at: number } | null | undefined): boolean =>
@@ -358,11 +390,11 @@ export class BitvavoFeed implements MarketDataFeed {
       const market = markets[0];
       const cached = this.tickerOne.get(market);
       if (fresh(cached)) return copyTickers(cached!.data);
-      const one = (await this.client.ticker24h(market)).filter((t) => t.market === market);
+      const one = (await this.client.ticker24h(market, clientOpts(req))).filter((t) => t.market === market);
       this.tickerOne.set(market, { at: this.nowFn(), data: one });
       return copyTickers(one);
     } else {
-      all = await this.fetchAllTickers();
+      all = await this.fetchAllTickers(req);
     }
     if (!markets) return copyTickers(all);
     const wanted = new Set(markets);
@@ -370,11 +402,11 @@ export class BitvavoFeed implements MarketDataFeed {
   }
 
   /** Alle 24h-tickers; gelijktijdige verzoeken delen één API-call. */
-  private async fetchAllTickers(): Promise<Ticker24h[]> {
+  private async fetchAllTickers(req?: FeedRequestOptions): Promise<Ticker24h[]> {
     if (!this.tickersAllInflight) {
       this.tickersAllInflight = (async () => {
         try {
-          const data = await this.client.ticker24h();
+          const data = await this.client.ticker24h(undefined, clientOpts(req));
           this.tickersAll = { at: this.nowFn(), data };
           this.tickerOne.clear(); // de volledige lijst is nu de meest actuele bron
           return data;
@@ -386,8 +418,8 @@ export class BitvavoFeed implements MarketDataFeed {
     return this.tickersAllInflight;
   }
 
-  async getPrice(market: string): Promise<number> {
-    const list = await this.client.tickerPrice(market);
+  async getPrice(market: string, req?: FeedRequestOptions): Promise<number> {
+    const list = await this.client.tickerPrice(market, clientOpts(req));
     const hit = list.find((p) => p.market === market) ?? (list.length === 1 ? list[0] : undefined);
     if (!hit || !Number.isFinite(hit.price) || hit.price <= 0) {
       throw new Error(`Geen actuele prijs beschikbaar voor ${market}`);
@@ -401,14 +433,14 @@ export class BitvavoFeed implements MarketDataFeed {
    * één verzoek; het resultaat wordt ~2 s hergebruikt (klok van de feed). Een
    * fout wordt niet gecachet en gaat door naar de aanroeper.
    */
-  async getPrices(): Promise<Record<string, number>> {
+  async getPrices(req?: FeedRequestOptions): Promise<Record<string, number>> {
     const now = this.nowFn();
     const cached = this.pricesAll;
     if (cached && now - cached.at >= 0 && now - cached.at < PRICES_TTL_MS) return { ...cached.data };
     if (!this.pricesInflight) {
       this.pricesInflight = (async () => {
         try {
-          const list = await this.client.tickerPrice();
+          const list = await this.client.tickerPrice(undefined, clientOpts(req));
           const data: Record<string, number> = {};
           for (const p of Array.isArray(list) ? list : []) {
             if (!p || typeof p.market !== "string" || p.market === "") continue;
@@ -426,7 +458,7 @@ export class BitvavoFeed implements MarketDataFeed {
     return { ...(await this.pricesInflight) };
   }
 
-  async getOrderBook(market: string, depth?: number): Promise<OrderBook> {
-    return this.client.book(market, depth);
+  async getOrderBook(market: string, depth?: number, req?: FeedRequestOptions): Promise<OrderBook> {
+    return this.client.book(market, depth, clientOpts(req));
   }
 }

@@ -394,6 +394,17 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
 
 /**
+ * Uitleg van de engine (`snapshot.universe.note`) die gewone status is, geen waarschuwing:
+ * "Nog geen automatische keuze gemaakt…" en "Opgeslagen automatische keuze…" (zie
+ * universeView in src/engine/tradingEngine.ts). Al het andere (bijv. "Automatische
+ * muntkeuze mislukt: …" of "Maar 12 munten voldoen…") is een waarschuwing.
+ */
+export function isPlainUniverseNote(note) {
+  const n = String(note ?? "").trim();
+  return /^Nog geen automatische keuze\b/i.test(n) || /^Opgeslagen automatische keuze\b/i.test(n);
+}
+
+/**
  * Korte Nederlandse status van de muntkeuze uit de snapshot, bijv.
  * "Nu actief: 30 munten, gekozen om 14:05". `draftMode` = de stand in het
  * formulier: wijkt die af van de server, dan staat in `pending` wat er na
@@ -422,9 +433,16 @@ export function universeStatus(snap, draftMode, fmt, now = Date.now()) {
     }
   }
   if (u?.note) {
-    // Nog geen automatische keuze: de uitleg van de server is dan gewone status, geen waarschuwing
-    if ((u.mode ?? serverMode) === "auto" && !Number.isFinite(u.updatedAt)) out.detail = String(u.note);
-    else out.note = String(u.note);
+    // Nog geen (eigen) automatische keuze: die uitleg is gewone status. Een mislukte keuze is
+    // altijd een waarschuwing, ook vóór de eerste gelukte keuze.
+    if ((u.mode ?? serverMode) === "auto" && isPlainUniverseNote(u.note)) {
+      // (de standaardzin "maakt zijn eerste keuze…" vervangen, een "Je vroeg er …" houden)
+      out.detail = Number.isFinite(u.updatedAt) && out.detail ? `${out.detail} ${String(u.note)}` : String(u.note);
+    } else {
+      out.note = String(u.note);
+      // "maakt zijn eerste keuze zodra hij draait" klopt niet als hij het al probeerde en dat mislukte
+      if (!Number.isFinite(u.updatedAt)) out.detail = "";
+    }
   }
   if (serverMode && draftMode && draftMode !== serverMode) {
     out.pending =
@@ -449,8 +467,63 @@ export function chipsView(selected, { query = "", expanded = false, limit = CHIP
 }
 
 /**
+ * Kopie van EXCLUDED_BASES in src/engine/universe.ts (een test bewaakt dat ze gelijk blijven):
+ * stablecoins, goud-tokens en verpakte BTC/ETH. De automatische muntkeuze slaat ze over, en
+ * "Alle markten toevoegen" dus ook (los toevoegen via zoeken kan nog wel).
+ */
+export const EXCLUDED_BASES = new Set([
+  // stablecoins (dollar / euro)
+  "USDT", "USDC", "DAI", "TUSD", "BUSD", "USDP", "PYUSD", "FDUSD", "USDE", "USDS", "GUSD", "FRAX",
+  "LUSD", "USDD", "RLUSD", "USD1", "USDG", "EURC", "EURS", "EURT", "EUROC", "EURI", "EURR", "EUROP", "EURCV",
+  // goud-tokens
+  "PAXG", "XAUT",
+  // verpakte / liquid-staking varianten van BTC en ETH
+  "WBTC", "CBBTC", "WETH", "STETH", "WSTETH", "CBETH", "RETH", "WEETH",
+]);
+
+/** Symbool in hoofdletters: "usdc-eur" → "USDC" */
+const baseUpper = (m) => {
+  const s = String(m || "");
+  const i = s.indexOf("-");
+  return (i > 0 ? s.slice(0, i) : s).toUpperCase();
+};
+
+/** Stablecoin, goud-token of verpakte BTC/ETH? */
+export const isExcludedMarket = (market) => EXCLUDED_BASES.has(baseUpper(market));
+
+/**
+ * Volgorde van de markten om toe te voegen (knoppen en "Alle markten toevoegen"), zoals de
+ * automatische muntkeuze: meeste handel eerst.
+ * 1. 24u-volume bekend en minstens `minVolume` → hoog naar laag;
+ * 2. volume onbekend → de bekende grote munten (`popular`), dan op naam;
+ * 3. volume bekend maar onder `minVolume` (lastig te verhandelen) → hoog naar laag;
+ * 4. stablecoins, goud en verpakte munten → op naam.
+ * @param {string[]} markets
+ * @param {{ volumes?: Record<string, number> | Map<string, number> | null, popular?: string[], minVolume?: number }} o
+ */
+export function orderMarketsForAdding(markets, { volumes = null, popular = [], minVolume = 0 } = {}) {
+  const vol = (m) => {
+    const v = volumes instanceof Map ? volumes.get(m) : volumes ? volumes[m] : undefined;
+    return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
+  };
+  const min = Number.isFinite(minVolume) && minVolume > 0 ? minVolume : 0;
+  const pop = (m) => {
+    const i = popular.indexOf(baseUpper(m));
+    return i < 0 ? Infinity : i;
+  };
+  const tier = (m) => (isExcludedMarket(m) ? 3 : vol(m) === null ? 1 : vol(m) >= min ? 0 : 2);
+  const list = [...new Set((Array.isArray(markets) ? markets : []).filter((m) => typeof m === "string" && m))];
+  return list
+    .map((m) => ({ m, t: tier(m), v: vol(m), p: pop(m) }))
+    .sort((a, b) => a.t - b.t || (a.t === 0 || a.t === 2 ? b.v - a.v : 0) || (a.t === 1 ? a.p - b.p : 0) || a.m.localeCompare(b.m))
+    .map((x) => x.m);
+}
+
+/**
  * "Alle markten toevoegen": de eigen lijst plus alle nog niet gekozen markten
- * (in de volgorde van `all`), tot hoogstens `max`.
+ * (in de volgorde van `all`), tot hoogstens `max`. Stablecoins, goud en verpakte
+ * munten (EXCLUDED_BASES) worden overgeslagen, net als bij de automatische keuze;
+ * staan ze al in de eigen lijst, dan blijven ze staan.
  * @returns {{ markets: string[], added: number }}
  */
 export function addAllMarkets(selected, all, max = MAX_MARKETS) {
@@ -460,7 +533,7 @@ export function addAllMarkets(selected, all, max = MAX_MARKETS) {
   const extra = [];
   for (const m of all || []) {
     if (extra.length >= room) break;
-    if (!have.has(m)) {
+    if (!have.has(m) && !isExcludedMarket(m)) {
       have.add(m);
       extra.push(m);
     }
@@ -468,5 +541,5 @@ export function addAllMarkets(selected, all, max = MAX_MARKETS) {
   return { markets: [...cur, ...extra], added: extra.length };
 }
 
-/** Eenheid van de trendfilter-periode zoals de gebruiker hem ziet */
-export const trendPeriodUnit = (interval) => (interval === "4h" ? "× 4 uur" : "dagen");
+/** Eenheid van de trendfilter-periode zoals de gebruiker hem ziet ("80 blokken van 4 uur", zoals overal) */
+export const trendPeriodUnit = (interval) => (interval === "4h" ? "blokken van 4 uur" : "dagen");

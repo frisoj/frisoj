@@ -52,6 +52,11 @@
  *    rond is (of na `ENTRY_ROUND_MAX_WAIT_MS`) gaan de sterkste eerst, langs het
  *    trendfilter en de spreadlimiet, en dan door de bestaande `tryEntry`.
  *  - Koersen van alle markten komen (als de feed het kan) uit één verzoek (`getPrices`).
+ *  - Open posities gaan voor: hun candles worden elke tick als eerste opgehaald (met
+ *    voorrang op de publieke rate limit), optionele gegevens (muntkeuze, tickers,
+ *    marktfilter, markten beoordelen, orderboek) geven snel op en wachten nooit op de
+ *    rate limit, het beoordelen van markten heeft een tijdsbudget per tick, en duurt een
+ *    tick toch lang, dan worden de stops tussendoor opnieuw gecontroleerd.
  */
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -108,6 +113,7 @@ import {
   MAX_MARKETS,
 } from "../core/defaults";
 import { closedCandles, dayKey, newId } from "../core/util";
+import type { FeedRequestOptions } from "../data/bitvavoFeed";
 import { roundAmount } from "../exchange/precision";
 import { RiskManager } from "../risk/riskManager";
 import { runEnsemble } from "../strategies/ensemble";
@@ -136,7 +142,7 @@ import {
 } from "./format";
 import { rankCandidates, relativeStrengthPct, type EntryCandidate } from "./ranking";
 import type { StateStore } from "./stateStore";
-import { selectUniverse, tickerSpreadPct, type UniverseSelection } from "./universe";
+import { selectUniverse, spreadAboveLimit, tickerSpreadPct, type UniverseSelection } from "./universe";
 
 export type DecideFn = (market: string, candles: Candle[], cfg: EnsembleConfig) => EnsembleDecision[];
 export type CreateRiskFn = (cfg: RiskConfig, interval: Interval) => RiskManagerLike;
@@ -229,6 +235,29 @@ const LATE_CANDLE_WINDOW_MS = 30_000;
 const AUTO_UNIVERSE_MAX_AGE_MS = 24 * 3_600_000;
 /** Zoveel mislukte markten per tick nog afzonderlijk melden; daarboven één samenvattende regel */
 const FEED_LOG_DETAIL_MAX = 3;
+/**
+ * Het beoordelen van markten start geen nieuwe candle-verzoeken meer als het al zo lang
+ * (ms, of korter: pollMs) bezig is: de rest komt de volgende tick (trage beurs, veel munten).
+ */
+export const SCAN_TIME_BUDGET_MS = 10_000;
+/**
+ * Duurt een tick langer dan dit (ms, of korter: pollMs), dan controleert de bot de stops van
+ * open posities tussendoor opnieuw (één verzoek voor alle koersen), zodat een trage beurs of
+ * veel munten de stop-loss niet vertragen.
+ */
+export const HELD_RECHECK_MS = 10_000;
+/** Koersen van alle markten ophalen mislukt: pas na zo lang (ms) opnieuw (de posities gebruiken dan hun candles) */
+export const BULK_RETRY_MS = 30_000;
+/** Geschatte duur (ms) van een tick met veel munten, voor de waarschuwing "te veel munten voor dit interval" */
+const EST_TICK_MS = 3_000;
+/**
+ * Optionele gegevens (markten beoordelen, tickers, muntkeuze, trendfilter, spread): snel
+ * opgeven (BitvavoFeed: geen herhalingen, korte timeout, niet wachten op de rate limit).
+ * Andere feeds negeren dit extra argument.
+ */
+const FAST: FeedRequestOptions = { fast: true };
+/** Koersen en candles van open posities: ook snel, maar mag een deel van de publieke reserve gebruiken. */
+const POSITION: FeedRequestOptions = { fast: true, priority: true };
 /** Trendfilter zonder instellingen = uit */
 const NO_TREND_FILTER: TrendFilterConfig = {
   market: false,
@@ -332,7 +361,32 @@ interface Holding {
 /** Resultaat van candles ophalen voor één markt (gooit nooit) */
 type CandleFetch =
   | { market: string; interval: Interval; ok: true; candles: Candle[] }
-  | { market: string; interval: Interval; ok: false; error: string };
+  | {
+      market: string;
+      interval: Interval;
+      ok: false;
+      error: string;
+      /** Overgeslagen wegens de rate limit (niet verstuurd of 429): niet als mislukt tellen */
+      rateLimited?: boolean;
+    };
+
+/**
+ * De feed met het optionele laatste argument {@link FeedRequestOptions} (BitvavoFeed).
+ * Andere feeds negeren dat extra argument.
+ */
+interface FeedWithOptions {
+  getMarkets(req?: FeedRequestOptions): Promise<MarketInfo[]>;
+  getCandles(market: string, interval: Interval, limit: number, req?: FeedRequestOptions): Promise<Candle[]>;
+  getTickers24h(markets?: string[], req?: FeedRequestOptions): Promise<Ticker24h[]>;
+  getPrice(market: string, req?: FeedRequestOptions): Promise<number>;
+  getOrderBook(market: string, depth?: number, req?: FeedRequestOptions): Promise<OrderBook>;
+  getPrices?(req?: FeedRequestOptions): Promise<Record<string, number>>;
+}
+
+/** Weigerde de beurs (of de client vooraf) het verzoek wegens de rate limit? */
+function isRateLimited(err: unknown): boolean {
+  return !!err && typeof err === "object" && (err as { isRateLimit?: unknown }).isRateLimit === true;
+}
 
 /** Per markt: wanneer (voor welke ronde) de candles voor het laatst zijn opgehaald */
 interface ScanState {
@@ -410,6 +464,13 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
 
 function uniq(list: readonly string[]): string[] {
   return [...new Set(list)];
+}
+
+/** Beschikbaar + in orders van één munt in een saldolijst (0 als hij ontbreekt). */
+function heldIn(balances: readonly Balance[], base: string): number {
+  const b = balances.find((x) => x.symbol === base);
+  if (!b) return 0;
+  return (isNum(b.available) ? b.available : 0) + (isNum(b.inOrder) ? b.inOrder : 0);
 }
 
 function trendKey(tf: TrendFilterConfig): string {
@@ -802,6 +863,14 @@ export class TradingEngine extends EventEmitter {
   private entryRejection = new Map<string, string>();
   private lastRoundCompletedAt: number | null = null;
   private lastRoundCandidates = 0;
+  /** Laatste stop-controle van de open posities (tijdens een tick) */
+  private heldCheckedAt: number | null = null;
+  /** Laatste mislukte poging om alle koersen op te halen (daarna even niet opnieuw) */
+  private bulkFailedAt: number | null = null;
+  /** Live: markten die deze run al gecontroleerd zijn op coins die de bot niet beheert (null = nog niet gestart) */
+  private unmanagedChecked: Set<string> | null = null;
+  /** Live: saldo-opvraging daarvoor mislukt → niet vóór dit tijdstip opnieuw */
+  private unmanagedRetryAt: number | null = null;
 
   constructor(deps: EngineDeps) {
     super();
@@ -1492,24 +1561,28 @@ export class TradingEngine extends EventEmitter {
     await this.loadMarkets(false);
     this.refreshHalt();
 
-    // 1–4: muntkeuze, koersen, tickers, marktfilter. Elk stap vangt zijn eigen fouten:
-    // de posities hieronder moeten altijd bewaakt worden.
+    // 5. Eerst de markten met een positie (of een verkoop met onbekende uitkomst): elke tick,
+    // op volgorde, vóór alle optionele v2-gegevens hieronder — die mogen de stop-loss nooit
+    // vertragen (bijv. een beurs die op één verzoek blijft hangen).
+    const unchecked = await this.processHeld(this.activeMarkets(now), now);
+
+    // 1–4: muntkeuze, koersen, tickers, marktfilter. Elke stap vangt zijn eigen fouten.
     await this.refreshUniverse(now);
     const active = this.activeMarkets(now);
-    await this.refreshBulkPrices(active);
+    // Te veel munten voor interval + verversen: één keer melden (de radar toont het ook).
+    const capacity = this.capacityNote(active.length);
+    if (capacity) this.logThrottled("capacity", "warn", capacity, Number.POSITIVE_INFINITY);
+    else this.throttle.delete("capacity");
+    const bulk = await this.refreshBulkPrices(active);
+    // Candles van een positie niet opgehaald: dan de stop controleren met de verse koers van net.
+    if (bulk && unchecked.length > 0) await this.checkHeldAtPrices(unchecked, bulk, now);
+    // Live: nieuw gekozen munten ook controleren op coins die de bot niet beheert.
+    if (this.mode === "live" && this.tickWhileRunning) await this.checkUnmanagedNew(active, now);
     await this.refreshTickers(now);
     await this.refreshMarketFilter(now);
     const round = await this.beginRound(now);
-
-    // 5. Markten met een positie (of een verkoop met onbekende uitkomst): elke tick, op volgorde.
     const held = this.heldMarkets(active);
-    for (const market of held) {
-      try {
-        await this.processMarket(market, now);
-      } catch (err) {
-        this.log("error", `Fout bij verwerken van ${market}: ${errorMessage(err)}`);
-      }
-    }
+    await this.recheckHeld();
 
     // 6. Actieve markten die voor deze ronde nog beoordeeld moeten worden.
     try {
@@ -1517,6 +1590,7 @@ export class TradingEngine extends EventEmitter {
     } catch (err) {
       this.log("error", `Fout bij het beoordelen van de markten: ${errorMessage(err)}`);
     }
+    await this.recheckHeld();
 
     // 8. Kansenronde: de beste koopkandidaten eerst.
     try {
@@ -1524,6 +1598,98 @@ export class TradingEngine extends EventEmitter {
     } catch (err) {
       this.log("error", `Fout in de kansenronde: ${errorMessage(err)}`);
     }
+    await this.recheckHeld();
+  }
+
+  /**
+   * 5. Markten met een positie of een verkoop met onbekende uitkomst verwerken (candles →
+   * stops, exits). Geeft de positie-markten terug waarvan de candles nu niet opgehaald konden
+   * worden (die krijgen een stop-controle op alleen de koers, zie {@link checkHeldAtPrices}).
+   */
+  private async processHeld(active: readonly string[], now: number): Promise<string[]> {
+    const unchecked: string[] = [];
+    for (const market of this.heldMarkets(active)) {
+      let checked = false;
+      try {
+        checked = await this.processMarket(market, now);
+      } catch (err) {
+        this.log("error", `Fout bij verwerken van ${market}: ${errorMessage(err)}`);
+      }
+      if (!checked && this.positions.some((p) => p.market === market)) unchecked.push(market);
+    }
+    this.heldCheckedAt = this.nowFn();
+    return unchecked;
+  }
+
+  /**
+   * Stop-controle met alleen een actuele koers (de synthetische candle uit managePosition,
+   * zonder gesloten candles): voor posities waarvan de candles niet opgehaald konden worden,
+   * en tussendoor in een lange tick.
+   */
+  private async checkHeldAtPrices(markets: readonly string[], prices: Record<string, number>, now: number): Promise<void> {
+    for (const market of markets) {
+      const price = Object.hasOwn(prices, market) ? prices[market] : undefined;
+      if (!isNum(price) || price <= 0) continue;
+      for (const pos of this.positions.filter((p) => p.market === market)) {
+        try {
+          await this.managePosition(pos, [], new Map(), price, now);
+        } catch (err) {
+          this.log("error", `Fout bij het bewaken van ${market}: ${errorMessage(err)}`);
+        }
+      }
+    }
+  }
+
+  /** Na zoveel ms in een tick de stops opnieuw controleren (pollMs, hooguit {@link HELD_RECHECK_MS}). */
+  private heldRecheckMs(): number {
+    return Math.max(1_000, Math.min(this.config.pollMs, HELD_RECHECK_MS));
+  }
+
+  /**
+   * Duurt de tick lang (trage beurs, veel munten, orders), dan de open posities tussendoor
+   * opnieuw bewaken: met één verzoek voor alle koersen (stop op de actuele koers), of zonder
+   * `getPrices` via hun candles.
+   */
+  private async recheckHeld(): Promise<void> {
+    if (this.positions.length === 0) return;
+    const now = this.nowFn();
+    if (this.heldCheckedAt !== null && now - this.heldCheckedAt < this.heldRecheckMs()) return;
+    const markets = uniq(this.positions.map((p) => p.market));
+    try {
+      let all: Record<string, number> | null = null;
+      if (this.hasBulkPrices() && !this.bulkInBackoff(now)) {
+        try {
+          all = await this.io.getPrices!(POSITION);
+          this.bulkFailedAt = null;
+        } catch {
+          this.bulkFailedAt = this.nowFn();
+        }
+      }
+      if (all && typeof all === "object") {
+        for (const m of markets) {
+          const p = Object.hasOwn(all, m) ? all[m] : undefined;
+          if (isNum(p) && p > 0) this.prices[m] = p;
+        }
+        await this.checkHeldAtPrices(markets, all, this.nowFn());
+      } else {
+        // Geen koersen van alle markten: dan via de candles van die markten (zoals aan het begin van de tick).
+        for (const m of markets) await this.processMarket(m, this.nowFn());
+      }
+    } catch (err) {
+      this.logThrottled("recheck", "warn", `Tussentijdse stop-controle mislukt: ${errorMessage(err)} — de volgende tick probeert het opnieuw`);
+    } finally {
+      this.heldCheckedAt = this.nowFn();
+    }
+  }
+
+  /** Mislukte het ophalen van alle koersen kort geleden? Dan even niet opnieuw (trage of hangende beurs). */
+  private bulkInBackoff(now: number): boolean {
+    return this.bulkFailedAt !== null && now - this.bulkFailedAt >= 0 && now - this.bulkFailedAt < BULK_RETRY_MS;
+  }
+
+  /** De feed, met het optionele laatste argument voor verzoek-opties (zie {@link FeedWithOptions}). */
+  private get io(): FeedWithOptions {
+    return this.feed as unknown as FeedWithOptions;
   }
 
   private async afterTick(): Promise<void> {
@@ -1644,14 +1810,22 @@ export class TradingEngine extends EventEmitter {
     this.universeDirty = false;
     this.universeAttemptAt = now;
     const prevActive = this.activeMarkets(now);
-    let markets: MarketInfo[];
-    let tickers: Ticker24h[];
-    try {
-      [markets, tickers] = await Promise.all([this.feed.getMarkets(), this.feed.getTickers24h()]);
-    } catch (err) {
-      this.universeFailed(errorMessage(err), now);
+    const [mRes, tRes] = await Promise.allSettled([this.io.getMarkets(FAST), this.io.getTickers24h(undefined, FAST)]);
+    if (tRes.status === "rejected") {
+      // De tickers zijn net geprobeerd: stap 3 hoeft deze tick niet nóg eens te wachten.
+      this.tickersAt = now;
+      this.logThrottled(
+        "tickers",
+        "warn",
+        `24-uursgegevens van de markten niet opgehaald: ${errorMessage(tRes.reason)} — de bot gebruikt de vorige`,
+      );
+    }
+    if (mRes.status === "rejected" || tRes.status === "rejected") {
+      this.universeFailed(errorMessage(mRes.status === "rejected" ? mRes.reason : (tRes as PromiseRejectedResult).reason), now);
       return;
     }
+    const markets = mRes.value;
+    const tickers = tRes.value;
     if (Array.isArray(tickers) && tickers.length > 0) this.setTickers(tickers, now);
     // Instellingen kunnen tijdens het ophalen veranderd zijn: met de huidige kiezen.
     const cfg = this.config.universe;
@@ -1731,27 +1905,34 @@ export class TradingEngine extends EventEmitter {
 
   /**
    * 2. Koersen van alle actieve markten en posities in één verzoek (als de feed dat kan).
-   * Geen "price"-event per markt: de snapshot draagt ze.
+   * Geen "price"-event per markt: de snapshot draagt ze. Geeft de verse koersen terug
+   * (null = niet opgehaald).
    */
-  private async refreshBulkPrices(active: readonly string[]): Promise<void> {
-    if (!this.hasBulkPrices()) return;
+  private async refreshBulkPrices(active: readonly string[]): Promise<Record<string, number> | null> {
+    if (!this.hasBulkPrices()) return null;
+    // Kort geleden mislukt (bijv. een hangend verzoek): niet elke tick opnieuw laten wachten.
+    if (this.bulkInBackoff(this.nowFn())) return null;
     let all: Record<string, number>;
     try {
-      all = await this.feed.getPrices!();
+      // Met open posities is dit ook de terugval voor hun stop-controle.
+      all = await this.io.getPrices!(this.positions.length > 0 ? POSITION : FAST);
+      this.bulkFailedAt = null;
     } catch (err) {
+      this.bulkFailedAt = this.nowFn();
       this.logThrottled(
         "prices",
         "warn",
         `Koersen van alle markten niet opgehaald: ${errorMessage(err)} — de bot gebruikt de laatst bekende koersen`,
       );
-      return;
+      return null;
     }
-    if (!all || typeof all !== "object") return;
+    if (!all || typeof all !== "object") return null;
     for (const m of uniq([...active, ...this.positions.map((p) => p.market)])) {
       if (!Object.hasOwn(all, m)) continue;
       const price = all[m];
       if (isNum(price) && price > 0) this.prices[m] = price;
     }
+    return all;
   }
 
   private setTickers(list: readonly Ticker24h[], now: number): void {
@@ -1766,7 +1947,7 @@ export class TradingEngine extends EventEmitter {
     if (this.tickersAt !== null && now - this.tickersAt < TICKERS_REFRESH_MS) return;
     this.tickersAt = now;
     try {
-      const list = await this.feed.getTickers24h();
+      const list = await this.io.getTickers24h(undefined, FAST);
       if (Array.isArray(list) && list.length > 0) this.setTickers(list, now);
     } catch (err) {
       this.logThrottled(
@@ -1804,7 +1985,7 @@ export class TradingEngine extends EventEmitter {
   ): Promise<TrendCache> {
     const key = trendKey(tf);
     try {
-      const raw = await this.feed.getCandles(market, tf.interval, trendCandlesNeeded(tf));
+      const raw = await this.io.getCandles(market, tf.interval, trendCandlesNeeded(tf), FAST);
       const candles = closedCandles(sanitizeCandles(raw), tf.interval, now);
       return { key, candles, fetchedAt: now, attemptAt: now, error: null };
     } catch (err) {
@@ -1820,8 +2001,11 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
-   * Trendcandles die op `atMs` bruikbaar zijn: te oude data (meer dan één candle achter)
-   * telt als "geen data" — dan blokkeert het filter (voor de zekerheid niet kopen).
+   * Trendcandles die op `atMs` bruikbaar zijn. Ze moeten de candle bevatten die op `atMs`
+   * als laatste gesloten is (zoals in de backtest). Alleen vlak na het sluiten (binnen
+   * {@link TREND_RETRY_MS}) mag die nog ontbreken, en alleen als het laatste ophalen gelukt
+   * is (de beurs was nog niet bij). Mislukt ophalen of oudere data telt als "geen data" —
+   * dan blokkeert het filter (voor de zekerheid niet kopen).
    */
   private usableTrendCandles(cache: TrendCache | null | undefined, tf: TrendFilterConfig, atMs: number): Candle[] {
     if (!cache || cache.key !== trendKey(tf)) return [];
@@ -1829,7 +2013,19 @@ export class TradingEngine extends EventEmitter {
     const last = cache.candles[cache.candles.length - 1];
     if (!last || !isNum(ms)) return [];
     const expected = Math.floor(atMs / ms) * ms - ms;
-    return last.time >= expected - ms ? cache.candles : [];
+    if (last.time >= expected) return cache.candles;
+    const justClosed = atMs - (expected + ms) < TREND_RETRY_MS;
+    return last.time >= expected - ms && justClosed && cache.error === null ? cache.candles : [];
+  }
+
+  /**
+   * Uitleg als er wel trendcandles zijn, maar niet de nieuwste die op `atMs` gesloten is
+   * (bijv. ophalen mislukt na het sluiten), anders null.
+   */
+  private staleTrendText(who: string, cache: TrendCache | null | undefined, tf: TrendFilterConfig, atMs: number): string | null {
+    if (!cache || cache.key !== trendKey(tf) || cache.candles.length === 0) return null;
+    if (this.usableTrendCandles(cache, tf, atMs).length > 0) return null;
+    return `${who}: koersdata niet actueel, ${tf.interval === "1d" ? "de laatste dagcandle" : "het laatste blok van 4 uur"} ontbreekt`;
   }
 
   /** 4. Marktfilter: Bitcoin-candles verversen als er een nieuwe candle gesloten is. */
@@ -1866,14 +2062,29 @@ export class TradingEngine extends EventEmitter {
   /** Trendfilter voor een koop in `market` die op `atMs` uitgevoerd zou worden. */
   private async trendGateFor(market: string, tf: TrendFilterConfig, atMs: number, now: number): Promise<TrendGateResult> {
     const data: { market?: Candle[]; coin?: Candle[] } = {};
+    const withError = (cache: TrendCache | null | undefined): string =>
+      cache && cache.error !== null ? ` (ophalen mislukt: ${cache.error})` : "";
     if (tf.market) {
       data.market = this.usableTrendCandles(this.marketTrend, tf, atMs);
       // Blokkeert het marktfilter al, dan de munt niet ophalen.
       const first = trendGate({ ...tf, coin: false }, data, atMs, market);
+      if (!first.allowed) {
+        const stale = this.staleTrendText(`Bitcoin (${MARKET_FILTER_MARKET})`, this.marketTrend, tf, atMs);
+        if (stale) return { ...first, reason: `Marktfilter: ${stale}${withError(this.marketTrend)} — geen nieuwe aankopen` };
+      }
       if (!first.allowed || !tf.coin) return first;
     }
-    if (tf.coin) data.coin = this.usableTrendCandles(await this.coinTrendCache(market, tf, now), tf, atMs);
-    return trendGate(tf, data, atMs, market);
+    let coinCache: TrendCache | null = null;
+    if (tf.coin) {
+      coinCache = await this.coinTrendCache(market, tf, now);
+      data.coin = this.usableTrendCandles(coinCache, tf, atMs);
+    }
+    const gate = trendGate(tf, data, atMs, market);
+    if (!gate.allowed && tf.coin && gate.reason?.startsWith("Muntfilter")) {
+      const stale = this.staleTrendText(this.baseName(market), coinCache, tf, atMs);
+      if (stale) return { ...gate, reason: `Muntfilter: ${stale}${withError(coinCache)} — geen aankoop` };
+    }
+    return gate;
   }
 
   /** Spreadlimiet: reden om NIET te kopen, of null. Geen limiet ingesteld → null. */
@@ -1883,7 +2094,7 @@ export class TradingEngine extends EventEmitter {
     const unknown = "Spread onbekend (orderboek niet opgehaald)";
     let book: OrderBook;
     try {
-      book = await this.feed.getOrderBook(market, 1);
+      book = await this.io.getOrderBook(market, 1, FAST);
     } catch {
       return unknown;
     }
@@ -1891,7 +2102,7 @@ export class TradingEngine extends EventEmitter {
     const ask = book?.asks?.[0]?.[0];
     if (!isNum(bid) || !isNum(ask) || bid <= 0 || ask <= 0 || ask < bid) return unknown;
     const spread = ((ask - bid) / ((ask + bid) / 2)) * 100;
-    return spread > max ? `Spread te groot (${fmtPct2(spread)} > ${fmtPct2(max)})` : null;
+    return spreadAboveLimit(spread, max) ? `Spread te groot (${fmtPct2(spread)} > ${fmtPct2(max)})` : null;
   }
 
   // ───────────────────────────── v2: rondes ─────────────────────────────
@@ -1973,17 +2184,22 @@ export class TradingEngine extends EventEmitter {
     this.scanState.set(market, { ...base, status: "ok", stale });
   }
 
-  private async fetchCandles(market: string): Promise<CandleFetch> {
+  private async fetchCandles(market: string, req: FeedRequestOptions): Promise<CandleFetch> {
     const cfg = this.config;
     const interval = cfg.interval;
     try {
       // Genoeg candles voor de warmup van de strategieën, ook als historyCandles laag staat:
       // anders valt bijv. ema-trend live stil terwijl de backtest hem wel gebruikt.
-      const raw = await this.feed.getCandles(market, interval, candlesToFetch(cfg));
+      const raw = await this.io.getCandles(market, interval, candlesToFetch(cfg), req);
       return { market, interval, ok: true, candles: sanitizeCandles(raw) };
     } catch (err) {
-      return { market, interval, ok: false, error: errorMessage(err) };
+      return { market, interval, ok: false, error: errorMessage(err), ...(isRateLimited(err) ? { rateLimited: true } : {}) };
     }
+  }
+
+  /** Zo lang (ms) mag het beoordelen van markten per tick nieuwe verzoeken starten. */
+  private scanBudgetMs(): number {
+    return Math.max(1_000, Math.min(this.config.pollMs, SCAN_TIME_BUDGET_MS));
   }
 
   /**
@@ -2015,12 +2231,35 @@ export class TradingEngine extends EventEmitter {
     }
     const list = active.filter((m) => pick.has(m));
     if (list.length === 0) return;
-    const results = await mapLimit(list, SCAN_CONCURRENCY, () => this.buyAllowed(), (m) => this.fetchCandles(m));
+    // Geen nieuwe verzoeken meer na het tijdsbudget of als de rate limit (bijna) op is: de
+    // rest blijft "nog te doen" voor de volgende tick (open posities gaan altijd voor).
+    const started = this.nowFn();
+    const budget = this.scanBudgetMs();
+    let limited = false;
+    const results = await mapLimit(
+      list,
+      SCAN_CONCURRENCY,
+      () => this.buyAllowed() && !limited && this.nowFn() - started < budget,
+      async (m) => {
+        const r = await this.fetchCandles(m, FAST);
+        if (!r.ok && r.rateLimited) limited = true;
+        return r;
+      },
+    );
+    if (limited) {
+      this.logThrottled(
+        "scan:ratelimit",
+        "warn",
+        "Rate limit van Bitvavo bijna bereikt: de bot bekijkt de overige munten zodra er weer ruimte is (open posities worden gewoon bewaakt)",
+      );
+    }
     const failed: { market: string; error: string }[] = [];
     const empty: string[] = [];
     for (const r of results) {
       // Gestopt / noodstop: de rest niet meer beoordelen (die blijven voor een volgende keer).
       if (!r || !this.buyAllowed()) break;
+      // Wegens de rate limit overgeslagen: geen fout, de volgende tick opnieuw.
+      if (!r.ok && r.rateLimited) continue;
       try {
         await this.processMarket(r.market, now, { pre: r, quiet: true });
       } catch (err) {
@@ -2118,7 +2357,18 @@ export class TradingEngine extends EventEmitter {
    * volume), en per kandidaat: vrije plek? → trendfilter → spreadlimiet → `tryEntry`.
    */
   private async flushRound(now: number, round: RoundState): Promise<void> {
-    const ms = INTERVAL_MS[this.config.interval];
+    const interval = this.config.interval;
+    const ms = INTERVAL_MS[interval];
+    const epoch = this.epoch;
+    // Na elke await: bestaat deze ronde nog? (Paper-reset, ander interval en stop wissen hem.)
+    const gone = (): boolean => this.round !== round || this.epoch !== epoch || this.config.interval !== interval;
+    // Vlak vóór een order (ook na de saldo-controle in live): nog steeds geldig?
+    const invalid = (market: string): string | null =>
+      gone()
+        ? "de instellingen of het account zijn tijdens deze ronde gewijzigd"
+        : !this.isActive(market)
+          ? "de bot volgt deze markt niet meer"
+          : null;
     const entries = [...this.pool.entries()];
     this.pool.clear();
     const btc = this.tickers.get(MARKET_FILTER_MARKET);
@@ -2142,11 +2392,12 @@ export class TradingEngine extends EventEmitter {
       });
     }
     const ranked = rankCandidates(cands);
-    const tf = this.config.ensemble.trendFilter;
     let reserved = 0;
     let filterBlocked = 0;
     let filterText: string | null = null;
+    let redone: string | null = null;
     for (let i = 0; i < ranked.length; i++) {
+      if (gone()) return;
       const { market, decision } = ranked[i];
       const rank = i + 1;
       const stop = this.entryStopNote(reserved);
@@ -2154,14 +2405,23 @@ export class TradingEngine extends EventEmitter {
         for (let j = i; j < ranked.length; j++) this.setNote(ranked[j].market, round, "candidate", stop, j + 1);
         break;
       }
+      // De marktlijst kan tijdens deze ronde gewijzigd zijn: alleen actieve markten kopen.
+      if (!this.isActive(market)) {
+        this.roundNotes.delete(market);
+        continue;
+      }
+      // Instellingen per kandidaat lezen (ze kunnen tijdens de ronde veranderen).
+      const cfg = this.config;
+      const tf = cfg.ensemble.trendFilter;
       if (trendFilterActive(tf)) {
         const gate = await this.trendGateFor(market, tf, decision.time + ms, now);
+        if (gone()) return;
         if (!gate.allowed) {
           const reason = gate.reason ?? "Trendfilter: geen aankoop";
           this.setNote(market, round, "blocked", reason, rank);
           if (reason.startsWith("Marktfilter")) {
             filterBlocked += 1;
-            filterText ??= describeTrend(`Bitcoin (${MARKET_FILTER_MARKET})`, gate.market, tf);
+            filterText ??= reason.replace(/^Marktfilter: /, "").replace(/ — geen nieuwe aankopen$/, "");
           } else {
             this.logRejection(market, decision.time, `Geen koop ${market}: ${reason}`);
           }
@@ -2169,14 +2429,29 @@ export class TradingEngine extends EventEmitter {
         }
       }
       const spread = await this.spreadBlock(market);
+      if (gone()) return;
       if (spread) {
         this.setNote(market, round, "blocked", spread, rank);
         this.logRejection(market, decision.time, `Geen koop ${market}: ${spread}`);
         continue;
       }
+      // Tijdens het wachten gewijzigde instellingen (bijv. trendfilter aangezet): deze
+      // kandidaat één keer opnieuw langs alle controles.
+      if (this.config !== cfg && redone !== market) {
+        redone = market;
+        i -= 1;
+        continue;
+      }
+      if (!this.isActive(market)) {
+        this.roundNotes.delete(market);
+        continue;
+      }
       this.entryRejection.delete(market);
       const price = this.prices[market];
-      const outcome = await this.tryEntry(market, decision, isNum(price) && price > 0 ? price : decision.price, now);
+      const outcome = await this.tryEntry(market, decision, isNum(price) && price > 0 ? price : decision.price, now, () =>
+        invalid(market),
+      );
+      if (gone()) return;
       if (outcome === "opened") {
         this.roundNotes.delete(market);
       } else if (outcome === "would-buy") {
@@ -2236,6 +2511,13 @@ export class TradingEngine extends EventEmitter {
       } else if (scan?.status === "error") {
         status = "error";
         text = `Koersdata ophalen mislukt${scan.error ? `: ${scan.error}` : ""}`;
+      } else if (d && d.action === "buy") {
+        // Koopsignaal zonder uitkomst in de lopende ronde: al beoordeeld (bijv. vóór Stop → Start,
+        // of al gekocht en weer verkocht). Op dezelfde candle koopt de bot niet opnieuw.
+        status = "blocked";
+        text = scan?.stale
+          ? "Geen nieuwe candle: er wordt weinig gehandeld"
+          : "Koopsignaal al beoordeeld: de bot koopt pas weer na een nieuwe candle";
       } else if (scan || d) {
         status = "watching";
         if (scan?.stale) text = "Geen nieuwe candle: er wordt weinig gehandeld";
@@ -2283,17 +2565,41 @@ export class TradingEngine extends EventEmitter {
       };
     }
     const st = trendStateAt(this.usableTrendCandles(cache, tf, now), tf.interval, tf.period, now);
+    const who = `Bitcoin (${MARKET_FILTER_MARKET})`;
     const note =
-      describeTrend(`Bitcoin (${MARKET_FILTER_MARKET})`, st, tf) +
+      ((st.ok === null ? this.staleTrendText(who, cache, tf, now) : null) ?? describeTrend(who, st, tf)) +
       (st.ok === true ? " — nieuwe aankopen toegestaan" : " — geen nieuwe aankopen") +
       (cache.error !== null ? ` (ophalen mislukt: ${cache.error})` : "");
     return { ...base, ok: st.ok, close: st.close, sma: st.sma, checkedAt: cache.fetchedAt, note };
   }
 
+  /**
+   * Haalt de bot elke candle alle actieve markten? Hooguit {@link SCAN_BATCH_PER_TICK} per
+   * tick en één tick per pollMs (+ ~3 s): anders een Nederlandse waarschuwing, anders null.
+   */
+  private capacityNote(active: number): string | null {
+    if (active <= SCAN_BATCH_PER_TICK) return null;
+    const ms = INTERVAL_MS[this.config.interval];
+    const cycle = Math.max(MIN_POLL_MS, this.config.pollMs) + EST_TICK_MS;
+    const perCandle = Math.floor((SCAN_BATCH_PER_TICK * ms) / cycle);
+    if (!isNum(perCandle) || perCandle >= active) return null;
+    return (
+      `Te veel munten voor dit interval: de bot bekijkt ongeveer ${perCandle} van de ${active} munten per candle ` +
+      `(hooguit ${SCAN_BATCH_PER_TICK} per keer verversen). Kies minder munten, een langer interval of zet "Ververs elke" lager.`
+    );
+  }
+
   private universeView(active: readonly string[], now: number): UniverseView {
     const u = this.config.universe;
+    const capacity = this.capacityNote(active.length);
     if (!u || u.mode !== "auto") {
-      return { mode: "manual", count: active.length, requested: this.manualMarkets().length, updatedAt: null };
+      return {
+        mode: "manual",
+        count: active.length,
+        requested: this.manualMarkets().length,
+        updatedAt: null,
+        ...(capacity ? { note: capacity } : {}),
+      };
     }
     const sel = this.autoSel;
     const p = sel ? null : this.usablePersistedAuto(now);
@@ -2303,6 +2609,7 @@ export class TradingEngine extends EventEmitter {
         ? "Opgeslagen automatische keuze; de bot kiest opnieuw zodra hij draait"
         : "Nog geen automatische keuze gemaakt: de bot gebruikt voorlopig je eigen lijst";
     }
+    if (capacity) note = note ? `${note}. ${capacity}` : capacity;
     return {
       mode: "auto",
       count: active.length,
@@ -2330,7 +2637,7 @@ export class TradingEngine extends EventEmitter {
       const known = this.prices[m];
       if (isNum(known) && known > 0) continue;
       try {
-        const p = await this.feed.getPrice(m);
+        const p = await this.io.getPrice(m, POSITION);
         if (isNum(p) && p > 0) this.prices[m] = p;
       } catch {
         // dagwissel wacht dan op de volgende tick
@@ -2370,17 +2677,19 @@ export class TradingEngine extends EventEmitter {
    * "price" + "candle" events → open posities bewaken → bij een nieuwe gesloten candle:
    * beslissing → verkoopsignaal-exit, of een koopkandidaat voor de kansenronde.
    * `opts.quiet`: fouten bij het ophalen niet zelf melden (de batch vat ze samen).
+   * Zonder `opts.pre` (markten met een positie) haalt hij zelf op, met voorrang.
+   * Geeft true als de candles verwerkt zijn (posities bewaakt), false als ophalen mislukte.
    */
   private async processMarket(
     market: string,
     now: number,
     opts: { pre?: CandleFetch; quiet?: boolean } = {},
-  ): Promise<void> {
-    const fetched = opts.pre ?? (await this.fetchCandles(market));
+  ): Promise<boolean> {
+    const fetched = opts.pre ?? (await this.fetchCandles(market, POSITION));
     const cfg = this.config;
     const interval = fetched.interval;
     // Interval intussen gewijzigd: deze candles horen er niet meer bij (volgende tick opnieuw).
-    if (interval !== cfg.interval) return;
+    if (interval !== cfg.interval) return false;
     if (!fetched.ok) {
       this.markFetched(market, now, interval, { ok: false, error: fetched.error });
       if (!opts.quiet) {
@@ -2390,13 +2699,13 @@ export class TradingEngine extends EventEmitter {
           `Koersdata voor ${market} niet beschikbaar: ${fetched.error} — markt deze ronde overgeslagen`,
         );
       }
-      return;
+      return false;
     }
     const candles = fetched.candles;
     if (candles.length === 0) {
       this.markFetched(market, now, interval, { ok: true, newestClosed: undefined });
       if (!opts.quiet) this.logThrottled(`feed:${market}`, "warn", `Geen candles ontvangen voor ${market} — markt overgeslagen`);
-      return;
+      return false;
     }
     this.throttle.delete(`feed:${market}`);
 
@@ -2434,7 +2743,7 @@ export class TradingEngine extends EventEmitter {
       await this.managePosition(pos, closed, atrByTime, price, now);
     }
 
-    if (!decision) return;
+    if (!decision) return true;
     this.decisions[market] = decision;
     this.emitEvent("decision", decision);
 
@@ -2453,17 +2762,18 @@ export class TradingEngine extends EventEmitter {
           `Geen koop ${market}: deze candle was vóór de herstart al beoordeeld — de bot wacht op de volgende candle`,
         );
         this.setNote(market, this.round, "blocked", this.entryRejection.get(market));
-        return;
+        return true;
       }
       const candleClose = decision.time + INTERVAL_MS[interval];
       if (this.trades.some((t) => t.market === market && t.entryTime >= candleClose)) {
         this.logRejection(market, decision.time, `Geen koop ${market}: het signaal van deze candle is al verhandeld`);
         this.setNote(market, this.round, "blocked", this.entryRejection.get(market));
-        return;
+        return true;
       }
       // Kopen gebeurt in de kansenronde (de sterkste kandidaten eerst).
       this.addCandidate(market, decision);
     }
+    return true;
   }
 
   private async managePosition(
@@ -2563,7 +2873,17 @@ export class TradingEngine extends EventEmitter {
     return "rejected";
   }
 
-  private async tryEntry(market: string, decision: EnsembleDecision, price: number, now: number): Promise<EntryOutcome> {
+  /**
+   * `stillValid` (kansenronde): geeft een reden als de koop vlak vóór de order niet meer
+   * mag (instellingen/account gewijzigd, markt niet meer actief), anders null.
+   */
+  private async tryEntry(
+    market: string,
+    decision: EnsembleDecision,
+    price: number,
+    now: number,
+    stillValid?: () => string | null,
+  ): Promise<EntryOutcome> {
     // Gestopt / noodstop tijdens deze ronde: geen nieuwe posities meer.
     if (!this.buyAllowed()) return this.entryRejected(market, "De bot is gestopt tijdens deze ronde");
     if (this.positions.some((p) => p.market === market)) {
@@ -2625,7 +2945,7 @@ export class TradingEngine extends EventEmitter {
       );
       return this.entryRejected(market, `Te weinig cash (${fmtEur(this.account.cashQuote)} beschikbaar, ${fmtEur(q)} nodig)`);
     }
-    return this.openPosition(market, decision, plan, price, info);
+    return this.openPosition(market, decision, plan, price, info, stillValid);
   }
 
   private async openPosition(
@@ -2634,6 +2954,7 @@ export class TradingEngine extends EventEmitter {
     plan: EntryPlan,
     price: number,
     info: MarketInfo | undefined,
+    stillValid?: () => string | null,
   ): Promise<EntryOutcome> {
     const stopDist = plan.expectedEntryPrice - plan.stopPrice;
     const tpDist = plan.takeProfitPrice - plan.expectedEntryPrice;
@@ -2678,6 +2999,11 @@ export class TradingEngine extends EventEmitter {
     if (!this.buyAllowed() || (this.mode === "live" && !this.armed)) {
       this.log("warn", `Koop ${market} geannuleerd: bot gestopt/ontwapend tijdens deze ronde`);
       return this.entryRejected(market, "Koop geannuleerd: de bot is gestopt of ontwapend");
+    }
+    const why = stillValid?.() ?? null;
+    if (why) {
+      this.log("warn", `Koop ${market} geannuleerd: ${why}`);
+      return this.entryRejected(market, `Koop geannuleerd: ${why}`);
     }
     const { res, threw } = await this.placeOrder(req, price);
     if (epoch !== this.epoch) {
@@ -3965,7 +4291,7 @@ export class TradingEngine extends EventEmitter {
   /** Verse koers van de feed (en onthouden), of null als die er nu niet is. */
   private async fetchPrice(market: string): Promise<number | null> {
     try {
-      const p = await this.feed.getPrice(market);
+      const p = await this.io.getPrice(market, POSITION);
       if (isNum(p) && p > 0) {
         this.prices[market] = p;
         return p;
@@ -3976,10 +4302,13 @@ export class TradingEngine extends EventEmitter {
     return null;
   }
 
-  /** Actuele koers voor handmatige exits; valt terug op de laatst bekende koers. */
+  /**
+   * Actuele koers voor handmatige exits (sluiten, noodstop); valt terug op de laatst bekende
+   * koers. Snel opgeven: niet wachten op de publieke rate limit (de verkoop zelf is privé).
+   */
   private async freshPrice(market: string): Promise<number> {
     try {
-      const p = await this.feed.getPrice(market);
+      const p = await this.io.getPrice(market, POSITION);
       if (isNum(p) && p > 0) {
         this.prices[market] = p;
         return p;
@@ -4191,7 +4520,8 @@ export class TradingEngine extends EventEmitter {
     const now = this.nowFn();
     if (!force && this.marketsFetchedAt !== null && now - this.marketsFetchedAt < MARKETS_REFRESH_MS) return;
     try {
-      const list = await this.feed.getMarkets();
+      // In een tick niet laten wachten (de feed geeft bij een fout de vorige lijst).
+      const list = await this.io.getMarkets(force ? undefined : FAST);
       if (Array.isArray(list) && list.length > 0) {
         this.marketInfo = new Map(list.map((m) => [m.market, m]));
       }
@@ -4212,19 +4542,20 @@ export class TradingEngine extends EventEmitter {
         `Live: ${this.positions.length} open positie(s) uit de opgeslagen staat. Zolang de bot niet gearmd is worden stops NIET automatisch uitgevoerd.`,
       );
     }
+    // Markten die deze run gecontroleerd worden op coins die de bot niet beheert; de tick
+    // controleert later ook markten die de automatische muntkeuze erbij zet.
+    this.unmanagedChecked = new Set();
+    this.unmanagedRetryAt = null;
     let balances: Balance[];
     try {
       balances = await this.broker.getBalances();
-      if (!Array.isArray(balances)) return;
+      if (!Array.isArray(balances)) throw new Error("leeg antwoord");
     } catch (err) {
       this.log("warn", `Kon saldi op Bitvavo niet controleren: ${errorMessage(err)}`);
+      this.unmanagedRetryAt = this.nowFn() + FETCH_RETRY_MS;
       return;
     }
-    const heldOf = (base: string): number => {
-      const b = balances.find((x) => x.symbol === base);
-      if (!b) return 0;
-      return (isNum(b.available) ? b.available : 0) + (isNum(b.inOrder) ? b.inOrder : 0);
-    };
+    const heldOf = (base: string): number => heldIn(balances, base);
     for (const pos of this.positions) {
       const { base } = splitMarket(pos.market, this.marketInfo.get(pos.market));
       const held = heldOf(base);
@@ -4237,20 +4568,30 @@ export class TradingEngine extends EventEmitter {
         );
       }
     }
-    // Omgekeerd: coins in een bot-markt die de bot NIET beheert (bijv. na een
-    // onbruikbaar statusbestand of een order met onbekende uitkomst): geen stop-loss.
+    const active = this.activeMarkets();
+    for (const m of active) this.unmanagedChecked.add(m);
+    await this.warnUnmanaged(active, balances);
+  }
+
+  /**
+   * Coins in een bot-markt die de bot NIET beheert (bijv. na een onbruikbaar statusbestand
+   * of een order met onbekende uitkomst): geen stop-loss, dus melden.
+   */
+  private async warnUnmanaged(markets: readonly string[], balances: readonly Balance[]): Promise<void> {
     const managed = new Set(this.positions.map((p) => p.market));
-    for (const market of this.activeMarkets()) {
+    for (const market of markets) {
       if (managed.has(market)) continue;
       const info = this.marketInfo.get(market);
       const { base } = splitMarket(market, info);
-      const held = heldOf(base);
+      const held = heldIn(balances, base);
       if (!(held > 0)) continue;
       let price: number;
       try {
-        price = await this.feed.getPrice(market);
+        price = await this.io.getPrice(market, FAST);
       } catch {
-        continue;
+        const known = this.prices[market];
+        if (!(isNum(known) && known > 0)) continue;
+        price = known;
       }
       if (!isNum(price) || price <= 0) continue;
       if (held * price >= this.exchangeMinimums(market).quote) {
@@ -4261,6 +4602,30 @@ export class TradingEngine extends EventEmitter {
         );
       }
     }
+  }
+
+  /**
+   * Live, na de start: markten die er (door de automatische muntkeuze) bij gekomen zijn ook
+   * controleren op coins die de bot niet beheert (één saldo-opvraging; mislukt → na een minuut opnieuw).
+   */
+  private async checkUnmanagedNew(active: readonly string[], now: number): Promise<void> {
+    const checked = this.unmanagedChecked;
+    if (!checked) return;
+    const fresh = active.filter((m) => !checked.has(m));
+    if (fresh.length === 0) return;
+    if (this.unmanagedRetryAt !== null && now < this.unmanagedRetryAt) return;
+    let balances: Balance[];
+    try {
+      balances = await this.broker.getBalances();
+      if (!Array.isArray(balances)) throw new Error("leeg antwoord");
+    } catch (err) {
+      this.unmanagedRetryAt = now + FETCH_RETRY_MS;
+      this.logThrottled("unmanaged", "warn", `Kon saldi op Bitvavo niet controleren: ${errorMessage(err)}`);
+      return;
+    }
+    this.unmanagedRetryAt = null;
+    for (const m of fresh) checked.add(m);
+    await this.warnUnmanaged(fresh, balances);
   }
 
   // ───────────────────────────── Persistentie ─────────────────────────────

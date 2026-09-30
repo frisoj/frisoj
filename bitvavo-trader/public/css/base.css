@@ -1222,6 +1222,37 @@ body.live-armed {
   }
 }
 
+/* Kopbalk tussen 901 en 1279 px (bijv. een iPad liggend, 1024 px): alles moet op één regel
+   passen, anders schuift de pagina opzij en valt Noodstop buiten beeld. Menu zonder iconen,
+   "Reset oefengeld" alleen als icoon (titel en aria-label blijven). */
+@media (min-width: 901px) and (max-width: 1279px) {
+  .nav-tabs button {
+    gap: 0;
+    padding: 0 8px;
+  }
+  .nav-tabs button svg {
+    display: none;
+  }
+  .bot-controls .btn .lbl-long {
+    display: none;
+  }
+}
+/* Nog smaller (901–1120 px, ook met een schuifbalk): merknaam weg (het logo blijft) en van de
+   verbindingsstatus alleen de gekleurde stip (de tekst blijft voor schermlezers en in de titel) */
+@media (min-width: 901px) and (max-width: 1120px) {
+  .brand-text {
+    display: none;
+  }
+  .conn .conn-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 1279px) {
   .stats-bar {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -2148,6 +2179,20 @@ tr.is-unsellable > td {
 .rangebar .lbl.r {
   right: 0;
 }
+/* Kleine munten (lange getallen, bijv. 0,00104874): doel op een tweede regel, rechts,
+   zodat stop en doel niet in elkaar overlopen (klasse gezet door tables.js) */
+.rangebar.tight {
+  height: 46px;
+}
+.rangebar.tight .lbl.r {
+  top: 31px;
+}
+.rangebar.no-bar.tight {
+  height: 30px;
+}
+.rangebar.no-bar.tight .lbl.r {
+  top: 15px;
+}
 .reason-pill {
   display: inline-block;
   padding: 1px 7px;
@@ -2242,6 +2287,19 @@ tr.row-new td {
   }
   .rangebar {
     width: 100%;
+  }
+  /* kaartweergave: de balk is breed genoeg, stop en doel gewoon naast elkaar */
+  .rangebar.tight {
+    height: 34px;
+  }
+  .rangebar.tight .lbl.r {
+    top: 18px;
+  }
+  .rangebar.no-bar.tight {
+    height: 18px;
+  }
+  .rangebar.no-bar.tight .lbl.r {
+    top: 2px;
   }
   .rangebar .lbl.l::before {
     content: "stop ";

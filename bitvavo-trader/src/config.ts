@@ -258,6 +258,8 @@ function loadEnvFileInto(env: NodeJS.ProcessEnv, file: string): void {
 export function readEngineOverrides(
   dataDir: string,
   warn: (msg: string) => void = (m) => console.warn(m),
+  /** Wordt aangeroepen bij een bestand van v1 (lijst zonder `universe`): die lijst geldt ("manual"). */
+  onLegacyMarkets?: (markets: string[]) => void,
 ): Partial<EngineConfig> {
   const file = join(dataDir, OVERRIDES_FILE);
   if (!existsSync(file)) return {};
@@ -319,6 +321,11 @@ export function readEngineOverrides(
       }
       out.universe = uni as UniverseConfig;
     } else skipped.push("universe");
+  } else if (out.markets) {
+    // Bestand van v1 (vóór de automatische muntkeuze): v2 slaat `universe` altijd op. Zonder
+    // dat veld betekende de opgeslagen lijst "precies deze markten" — dat blijft zo.
+    out.universe = { mode: "manual" } as UniverseConfig;
+    onLegacyMarkets?.([...out.markets]);
   }
   if (raw.risk !== undefined) {
     if (isPlainObject(raw.risk)) {
@@ -582,7 +589,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
   }
   // Instellingen die in het dashboard zijn opgeslagen winnen van .env. Zeg dat
   // hardop als ze MARKETS/INTERVAL uit .env overschrijven, anders lijkt .env kapot.
-  const overrides = readEngineOverrides(dataDir, warn);
+  let legacyMarkets: string[] | null = null;
+  const overrides = readEngineOverrides(dataDir, warn, (list) => {
+    legacyMarkets = list;
+  });
   const overridesFile = join(dataDir, OVERRIDES_FILE);
   const fromEnv = engine;
   engine = mergeEngineConfig(engine, overrides);
@@ -591,6 +601,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
       `⚠ MARKETS uit .env (${envSelectionLabel(fromEnv)}) wordt genegeerd: in het dashboard is ` +
         `${savedSelectionLabel(engine, fromEnv)} opgeslagen (${overridesFile}). ` +
         "Wijzig de munten in het tabblad Instellingen, of verwijder dat bestand om .env weer te laten gelden.",
+    );
+  } else if (legacyMarkets !== null && marketsRaw === undefined) {
+    // Zonder MARKETS zou de bot anders stilletjes automatisch 30 munten kiezen.
+    warn(
+      `ℹ Oud instellingenbestand (${overridesFile}): de bot volgt je opgeslagen munten (${shortList(legacyMarkets)}). ` +
+        "Automatisch kiezen kan in Instellingen → Munten.",
     );
   }
   if (intervalRaw !== undefined && overrides.interval && overrides.interval !== fromEnv.interval) {

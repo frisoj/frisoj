@@ -386,3 +386,25 @@ describe("munten-radar: oudere server (geen snapshot.radar)", () => {
     expect(p.part('[data-rd="empty"]').textContent).toBe("Munten laden…");
   });
 });
+
+describe("ronde 5: uitleg van de muntkeuze (zelfde indeling als Instellingen)", () => {
+  it("mislukt = waarschuwing; 'nog geen keuze' en 'opgeslagen keuze' = gewone uitleg", async () => {
+    const fail = "Automatische muntkeuze mislukt: fake — de bot gebruikt je eigen lijst (3 markten)";
+    const p = await mount(makeSnap({ universe: { mode: "auto", count: N, requested: N, updatedAt: null, note: fail } }));
+    const note = p.part('[data-rd="note"]');
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toBe(fail);
+    expect(note.dataset.kind).toBe("warn");
+
+    for (const plain of [
+      "Nog geen automatische keuze gemaakt: de bot gebruikt voorlopig je eigen lijst",
+      "Opgeslagen automatische keuze; de bot kiest opnieuw zodra hij draait",
+    ]) {
+      p.setState(makeSnap({ universe: { mode: "auto", count: N, requested: N, updatedAt: null, note: plain } }));
+      p.bus.emit("snapshot", makeSnap({ universe: { mode: "auto", count: N, requested: N, updatedAt: null, note: plain } }));
+      vi.advanceTimersByTime(1000);
+      expect(note.textContent).toBe(plain);
+      expect(note.dataset.kind).toBe("info");
+    }
+  });
+});

@@ -36,6 +36,19 @@ function baseOf(market: string, info?: MarketInfo): string {
   return (i > 0 ? market.slice(0, i) : market).toUpperCase();
 }
 
+/** Marge (procentpunten) bij de spreadlimiet: afrondingsruis telt niet als "erboven" (zelfde als de backtest). */
+export const SPREAD_EPS_PCT = 1e-9;
+
+/**
+ * Ligt de spread (in %) boven de limiet (in %; 0 of minder = geen limiet)? Precies op de
+ * limiet (ook met afrondingsruis, bijv. 0,30000000000001 bij 0,3) is niet erboven.
+ */
+export function spreadAboveLimit(spreadPct: number, maxSpreadPct: number): boolean {
+  return (
+    Number.isFinite(maxSpreadPct) && maxSpreadPct > 0 && Number.isFinite(spreadPct) && spreadPct - maxSpreadPct > SPREAD_EPS_PCT
+  );
+}
+
 /** Spread in % uit bid/ask, of null als onbekend. */
 export function tickerSpreadPct(t: Pick<Ticker24h, "bid" | "ask">): number | null {
   const { bid, ask } = t;
@@ -91,7 +104,7 @@ export function selectUniverse(
       continue;
     }
     const spread = tickerSpreadPct(t);
-    if (spreadCap > 0 && spread !== null && spread > spreadCap) {
+    if (spread !== null && spreadAboveLimit(spread, spreadCap)) {
       excluded.push({ market, reason: `spread te groot (${spread.toFixed(2)}%)` });
       continue;
     }

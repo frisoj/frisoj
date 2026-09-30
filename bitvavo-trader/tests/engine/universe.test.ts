@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MarketInfo, Ticker24h, UniverseConfig } from "../../src/core/types";
-import { EXCLUDED_BASES, selectUniverse, tickerSpreadPct } from "../../src/engine/universe";
+import { EXCLUDED_BASES, SPREAD_EPS_PCT, selectUniverse, spreadAboveLimit, tickerSpreadPct } from "../../src/engine/universe";
 
 function info(market: string, over: Partial<MarketInfo> = {}): MarketInfo {
   const [base, quote] = market.split("-");
@@ -71,5 +71,27 @@ describe("tickerSpreadPct", () => {
     expect(tickerSpreadPct({ bid: null, ask: 101 })).toBeNull();
     expect(tickerSpreadPct({ bid: 0, ask: 101 })).toBeNull();
     expect(tickerSpreadPct({ bid: 102, ask: 101 })).toBeNull();
+  });
+});
+
+describe("spreadAboveLimit (ronde 5: zelfde grens als de backtest)", () => {
+  it("precies op de limiet (ook met afrondingsruis) is niet erboven; 0 of minder = geen limiet", () => {
+    const pct = tickerSpreadPct({ bid: 99.85, ask: 100.15 })!;
+    expect(pct).toBeGreaterThan(0.3); // 0,30000000000001137: afrondingsruis
+    expect(spreadAboveLimit(pct, 0.3)).toBe(false);
+    expect(spreadAboveLimit(0.3 + 1e-6, 0.3)).toBe(true);
+    expect(spreadAboveLimit(0.32, 0.3)).toBe(true);
+    expect(spreadAboveLimit(5, 0)).toBe(false);
+    expect(spreadAboveLimit(5, -1)).toBe(false);
+    expect(spreadAboveLimit(Number.NaN, 0.3)).toBe(false);
+    expect(SPREAD_EPS_PCT).toBe(1e-9);
+  });
+
+  it("selectUniverse houdt een markt met een spread precies op de limiet", () => {
+    const markets = [info("AAA-EUR"), info("BBB-EUR")];
+    const tickers = [ticker("AAA-EUR", 2e6, 99.85, 100.15), ticker("BBB-EUR", 1e6, 99.84, 100.16)];
+    const sel = selectUniverse(markets, tickers, { ...CFG, count: 10 }, 0.3);
+    expect(sel.markets).toEqual(["AAA-EUR"]);
+    expect(sel.excluded).toEqual([{ market: "BBB-EUR", reason: "spread te groot (0.32%)" }]);
   });
 });

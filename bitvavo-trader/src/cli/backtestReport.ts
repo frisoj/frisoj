@@ -7,7 +7,7 @@ import { MARKET_FILTER_MARKET } from "../core/defaults";
 import type { Candle, EnsembleConfig, MarketDataFeed, TrendFilterConfig } from "../core/types";
 import type { BlockedEntries } from "../backtest/simulator";
 import { loadTrendCandles, type TrendCandles } from "../backtest/trendData";
-import { describeTrend, trendFilterActive, trendStateAt } from "../strategies/trendFilter";
+import { describeTrend, trendFilterActive, trendPeriodLabel, trendStateAt } from "../strategies/trendFilter";
 
 export interface BacktestWindow {
   /** Eerste candle van de gevraagde periode (candles.length als die er niet is) */
@@ -102,17 +102,13 @@ export function withoutTrendFilter(ensemble: EnsembleConfig): EnsembleConfig {
   return { ...ensemble, trendFilter: { ...tf, market: false, coin: false } };
 }
 
-function periodText(tf: TrendFilterConfig): string {
-  return tf.interval === "1d" ? `${tf.period} dagen` : `${tf.period} candles van 4 uur`;
-}
-
 /** Korte Nederlandse omschrijving van het trendfilter, bijv. voor de kop van het rapport. */
 export function trendFilterLabel(tf: TrendFilterConfig | undefined | null, disabledByFlag = false): string {
   if (!trendFilterActive(tf)) return disabledByFlag ? "Trendfilter: uit (--no-trend)" : "Trendfilter: uit";
   const who: string[] = [];
   if (tf.market) who.push(`Bitcoin (${MARKET_FILTER_MARKET})`);
   if (tf.coin) who.push("de munt zelf");
-  return `Trendfilter: alleen kopen als ${who.join(" en ")} boven het gemiddelde van ${periodText(tf)} staat`;
+  return `Trendfilter: alleen kopen als ${who.join(" en ")} boven het gemiddelde van ${trendPeriodLabel(tf)} staat`;
 }
 
 export interface CliTrendSetup {
@@ -148,11 +144,13 @@ export async function prepareTrendFilter(
   const { trendCandles, note } = await loadTrendCandles(feed, market, tf, fromMs, toMs);
   const lines = [trendFilterLabel(tf)];
   const coinName = market.includes("-") ? market.slice(0, market.indexOf("-")) : market;
+  // Zelfde regel als de backtest en de engine: te oude data = onbekend.
+  const fresh = { rejectStale: true };
   if (tf.market && trendCandles?.market) {
-    lines.push(`Nu: ${describeTrend(`Bitcoin (${MARKET_FILTER_MARKET})`, trendStateAt(trendCandles.market, tf.interval, tf.period, toMs), tf)}`);
+    lines.push(`Nu: ${describeTrend(`Bitcoin (${MARKET_FILTER_MARKET})`, trendStateAt(trendCandles.market, tf.interval, tf.period, toMs, fresh), tf)}`);
   }
   if (tf.coin && trendCandles?.coin) {
-    lines.push(`Nu: ${describeTrend(coinName, trendStateAt(trendCandles.coin, tf.interval, tf.period, toMs), tf)}`);
+    lines.push(`Nu: ${describeTrend(coinName, trendStateAt(trendCandles.coin, tf.interval, tf.period, toMs, fresh), tf)}`);
   }
   return { ensemble, ...(trendCandles ? { trendCandles } : {}), ...(note ? { note } : {}), lines };
 }

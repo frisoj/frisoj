@@ -400,7 +400,12 @@ describe("Rondes: meer markten dan één batch", () => {
       if (how === "stop") await h.engine.stop();
       else if (how === "kill") await h.engine.killSwitch();
       else h.engine.resetPaper(1000);
-      expect(row(h, "M005-EUR").status).toBe("watching");
+      // Het koopsignaal is al beoordeeld: "tegengehouden" met uitleg (niet "wacht" naast KOOP).
+      expect(row(h, "M005-EUR")).toMatchObject({
+        status: "blocked",
+        action: "buy",
+        note: "Koopsignaal al beoordeeld: de bot koopt pas weer na een nieuwe candle",
+      });
       expect(h.engine.snapshot().scan!.roundStartedAt).toBeNull();
       h.clock.advance(15_000);
       await h.engine.tick(); // handmatige tick: de rest van de ronde

@@ -457,3 +457,75 @@ describe("v2 Instellingen: Trendfilter en max. spread", () => {
     ]);
   });
 });
+
+describe("ronde 5: mislukte automatische muntkeuze (UI-3)", () => {
+  it("staat in het waarschuwingsvak met een gele stip, niet als grijze uitleg onder een groene stip", async () => {
+    const note = "Automatische muntkeuze mislukt: Bitvavo-fout bij GET /ticker/24h: fake — de bot gebruikt je eigen lijst (3 markten)";
+    const { el } = await mount({
+      snapshot: {
+        mode: "paper",
+        liveArmed: false,
+        config: structuredClone(DEFAULT_ENGINE_CONFIG),
+        activeMarkets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
+        universe: { mode: "auto", count: 3, requested: 30, updatedAt: null, note },
+      },
+    });
+    const html = flat(el.innerHTML);
+    expect(html).toContain('<div class="st-uni-now is-warn">');
+    expect(html).toContain(`<div class="pn-banner pn-banner-warn st-uni-note">${note}</div>`);
+    expect(html).not.toContain(`<div class="st-help">${note}</div>`);
+    expect(html).not.toContain("eerste automatische keuze zodra hij draait");
+  });
+
+  it("nog geen keuze gemaakt: gewone status (groene stip, geen waarschuwingsvak)", async () => {
+    const note = "Nog geen automatische keuze gemaakt: de bot gebruikt voorlopig je eigen lijst";
+    const { el } = await mount({
+      snapshot: {
+        mode: "paper",
+        liveArmed: false,
+        config: structuredClone(DEFAULT_ENGINE_CONFIG),
+        activeMarkets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
+        universe: { mode: "auto", count: 3, requested: 30, updatedAt: null, note },
+      },
+    });
+    const html = flat(el.innerHTML);
+    expect(html).toContain('<div class="st-uni-now">');
+    expect(html).toContain(`<div class="st-help">${note}</div>`);
+    expect(html).not.toContain("st-uni-note");
+  });
+});
+
+describe("ronde 5: 'Alle markten toevoegen' (UI-6)", () => {
+  it("zonder stablecoins/goud/verpakte munten, meeste handel eerst (volumes uit de radar)", async () => {
+    const known = new Set(["BTC-EUR", "ETH-EUR", "SOL-EUR", "USDC-EUR", "PAXG-EUR", "WBTC-EUR", "AAA-EUR", "BIG-EUR", "ILQ-EUR"]);
+    const radar = [
+      { market: "BIG-EUR", volumeQuote24h: 9e8 },
+      { market: "SOL-EUR", volumeQuote24h: 5e7 },
+      { market: "ILQ-EUR", volumeQuote24h: 20_000 },
+      { market: "USDC-EUR", volumeQuote24h: 6e8 },
+    ];
+    const snapshot = { mode: "paper", liveArmed: false, config: structuredClone(DEFAULT_ENGINE_CONFIG), activeMarkets: ["BIG-EUR", "SOL-EUR"], radar };
+    const { el, server, click, clickData, toasts } = await mount({ known, snapshot });
+    clickData({ uniMode: "manual" }); // eigen lijst: BTC, ETH, SOL
+    const html = flat(el.innerHTML);
+    expect(html).toContain("Alle markten toevoegen (3)");
+    // knoppen om toe te voegen: meeste handel eerst, stablecoins e.d. achteraan
+    expect([...html.matchAll(/data-add="([^"]+)"/g)].map((m) => m[1])).toEqual([
+      "BIG-EUR",
+      "AAA-EUR",
+      "ILQ-EUR",
+      "PAXG-EUR",
+      "USDC-EUR",
+      "WBTC-EUR",
+    ]);
+    clickData({ act: "markets-all" });
+    expect(toasts.at(-1)).toBe(
+      "info: 3 munten toegevoegd (6/400), meeste handel eerst. Overgeslagen, net als bij Automatisch: 3 stablecoins, goud- en verpakte munten. Klik op Opslaan om het te bewaren.",
+    );
+    click("save");
+    await settle();
+    const put = server.puts[0] as Fake;
+    // bekend volume ≥ € 250.000, dan onbekend (op naam), dan te weinig handel; geen USDC/PAXG/WBTC
+    expect(put.markets).toEqual(["BTC-EUR", "ETH-EUR", "SOL-EUR", "BIG-EUR", "AAA-EUR", "ILQ-EUR"]);
+  });
+});

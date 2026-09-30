@@ -29,6 +29,7 @@ import {
   coinTrendText,
   STATUS_INFO,
 } from "./radarLogic.js";
+import { isPlainUniverseNote } from "./settingsLogic.js";
 import { botMarkets } from "../format.js";
 
 const LS_COLLAPSED = "bvt-radar-collapsed";
@@ -336,7 +337,8 @@ export function mountRadar(ctx, el) {
     }
     setText(q.note, notes.join(" "));
     setHidden(q.note, !notes.length);
-    q.note.dataset.kind = uNote ? "warn" : "info";
+    // "Nog geen automatische keuze…" is gewone status; een mislukte keuze e.d. een waarschuwing
+    q.note.dataset.kind = uNote && !isPlainUniverseNote(uNote) ? "warn" : "info";
 
     for (const f of RADAR_FILTERS) {
       setText(q.n[f.key], String(counts[f.key] || 0));

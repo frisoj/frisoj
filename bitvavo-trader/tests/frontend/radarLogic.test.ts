@@ -262,8 +262,9 @@ describe("teksten", () => {
     });
     expect(L.marketFilterBadge({ ...mf, ok: false, note: "" }).note).toContain("Verkopen en stops gaan gewoon door");
     expect(L.marketFilterBadge({ ...mf, ok: null })).toMatchObject({ kind: "unknown", text: "Bitcoin-trend onbekend — de bot koopt nu niet" });
+    // ronde 5: zelfde woorden als Instellingen/Backtest/engine ("blokken van 4 uur", niet "200 uur")
     expect(L.marketFilterBadge({ ...mf, ok: true, interval: "4h", period: 50 }).text).toBe(
-      "Bitcoin boven gemiddelde van 200 uur — kopen mag",
+      "Bitcoin boven gemiddelde van 50 blokken van 4 uur — kopen mag",
     );
     expect(L.marketFilterBadge(null)).toMatchObject({ kind: "off", text: "Marktfilter uit" });
     expect(L.marketFilterBadge(undefined)).toBeNull();
@@ -272,7 +273,24 @@ describe("teksten", () => {
   it("trendPeriodText", () => {
     expect(L.trendPeriodText("1d", 50)).toBe("50 dagen");
     expect(L.trendPeriodText("1d", 1)).toBe("1 dag");
-    expect(L.trendPeriodText("4h", 30)).toBe("120 uur");
+    expect(L.trendPeriodText("4h", 30)).toBe("30 blokken van 4 uur");
+  });
+
+  it("4-uurs trendfilter overal in dezelfde woorden (radar, Instellingen, Backtest-lab, uitleg van de engine) — UI-4", async () => {
+    const S = await loadPublic("js/panels/settingsLogic.js");
+    const B = await loadPublic("js/panels/backtestLogic.js");
+    const { describeTrend } = await import("../../src/strategies/trendFilter");
+    const tf = { market: true, coin: false, interval: "4h", period: 80 };
+    const words = L.trendPeriodText("4h", 80);
+    expect(words).toBe("80 blokken van 4 uur");
+    expect(L.marketFilterBadge({ market: "BTC-EUR", ok: true, interval: "4h", period: 80, note: "" }).text).toContain(words);
+    expect(`80 ${S.trendPeriodUnit("4h")}`).toBe(words);
+    expect(B.describeTrendFilter(tf)).toContain(words);
+    const note = describeTrend("Bitcoin (BTC-EUR)", { ok: true, close: 2, sma: 1, candleTime: 0, available: 80 }, tf as never);
+    expect(note).toContain(words);
+    // dagen: ook overal gelijk
+    expect(L.trendPeriodText("1d", 50)).toBe(`50 ${S.trendPeriodUnit("1d")}`);
+    expect(B.describeTrendFilter({ ...tf, interval: "1d", period: 50 })).toContain(L.trendPeriodText("1d", 50));
   });
 
   it("ronde-voortgang", () => {

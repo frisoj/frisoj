@@ -165,6 +165,25 @@ export function filterMarketList(markets, query) {
   return [...exact, ...starts, ...contains];
 }
 
+/** Ruimte tussen een in beeld geschoven tab en de rand van de marktbalk (de vervaagde rand is 32 px) */
+export const REVEAL_PAD = 36;
+
+/**
+ * Hoeveel pixels de marktbalk horizontaal moet schuiven (negatief = naar links) zodat de tab
+ * helemaal in beeld staat, met `pad` ruimte tot de rand (minder als de tab anders niet past).
+ * 0 = staat al in beeld. Alleen de dichtstbijzijnde rand telt ("nearest").
+ * @param {{ left: number, right: number }} strip  rechthoek van de balk
+ * @param {{ left: number, right: number }} tab    rechthoek van de tab
+ */
+export function revealDelta(strip, tab, pad = REVEAL_PAD) {
+  if (!strip || !tab || ![strip.left, strip.right, tab.left, tab.right].every(isNum)) return 0;
+  const room = Math.max(0, Math.min(pad, (strip.right - strip.left - (tab.right - tab.left)) / 2));
+  if (tab.left < strip.left + room) return tab.left - strip.left - room;
+  // rechts eruit: naar links schuiven, maar nooit zo ver dat de linkerkant van de tab wegvalt
+  if (tab.right > strip.right - room) return Math.min(tab.right - strip.right + room, tab.left - strip.left - room);
+  return 0;
+}
+
 const nfCache = new Map();
 function nf(d) {
   if (!nfCache.has(d)) {
@@ -274,6 +293,7 @@ export function mountLiveChart(ctx, els) {
     pickerOpen: false,
     pickerList: [],
     pickerIdx: 0,
+    revealQueued: false,
   };
 
   // ───────────── Marktbalk: tabs + "Alle munten" ─────────────
@@ -1129,8 +1149,12 @@ export function mountLiveChart(ctx, els) {
     const list = st.tabModel.tabs;
     const extra = new Set(st.tabModel.extra);
     const key = list.join(",") + "|" + st.market + "|" + st.tabModel.extra.join(",");
+    let rebuilt = false;
     if (key !== st.tabsKey) {
       st.tabsKey = key;
+      rebuilt = true;
+      // Stond de toetsenbordfocus op een tab? Dan na het opnieuw tekenen op dezelfde munt terugzetten
+      const focusMarket = focusedTabMarket();
       if (!list.length) {
         stripEl.innerHTML = `<div class="mkt-tab" style="cursor:default"><span class="mkt-icon"><span class="spinner"></span></span><span class="mkt-name">Markten laden…</span></div>`;
       } else {
@@ -1150,21 +1174,53 @@ export function mountLiveChart(ctx, els) {
           .join("");
         // Nieuwe tabs (bijv. een nieuwe koopkans): alleen voor die tabs de 24u-cijfers ophalen
         refreshStats24();
-        revealActiveTab();
       }
+      if (focusMarket) focusTab(focusMarket);
     }
     updateTabValues();
     renderAllButton();
+    // Pas na de waarden en de knop "Alle munten": die bepalen de breedte van tabs en balk
+    if (rebuilt) queueReveal();
+  }
+
+  /** Markt van de tab die nu de toetsenbordfocus heeft (of null) */
+  function focusedTabMarket() {
+    const a = typeof document !== "undefined" ? document.activeElement : null;
+    if (!a || a === stripEl || typeof stripEl.contains !== "function" || !stripEl.contains(a)) return null;
+    return (a.dataset && a.dataset.market) || null;
+  }
+
+  /** Focus op de tab van `market` (anders de gekozen tab), zonder de pagina te laten verspringen */
+  function focusTab(market) {
+    const tabs = [...stripEl.querySelectorAll("[data-market]")];
+    const btn = tabs.find((b) => b.dataset.market === market) || stripEl.querySelector(".mkt-tab.active");
+    if (!btn || typeof btn.focus !== "function") return false;
+    btn.focus({ preventScroll: true });
+    return true;
+  }
+
+  /**
+   * De gekozen tab in beeld schuiven, maar pas bij de volgende frame: dan staan de prijzen in de
+   * tabs en is de knop "Alle munten" zichtbaar (die maakt de balk smaller). Meteen meten gaf
+   * verkeerde breedtes, waardoor de gekozen munt op een telefoon buiten beeld bleef.
+   */
+  function queueReveal() {
+    if (st.revealQueued) return;
+    st.revealQueued = true;
+    const run = () => {
+      st.revealQueued = false;
+      revealActiveTab();
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(run);
+    else setTimeout(run, 0);
   }
 
   /** De gekozen markt in beeld schuiven als de balk breder is dan het scherm (alleen horizontaal) */
   function revealActiveTab() {
     const btn = stripEl.querySelector(".mkt-tab.active");
     if (!btn || typeof btn.getBoundingClientRect !== "function" || !(stripEl.scrollWidth > stripEl.clientWidth + 1)) return;
-    const n = stripEl.getBoundingClientRect();
-    const b = btn.getBoundingClientRect();
-    if (b.left < n.left) stripEl.scrollLeft -= n.left - b.left + 24;
-    else if (b.right > n.right) stripEl.scrollLeft += b.right - n.right + 24;
+    const d = revealDelta(stripEl.getBoundingClientRect(), btn.getBoundingClientRect());
+    if (d) stripEl.scrollLeft += d;
   }
 
   /** Waarden in de tabs bijwerken (alleen `onlyMarket` als die gegeven is) */
@@ -1214,7 +1270,11 @@ export function mountLiveChart(ctx, els) {
     if (!allWrap) return;
     const { hidden, total } = st.tabModel;
     const show = hidden > 0 || st.pickerOpen;
-    if (allWrap.hidden === show) allWrap.hidden = !show;
+    if (allWrap.hidden === show) {
+      allWrap.hidden = !show;
+      // De knop verschijnt/verdwijnt naast de balk: die wordt smaller/breder → gekozen tab opnieuw in beeld
+      queueReveal();
+    }
     if (allN) allN.textContent = `${total} ▾`;
     if (allBtn) {
       allBtn.setAttribute("aria-label", `Alle munten (${total}) — kies een munt`);
@@ -1309,8 +1369,12 @@ export function mountLiveChart(ctx, els) {
 
   function pickMarket(m) {
     if (!m) return;
+    // Zat de focus in de lijst (toetsenbord, zoekveld)? Die verdwijnt zo: zet hem op de tab van de munt
+    const a = typeof document !== "undefined" ? document.activeElement : null;
+    const hadFocus = !!(a && pop && typeof pop.contains === "function" && pop.contains(a));
     closePicker(false);
     if (m !== st.market) bus.emit("market-selected", { market: m });
+    if (hadFocus && !focusTab(m) && allBtn) allBtn.focus();
   }
 
   /** Klikken/toetsen van de marktbalk (vóór de grafiekcheck aangeroepen: werkt ook zonder grafiekbibliotheek) */
@@ -1576,7 +1640,10 @@ export function mountLiveChart(ctx, els) {
   });
 
   bus.on("tab-changed", (d) => {
-    if (d && d.tab === "live" && st.market && st.interval && Date.now() - st.loadedAt > 60_000) load(false);
+    if (!d || d.tab !== "live") return;
+    // Munt gekozen terwijl Live verborgen was (bijv. vanuit de Scanner): nu pas is er iets te meten
+    queueReveal();
+    if (st.market && st.interval && Date.now() - st.loadedAt > 60_000) load(false);
   });
 
   // ───────────── Start ─────────────

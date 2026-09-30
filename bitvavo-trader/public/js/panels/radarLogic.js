@@ -240,10 +240,13 @@ export function snapshotSummary(snap, rows) {
   return summaryText({ count: active.length, mode: universeMode(snap), buy: counts.buy, positions });
 }
 
-/** "50 dagen" (1d) / "200 uur" (4h: 50 × 4 uur) */
+/**
+ * "50 dagen" (1d) / "80 blokken van 4 uur" (4h). Dezelfde woorden als Instellingen, het
+ * Backtest-lab en de uitleg van de engine (trendPeriodLabel in src/strategies/trendFilter.ts).
+ */
 export function trendPeriodText(interval, period) {
   const p = isNum(period) && period > 0 ? Math.round(period) : 50;
-  if (interval === "4h") return `${p * 4} uur`;
+  if (interval === "4h") return `${p} blokken van 4 uur`;
   if (interval === "1d" || !interval) return plural(p, "dag", "dagen");
   return `${p} candles van ${interval}`;
 }

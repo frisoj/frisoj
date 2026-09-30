@@ -594,3 +594,56 @@ describe("helpers voor het startscherm", () => {
     expect(describeAutoUniverse({ count: 1, minVolumeEur: 0 })).toBe("automatisch: de munt met de meeste handel (min. €0 per dag)");
   });
 });
+
+describe("oud config.json van v1 (zonder universe) — ronde 5", () => {
+  /** Zoals v1 het opsloeg: de volledige config zonder v2-velden. */
+  function v1File(markets: string[]): string {
+    const dir = tmp();
+    const v1 = structuredClone(DEFAULT_ENGINE_CONFIG) as Partial<EngineConfig>;
+    delete v1.universe;
+    delete v1.ensemble!.trendFilter;
+    delete v1.risk!.maxSpreadPct;
+    v1.markets = markets;
+    writeFileSync(join(dir, "config.json"), JSON.stringify(v1));
+    return dir;
+  }
+
+  it("zonder MARKETS in .env volgt de bot de opgeslagen munten (manual), met één uitleg bij het starten", () => {
+    const dir = v1File(["BTC-EUR", "ADA-EUR"]);
+    const warnings: string[] = [];
+    const cfg = loadConfig({ DATA_DIR: dir }, { warn: (m) => warnings.push(m) });
+    expect(cfg.engine.universe).toEqual({ mode: "manual", count: 30, minVolumeEur: 250_000 });
+    expect(cfg.engine.markets).toEqual(["BTC-EUR", "ADA-EUR"]);
+    expect(warnings).toEqual([
+      `ℹ Oud instellingenbestand (${join(dir, "config.json")}): de bot volgt je opgeslagen munten (BTC-EUR, ADA-EUR). ` +
+        "Automatisch kiezen kan in Instellingen → Munten.",
+    ]);
+    // De beschermende v2-standaarden blijven (trendfilter, spreadlimiet).
+    expect(cfg.engine.ensemble.trendFilter).toEqual(DEFAULT_ENGINE_CONFIG.ensemble.trendFilter);
+    expect(cfg.engine.risk.maxSpreadPct).toBe(DEFAULT_ENGINE_CONFIG.risk.maxSpreadPct);
+  });
+
+  it.each(["auto", "auto:50"])("MARKETS=%s in .env: de opgeslagen lijst wint, met de gewone melding", (raw) => {
+    const dir = v1File(["BTC-EUR", "ADA-EUR"]);
+    const warnings: string[] = [];
+    const cfg = loadConfig({ DATA_DIR: dir, MARKETS: raw }, { warn: (m) => warnings.push(m) });
+    expect(cfg.engine.universe?.mode).toBe("manual");
+    expect(cfg.engine.markets).toEqual(["BTC-EUR", "ADA-EUR"]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/^⚠ MARKETS uit \.env \(auto:\d+\) wordt genegeerd: in het dashboard is een eigen lijst \(BTC-EUR, ADA-EUR\) opgeslagen/);
+  });
+
+  it("readEngineOverrides: v1-bestand → universe manual + melding; v2-bestand met universe → ongewijzigd", () => {
+    const seen: string[][] = [];
+    const v1 = readEngineOverrides(v1File(["ETH-EUR"]), () => {}, (m) => seen.push(m));
+    expect(v1.universe).toEqual({ mode: "manual" });
+    expect(seen).toEqual([["ETH-EUR"]]);
+
+    const dir = tmp();
+    saveEngineOverrides(dir, { ...structuredClone(DEFAULT_ENGINE_CONFIG), markets: ["ETH-EUR"] });
+    const v2 = readEngineOverrides(dir, () => {}, (m) => seen.push(m));
+    expect(v2.universe).toEqual(DEFAULT_ENGINE_CONFIG.universe);
+    expect(seen).toHaveLength(1);
+    expect(loadConfig({ DATA_DIR: dir }).engine.universe?.mode).toBe("auto");
+  });
+});
