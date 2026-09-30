@@ -1031,4 +1031,59 @@ export interface AppInfo {
   version: string;
   /** Startkapitaal van de oefenmodus (paper) */
   paperStartingCapital?: number;
+  /** Meerdere bots: deze bot (id + naam), zie BotSummary */
+  bot?: { id: string; name: string; short: string; color: string };
+}
+
+// ─────────────────────────────── Meerdere bots (wedstrijd) ───────────────────────────────
+
+/** GET /api/bots: samenvatting van één bot voor de wedstrijd */
+export interface BotSummary {
+  id: string;
+  /** Bijv. "Snelle scalper" */
+  name: string;
+  /** Kort, bijv. "Scalper" */
+  short: string;
+  /** Nederlandse uitleg van de handelsstijl */
+  description: string;
+  /** Kleur (hex) voor grafieken */
+  color: string;
+  /** URL-pad van het eigen dashboard, bijv. "/bot/scalper/" */
+  path: string;
+  mode: TradingMode;
+  running: boolean;
+  liveArmed: boolean;
+  interval: Interval;
+  startedAt: number | null;
+  /** Startkapitaal (paper) of kapitaallimiet (live) */
+  startingEquity: number;
+  equity: number;
+  totalPnlQuote: number;
+  totalReturnPct: number;
+  dayPnlQuote: number;
+  dayReturnPct: number;
+  feesPaid: number;
+  /** Resultaat vóór kosten: totalPnlQuote + feesPaid */
+  grossPnlQuote: number;
+  /** Gesloten trades (alle, niet alleen de laatste 200) */
+  trades: number;
+  wins: number;
+  losses: number;
+  winRatePct: number;
+  /** Gemiddelde winst / verlies per trade in % (0 als er geen zijn) */
+  avgWinPct: number;
+  avgLossPct: number;
+  /** Bruto winst / bruto verlies (999 als er geen verlies is, 0 zonder trades) */
+  profitFactor: number;
+  /** Grootste daling van piek naar dal van (equity + skimmed), in % van de piek (≤ 0) */
+  maxDrawdownPct: number;
+  tradesToday: number;
+  openPositions: number;
+  activeMarkets: number;
+  halted: HaltStatus;
+  /** Markt met het beste / slechtste resultaat (null zonder trades) */
+  bestMarket: { market: string; pnlQuote: number } | null;
+  worstMarket: { market: string; pnlQuote: number } | null;
+  /** Equity-verloop (equity + skimmed), oplopend, max ~300 punten */
+  equityHistory: { time: number; value: number }[];
 }

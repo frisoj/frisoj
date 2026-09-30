@@ -974,3 +974,70 @@ seen excluding it.
   previous day end — days, days ≥ target (1% when the target is off), win / loss days, average / best / worst day.
 * Dashboard: risk panel row "Dagdoel" (progress → "gehaald ✓ grens +1%" → "winst vastgezet ✓"), a green
   "Winst vastgezet" banner and a green "WINST VAST ✓" badge in the header instead of the red halt.
+
+## v3 — Bot-wedstrijd: meerdere bots in één programma (binding)
+
+Four bots (default) run side by side in ONE process, each with its own budget, trading style, engine, broker,
+state and settings, sharing one market-data feed. The user compares them in a new dashboard tab "Wedstrijd".
+
+### Profiles (`src/bots/profiles.ts`, done and tested)
+`BOT_PROFILES` (scalper, trend, dip, allround), `DEFAULT_BOT_IDS`, `getProfile(id)`, `profileEngineConfig(profile, base?)`
+(DEFAULT_ENGINE_CONFIG with the profile on top). `BotSummary` is in `src/core/types.ts` (and `AppInfo.bot?`).
+
+### Config (`src/config.ts`)
+* `.env` `BOTS` = comma list of profile ids (default all four: `scalper,trend,dip,allround`); unknown id → Dutch
+  ConfigError; duplicates removed. `BOTS=allround` = a single bot.
+* `PAPER_CAPITAL_PER_BOT` (default 25, ≥ 5): paper starting capital of each bot when there is more than one bot;
+  with exactly one bot the existing `PAPER_STARTING_CAPITAL` (default 50) applies.
+* Live: `LIVE_BOT=<id>` picks the ONE bot that trades with real money (`TRADING_MODE=live`); all other bots keep
+  running in paper mode on real prices. With more than one bot and no (valid) `LIVE_BOT`, startup fails with a
+  Dutch StartupError. The live bot uses `CAPITAL_LIMIT_EUR`. Never two live bots (one Bitvavo account).
+* Per-bot engine config = `profileEngineConfig(profile)` → then `.env` `MARKETS`/`INTERVAL` are **ignored** for
+  multi-bot (profiles decide; say so once in the banner when they are set) → then saved dashboard settings of that bot
+  (`<DATA_DIR>/bots/<id>/config.json`, read with the existing `readEngineOverrides` + `mergeEngineConfig`, saved with
+  `saveEngineOverrides(<botDir>, cfg)`). State: `<DATA_DIR>/bots/<id>/state-<mode>.json`. A single-bot setup
+  (`BOTS=<one id>`) keeps using the old paths (`<DATA_DIR>/config.json`, `<DATA_DIR>/state-<mode>.json`) and the
+  old env behaviour, so existing single-bot users lose nothing.
+
+### Process (`src/main.ts`)
+* One `BitvavoClient`, one feed (shared), one `HeavyRunner` (shared). Per bot: its own broker (`PaperBroker` with
+  the bot's capital; the live bot a `LiveBroker` + `syncAccountFees`), `StateStore`, `TradingEngine`,
+  `createApp(...)` (with `persistConfig` to the bot's dir and `info` adding `AppInfo.bot`), `startPriceMonitor()`,
+  autostart.
+* `attachTerminalLog(engine, prefix)` — every terminal log line is prefixed with the bot's short name
+  (`[Scalper] KOOP …`) when there is more than one bot.
+* Banner: mode, data source, one line per bot (name, interval, capital, coins) and the URLs (overview + per bot).
+* Graceful shutdown stops all engines (existing shutdown helper, generalised).
+
+### HTTP (`src/server/multiApp.ts`, new)
+`createMultiApp({ bots: { id, app, engine, profile, config }[], defaultId })` → `App`-like `{ handle, hub?, dispose }`:
+* `/api/...` → the default (first) bot's app (backward compatible; single-bot = unchanged).
+* `/bot/<id>/api/...` → that bot's app with the `/bot/<id>` prefix stripped from `req.url` (all existing security
+  checks — Host, token, CSRF, body limits — run unchanged inside that app).
+* `/bot/<id>` → 301 to `/bot/<id>/`; `/bot/<id>/` and `/bot/<id>/index.html` → the dashboard (`public/index.html`,
+  assets are absolute paths so they load from `/`). Unknown id → 404 "Onbekende bot".
+* Aggregate routes, registered on the DEFAULT bot's router via a new optional `ApiDeps.bots` provider (so they get
+  the same security): `GET /api/bots` → `BotSummary[]` (in `BOTS` order); `POST /api/bots/start-all`,
+  `/api/bots/stop-all`, `/api/bots/kill-all` → `{ results: { id, ok, error?, killResult? }[] }` (kill-all runs every
+  bot's kill switch even when one fails). `summarize(engine, profile)` is a pure, tested function in
+  `src/bots/summary.ts` (maxDrawdown over equity+skimmed, win/loss stats over ALL closed trades the engine keeps,
+  best/worst market, equity history downsampled to ≤ 300 points).
+* `GET /api/info` of each bot includes `bot: { id, name, short, color }`.
+
+### Feed
+`BitvavoFeed.getCandles`: concurrent identical requests (market|interval|limit) share one in-flight request and the
+result is reused for 5 s — several bots on the same interval then cost one request.
+
+### Dashboard
+* `public/js/api.js`: `BASE` = `/bot/<id>` when `location.pathname` starts with `/bot/<id>`, else `""`. Every
+  bot-specific request and the SSE URL get the BASE; `api.getBots()`, `api.startAll()`, `api.stopAll()`, `api.killAll()`
+  always use the root (`/api/bots…`).
+* Header: a bot switcher (current bot's name + colour dot; a list of all bots with their total return %, linking to
+  `/bot/<id>/`), hidden when there is one bot. The page title shows the bot's short name.
+* New nav tab **Wedstrijd** (`#tab-compete`, panel `public/js/panels/compete.js`, pure helpers
+  `public/js/panels/competeLogic.js`, styles `public/css/compete.css`): leaderboard (rank by total return), per bot:
+  result € and %, result before costs, fees, win rate (W/L), trades (today / total), max drawdown, today's result,
+  status (running / stopped / halted, live badge), link "Open dashboard"; one chart with the equity lines of all bots
+  (profile colours); a plain-Dutch analysis (who leads, whether any bot earns more than its costs, how much of the
+  gross result went to fees); buttons "Alles starten", "Alles stoppen", "Noodstop alle bots" (confirm modal).
+  Polls `/api/bots` every 10 s while visible. Works at 390 px and 1440 px.
