@@ -741,6 +741,11 @@ export class TradingEngine extends EventEmitter {
     };
   }
 
+  /** Laatste beslissing van een markt (ook als die niet in de snapshot staat), of null. */
+  decisionFor(market: string): EnsembleDecision | null {
+    return this.decisions[market] ?? null;
+  }
+
   updateConfig(partial: Partial<EngineConfig>): EngineConfig {
     const prev = this.config;
     const p: Partial<EngineConfig> = partial ?? {};
