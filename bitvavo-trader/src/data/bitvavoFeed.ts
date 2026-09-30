@@ -15,6 +15,12 @@
  *   zonder markt (gewicht 1). Gelijktijdige aanroepen delen één verzoek en het
  *   resultaat wordt ~2 s hergebruikt. Fouten worden niet gecachet en gaan door
  *   naar de aanroeper.
+ * - `getCandles` (v3, meerdere bots): gelijke verzoeken (markt|interval|limit) die
+ *   tegelijk lopen delen één verzoek, en een (niet-leeg) resultaat wordt ~5 s
+ *   hergebruikt — bots op hetzelfde interval kosten dan samen één verzoek. Alleen
+ *   verzoeken met dezelfde opties (`fast`/`priority`) delen een lopend verzoek, want
+ *   die bepalen hoe het mag mislukken; een gelukt resultaat is voor iedereen bruikbaar.
+ *   Elke aanroeper krijgt eigen kopieën (de cache kan niet aangepast worden).
  * - Optioneel (buiten het MarketDataFeed-contract): een laatste argument
  *   {@link FeedRequestOptions} per verzoek. De engine geeft dat mee; andere feeds
  *   negeren het.
@@ -39,6 +45,10 @@ const MARKETS_TTL_MS = 3_600_000;
 const TICKERS_TTL_MS = 30_000;
 /** Prijzen van alle markten: kort hergebruiken, zodat gelijktijdige vragers (engine, server) één verzoek delen. */
 const PRICES_TTL_MS = 2_000;
+/** Candles: zo lang hergebruiken meerdere bots (en het dashboard) hetzelfde antwoord. */
+export const CANDLES_TTL_MS = 5_000;
+/** Vanaf zoveel bewaarde candle-antwoorden worden de verlopen opgeruimd. */
+const CANDLES_CACHE_SWEEP = 256;
 const PAGE_LIMIT = 1440;
 const LOW_RATE_LIMIT = 100;
 const VERY_LOW_RATE_LIMIT = 20;
@@ -128,6 +138,11 @@ function copyTickers(list: readonly Ticker24h[]): Ticker24h[] {
   return list.map((t) => ({ ...t }));
 }
 
+/** Idem voor candles. */
+function copyCandles(list: readonly Candle[]): Candle[] {
+  return list.map((c) => ({ ...c }));
+}
+
 function intervalMs(interval: Interval): number {
   const ms = INTERVAL_MS[interval];
   if (!ms) throw new Error(`Ongeldig interval: ${String(interval)}`);
@@ -149,6 +164,10 @@ export class BitvavoFeed implements MarketDataFeed {
   /** Laatste prijzen van ALLE markten (markt → prijs) */
   private pricesAll: { at: number; data: Record<string, number> } | null = null;
   private pricesInflight: Promise<Record<string, number>> | null = null;
+  /** Laatste candle-antwoorden per "markt|interval|limit" */
+  private readonly candlesCache = new Map<string, { at: number; data: Candle[] }>();
+  /** Lopende candle-verzoeken per "markt|interval|limit|opties" */
+  private readonly candlesInflight = new Map<string, Promise<Candle[]>>();
   private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(
@@ -191,9 +210,44 @@ export class BitvavoFeed implements MarketDataFeed {
     intervalMs(interval);
     const n = Math.min(PAGE_LIMIT, Math.floor(Number(limit)));
     if (!(n >= 1)) return [];
-    const candles = await this.client.candles(market, interval, { limit: n }, clientOpts(req));
-    const sorted = dedupeSort(candles ?? []);
-    return sorted.length > n ? sorted.slice(sorted.length - n) : sorted;
+    const key = `${market}|${interval}|${n}`;
+    const now = this.nowFn();
+    const cached = this.candlesCache.get(key);
+    if (cached && now - cached.at >= 0 && now - cached.at < CANDLES_TTL_MS) return copyCandles(cached.data);
+
+    // Alleen verzoeken met dezelfde opties delen een lopend verzoek: een `fast`-verzoek
+    // mag snel mislukken (geen herhaling, niet wachten), een stop-loss-verzoek niet.
+    const flightKey = `${key}|${req?.fast === true ? "f" : "-"}${req?.priority === true ? "p" : "-"}`;
+    let flight = this.candlesInflight.get(flightKey);
+    if (!flight) {
+      // Het verzoek start pas na het registreren (then), zodat ook een synchrone fout
+      // het lopende verzoek netjes opruimt.
+      const p: Promise<Candle[]> = Promise.resolve()
+        .then(() => this.client.candles(market, interval, { limit: n }, clientOpts(req)))
+        .then((candles) => {
+          const sorted = dedupeSort(candles ?? []);
+          const data = sorted.length > n ? sorted.slice(sorted.length - n) : sorted;
+          // Een leeg antwoord (nieuwe of illiquide markt, storing) niet hergebruiken.
+          if (data.length > 0) this.storeCandles(key, data);
+          return data;
+        })
+        .finally(() => {
+          if (this.candlesInflight.get(flightKey) === p) this.candlesInflight.delete(flightKey);
+        });
+      this.candlesInflight.set(flightKey, p);
+      flight = p;
+    }
+    return copyCandles(await flight);
+  }
+
+  private storeCandles(key: string, data: Candle[]): void {
+    const now = this.nowFn();
+    if (this.candlesCache.size >= CANDLES_CACHE_SWEEP) {
+      for (const [k, v] of this.candlesCache) {
+        if (!(now - v.at >= 0 && now - v.at < CANDLES_TTL_MS)) this.candlesCache.delete(k);
+      }
+    }
+    this.candlesCache.set(key, { at: now, data });
   }
 
   async getHistory(market: string, interval: Interval, fromMs: number, toMs: number): Promise<Candle[]> {

@@ -17,13 +17,18 @@ export interface TerminalOut {
   error(msg: string): void;
 }
 
-/** Print één logregel (warn/error/trade; info alleen in het dashboard). */
-export function printLogEntry(entry: LogEntry, out: TerminalOut = console): void {
+/**
+ * Print één logregel (warn/error/trade; info alleen in het dashboard). Met `prefix`
+ * (bij meer bots de korte naam, bijv. "Scalper") begint de regel met `[Scalper] `,
+ * zodat je in de terminal ziet welke bot het was.
+ */
+export function printLogEntry(entry: LogEntry, out: TerminalOut = console, prefix?: string): void {
   if (!entry || typeof entry.message !== "string") return;
   const time = new Date(entry.time ?? Date.now()).toLocaleTimeString("nl-NL");
-  if (entry.level === "error") out.error(`[${time}] ✖ ${entry.message}`);
-  else if (entry.level === "warn") out.warn(`[${time}] ⚠ ${entry.message}`);
-  else if (entry.level === "trade") out.log(`[${time}] € ${entry.message}`);
+  const who = prefix ? `[${prefix}] ` : "";
+  if (entry.level === "error") out.error(`${who}[${time}] ✖ ${entry.message}`);
+  else if (entry.level === "warn") out.warn(`${who}[${time}] ⚠ ${entry.message}`);
+  else if (entry.level === "trade") out.log(`${who}[${time}] € ${entry.message}`);
 }
 
 /**
@@ -32,7 +37,15 @@ export function printLogEntry(entry: LogEntry, out: TerminalOut = console): void
  * daarna de listener voor nieuwe regels. Beide gebeuren synchroon achter
  * elkaar, dus er kan geen regel dubbel of verloren gaan.
  */
-export function attachTerminalLog(engine: LogSourceLike, print: (entry: LogEntry) => void = (e) => printLogEntry(e)): void {
+export function attachTerminalLog(
+  engine: LogSourceLike,
+  /** Eigen printfunctie, of een voorvoegsel (korte botnaam) voor {@link printLogEntry}. */
+  printOrPrefix?: ((entry: LogEntry) => void) | string,
+): void {
+  const print =
+    typeof printOrPrefix === "function"
+      ? printOrPrefix
+      : (e: LogEntry) => printLogEntry(e, console, typeof printOrPrefix === "string" ? printOrPrefix : undefined);
   const earlier = engine
     .snapshot()
     .logs.filter((l) => l && (l.level === "warn" || l.level === "error"))

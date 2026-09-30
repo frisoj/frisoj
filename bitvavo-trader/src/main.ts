@@ -1,48 +1,42 @@
 /**
- * Startpunt: `npm start`. Leest de configuratie, kiest de databron en broker,
- * start de trading-engine en het dashboard (HTTP + SSE).
+ * Startpunt: `npm start`. Leest de configuratie, kiest de databron, bouwt de bots
+ * (standaard vier, elk met een eigen budget, broker, engine en instellingen; zie
+ * `BOTS` in .env) en start het dashboard (HTTP + SSE).
  */
+import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import {
   ConfigError,
   describeAutoUniverse,
   loadConfig,
-  repairRiskConfig,
+  planBots,
   shortList,
   universeOrManual,
   type AppConfig,
 } from "./config";
-import { APP_VERSION, DEFAULT_ENGINE_CONFIG } from "./core/defaults";
+import { APP_VERSION } from "./core/defaults";
 import type {
   BacktestResult,
-  Broker,
   EngineConfig,
   MarketDataFeed,
   OptimizationResult,
   WalkForwardResult,
 } from "./core/types";
 import { BitvavoClient } from "./exchange/bitvavoClient";
-import { LiveBroker } from "./broker/liveBroker";
-import { PaperBroker } from "./broker/paperBroker";
 import { BitvavoFeed } from "./data/bitvavoFeed";
 import { SimulatedFeed } from "./data/simulatedFeed";
 import { isBitvavoReachable } from "./data/reachability";
-import { StateStore } from "./engine/stateStore";
-import { TradingEngine } from "./engine/tradingEngine";
 import { listStrategies } from "./strategies";
 import { decisionsToMarkers, runEnsemble } from "./strategies/ensemble";
 import { detectRegimes } from "./strategies/regime";
 import { chartIndicators } from "./indicators";
 import { validateRiskConfig } from "./risk/riskManager";
-import { createApp, startHttpServer, isLoopbackHost, type RunningServer } from "./server/httpServer";
+import { startHttpServer, isLoopbackHost, type RunningServer } from "./server/httpServer";
 import { HeavyRunner } from "./server/heavyRunner";
-import { createShutdown } from "./server/shutdown";
-import { syncAccountFees } from "./server/accountFees";
-import { attachTerminalLog } from "./server/terminalLog";
+import { combineEngines, createShutdown } from "./server/shutdown";
 import type { Services } from "./server/routes";
-
-class StartupError extends Error {}
+import { assembleBots, assertNoOtherLiveLedgers, StartupError, type AssembledBot } from "./bots/assemble";
 
 const LINE = "═".repeat(66);
 const BANG = "!".repeat(66);
@@ -84,81 +78,48 @@ async function createFeed(config: AppConfig, client: BitvavoClient): Promise<Mar
   return new SimulatedFeed();
 }
 
-/**
- * Houdt in de eigen marktlijst (`config.markets`, 1..400) alleen markten over
- * die bestaan en verhandelbaar zijn in EUR. Bij de automatische muntkeuze is
- * dat de reservelijst (tot de eerste automatische keuze); die keuze zelf
- * gebruikt altijd de actuele marktlijst van Bitvavo.
- */
-async function sanitizeMarkets(feed: MarketDataFeed, engine: EngineConfig): Promise<void> {
-  let known: Set<string>;
-  try {
-    const markets = await feed.getMarkets();
-    known = new Set(markets.filter((m) => m.quote === "EUR" && m.status === "trading").map((m) => m.market));
-  } catch (err) {
-    console.warn(`⚠ Kon de marktlijst niet ophalen (${(err as Error).message}); markten niet gecontroleerd.`);
-    return;
-  }
-  const auto = universeOrManual(engine.universe).mode === "auto";
-  const which = auto ? "je eigen marktlijst (reserve voor de automatische keuze)" : "je marktlijst";
-  const ok = engine.markets.filter((m) => known.has(m));
-  const dropped = engine.markets.filter((m) => !known.has(m));
-  if (dropped.length > 0) {
-    console.warn(`⚠ Onbekende of niet-verhandelbare markten overgeslagen in ${which}: ${shortList(dropped)}`);
-  }
-  if (ok.length === 0) {
-    const fallback = DEFAULT_ENGINE_CONFIG.markets.filter((m) => known.has(m));
-    const list = fallback.length > 0 ? fallback : [...known].sort().slice(0, 3);
-    if (list.length === 0) throw new StartupError("Er zijn geen verhandelbare EUR-markten gevonden.");
-    console.warn(`⚠ Geen geldige markten in ${which}; de bot gebruikt ${list.join(", ")}.`);
-    engine.markets = list;
-  } else {
-    engine.markets = ok;
-  }
-}
-
 /** De "Markten:"-regel van het startscherm. */
 function marketsLine(engineCfg: EngineConfig): string {
   const u = universeOrManual(engineCfg.universe);
   return u.mode === "auto" ? describeAutoUniverse(u) : shortList(engineCfg.markets);
 }
 
-function printBanner(
-  config: AppConfig,
-  feed: MarketDataFeed,
-  engineCfg: EngineConfig,
-  url: string,
-  running: boolean | "starting",
-) {
-  const eur = (n: number) => `€${n.toLocaleString("nl-NL", { maximumFractionDigits: 2 })}`;
+const eur = (n: number) => `€${n.toLocaleString("nl-NL", { maximumFractionDigits: 2 })}`;
+const pct = (n: number, d = 2) => `${n.toLocaleString("nl-NL", { maximumFractionDigits: d })}%`;
+
+function riskLine(engineCfg: EngineConfig): string {
+  const r = engineCfg.risk;
+  return (
+    `${pct(r.riskPerTradePct)} per trade, max ${pct(r.maxPositionPct)} per positie, ` +
+    `dagverlieslimiet ${pct(r.dailyLossLimitPct)}, taker fee ${pct(r.takerFee * 100, 3)}`
+  );
+}
+
+function runningText(running: boolean | "starting", many: boolean): string {
+  if (running === "starting") return many ? "worden gestart (eerste koersen ophalen…)" : "wordt gestart (eerste koersen ophalen…)";
+  if (running) return many ? "draaien" : "draait";
+  return many ? "gestopt (start ze in het dashboard)" : "gestopt (start hem in het dashboard)";
+}
+
+/** Startscherm met één bot: zoals vóór de wedstrijd (plus de naam van het profiel). */
+function printSingleBanner(config: AppConfig, feed: MarketDataFeed, bot: AssembledBot, url: string, running: boolean | "starting") {
+  const engineCfg = bot.engine.snapshot().config;
   const out: string[] = [];
   out.push("", LINE, `  Bitvavo Trader v${APP_VERSION}`, LINE);
-  if (config.mode === "paper") {
-    out.push(`  Modus:      OEFENMODUS (paper) — Oefenmodus met nep-geld (${eur(config.paperStartingCapital)})`);
+  if (bot.setup.mode === "paper") {
+    out.push(`  Modus:      OEFENMODUS (paper) — Oefenmodus met nep-geld (${eur(bot.setup.startingCapital)})`);
   } else {
-    out.push(`  Modus:      LIVE — ECHT GELD (de bot gebruikt maximaal ${eur(config.capitalLimitQuote)})`);
+    out.push(`  Modus:      LIVE — ECHT GELD (de bot gebruikt maximaal ${eur(bot.setup.startingCapital)})`);
     out.push("              Er worden pas echte orders geplaatst als je de bot in het dashboard 'armt'.");
-    const r = engineCfg.risk;
-    const pct = (n: number, d = 2) => `${n.toLocaleString("nl-NL", { maximumFractionDigits: d })}%`;
-    out.push(
-      `  Risico:     ${pct(r.riskPerTradePct)} per trade, max ${pct(r.maxPositionPct)} per positie, ` +
-        `dagverlieslimiet ${pct(r.dailyLossLimitPct)}, taker fee ${pct(r.takerFee * 100, 3)}`,
-    );
+    out.push(`  Risico:     ${riskLine(engineCfg)}`);
   }
   out.push(
     `  Marktdata:  ${feed.source === "bitvavo" ? "Bitvavo (echte koersen)" : "SIMULATIE (nep-koersen, geen echte markt)"}`,
   );
+  out.push(`  Stijl:      ${bot.setup.profile.name}`);
   out.push(`  Markten:    ${marketsLine(engineCfg)}`);
   out.push(`  Interval:   ${engineCfg.interval}`);
-  out.push(
-    `  Bot:        ${
-      running === "starting"
-        ? "wordt gestart (eerste koersen ophalen…)"
-        : running
-          ? "draait"
-          : "gestopt (start hem in het dashboard)"
-    }`,
-  );
+  out.push(`  Bot:        ${runningText(running, false)}`);
   if (config.dashboardToken) out.push("  Token:      dashboard vraagt om DASHBOARD_TOKEN uit .env");
   const phoneUrls = lanUrls(config);
   if (phoneUrls.length > 0) {
@@ -169,6 +130,73 @@ function printBanner(
   } else {
     out.push("", `  ➜ Open het dashboard:  ${url}`, "", "  Stoppen: druk op Ctrl+C", LINE, "");
   }
+  console.log(out.join("\n"));
+}
+
+/** Tekst op vaste breedte (voor de kolommen van de botlijst). */
+function pad(s: string, n: number): string {
+  return s.length >= n ? s : s + " ".repeat(n - s.length);
+}
+
+/** Startscherm met meer bots: één regel per bot en de adressen (overzicht + per bot). */
+function printMultiBanner(
+  config: AppConfig,
+  feed: MarketDataFeed,
+  bots: readonly AssembledBot[],
+  url: string,
+  running: boolean | "starting",
+) {
+  const out: string[] = [];
+  const live = bots.find((b) => b.setup.mode === "live");
+  const paper = bots.filter((b) => b.setup.mode === "paper");
+  out.push("", LINE, `  Bitvavo Trader v${APP_VERSION} — Bot-wedstrijd: ${bots.length} bots`, LINE);
+  const paperCapital = [...new Set(paper.map((b) => b.setup.startingCapital))];
+  const paperText = paperCapital.length === 1 ? `${eur(paperCapital[0])} per bot` : "eigen bedrag per bot";
+  if (!live) {
+    out.push(`  Modus:      OEFENMODUS (paper) — elke bot oefent met eigen nep-geld (${paperText})`);
+  } else {
+    out.push(`  Modus:      LIVE — ECHT GELD voor ${live.setup.profile.name} (maximaal ${eur(live.setup.startingCapital)})`);
+    out.push(`              De andere bots oefenen met nep-geld (${paperText}) op echte koersen.`);
+    out.push("              Er worden pas echte orders geplaatst als je de live-bot in zijn dashboard 'armt'.");
+    out.push(`  Risico:     ${riskLine(live.engine.snapshot().config)} (live-bot)`);
+  }
+  out.push(
+    `  Marktdata:  ${feed.source === "bitvavo" ? "Bitvavo (echte koersen, gedeeld door alle bots)" : "SIMULATIE (nep-koersen, geen echte markt)"}`,
+  );
+  out.push("  Bots:");
+  const nameWidth = Math.max(...bots.map((b) => b.setup.profile.name.length));
+  for (const b of bots) {
+    const cfg = b.engine.snapshot().config;
+    const money = b.setup.mode === "live" ? `${eur(b.setup.startingCapital)} ECHT GELD` : `${eur(b.setup.startingCapital)} nep-geld`;
+    out.push(`    • ${pad(b.setup.profile.name, nameWidth)}  ${pad(cfg.interval, 3)}  ${pad(money, 15)}  ${marketsLine(cfg)}`);
+  }
+  if (config.marketsEnv || config.intervalEnv) {
+    out.push(
+      "  ℹ MARKETS/INTERVAL uit .env gelden niet bij meerdere bots: elke bot volgt zijn eigen stijl",
+      "    (aan te passen per bot, in zijn dashboard → Instellingen).",
+    );
+  }
+  if (existsSync(join(config.dataDir, "state-paper.json")) && !live) {
+    out.push(
+      `  ℹ Je oude oefenadministratie (${join(config.dataDir, "state-paper.json")}) doet niet mee in de wedstrijd;`,
+      "    met BOTS=allround (één bot) gebruik je hem weer.",
+    );
+  }
+  out.push(
+    `  Status:     ${runningText(running, true)}${live && running === "starting" ? " — de live-bot start je zelf in zijn dashboard" : ""}`,
+  );
+  if (config.dashboardToken) out.push("  Token:      dashboard vraagt om DASHBOARD_TOKEN uit .env");
+  const phoneUrls = lanUrls(config);
+  const local = phoneUrls.length > 0 ? `http://127.0.0.1:${config.port}` : url;
+  const here = phoneUrls.length > 0 ? " op deze computer" : "";
+  out.push("", `  ➜ Wedstrijd (alle bots)${here}: ${local}/  (tabblad "Wedstrijd")`);
+  const urlWidth = nameWidth + 1;
+  for (const b of bots) out.push(`  ➜ ${pad(`${b.setup.profile.name}:`, urlWidth)}  ${local}${b.setup.path}`);
+  if (phoneUrls.length > 0) {
+    for (const u of phoneUrls) out.push(`  ➜ Op je telefoon (zelfde wifi): ${u}/  (één bot, bijv.: ${u}${bots[0].setup.path})`);
+    if (!config.dashboardToken) out.push("  ⚠ Zet een DASHBOARD_TOKEN in .env: nu kan iedereen op je wifi de bots bedienen.");
+  }
+  out.push("", "  Stoppen: druk op Ctrl+C", LINE, "");
   console.log(out.join("\n"));
 }
 
@@ -185,13 +213,20 @@ function lanUrls(config: AppConfig): string[] {
 }
 
 async function main(): Promise<void> {
-  const config = loadConfig();
-  const engineConfig = structuredClone(config.engine);
-  // Vóór het bouwen van een broker: de PaperBroker neemt fee/slippage over.
-  const fixedRisk = repairRiskConfig(engineConfig.risk);
-  if (fixedRisk.length > 0) {
-    console.warn(`⚠ Ongeldige risico-instellingen vervangen door standaardwaarden: ${fixedRisk.join(", ")}.`);
+  // Meldingen over de oude instellingen van één bot alleen als er ook één bot draait.
+  const config = loadConfig(process.env, { onlySingleBotWarnings: true });
+  // Eén BotSetup per bot (profiel, modus, map, kapitaal, instellingen). Live met meer
+  // bots zonder geldige LIVE_BOT stopt hier met een Nederlandse uitleg.
+  let setups;
+  try {
+    setups = planBots(config);
+  } catch (err) {
+    if (err instanceof ConfigError) throw new StartupError(err.message);
+    throw err;
   }
+  const multi = setups.length > 1;
+  // Live: geen onbewaakte live-posities van een andere bot achterlaten (vóór enig netwerkverkeer).
+  assertNoOtherLiveLedgers(config, setups);
 
   const client = new BitvavoClient({
     apiKey: config.apiKey,
@@ -199,6 +234,7 @@ async function main(): Promise<void> {
     operatorId: config.operatorId,
   });
 
+  // Eén feed voor alle bots (Bitvavo deelt gelijke verzoeken en cachet ze kort).
   const feed = await createFeed(config, client);
   if (config.mode === "live" && feed.source !== "bitvavo") {
     throw new StartupError(
@@ -206,45 +242,8 @@ async function main(): Promise<void> {
         "(DATA_SOURCE=bitvavo) of zet TRADING_MODE=paper.",
     );
   }
-  await sanitizeMarkets(feed, engineConfig);
 
-  let broker: Broker;
-  if (config.mode === "paper") {
-    broker = new PaperBroker({
-      startingQuote: config.paperStartingCapital,
-      takerFee: engineConfig.risk.takerFee,
-      slippagePct: engineConfig.risk.slippagePct,
-    });
-  } else {
-    broker = new LiveBroker(client, {
-      getMarketInfo: async (market: string) => (await feed.getMarkets()).find((m) => m.market === market),
-    });
-    // Echte fees ophalen en daarna ook aan de (al gebouwde) LiveBroker doorgeven.
-    await syncAccountFees({
-      account: () => client.account(),
-      broker,
-      risk: engineConfig.risk,
-      validateRisk: validateRiskConfig,
-    });
-  }
-
-  const store = new StateStore(join(config.dataDir, `state-${config.mode}.json`));
-  const engine = new TradingEngine({
-    feed,
-    broker,
-    config: engineConfig,
-    mode: config.mode,
-    store,
-    startingCapital: config.mode === "paper" ? config.paperStartingCapital : config.capitalLimitQuote,
-  });
-  // Ook wat de engine al tijdens het bouwen logde (bijv. "Opgeslagen staat onbruikbaar …"),
-  // daarna elke nieuwe regel.
-  attachTerminalLog(engine);
-  // Zolang de bot niet draait (vóór Start, na Stop/noodstop): alleen koersen verversen,
-  // meteen één keer, zodat herstelde posities niet tegen de instapkoers getoond worden.
-  void engine.startPriceMonitor();
-
-  // Backtests/optimalisaties in een worker-thread: de engine en de noodstop blijven reageren.
+  // Backtests/optimalisaties in één gedeelde worker-thread: de engines en de noodstop blijven reageren.
   const heavyRunner = new HeavyRunner({ log: (m) => console.warn(m) });
   const services: Services = {
     runBacktest: (input) => heavyRunner.run<BacktestResult>("backtest", input),
@@ -257,7 +256,14 @@ async function main(): Promise<void> {
     detectRegimes,
     validateRiskConfig,
   };
-  const app = createApp({ config, engine, feed, services });
+
+  // Per bot: broker (paper met eigen kapitaal, of de ene live-bot met LiveBroker + echte fees),
+  // StateStore, TradingEngine (+ terminal-log met de naam ervoor), koersbewaking en app.
+  const { bots, app } = await assembleBots({ config, setups, feed, services, client });
+  const engines = combineEngines(
+    bots.map((b) => b.engine),
+    { names: bots.map((b) => b.setup.profile.name) },
+  );
 
   let server: RunningServer;
   try {
@@ -285,9 +291,13 @@ async function main(): Promise<void> {
 
   // Eerst het adres tonen: de server draait al. De eerste tick (koersen ophalen)
   // kan bij een trage verbinding even duren; daar mag het startscherm niet op wachten.
-  printBanner(config, feed, engine.snapshot().config, server.url, config.autostart ? "starting" : false);
-  if (config.autostart) {
+  const toStart = bots.filter((b) => b.setup.autostart);
+  const running = toStart.length > 0 ? "starting" : false;
+  if (multi) printMultiBanner(config, feed, bots, server.url, running);
+  else printSingleBanner(config, feed, bots[0], server.url, running);
+  if (toStart.length > 0) {
     const localUrl = lanUrls(config).length > 0 ? `http://127.0.0.1:${config.port}` : server.url;
+    let pending = toStart.length;
     const slow = setTimeout(() => {
       console.log(
         `⏳ Nog bezig met de eerste koersen ophalen${feed.source === "bitvavo" ? " bij Bitvavo" : ""}… ` +
@@ -295,45 +305,57 @@ async function main(): Promise<void> {
       );
     }, 15_000);
     slow.unref();
-    engine
-      .start()
-      .then(
-        () => console.log(`✔ De bot draait. Open het dashboard: ${localUrl}`),
-        (err: unknown) =>
-          console.error(`✖ Kon de bot niet automatisch starten: ${(err as Error).message}. Start hem in het dashboard.`),
-      )
-      .finally(() => clearTimeout(slow));
+    for (const b of toStart) {
+      const who = multi ? `[${b.setup.profile.short}] ` : "";
+      const dashboard = multi ? `${localUrl}${b.setup.path}` : localUrl;
+      b.engine
+        .start()
+        .then(
+          () => console.log(`${who}✔ De bot draait. Open het dashboard: ${dashboard}`),
+          (err: unknown) =>
+            console.error(
+              `${who}✖ Kon de bot niet automatisch starten: ${(err as Error).message}. Start hem in het dashboard.`,
+            ),
+        )
+        .finally(() => {
+          if (--pending === 0) clearTimeout(slow);
+        });
+    }
   }
-  if (config.mode === "live") {
+  const liveBot = bots.find((b) => b.setup.mode === "live");
+  if (liveBot) {
     loud([
-      "⚠  LIVE MODE: je handelt met ECHT geld. Verlies is mogelijk.",
-      "⚠  Start de bot in het dashboard en arm hem pas als je het zeker weet.",
+      multi
+        ? `⚠  LIVE MODE: ${liveBot.setup.profile.name} handelt met ECHT geld. Verlies is mogelijk.`
+        : "⚠  LIVE MODE: je handelt met ECHT geld. Verlies is mogelijk.",
+      multi
+        ? `⚠  Start en arm hem pas in zijn dashboard als je het zeker weet: ${liveBot.setup.path}`
+        : "⚠  Start de bot in het dashboard en arm hem pas als je het zeker weet.",
     ]);
   }
 
   // ── Netjes afsluiten ──
-  // In live mode wacht de noodrem langer zolang er (mogelijk) een order bij Bitvavo
-  // loopt; zie src/server/shutdown.ts.
+  // Alle engines stoppen (tegelijk). In live mode wacht de noodrem langer zolang er
+  // (mogelijk) een order bij Bitvavo loopt; zie src/server/shutdown.ts.
   const { shutdown } = createShutdown({
     mode: config.mode,
     stopEngine: async () => {
-      engine.stopPriceMonitor();
+      for (const b of bots) b.engine.stopPriceMonitor();
       await heavyRunner.close().catch(() => undefined);
-      await engine.stop();
+      await engines.stopAll();
     },
     cleanup: async () => {
-      try {
-        store.flush();
-      } catch (err) {
-        console.error(`Fout bij opslaan van de toestand: ${(err as Error).message}`);
+      for (const b of bots) {
+        try {
+          b.store.flush();
+        } catch (err) {
+          const who = multi ? ` van ${b.setup.profile.name}` : "";
+          console.error(`Fout bij opslaan van de toestand${who}: ${(err as Error).message}`);
+        }
       }
       await server.close().catch(() => undefined);
     },
-    // Optionele vlag van de engine; zonder vlag geldt "mogelijk" tot engine.stop() klaar is.
-    orderInFlight: () => {
-      const flag = (engine as unknown as { orderInFlight?: unknown }).orderInFlight;
-      return typeof flag === "boolean" ? flag : undefined;
-    },
+    orderInFlight: engines.orderInFlight,
     exit: (code) => process.exit(code),
     loud,
   });

@@ -8,6 +8,7 @@ import { isIPv6 } from "node:net";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
+import { DEFAULT_BOT_IDS, getProfile, profileEngineConfig, type BotProfile } from "./bots/profiles";
 import {
   DEFAULT_ENGINE_CONFIG,
   DEFAULT_PAPER_CAPITAL,
@@ -51,6 +52,19 @@ export interface AppConfig {
   engine: EngineConfig;
   /** Start de bot automatisch (paper: standaard ja; live: ALTIJD nee) */
   autostart: boolean;
+  // ── v3: meerdere bots (optioneel, zodat oudere configs in tests blijven werken) ──
+  /** Profiel-id's uit `BOTS`, in die volgorde en zonder dubbele (standaard alle vier). */
+  bots?: string[];
+  /** Startkapitaal (paper) van elke bot als er meer dan één bot is (`PAPER_CAPITAL_PER_BOT`, standaard 25). */
+  paperCapitalPerBot?: number;
+  /** `LIVE_BOT`: de ene bot die in live mode met echt geld handelt (zie {@link resolveLiveBot}). */
+  liveBot?: string;
+  /** `AUTOSTART` voor bots in oefenmodus, ook als een andere bot live handelt (live start nooit vanzelf). */
+  paperAutostart?: boolean;
+  /** `MARKETS` zoals in .env (alleen gebruikt bij één bot; meerdere bots volgen hun profiel). */
+  marketsEnv?: MarketsEnv;
+  /** `INTERVAL` zoals in .env (idem). */
+  intervalEnv?: Interval;
 }
 
 export interface LoadConfigOptions {
@@ -61,6 +75,13 @@ export interface LoadConfigOptions {
   envFile?: string | false;
   /** Waarschuwingen (standaard console.warn); handig om in tests op te vangen. */
   warn?: (msg: string) => void;
+  /**
+   * true (main.ts): meldingen over de instellingen van één bot (`<dataDir>/config.json`
+   * en MARKETS/INTERVAL uit .env) alleen geven als er ook echt één bot draait. Bij
+   * meerdere bots gelden die niet (elke bot heeft een profiel en een eigen map), dus
+   * zouden ze alleen verwarren. Standaard: altijd melden.
+   */
+  onlySingleBotWarnings?: boolean;
 }
 
 export class ConfigError extends Error {
@@ -505,6 +526,204 @@ export function saveEngineOverrides(dataDir: string, cfg: EngineConfig): void {
   renameSync(tmp, file);
 }
 
+// ─────────────────────────────── meerdere bots (v3) ───────────────────────────────
+
+/** Standaard startkapitaal (paper) per bot als er meer dan één bot is. */
+export const DEFAULT_PAPER_CAPITAL_PER_BOT = 25;
+/** Submap van DATA_DIR met één map per bot (alleen bij meer dan één bot). */
+export const BOTS_DIR = "bots";
+
+const BOT_ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** Bekende bot-id's als tekst voor meldingen: "scalper, trend, dip, allround". */
+function knownBotsText(): string {
+  return DEFAULT_BOT_IDS.join(", ");
+}
+
+/**
+ * Leest `BOTS` uit .env: een komma-lijst met profiel-id's (hoofdletters en spaties
+ * maken niet uit, dubbele tellen één keer, de volgorde blijft). Leeg of weggelaten =
+ * alle vier de bots. Een onbekende id geeft een Nederlandse ConfigError.
+ */
+export function parseBotsEnv(raw: string | undefined): string[] {
+  if (raw === undefined || raw.trim() === "") return [...DEFAULT_BOT_IDS];
+  const ids = [
+    ...new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+  if (ids.length === 0) {
+    throw new ConfigError(`BOTS bevat geen bots (nu: "${raw}"). Kies uit: ${knownBotsText()}, bijv. BOTS=scalper,trend.`);
+  }
+  const unknown = ids.filter((id) => !getProfile(id));
+  if (unknown.length > 0) {
+    throw new ConfigError(
+      `BOTS bevat ${unknown.length === 1 ? "een onbekende bot" : "onbekende bots"}: ${unknown.map((u) => `"${u}"`).join(", ")}. ` +
+        `Kies uit: ${knownBotsText()} (komma-gescheiden), bijv. BOTS=scalper,trend. Leeg = alle vier.`,
+    );
+  }
+  return ids;
+}
+
+/**
+ * Welke bot met echt geld handelt. Alleen in live mode (anders null). Eén bot → die
+ * bot (`LIVE_BOT` mag dan weg, maar moet anders dezelfde zijn). Meer bots → `LIVE_BOT`
+ * is verplicht en moet in `BOTS` staan: er is maar één Bitvavo-account, dus nooit twee
+ * live bots. Gooit een Nederlandse ConfigError als dat niet klopt.
+ */
+export function resolveLiveBot(mode: TradingMode, bots: readonly string[], liveBot: string | undefined): string | null {
+  if (mode !== "live") return null;
+  const wanted = liveBot?.trim().toLowerCase() || undefined;
+  if (wanted === undefined) {
+    if (bots.length === 1) return bots[0];
+    throw new ConfigError(
+      `Live handelen met ${bots.length} bots: kies in .env welke ÉÉN bot met echt geld handelt, bijvoorbeeld ` +
+        `LIVE_BOT=${bots.includes("trend") ? "trend" : bots[0]}. De andere bots blijven oefenen met nep-geld op echte koersen. ` +
+        `Kies uit: ${bots.join(", ")}. Of zet BOTS op één bot, of TRADING_MODE=paper om te oefenen.`,
+    );
+  }
+  if (!getProfile(wanted)) {
+    throw new ConfigError(`LIVE_BOT="${wanted}" is geen bekende bot. Kies uit: ${bots.join(", ")}.`);
+  }
+  if (!bots.includes(wanted)) {
+    throw new ConfigError(
+      `LIVE_BOT=${wanted} draait niet: BOTS bevat alleen ${bots.join(", ")}. ` +
+        `Zet LIVE_BOT op een van die bots, of voeg ${wanted} toe aan BOTS.`,
+    );
+  }
+  return wanted;
+}
+
+/**
+ * Map met de instellingen (`config.json`) en de toestand (`state-<mode>.json`) van een
+ * bot: bij één bot de oude plek (`dataDir` zelf), bij meer bots `<dataDir>/bots/<id>`.
+ */
+export function botDataDir(dataDir: string, id: string, multi: boolean): string {
+  if (!BOT_ID_RE.test(id)) throw new ConfigError(`Ongeldige bot-id: "${id}".`);
+  return multi ? join(dataDir, BOTS_DIR, id) : dataDir;
+}
+
+/** Het toestandsbestand van een bot: `<botDataDir>/state-<mode>.json`. */
+export function botStateFile(dataDir: string, id: string, multi: boolean, mode: TradingMode): string {
+  return join(botDataDir(dataDir, id, multi), `state-${mode}.json`);
+}
+
+/** Legt MARKETS/INTERVAL uit .env over een engineconfig heen (muteert `engine`). */
+function applyEnvSelection(engine: EngineConfig, markets: MarketsEnv | undefined, interval: Interval | undefined): void {
+  if (markets) {
+    const universe = universeOrManual(engine.universe);
+    if (markets.mode === "auto") {
+      engine.universe = { ...universe, mode: "auto", count: markets.count };
+    } else {
+      engine.markets = [...markets.markets];
+      engine.universe = { ...universe, mode: "manual" };
+    }
+  }
+  if (interval) engine.interval = interval;
+}
+
+export interface BotEngineConfigOptions {
+  /** De eigen map van de bot ({@link botDataDir}); daar staat zijn opgeslagen `config.json`. */
+  dataDir: string;
+  /** Alleen bij één bot: MARKETS/INTERVAL uit .env (tussen profiel en opgeslagen instellingen). */
+  env?: { markets?: MarketsEnv; interval?: Interval };
+  warn?: (msg: string) => void;
+}
+
+/**
+ * Engine-instellingen van één bot: het profiel (`profileEngineConfig`) → bij één bot
+ * MARKETS/INTERVAL uit .env → de in het dashboard opgeslagen instellingen van die bot
+ * (`<dataDir>/config.json`, gelezen met `readEngineOverrides`, per veld gecontroleerd).
+ */
+export function loadBotEngineConfig(profile: BotProfile, opts: BotEngineConfigOptions): EngineConfig {
+  const engine = profileEngineConfig(profile);
+  applyEnvSelection(engine, opts.env?.markets, opts.env?.interval);
+  const overrides = readEngineOverrides(opts.dataDir, opts.warn ?? ((m) => console.warn(m)));
+  return mergeEngineConfig(engine, overrides);
+}
+
+/** Alles wat main.ts nodig heeft om één bot te bouwen. */
+export interface BotSetup {
+  id: string;
+  profile: BotProfile;
+  /** "live" alleen voor de bot uit LIVE_BOT (in live mode); alle andere bots "paper". */
+  mode: TradingMode;
+  /** Meer dan één bot? (bepaalt de mappen en de logprefix) */
+  multi: boolean;
+  /** Eigen map (instellingen); bij één bot de oude DATA_DIR. */
+  dataDir: string;
+  /** `<dataDir>/state-<mode>.json` */
+  stateFile: string;
+  /** Paper: eigen startkapitaal; live: CAPITAL_LIMIT_EUR. */
+  startingCapital: number;
+  engine: EngineConfig;
+  /** Automatisch starten (live nooit). */
+  autostart: boolean;
+  /** Pad van het eigen dashboard: "/bot/<id>/". */
+  path: string;
+  /** Wat de server van deze bot krijgt (modus, map, kapitaal, instellingen). */
+  appConfig: AppConfig;
+}
+
+/**
+ * Maakt van de geladen configuratie één {@link BotSetup} per bot (in de volgorde van
+ * BOTS). Bij één bot: de oude paden, PAPER_STARTING_CAPITAL en MARKETS/INTERVAL uit
+ * .env, zodat bestaande gebruikers niets verliezen. Bij meer bots: `<DATA_DIR>/bots/<id>`,
+ * PAPER_CAPITAL_PER_BOT en alleen het profiel (+ opgeslagen instellingen van die bot).
+ * Gooit een ConfigError als de live-bot niet klopt (zie {@link resolveLiveBot}).
+ */
+export function planBots(config: AppConfig, opts: { warn?: (msg: string) => void } = {}): BotSetup[] {
+  const warn = opts.warn ?? ((m: string) => console.warn(m));
+  const ids = config.bots && config.bots.length > 0 ? [...config.bots] : [...DEFAULT_BOT_IDS];
+  const multi = ids.length > 1;
+  const liveId = resolveLiveBot(config.mode, ids, config.liveBot);
+  const perBot = config.paperCapitalPerBot ?? DEFAULT_PAPER_CAPITAL_PER_BOT;
+  return ids.map((id): BotSetup => {
+    const profile = getProfile(id);
+    if (!profile) throw new ConfigError(`BOTS bevat een onbekende bot: "${id}". Kies uit: ${knownBotsText()}.`);
+    const mode: TradingMode = id === liveId ? "live" : "paper";
+    const dataDir = botDataDir(config.dataDir, id, multi);
+    const startingCapital = mode === "live" ? config.capitalLimitQuote : multi ? perBot : config.paperStartingCapital;
+    const engine = loadBotEngineConfig(profile, {
+      dataDir,
+      // Eén bot: .env telt zoals vroeger. loadConfig heeft daar al over gemeld (zelfde
+      // bestand, zelfde .env), dus hier stil om dubbele meldingen te voorkomen.
+      ...(multi ? {} : { env: { markets: config.marketsEnv, interval: config.intervalEnv } }),
+      warn: multi ? warn : () => {},
+    });
+    const autostart = mode === "live" ? false : multi ? (config.paperAutostart ?? config.autostart) : config.autostart;
+    const appConfig: AppConfig = multi
+      ? {
+          ...config,
+          mode,
+          dataDir,
+          engine,
+          autostart,
+          paperStartingCapital: mode === "paper" ? startingCapital : config.paperStartingCapital,
+          // Alleen de live-bot krijgt de API-sleutel; de oefenbots hebben hem niet nodig.
+          apiKey: mode === "live" ? config.apiKey : undefined,
+          apiSecret: mode === "live" ? config.apiSecret : undefined,
+        }
+      : { ...config, engine };
+    return {
+      id,
+      profile,
+      mode,
+      multi,
+      dataDir,
+      stateFile: botStateFile(config.dataDir, id, multi, mode),
+      startingCapital,
+      engine: cloneEngineConfig(engine),
+      autostart,
+      path: `/bot/${id}/`,
+      appConfig,
+    };
+  });
+}
+
 // ─────────────────────────────── loadConfig ───────────────────────────────
 
 /** Wat de bot volgt, om .env en opgeslagen instellingen te vergelijken: "auto:30" of "manual:BTC-EUR,…". */
@@ -567,50 +786,50 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
   const dataDirRaw = str(env, "DATA_DIR") ?? "./data";
   const dataDir = isAbsolute(dataDirRaw) ? dataDirRaw : resolve(PROJECT_ROOT, dataDirRaw);
 
+  // Meerdere bots (v3)
+  const bots = parseBotsEnv(str(env, "BOTS"));
+  const paperCapitalPerBot = num(env, "PAPER_CAPITAL_PER_BOT", DEFAULT_PAPER_CAPITAL_PER_BOT, {
+    min: 5,
+    max: 10_000_000,
+  });
+  const liveBotRaw = str(env, "LIVE_BOT")?.toLowerCase();
+  // Meldingen over de instellingen van één bot (config.json in DATA_DIR, MARKETS/INTERVAL).
+  const singleWarn = opts.onlySingleBotWarnings && bots.length > 1 ? () => {} : warn;
+
   // Engine: standaard → env → opgeslagen dashboard-instellingen
   let engine = cloneEngineConfig(DEFAULT_ENGINE_CONFIG);
   const marketsRaw = str(env, "MARKETS");
-  if (marketsRaw !== undefined) {
-    const parsed = parseMarketsEnv(marketsRaw);
-    const universe = universeOrManual(engine.universe);
-    if (parsed.mode === "auto") {
-      engine.universe = { ...universe, mode: "auto", count: parsed.count };
-    } else {
-      engine.markets = parsed.markets;
-      engine.universe = { ...universe, mode: "manual" };
-    }
-  }
+  const marketsEnv = marketsRaw !== undefined ? parseMarketsEnv(marketsRaw) : undefined;
   const intervalRaw = str(env, "INTERVAL");
-  if (intervalRaw !== undefined) {
-    if (!(INTERVALS as readonly string[]).includes(intervalRaw)) {
-      throw new ConfigError(`INTERVAL moet een van ${INTERVALS.join(", ")} zijn (nu: "${intervalRaw}").`);
-    }
-    engine.interval = intervalRaw as Interval;
+  if (intervalRaw !== undefined && !(INTERVALS as readonly string[]).includes(intervalRaw)) {
+    throw new ConfigError(`INTERVAL moet een van ${INTERVALS.join(", ")} zijn (nu: "${intervalRaw}").`);
   }
+  const intervalEnv = intervalRaw as Interval | undefined;
+  applyEnvSelection(engine, marketsEnv, intervalEnv);
   // Instellingen die in het dashboard zijn opgeslagen winnen van .env. Zeg dat
   // hardop als ze MARKETS/INTERVAL uit .env overschrijven, anders lijkt .env kapot.
   let legacyMarkets: string[] | null = null;
-  const overrides = readEngineOverrides(dataDir, warn, (list) => {
+  const overrides = readEngineOverrides(dataDir, singleWarn, (list) => {
     legacyMarkets = list;
   });
   const overridesFile = join(dataDir, OVERRIDES_FILE);
   const fromEnv = engine;
   engine = mergeEngineConfig(engine, overrides);
   if (marketsRaw !== undefined && selectionKey(engine) !== selectionKey(fromEnv)) {
-    warn(
+    singleWarn(
       `⚠ MARKETS uit .env (${envSelectionLabel(fromEnv)}) wordt genegeerd: in het dashboard is ` +
         `${savedSelectionLabel(engine, fromEnv)} opgeslagen (${overridesFile}). ` +
         "Wijzig de munten in het tabblad Instellingen, of verwijder dat bestand om .env weer te laten gelden.",
     );
   } else if (legacyMarkets !== null && marketsRaw === undefined) {
     // Zonder MARKETS zou de bot anders stilletjes automatisch 30 munten kiezen.
-    warn(
+    singleWarn(
       `ℹ Oud instellingenbestand (${overridesFile}): de bot volgt je opgeslagen munten (${shortList(legacyMarkets)}). ` +
         "Automatisch kiezen kan in Instellingen → Munten.",
     );
   }
   if (intervalRaw !== undefined && overrides.interval && overrides.interval !== fromEnv.interval) {
-    warn(
+    singleWarn(
       `⚠ INTERVAL uit .env (${fromEnv.interval}) wordt genegeerd: in het dashboard is ${overrides.interval} ` +
         `opgeslagen (${overridesFile}). Wijzig het interval in het tabblad Instellingen, of verwijder dat ` +
         "bestand om .env weer te laten gelden.",
@@ -640,7 +859,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
       );
     }
   }
-  const autostart = mode === "live" ? false : bool(env, "AUTOSTART", true);
+  const paperAutostart = bool(env, "AUTOSTART", true);
+  const autostart = mode === "live" ? false : paperAutostart;
+
+  // Welke bot met echt geld handelt. Een ongeldige LIVE_BOT stopt live mode meteen;
+  // in oefenmodus doet LIVE_BOT niets (alleen een melding). Live met meer bots en
+  // zonder LIVE_BOT weigert main.ts te starten (planBots → resolveLiveBot).
+  let liveBot: string | undefined;
+  if (liveBotRaw !== undefined) {
+    if (mode === "live") {
+      liveBot = resolveLiveBot(mode, bots, liveBotRaw) ?? undefined;
+    } else {
+      warn(`ℹ LIVE_BOT=${liveBotRaw} wordt genegeerd: TRADING_MODE=paper, dus alle bots oefenen met nep-geld.`);
+    }
+  }
 
   return {
     mode,
@@ -656,5 +888,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: LoadConfi
     dataDir,
     engine,
     autostart,
+    bots,
+    paperCapitalPerBot,
+    ...(liveBot !== undefined ? { liveBot } : {}),
+    paperAutostart,
+    ...(marketsEnv !== undefined ? { marketsEnv } : {}),
+    ...(intervalEnv !== undefined ? { intervalEnv } : {}),
   };
 }

@@ -8,7 +8,7 @@ import { isIPv6, type AddressInfo } from "node:net";
 import type { AppInfo, EngineConfig, MarketDataFeed } from "../core/types";
 import { isLoopbackHost, saveEngineOverrides, type AppConfig } from "../config";
 import { HttpError, readJsonBody, sendError, type Router } from "./router";
-import { buildApiRouter, type EngineLike, type Services } from "./routes";
+import { buildApiRouter, type ApiDeps, type EngineLike, type Services } from "./routes";
 import type { Scanner } from "./scanner";
 import { SseHub, type EventSourceLike } from "./sse";
 import { DEFAULT_PUBLIC_DIR, resolveLightweightCharts, serveStatic } from "./static";
@@ -19,7 +19,7 @@ export interface CreateAppDeps {
   feed: MarketDataFeed;
   services: Services;
   /** Overschrijft (delen van) AppInfo */
-  info?: () => AppInfo;
+  info?: () => Partial<AppInfo>;
   hub?: SseHub;
   scanner?: Scanner;
   publicDir?: string;
@@ -28,6 +28,10 @@ export interface CreateAppDeps {
   persistConfig?: (cfg: EngineConfig) => void;
   now?: () => number;
   log?: (level: "info" | "warn" | "error", msg: string) => void;
+  /** Meerdere bots: provider voor `/api/bots…` (zie ApiDeps.bots) */
+  bots?: ApiDeps["bots"];
+  /** Meerdere bots: gedeelde "één berekening tegelijk"-vergrendeling (zie ApiDeps.heavyGate) */
+  heavyGate?: ApiDeps["heavyGate"];
 }
 
 export interface App {
@@ -134,6 +138,62 @@ export function tokensEqual(given: string, expected: string): boolean {
   return timingSafeEqual(digest(given), digest(expected));
 }
 
+/** Is dit een API-pad (`/api` of `/api/…`)? */
+export function isApiPath(pathname: string): boolean {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+/**
+ * De beveiligingscontroles die voor ELK verzoek gelden, vóór er iets gerouteerd
+ * wordt (createApp en de multi-bot-server gebruiken precies deze functie):
+ * beveiligingsheaders, maximaal één Host-header, de Host-check bij binden op
+ * loopback (DNS-rebinding) en voor API-paden: geen cache, geen verzoeken van een
+ * andere website en — als DASHBOARD_TOKEN gezet is — de token. Gooit een HttpError.
+ * `pathname` is het pad zoals de app het ziet (bij /bot/<id>/api/… zonder voorvoegsel).
+ */
+export function guardRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+  pathname: string,
+  opts: { host: string; dashboardToken?: string },
+): void {
+  setSecurityHeaders(res);
+  // Meer dan één Host-header is een ongeldig verzoek (RFC 9112). Node houdt stilletjes de
+  // eerste, dus "Host: localhost" + "Host: evil.example" zou anders door de Host-check glippen.
+  if (countRawHeader(req, "host") > 1) {
+    throw new HttpError(400, "Ongeldig verzoek: meer dan één Host-header.");
+  }
+
+  // Bescherming tegen DNS-rebinding: bij binden op loopback alleen lokale Host-headers.
+  // Zonder Host-header (HTTP/1.0) valt er niets te controleren → weigeren.
+  if (isLoopbackHost(opts.host)) {
+    const hostHeader = req.headers.host;
+    if (hostHeader === undefined || hostHeader.trim() === "") {
+      throw new HttpError(400, "Ongeldig verzoek: de Host-header ontbreekt.");
+    }
+    // Ongeldige Host-header (null) of een andere host dan loopback → weigeren.
+    const hostname = hostnameOf(hostHeader);
+    if (hostname === null || !isLoopbackHost(hostname)) {
+      throw new HttpError(403, "Toegang geweigerd: onbekende Host-header.");
+    }
+  }
+
+  if (isApiPath(pathname)) {
+    res.setHeader("Cache-Control", "no-store");
+    rejectCrossSite(req);
+    const token = opts.dashboardToken;
+    if (token) {
+      const header = req.headers["x-dashboard-token"];
+      let given = typeof header === "string" ? header : undefined;
+      if (given === undefined && pathname === "/api/events") given = url.searchParams.get("token") ?? undefined;
+      if (given === undefined || !tokensEqual(given, token)) {
+        throw new HttpError(401, "Ongeldige of ontbrekende dashboard-token.");
+      }
+    }
+  }
+}
+
 export function createApp(deps: CreateAppDeps): App {
   const { config, engine } = deps;
   const hub = deps.hub ?? new SseHub();
@@ -151,15 +211,14 @@ export function createApp(deps: CreateAppDeps): App {
     now: deps.now,
     log,
     persistConfig: deps.persistConfig ?? ((cfg) => saveEngineOverrides(config.dataDir, cfg)),
+    bots: deps.bots,
+    heavyGate: deps.heavyGate,
   });
   const publicDir = deps.publicDir ?? DEFAULT_PUBLIC_DIR;
   const vendorFile = deps.vendorFile === undefined ? resolveLightweightCharts() : deps.vendorFile;
 
   // Engine-events → SSE
   const unbridge = typeof engine.on === "function" ? hub.bridge(engine as EventSourceLike) : () => {};
-
-  const token = config.dashboardToken;
-  const checkHost = isLoopbackHost(config.host);
 
   async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setSecurityHeaders(res);
@@ -171,39 +230,12 @@ export function createApp(deps: CreateAppDeps): App {
       throw new HttpError(400, "Ongeldige URL.");
     }
     const pathname = url.pathname;
-    const isApi = pathname === "/api" || pathname.startsWith("/api/");
+    const isApi = isApiPath(pathname);
 
-    // Meer dan één Host-header is een ongeldig verzoek (RFC 9112). Node houdt stilletjes de
-    // eerste, dus "Host: localhost" + "Host: evil.example" zou anders door de Host-check glippen.
-    if (countRawHeader(req, "host") > 1) {
-      throw new HttpError(400, "Ongeldig verzoek: meer dan één Host-header.");
-    }
-
-    // Bescherming tegen DNS-rebinding: bij binden op loopback alleen lokale Host-headers.
-    // Zonder Host-header (HTTP/1.0) valt er niets te controleren → weigeren.
-    if (checkHost) {
-      const hostHeader = req.headers.host;
-      if (hostHeader === undefined || hostHeader.trim() === "") {
-        throw new HttpError(400, "Ongeldig verzoek: de Host-header ontbreekt.");
-      }
-      // Ongeldige Host-header (null) of een andere host dan loopback → weigeren.
-      const hostname = hostnameOf(hostHeader);
-      if (hostname === null || !isLoopbackHost(hostname)) {
-        throw new HttpError(403, "Toegang geweigerd: onbekende Host-header.");
-      }
-    }
+    // Host-headers, andere websites, token (zie guardRequest).
+    guardRequest(req, res, url, pathname, config);
 
     if (isApi) {
-      res.setHeader("Cache-Control", "no-store");
-      rejectCrossSite(req);
-      if (token) {
-        const header = req.headers["x-dashboard-token"];
-        let given = typeof header === "string" ? header : undefined;
-        if (given === undefined && pathname === "/api/events") given = url.searchParams.get("token") ?? undefined;
-        if (given === undefined || !tokensEqual(given, token)) {
-          throw new HttpError(401, "Ongeldige of ontbrekende dashboard-token.");
-        }
-      }
       const match = router.match(method, pathname);
       if (match.kind === "not-found") throw new HttpError(404, `Onbekend API-pad: ${pathname}`);
       if (match.kind === "method-not-allowed") {

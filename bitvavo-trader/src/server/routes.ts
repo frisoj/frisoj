@@ -5,6 +5,7 @@
 import type {
   AppInfo,
   BacktestResult,
+  BotSummary,
   Candle,
   CandlesResponse,
   ChartIndicators,
@@ -139,6 +140,26 @@ export interface Services {
   validateRiskConfig: RiskValidator;
 }
 
+/** Eén bot voor de wedstrijd-routes (`/api/bots…`). */
+export interface BotEntry {
+  id: string;
+  engine: Pick<EngineLike, "start" | "stop" | "killSwitch">;
+  /** Samenvatting voor het klassement (zie src/bots/summary.ts) */
+  summary(): BotSummary;
+}
+
+/** Uitkomst per bot van `POST /api/bots/start-all | stop-all | kill-all`. */
+export interface BotActionResult {
+  id: string;
+  /**
+   * start/stop: gelukt. kill: de noodstop liep én elke positie is verkocht; staat er
+   * nog iets open (`killResult.failed`), dan false met een Nederlandse `error`.
+   */
+  ok: boolean;
+  error?: string;
+  killResult?: KillResult;
+}
+
 export interface ApiDeps {
   config: AppConfig;
   engine: EngineLike;
@@ -146,12 +167,29 @@ export interface ApiDeps {
   services: Services;
   hub: SseHub;
   /** Overschrijft (delen van) AppInfo, bijv. voor tests */
-  info?: () => AppInfo;
+  info?: () => Partial<AppInfo>;
   /** Aanroepen na een geslaagde config-wijziging (standaard: saveEngineOverrides) */
   persistConfig?: (cfg: EngineConfig) => void;
   scanner?: Scanner;
   now?: () => number;
   log?: (level: "info" | "warn" | "error", msg: string) => void;
+  /**
+   * Meerdere bots (optioneel): alle bots in de volgorde van BOTS. Met deze provider
+   * krijgt de router `GET /api/bots` en `POST /api/bots/start-all | stop-all | kill-all`,
+   * met dezelfde beveiliging als elke andere API-route.
+   */
+  bots?: () => readonly BotEntry[];
+  /**
+   * Gedeelde vergrendeling voor backtest/optimalisatie/walk-forward (één tegelijk).
+   * Meerdere bots in één proces delen één rekenwerker en dus ook deze vergrendeling;
+   * zonder deze optie heeft elke router zijn eigen.
+   */
+  heavyGate?: HeavyGate;
+}
+
+/** Welke zware berekening er nu loopt (null = geen). */
+export interface HeavyGate {
+  busy: string | null;
 }
 
 export const ARM_CONFIRM_TEXT = "IK BEGRIJP HET RISICO";
@@ -176,6 +214,38 @@ function isKillResult(v: unknown): v is KillResult {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** "BTC-EUR (onverkoopbaar: …); ETH-EUR (…)" — wat na een noodstop nog open staat. */
+function failedText(failed: KillResult["failed"]): string {
+  const shown = failed.slice(0, 5).map((f) => `${f.market} (${f.reason})`);
+  if (failed.length > shown.length) shown.push(`+${failed.length - shown.length} meer`);
+  return shown.join("; ");
+}
+
+/**
+ * Voert een actie uit op ELKE bot tegelijk; een fout bij de ene bot houdt de andere
+ * niet tegen (allSettled). De actie wordt voor alle bots synchroon in gang gezet, dus
+ * bij de noodstop stoppen alle bots meteen met kopen.
+ */
+async function forEachBot<T>(
+  bots: readonly BotEntry[],
+  action: (bot: BotEntry) => Promise<T>,
+  toResult: (bot: BotEntry, value: T) => BotActionResult,
+): Promise<{ results: BotActionResult[] }> {
+  const runs = bots.map((bot) => {
+    try {
+      return action(bot);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  });
+  const settled = await Promise.allSettled(runs);
+  return {
+    results: settled.map((r, i) =>
+      r.status === "fulfilled" ? toResult(bots[i], r.value) : { id: bots[i].id, ok: false, error: errorMessage(r.reason) },
+    ),
+  };
 }
 
 export function buildApiRouter(deps: ApiDeps): Router {
@@ -213,14 +283,15 @@ export function buildApiRouter(deps: ApiDeps): Router {
       .sort((a, b) => a.market.localeCompare(b.market));
 
   // ── zware berekeningen: één tegelijk ──
-  let busy: string | null = null;
+  // Meerdere bots delen één rekenwerker: dan delen ze ook deze vergrendeling (heavyGate).
+  const gate: HeavyGate = deps.heavyGate ?? { busy: null };
   const heavy = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
-    if (busy) throw new HttpError(429, `Er loopt al een berekening (${busy}). Wacht tot die klaar is.`);
-    busy = name;
+    if (gate.busy) throw new HttpError(429, `Er loopt al een berekening (${gate.busy}). Wacht tot die klaar is.`);
+    gate.busy = name;
     try {
       return await fn();
     } finally {
-      busy = null;
+      gate.busy = null;
     }
   };
 
@@ -514,6 +585,44 @@ export function buildApiRouter(deps: ApiDeps): Router {
     engine.resetPaper(capital);
     return engine.snapshot();
   });
+
+  // ── Meerdere bots (wedstrijd) ──
+  if (deps.bots) {
+    const bots = deps.bots;
+    router.get("/api/bots", () => bots().map((b) => b.summary()));
+    router.post("/api/bots/start-all", () =>
+      forEachBot(
+        bots(),
+        (b) => b.engine.start(),
+        (b) => ({ id: b.id, ok: true }),
+      ),
+    );
+    router.post("/api/bots/stop-all", () =>
+      forEachBot(
+        bots(),
+        (b) => b.engine.stop(),
+        (b) => ({ id: b.id, ok: true }),
+      ),
+    );
+    // Noodstop van ALLE bots: elke bot krijgt zijn noodstop, ook als die van een andere
+    // bot mislukt. Net als bij één bot 200 met de details van wat niet verkocht kon worden.
+    router.post("/api/bots/kill-all", () =>
+      forEachBot(
+        bots(),
+        (b) => b.engine.killSwitch(),
+        (b, killResult) => {
+          if (!isKillResult(killResult)) return { id: b.id, ok: true };
+          if (killResult.failed.length === 0) return { id: b.id, ok: true, killResult };
+          return {
+            id: b.id,
+            ok: false,
+            error: `Niet alles verkocht: ${failedText(killResult.failed)}`,
+            killResult,
+          };
+        },
+      ),
+    );
+  }
 
   router.get("/api/markets", () => eurTradingMarkets());
 

@@ -1081,6 +1081,15 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
+   * Alleen-lezen: alle gesloten trades die de engine bewaart (tot {@link MAX_TRADES_KEPT}
+   * = 1000, de oudste vallen daarna af), oudste eerst, als kopieën. De snapshot toont
+   * alleen de laatste 200; de bot-wedstrijd telt winst/verlies over deze hele lijst.
+   */
+  allTrades(): Trade[] {
+    return this.trades.map((t) => ({ ...t }));
+  }
+
+  /**
    * Laatste beslissing van een markt (ook als die niet in de snapshot staat, bijv. bij
    * meer dan {@link SNAPSHOT_DECISIONS_LIMIT} actieve markten), of null.
    */

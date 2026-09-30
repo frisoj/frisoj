@@ -132,3 +132,60 @@ export function createShutdown(deps: ShutdownDeps): ShutdownController {
     },
   };
 }
+
+// ─────────────────────────────── meerdere engines (v3) ───────────────────────────────
+
+/** Wat het afsluiten van een engine gebruikt (de TradingEngine past). */
+export interface StoppableEngine {
+  stop(): Promise<void>;
+  stopPriceMonitor?(): void;
+  /** true zolang er een order bij de broker loopt; ontbreekt = onbekend */
+  readonly orderInFlight?: unknown;
+}
+
+/**
+ * Maakt van meerdere engines (één per bot) de `stopEngine` en `orderInFlight` voor
+ * {@link createShutdown}:
+ * - `stopAll` zet eerst bij elke engine de koersbewaking uit en stopt daarna ALLE
+ *   engines tegelijk; een fout bij de ene engine houdt de andere niet tegen (die fout
+ *   wordt gemeld en daarna doorgegeven, zodat het afsluiten hem ook ziet).
+ * - `orderInFlight`: true als een engine een order heeft lopen; onbekend (undefined)
+ *   als een engine het niet kan zeggen; anders false.
+ */
+export function combineEngines(
+  engines: readonly StoppableEngine[],
+  opts: { warn?: (msg: string) => void; names?: readonly string[] } = {},
+): { stopAll: () => Promise<void>; orderInFlight: () => boolean | undefined } {
+  const warn = opts.warn ?? ((m: string) => console.warn(m));
+  const name = (i: number) => opts.names?.[i] ?? `bot ${i + 1}`;
+  return {
+    stopAll: async () => {
+      engines.forEach((e, i) => {
+        try {
+          e.stopPriceMonitor?.();
+        } catch (err) {
+          warn(`Fout bij stoppen van de koersbewaking (${name(i)}): ${(err as Error).message}`);
+        }
+      });
+      const settled = await Promise.allSettled(engines.map((e) => Promise.resolve().then(() => e.stop())));
+      const failed: string[] = [];
+      settled.forEach((r, i) => {
+        if (r.status === "rejected") {
+          const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+          warn(`Fout bij stoppen van ${name(i)}: ${msg}`);
+          failed.push(`${name(i)}: ${msg}`);
+        }
+      });
+      if (failed.length > 0) throw new Error(failed.join("; "));
+    },
+    orderInFlight: () => {
+      let unknown = false;
+      for (const e of engines) {
+        const flag = e.orderInFlight;
+        if (flag === true) return true;
+        if (typeof flag !== "boolean") unknown = true;
+      }
+      return unknown ? undefined : false;
+    },
+  };
+}
