@@ -1,6 +1,6 @@
 /** Stuurt het echte public/js/panels/signals.js aan met een nep-DOM. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeNode, installBrowserGlobals, loadPublic, makeBus, type Fake } from "./helpers";
+import { fakeNode, installBrowserGlobals, loadPublic, makeBus, settle, type Fake } from "./helpers";
 
 const T0 = Date.UTC(2026, 8, 29, 10, 50);
 const config15 = { interval: "15m", markets: ["BTC-EUR"], ensemble: { buyThreshold: 0.35, sellThreshold: -0.3, weights: {} } };
@@ -34,7 +34,7 @@ afterEach(() => {
   env.restore();
 });
 
-async function mount(snap: Fake) {
+async function mount(snap: Fake, apiOver: Fake = {}) {
   const { mountSignals } = await loadPublic("js/panels/signals.js");
   const { fmt, esc } = await loadPublic("js/format.js");
   const nodes = new Map<string, Fake>();
@@ -49,7 +49,7 @@ async function mount(snap: Fake) {
     fmt,
     esc,
     bus,
-    api: { getStrategies: () => new Promise(() => {}) },
+    api: { getStrategies: () => new Promise(() => {}), ...apiOver },
     getState: () => snap,
     getSelectedMarket: () => "BTC-EUR",
   };
@@ -176,5 +176,130 @@ describe("signaalpaneel: exit-score", () => {
     expect(help).toContain("Verkopen gaat op de <b>exit-score</b>");
     expect(help).toContain("alléén de strategieën die wél een mening hebben");
     expect(help).toContain("onder de verkoopdrempel");
+  });
+});
+
+describe("signaalpaneel: veel munten (v2) — ontbrekende beslissing ophalen", () => {
+  const many = Array.from({ length: 50 }, (_, i) => `M${String(i).padStart(2, "0")}-EUR`);
+  const v2Snap = (decisions: Fake = {}, extra: Fake = {}) => ({
+    config: { ...config15, markets: ["BTC-EUR"], universe: { mode: "auto", count: 50, minVolumeEur: 0 } },
+    activeMarkets: many,
+    positions: [],
+    decisions,
+    ...extra,
+  });
+  const decFor = (market: string, over: Fake = {}) => ({ ...dec, market, ...over });
+  const votesHtml = (p: Awaited<ReturnType<typeof mount>>) => String(p.q(".sig-votes").innerHTML);
+  const ApiErr = (status: number) => Object.assign(new Error("Onbekende route"), { status });
+
+  it("haalt de beslissing op met GET /api/decision en toont hem", async () => {
+    const getDecision = vi.fn(async (m: string) => ({ decision: decFor(m, { action: "buy", score: 0.55 }) }));
+    const p = await mount(v2Snap(), { getDecision });
+    p.bus.emit("market-selected", { market: "M45-EUR" });
+    env.flushRaf();
+    expect(getDecision).toHaveBeenCalledWith("M45-EUR");
+    expect(p.action()).toBe("GEEN DATA");
+    expect(votesHtml(p)).toContain("ophalen");
+    await settle();
+    env.flushRaf();
+    expect(p.action()).toBe("KOOP");
+  });
+
+  it("houdt een opgehaalde beslissing vast als de volgende snapshot hem niet bevat (> 40 munten)", async () => {
+    const getDecision = vi.fn(async (m: string) => ({ decision: decFor(m) }));
+    const p = await mount(v2Snap(), { getDecision });
+    p.bus.emit("market-selected", { market: "M45-EUR" });
+    env.flushRaf();
+    await settle();
+    env.flushRaf();
+    expect(p.action()).toBe("KOOP");
+    p.bus.emit("snapshot", v2Snap({ "M00-EUR": decFor("M00-EUR") }));
+    env.flushRaf();
+    expect(p.action()).toBe("KOOP");
+    expect(getDecision).toHaveBeenCalledTimes(1);
+    // en blijft bij met de decision-events
+    p.bus.emit("decision", decFor("M45-EUR", { action: "sell", score: -0.5, time: dec.time + 900_000 }));
+    env.flushRaf();
+    expect(p.action()).toBe("VERKOOP");
+    // een markt die de bot niet meer volgt vervalt wel
+    p.bus.emit("snapshot", v2Snap({}, { activeMarkets: many.filter((m) => m !== "M45-EUR") }));
+    env.flushRaf();
+    expect(p.action()).toBe("GEEN DATA");
+  });
+
+  it("null = nog niet beoordeeld: vriendelijke tekst, niet meteen opnieuw vragen", async () => {
+    const getDecision = vi.fn(async () => ({ decision: null }));
+    const p = await mount(v2Snap(), { getDecision });
+    p.bus.emit("market-selected", { market: "M45-EUR" });
+    env.flushRaf();
+    await settle();
+    env.flushRaf();
+    expect(p.action()).toBe("GEEN DATA");
+    expect(votesHtml(p)).toContain("M45-EUR is nog niet beoordeeld");
+    expect(votesHtml(p)).toContain("wacht op de volgende candle");
+    for (let i = 0; i < 3; i++) {
+      p.bus.emit("snapshot", v2Snap());
+      env.flushRaf();
+    }
+    expect(getDecision).toHaveBeenCalledTimes(1);
+    // na een minuut wel opnieuw
+    now += 61_000;
+    p.bus.emit("snapshot", v2Snap());
+    env.flushRaf();
+    expect(getDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it("radar meldt dat de markt beoordeeld is → meteen opnieuw vragen (na minstens 10 s)", async () => {
+    let answer: Fake = { decision: null };
+    const getDecision = vi.fn(async () => answer);
+    const p = await mount(v2Snap(), { getDecision });
+    p.bus.emit("market-selected", { market: "M45-EUR" });
+    env.flushRaf();
+    await settle();
+    answer = { decision: decFor("M45-EUR", { action: "sell", score: -0.4 }) };
+    now += 12_000;
+    p.bus.emit("snapshot", v2Snap({}, { radar: [{ market: "M45-EUR", status: "watching", evaluatedAt: dec.time }] }));
+    await settle();
+    env.flushRaf();
+    expect(getDecision).toHaveBeenCalledTimes(2);
+    expect(p.action()).toBe("VERKOOP");
+  });
+
+  it("oudere server zonder /api/decision (404): standaardtekst en niet blijven proberen", async () => {
+    const getDecision = vi.fn(async () => {
+      throw ApiErr(404);
+    });
+    const p = await mount(v2Snap(), { getDecision });
+    p.bus.emit("market-selected", { market: "M45-EUR" });
+    env.flushRaf();
+    await settle();
+    env.flushRaf();
+    expect(votesHtml(p)).toContain("Nog geen beslissing voor M45-EUR");
+    p.bus.emit("market-selected", { market: "M46-EUR" });
+    env.flushRaf();
+    now += 120_000;
+    p.bus.emit("snapshot", v2Snap());
+    env.flushRaf();
+    expect(getDecision).toHaveBeenCalledTimes(1);
+  });
+
+  it("automatische muntkeuze: markt buiten de keuze → uitleg dat de bot zelf kiest, niets ophalen", async () => {
+    const getDecision = vi.fn(async () => ({ decision: null }));
+    const p = await mount(v2Snap(), { getDecision });
+    p.bus.emit("market-selected", { market: "DOGE-EUR" });
+    env.flushRaf();
+    expect(votesHtml(p)).toContain("de bot kiest zelf de munten");
+    expect(getDecision).not.toHaveBeenCalled();
+  });
+
+  it("markt met een open positie buiten de actieve munten telt als 'in de bot'", async () => {
+    const getDecision = vi.fn(async (m: string) => ({ decision: decFor(m) }));
+    const p = await mount(v2Snap({}, { positions: [{ market: "OLD-EUR" }] }), { getDecision });
+    p.bus.emit("market-selected", { market: "OLD-EUR" });
+    env.flushRaf();
+    await settle();
+    env.flushRaf();
+    expect(getDecision).toHaveBeenCalledWith("OLD-EUR");
+    expect(p.action()).toBe("KOOP");
   });
 });

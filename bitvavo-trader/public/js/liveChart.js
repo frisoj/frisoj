@@ -1,6 +1,12 @@
 // Live-grafiek (A9): marktbalk, candlestick-grafiek met indicatoren, markers
 // voor signalen en trades, prijslijnen voor open posities, RSI- en MACD-pane.
 // Alle drie de grafieken delen tijdas en crosshair.
+//
+// Veel munten (v2, tot 400): de marktbalk toont hooguit MAX_TABS tabs (gekozen markt,
+// posities, beste koopkansen, dan de volgorde van de bot) plus een knop "Alle munten"
+// met een doorzoekbare lijst. 24u-statistieken/sparklines alleen voor de zichtbare tabs.
+
+import { botMarkets } from "./format.js";
 
 const INTERVAL_MS = {
   "1m": 60_000,
@@ -75,6 +81,88 @@ export function coinColor(base) {
   let h = 0;
   for (let i = 0; i < base.length; i++) h = (h * 31 + base.charCodeAt(i)) % 360;
   return `hsl(${h} 70% 62%)`;
+}
+
+/** Maximaal aantal markttabs in de marktbalk (de rest via "Alle munten") */
+export const MAX_TABS = 12;
+/** 24u-cijfers van een tab zijn zo lang "vers"; na een mislukte poging pas na STATS_RETRY_MS opnieuw */
+const STATS_TTL_MS = 4.5 * 60_000;
+const STATS_RETRY_MS = 60_000;
+
+/**
+ * Welke markten als tab in de marktbalk staan (hooguit `max`).
+ * Passen alle markten van de bot (plus een losse gekozen markt), dan staan ze er allemaal,
+ * in de volgorde van de bot. Anders gaat het op voorrang: de gekozen markt, markten met een
+ * open positie, de beste koopkansen (radar-`rank`), dan de volgorde van de bot. Die tabs
+ * staan in een vaste volgorde (posities, kansen, de rest in botvolgorde, een losse markt
+ * achteraan), zodat een klik op een zichtbare tab de balk niet door elkaar gooit.
+ * @param {{ selected?: string|null, active?: string[], positions?: string[], radar?: object[]|null, max?: number }} o
+ * @returns {{ tabs: string[], extra: string[], hidden: number, total: number }}
+ *   `extra` = tabs die niet bij de bot horen (alleen bekijken), `hidden` = markten van de bot zonder tab
+ */
+export function pickTabMarkets({ selected = null, active = [], positions = [], radar = null, max = MAX_TABS } = {}) {
+  const str = (m) => typeof m === "string" && m.length > 0;
+  const act = [...new Set((Array.isArray(active) ? active : []).filter(str))];
+  const pos = [...new Set((Array.isArray(positions) ? positions : []).filter(str))];
+  const base = [...new Set([...act, ...pos])];
+  const baseSet = new Set(base);
+  const sel = str(selected) ? selected : null;
+  const extraSel = sel && !baseSet.has(sel) ? sel : null;
+  const lim = Math.max(1, Math.floor(Number(max)) || MAX_TABS);
+  if (base.length + (extraSel ? 1 : 0) <= lim) {
+    return { tabs: extraSel ? [...base, extraSel] : base, extra: extraSel ? [extraSel] : [], hidden: 0, total: base.length };
+  }
+  const ranked = (Array.isArray(radar) ? radar : [])
+    .filter(
+      (r) =>
+        r && str(r.market) && baseSet.has(r.market) && isNum(r.rank) && (r.status === "candidate" || r.status === "blocked"),
+    )
+    .sort((a, b) => a.rank - b.rank)
+    .map((r) => r.market);
+  const chosen = new Set();
+  for (const m of [sel, ...pos, ...ranked, ...act]) {
+    if (chosen.size >= lim) break;
+    if (m) chosen.add(m);
+  }
+  const tabs = [];
+  const placed = new Set();
+  for (const m of [...pos, ...ranked, ...act]) {
+    if (chosen.has(m) && !placed.has(m)) {
+      placed.add(m);
+      tabs.push(m);
+    }
+  }
+  if (extraSel) tabs.push(extraSel);
+  return {
+    tabs,
+    extra: extraSel ? [extraSel] : [],
+    hidden: base.filter((m) => !chosen.has(m)).length,
+    total: base.length,
+  };
+}
+
+/**
+ * Zoeken in de lijst "Alle munten": eerst exact symbool ("btc" → BTC-EUR), dan markten die
+ * met de zoekterm beginnen, dan markten die hem bevatten; binnen een groep de oorspronkelijke volgorde.
+ */
+export function filterMarketList(markets, query) {
+  const list = (Array.isArray(markets) ? markets : []).filter((m) => typeof m === "string");
+  const q = String(query || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s/]+/g, "-");
+  if (!q) return list.slice();
+  const exact = [];
+  const starts = [];
+  const contains = [];
+  for (const m of list) {
+    const u = m.toUpperCase();
+    const base = u.split("-")[0];
+    if (base === q || u === q) exact.push(m);
+    else if (base.startsWith(q) || u.startsWith(q)) starts.push(m);
+    else if (u.includes(q)) contains.push(m);
+  }
+  return [...exact, ...starts, ...contains];
 }
 
 const nfCache = new Map();
@@ -178,7 +266,43 @@ export function mountLiveChart(ctx, els) {
     markerInfo: new Map(),
     refetchTimer: null,
     tabsKey: "",
+    tabModel: { tabs: [], extra: [], hidden: 0, total: 0 },
+    radarMap: new Map(),
+    statsTried: {},
+    statsBusy: false,
+    statsAgain: false,
+    pickerOpen: false,
+    pickerList: [],
+    pickerIdx: 0,
   };
+
+  // ───────────── Marktbalk: tabs + "Alle munten" ─────────────
+
+  tabsEl.innerHTML = `
+    <div class="market-tabs" role="tablist" aria-label="Markten" data-strip></div>
+    <div class="mkt-all-wrap" data-allwrap hidden>
+      <button type="button" class="mkt-all" data-all aria-haspopup="listbox" aria-expanded="false" title="Kies uit alle munten die de bot volgt">
+        <svg class="mkt-all-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>
+        <span class="mkt-all-txt"><b>Alle munten</b><small data-all-n></small></span>
+      </button>
+      <div class="mkt-pop" data-pop hidden>
+        <div class="mkt-pop-head">
+          <input type="text" inputmode="search" class="input" data-pop-q placeholder="Zoek munt, bijv. BTC" aria-label="Zoek een munt"
+            autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" role="combobox" aria-expanded="true" aria-controls="mkt-pop-list" aria-autocomplete="list" />
+          <button type="button" class="mkt-pop-x" data-pop-x aria-label="Sluiten">×</button>
+        </div>
+        <div class="mkt-pop-meta" data-pop-meta></div>
+        <ul class="mkt-pop-list" id="mkt-pop-list" role="listbox" aria-label="Munten" data-pop-list></ul>
+      </div>
+    </div>`;
+  const stripEl = tabsEl.querySelector("[data-strip]") || tabsEl;
+  const allWrap = tabsEl.querySelector("[data-allwrap]");
+  const allBtn = tabsEl.querySelector("[data-all]");
+  const allN = tabsEl.querySelector("[data-all-n]");
+  const pop = tabsEl.querySelector("[data-pop]");
+  const popQ = tabsEl.querySelector("[data-pop-q]");
+  const popMeta = tabsEl.querySelector("[data-pop-meta]");
+  const popList = tabsEl.querySelector("[data-pop-list]");
 
   // ───────────── Overlay (laden / leeg / fout) ─────────────
 
@@ -256,16 +380,20 @@ export function mountLiveChart(ctx, els) {
   const legRsi = mkLegend(rsiEl);
   const legMacd = mkLegend(macdEl);
 
+  wireBar();
+
   if (!LWC || typeof LWC.createChart !== "function") {
     showOverlay("error", "De grafiekbibliotheek (lightweight-charts) is niet geladen.");
     bus.on("snapshot", (s) => {
-      st.markets = (s && s.config && s.config.markets) || [];
+      st.markets = botMarkets(s);
+      noteRadar(s);
       renderTabs();
     });
     return;
   }
 
   const { LineStyle, CrosshairMode, ColorType } = LWC;
+  st.chartReady = true;
 
   // ───────────── Grafieken ─────────────
 
@@ -908,6 +1036,10 @@ export function mountLiveChart(ctx, els) {
   }
 
   function change24(market, price) {
+    // Zelfde getal als in de Munten-radar (24h-tickers van Bitvavo) als de engine dat stuurt
+    const r = st.radarMap.get(market);
+    if (r && isNum(r.changePct24h)) return r.changePct24h;
+    // Oudere server: zelf berekend uit de 1h-candles van de zichtbare tabs
     const s = st.stats24[market];
     if (s && isNum(s.open) && s.open > 0 && isNum(price)) return ((price - s.open) / s.open) * 100;
     return null;
@@ -923,9 +1055,11 @@ export function mountLiveChart(ctx, els) {
     tb("[data-ct-iv]").textContent = st.interval || "–";
     renderToolbarPrice();
     const s = st.stats24[m];
+    const r = st.radarMap.get(m);
+    const vol = r && isNum(r.volumeQuote24h) ? r.volumeQuote24h : s ? s.volQuote || 0 : null;
     tb("[data-ct-stats]").innerHTML = s
       ? `<span>24u hoog<b>${esc(fmtP(s.high))}</b></span><span>24u laag<b>${esc(fmtP(s.low))}</b></span><span>Volume 24u<b>€ ${esc(
-          compactNf.format(s.volQuote || 0),
+          compactNf.format(vol || 0),
         )}</b></span>`
       : "";
     renderCountdown();
@@ -968,43 +1102,78 @@ export function mountLiveChart(ctx, els) {
 
   // ───────────── Marktbalk ─────────────
 
+  /** Radar-rijen per markt (24u-verandering, status, rank) uit de laatste snapshot */
+  function noteRadar(snap) {
+    const map = new Map();
+    if (snap && Array.isArray(snap.radar)) for (const r of snap.radar) if (r && typeof r.market === "string") map.set(r.market, r);
+    st.radarMap = map;
+  }
+
+  function computeTabModel() {
+    const snap = ctx.getState();
+    return pickTabMarkets({
+      selected: st.market,
+      active: st.markets,
+      positions: snap && Array.isArray(snap.positions) ? snap.positions.map((p) => p && p.market) : [],
+      radar: snap && Array.isArray(snap.radar) ? snap.radar : null,
+    });
+  }
+
+  /** De markten die nu als tab zichtbaar zijn */
   function tabMarkets() {
-    const list = [...st.markets];
-    if (st.market && !list.includes(st.market)) list.push(st.market);
-    return list;
+    return st.tabModel.tabs;
   }
 
   function renderTabs() {
-    const list = tabMarkets();
-    const key = list.join(",") + "|" + st.market;
+    st.tabModel = computeTabModel();
+    const list = st.tabModel.tabs;
+    const extra = new Set(st.tabModel.extra);
+    const key = list.join(",") + "|" + st.market + "|" + st.tabModel.extra.join(",");
     if (key !== st.tabsKey) {
       st.tabsKey = key;
       if (!list.length) {
-        tabsEl.innerHTML = `<div class="mkt-tab" style="cursor:default"><span class="mkt-icon"><span class="spinner"></span></span><span class="mkt-name">Markten laden…</span></div>`;
-        return;
-      }
-      tabsEl.innerHTML = list
-        .map((m) => {
-          const [base, quote] = m.split("-");
-          const extra = !st.markets.includes(m);
-          return `<button type="button" role="tab" class="mkt-tab${m === st.market ? " active" : ""}${extra ? " extra" : ""}"
-            data-market="${esc(m)}" aria-selected="${m === st.market}" title="${extra ? "Niet in de bot-markten (alleen bekijken)" : esc(m)}">
+        stripEl.innerHTML = `<div class="mkt-tab" style="cursor:default"><span class="mkt-icon"><span class="spinner"></span></span><span class="mkt-name">Markten laden…</span></div>`;
+      } else {
+        stripEl.innerHTML = list
+          .map((m) => {
+            const [base, quote] = m.split("-");
+            const isExtra = extra.has(m);
+            return `<button type="button" role="tab" class="mkt-tab${m === st.market ? " active" : ""}${isExtra ? " extra" : ""}"
+            data-market="${esc(m)}" aria-selected="${m === st.market}" title="${isExtra ? "Niet in de bot-markten (alleen bekijken)" : esc(m)}">
             <span class="mkt-icon" style="--c:${coinColor(base || "")}">${esc((base || "?").slice(0, 4))}</span>
             <span class="mkt-name">${esc(base || m)}<small>/${esc(quote || "")}</small></span>
             <span class="mkt-price" data-p>–</span>
             <span class="mkt-meta"><span class="mkt-chg flat" data-c>–</span><svg class="mkt-spark" viewBox="0 0 64 18" preserveAspectRatio="none" data-s></svg></span>
             <span class="mkt-flags" data-f></span>
           </button>`;
-        })
-        .join("");
+          })
+          .join("");
+        // Nieuwe tabs (bijv. een nieuwe koopkans): alleen voor die tabs de 24u-cijfers ophalen
+        refreshStats24();
+        revealActiveTab();
+      }
     }
     updateTabValues();
+    renderAllButton();
   }
 
-  function updateTabValues() {
+  /** De gekozen markt in beeld schuiven als de balk breder is dan het scherm (alleen horizontaal) */
+  function revealActiveTab() {
+    const btn = stripEl.querySelector(".mkt-tab.active");
+    if (!btn || typeof btn.getBoundingClientRect !== "function" || !(stripEl.scrollWidth > stripEl.clientWidth + 1)) return;
+    const n = stripEl.getBoundingClientRect();
+    const b = btn.getBoundingClientRect();
+    if (b.left < n.left) stripEl.scrollLeft -= n.left - b.left + 24;
+    else if (b.right > n.right) stripEl.scrollLeft += b.right - n.right + 24;
+  }
+
+  /** Waarden in de tabs bijwerken (alleen `onlyMarket` als die gegeven is) */
+  function updateTabValues(onlyMarket = null) {
     const snap = ctx.getState();
-    tabsEl.querySelectorAll("[data-market]").forEach((btn) => {
+    const posSet = new Set(snap && Array.isArray(snap.positions) ? snap.positions.map((p) => p && p.market) : []);
+    stripEl.querySelectorAll("[data-market]").forEach((btn) => {
       const m = btn.dataset.market;
+      if (onlyMarket && m !== onlyMarket) return;
       const price = currentPrice(m);
       const pe = btn.querySelector("[data-p]");
       pe.textContent = isNum(price) ? fmt.price(price) : "–";
@@ -1020,54 +1189,229 @@ export function mountLiveChart(ctx, els) {
         const up = s.spark[s.spark.length - 1] >= s.spark[0];
         sp.innerHTML = `<path d="${sparkPath(s.spark, 64, 18)}" fill="none" stroke="${up ? theme.green : theme.red}" stroke-width="1.3" vector-effect="non-scaling-stroke"/>`;
       }
-      const hasPos = snap && Array.isArray(snap.positions) && snap.positions.some((p) => p.market === m);
-      btn.querySelector("[data-f]").innerHTML = hasPos ? `<span class="mkt-flag open" title="Open positie"></span>` : "";
+      if (onlyMarket) return;
+      const r = st.radarMap.get(m);
+      const flags = [];
+      if (posSet.has(m)) flags.push(`<span class="mkt-flag open" title="Open positie"></span>`);
+      else if (r && r.status === "candidate")
+        flags.push(`<span class="mkt-flag buy" title="Koopsignaal${isNum(r.rank) ? ` (#${r.rank} in de kansenlijst)` : ""}"></span>`);
+      const fe = btn.querySelector("[data-f]");
+      const html = flags.join("");
+      if (fe.innerHTML !== html) fe.innerHTML = html;
     });
   }
 
-  tabsEl.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-market]");
-    if (!b) return;
-    const m = b.dataset.market;
-    if (m !== st.market) bus.emit("market-selected", { market: m });
-  });
+  // ───────────── "Alle munten": doorzoekbare lijst ─────────────
 
-  // 24-uurs statistieken per markt (1h-candles; licht voor de server)
-  let statsBusy = false;
-  async function refreshStats24() {
-    if (statsBusy) return;
-    statsBusy = true;
-    try {
-      for (const m of tabMarkets()) {
-        try {
-          const res = await api.getCandles(m, "1h", 25);
-          const cs = (res && res.candles) || [];
-          if (!cs.length) continue;
-          const lastT = cs[cs.length - 1].time;
-          const win = cs.filter((c) => c.time > lastT - 24 * 3_600_000);
-          const w = win.length ? win : cs;
-          st.stats24[m] = {
-            open: w[0].open,
-            high: Math.max(...w.map((c) => c.high)),
-            low: Math.min(...w.map((c) => c.low)),
-            volQuote: w.reduce((s, c) => s + (c.volume || 0) * (c.close || 0), 0),
-            last: cs[cs.length - 1].close,
-            spark: cs.slice(-25).map((c) => c.close),
-            at: Date.now(),
-          };
-        } catch (err) {
-          console.warn(`24u-statistieken voor ${m} niet beschikbaar`, err.message);
-        }
-      }
-    } finally {
-      statsBusy = false;
-      updateTabValues();
-      renderToolbar();
+  /** Alle markten van de bot (plus markten met een positie) voor de lijst */
+  function pickerMarkets() {
+    const snap = ctx.getState();
+    const pos = snap && Array.isArray(snap.positions) ? snap.positions.map((p) => p && p.market).filter(Boolean) : [];
+    return [...new Set([...st.markets, ...pos])];
+  }
+
+  function renderAllButton() {
+    if (!allWrap) return;
+    const { hidden, total } = st.tabModel;
+    const show = hidden > 0 || st.pickerOpen;
+    if (allWrap.hidden === show) allWrap.hidden = !show;
+    if (allN) allN.textContent = `${total} ▾`;
+    if (allBtn) {
+      allBtn.setAttribute("aria-label", `Alle munten (${total}) — kies een munt`);
+      allBtn.classList.toggle("has-sel", !!st.market && !st.tabModel.tabs.includes(st.market));
     }
   }
-  setInterval(() => {
-    if (!document.hidden) refreshStats24();
-  }, 5 * 60_000);
+
+  function pickerRowHtml(m, i) {
+    const [base, quote] = m.split("-");
+    const r = st.radarMap.get(m);
+    const snap = ctx.getState();
+    const hasPos = !!(snap && Array.isArray(snap.positions) && snap.positions.some((p) => p && p.market === m));
+    const price = currentPrice(m);
+    const chg = change24(m, price);
+    let flag = `<span class="mkp-flag"></span>`;
+    if (hasPos) flag = `<span class="mkp-flag pos" title="Open positie">●</span>`;
+    else if (r && r.status === "candidate") flag = `<span class="mkp-flag buy" title="Koopsignaal">${isNum(r.rank) ? `#${esc(r.rank)}` : "▲"}</span>`;
+    else if (r && r.status === "blocked") flag = `<span class="mkp-flag blocked" title="Koopsignaal, maar tegengehouden">⛔</span>`;
+    return `<li role="option" id="mkp-${i}" class="mkp-item${i === st.pickerIdx ? " active" : ""}${m === st.market ? " sel" : ""}"
+      data-market="${esc(m)}" aria-selected="${m === st.market}">
+      <span class="mkt-icon" style="--c:${coinColor(base || "")}">${esc((base || "?").slice(0, 4))}</span>
+      <span class="mkp-name">${esc(base || m)}<small>/${esc(quote || "")}</small></span>
+      ${flag}
+      <span class="mkp-price">${isNum(price) ? esc(fmt.price(price)) : "–"}</span>
+      <span class="mkp-chg ${fmt.pnlClass(chg)}">${chg === null ? "" : esc(fmt.pct(chg, 1))}</span>
+    </li>`;
+  }
+
+  function renderPickerList() {
+    if (!popList) return;
+    const all = pickerMarkets();
+    const list = filterMarketList(all, popQ ? popQ.value : "");
+    st.pickerList = list;
+    if (st.pickerIdx >= list.length) st.pickerIdx = Math.max(0, list.length - 1);
+    popList.innerHTML = list.length
+      ? list.map(pickerRowHtml).join("")
+      : `<li class="mkp-empty">Geen munt gevonden. De lijst bevat alleen munten die de bot volgt.</li>`;
+    if (popMeta) {
+      popMeta.textContent =
+        list.length === all.length ? `${all.length} munten die de bot volgt` : `${list.length} van ${all.length} munten`;
+    }
+    if (popQ) {
+      if (list.length) popQ.setAttribute("aria-activedescendant", `mkp-${st.pickerIdx}`);
+      else popQ.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  function movePicker(delta) {
+    const n = st.pickerList.length;
+    if (!n || !popList) return;
+    const prev = popList.querySelector(`#mkp-${st.pickerIdx}`);
+    st.pickerIdx = (st.pickerIdx + delta + n) % n;
+    const next = popList.querySelector(`#mkp-${st.pickerIdx}`);
+    if (prev) prev.classList.remove("active");
+    if (next) {
+      next.classList.add("active");
+      if (typeof next.scrollIntoView === "function") next.scrollIntoView({ block: "nearest" });
+    }
+    if (popQ) popQ.setAttribute("aria-activedescendant", `mkp-${st.pickerIdx}`);
+  }
+
+  function onDocPointer(e) {
+    if (st.pickerOpen && allWrap && !allWrap.contains(e.target)) closePicker(false);
+  }
+
+  function openPicker() {
+    if (!pop || st.pickerOpen) return;
+    st.pickerOpen = true;
+    if (popQ) popQ.value = "";
+    const list = filterMarketList(pickerMarkets(), "");
+    st.pickerIdx = Math.max(0, list.indexOf(st.market));
+    pop.hidden = false;
+    allBtn && allBtn.setAttribute("aria-expanded", "true");
+    renderPickerList();
+    const cur = popList && popList.querySelector(`#mkp-${st.pickerIdx}`);
+    if (cur && typeof cur.scrollIntoView === "function") cur.scrollIntoView({ block: "center" });
+    // Op een telefoon niet meteen het toetsenbord over de lijst heen
+    const fine = typeof window.matchMedia === "function" && window.matchMedia("(pointer: fine)").matches;
+    if (fine && popQ) popQ.focus();
+    document.addEventListener("pointerdown", onDocPointer, true);
+  }
+
+  function closePicker(focusButton = true) {
+    if (!st.pickerOpen) return;
+    st.pickerOpen = false;
+    if (pop) pop.hidden = true;
+    allBtn && allBtn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("pointerdown", onDocPointer, true);
+    if (focusButton && allBtn) allBtn.focus();
+    renderAllButton();
+  }
+
+  function pickMarket(m) {
+    if (!m) return;
+    closePicker(false);
+    if (m !== st.market) bus.emit("market-selected", { market: m });
+  }
+
+  /** Klikken/toetsen van de marktbalk (vóór de grafiekcheck aangeroepen: werkt ook zonder grafiekbibliotheek) */
+  function wireBar() {
+    stripEl.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-market]");
+      if (!b) return;
+      const m = b.dataset.market;
+      if (m !== st.market) bus.emit("market-selected", { market: m });
+    });
+    allBtn && allBtn.addEventListener("click", () => (st.pickerOpen ? closePicker() : openPicker()));
+    tabsEl.querySelector("[data-pop-x]")?.addEventListener("click", () => closePicker());
+    popQ &&
+      popQ.addEventListener("input", () => {
+        st.pickerIdx = 0;
+        renderPickerList();
+        if (popList) popList.scrollTop = 0;
+      });
+    popQ &&
+      popQ.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          movePicker(1);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          movePicker(-1);
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          pickMarket(st.pickerList[st.pickerIdx]);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          closePicker();
+        }
+      });
+    pop &&
+      pop.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          closePicker();
+        }
+      });
+    popList &&
+      popList.addEventListener("click", (e) => {
+        const li = e.target.closest("[data-market]");
+        if (li) pickMarket(li.dataset.market);
+      });
+    setInterval(() => {
+      if (!document.hidden) refreshStats24();
+    }, 5 * 60_000);
+  }
+
+  // 24-uurs statistieken per zichtbare tab (1h-candles; licht voor de server).
+  // Alleen voor tabs zonder (verse) cijfers: met 400 munten nooit voor alle markten.
+  async function refreshStats24(force = false) {
+    if (st.statsBusy) {
+      st.statsAgain = true;
+      return;
+    }
+    st.statsBusy = true;
+    try {
+      for (let pass = 0; pass < 3; pass++) {
+        st.statsAgain = false;
+        const now = Date.now();
+        const todo = tabMarkets().filter((m) => {
+          const s = st.stats24[m];
+          if (force) return true;
+          if (s && now - s.at < STATS_TTL_MS) return false;
+          return !(st.statsTried[m] && now - st.statsTried[m] < STATS_RETRY_MS);
+        });
+        for (const m of todo) {
+          st.statsTried[m] = Date.now();
+          try {
+            const res = await api.getCandles(m, "1h", 25);
+            const cs = (res && res.candles) || [];
+            if (!cs.length) continue;
+            const lastT = cs[cs.length - 1].time;
+            const win = cs.filter((c) => c.time > lastT - 24 * 3_600_000);
+            const w = win.length ? win : cs;
+            st.stats24[m] = {
+              open: w[0].open,
+              high: Math.max(...w.map((c) => c.high)),
+              low: Math.min(...w.map((c) => c.low)),
+              volQuote: w.reduce((s, c) => s + (c.volume || 0) * (c.close || 0), 0),
+              last: cs[cs.length - 1].close,
+              spark: cs.slice(-25).map((c) => c.close),
+              at: Date.now(),
+            };
+          } catch (err) {
+            console.warn(`24u-statistieken voor ${m} niet beschikbaar`, err && err.message);
+          }
+        }
+        force = false;
+        if (!st.statsAgain) break;
+      }
+    } finally {
+      st.statsBusy = false;
+      updateTabValues();
+      if (st.chartReady) renderToolbar();
+    }
+  }
 
   // ───────────── Laden ─────────────
 
@@ -1162,17 +1506,19 @@ export function mountLiveChart(ctx, els) {
 
   // ───────────── Bus ─────────────
 
-  function onConfigLike(cfg) {
+  /**
+   * Markten van de bot + interval bijwerken. `newerConfig` = config uit "config-changed"
+   * (bij zelf gekozen munten geldt die lijst meteen, zie botMarkets).
+   */
+  function onConfigLike(cfg, newerConfig = null) {
     if (!cfg) return;
-    const markets = Array.isArray(cfg.markets) ? cfg.markets : st.markets;
+    const next = botMarkets(ctx.getState(), newerConfig);
+    const markets = next.length ? next : st.markets;
     const marketsChanged = markets.join(",") !== st.markets.join(",");
     st.markets = markets;
     const intervalChanged = cfg.interval && cfg.interval !== st.interval;
     if (cfg.interval) st.interval = cfg.interval;
-    if (marketsChanged) {
-      renderTabs();
-      refreshStats24();
-    }
+    if (marketsChanged) renderTabs(); // haalt zelf de 24u-cijfers van nieuwe tabs op
     if (intervalChanged) {
       renderToolbar();
       if (st.market) load(true);
@@ -1182,6 +1528,7 @@ export function mountLiveChart(ctx, els) {
   bus.on("snapshot", (snap) => {
     if (!snap) return;
     if (!st.market) st.market = ctx.getSelectedMarket();
+    noteRadar(snap);
     onConfigLike(snap.config);
     renderTabs();
     syncPositions();
@@ -1189,7 +1536,7 @@ export function mountLiveChart(ctx, els) {
     renderToolbarPrice();
   });
 
-  bus.on("config-changed", (cfg) => onConfigLike(cfg));
+  bus.on("config-changed", (cfg) => onConfigLike(cfg, cfg));
 
   bus.on("market-selected", (d) => {
     const m = d && d.market;
@@ -1211,7 +1558,8 @@ export function mountLiveChart(ctx, els) {
       onLivePrice(p.price, p.time);
       renderToolbarPrice();
     }
-    updateTabValues();
+    // Alleen de tab van deze markt (als die zichtbaar is), niet de hele balk
+    updateTabValues(p.market);
   });
 
   bus.on("candle", (d) => {
@@ -1235,13 +1583,13 @@ export function mountLiveChart(ctx, els) {
 
   const snap0 = ctx.getState();
   if (snap0) {
-    st.markets = (snap0.config && snap0.config.markets) || [];
+    st.markets = botMarkets(snap0);
     st.interval = (snap0.config && snap0.config.interval) || null;
+    noteRadar(snap0);
   }
-  renderTabs();
+  renderTabs(); // haalt ook de 24u-cijfers van de zichtbare tabs op
   renderToolbar();
   updateLegend(null);
   if (st.market && st.interval) load(true);
   else showOverlay("wait");
-  if (st.markets.length) refreshStats24();
 }

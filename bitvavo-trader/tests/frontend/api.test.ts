@@ -36,6 +36,16 @@ describe("api: nieuwe routes", () => {
     expect(calls).toEqual([{ url: "/api/positions/pos_1%2Fx/writeoff", method: "POST", body: undefined }]);
   });
 
+  it("getDecision(market) → GET /api/decision?market=… (ge-encodeerd)", async () => {
+    const { api } = await loadPublic("js/api.js");
+    await api.getDecision("BTC-EUR");
+    await api.getDecision("A B/C");
+    expect(calls).toEqual([
+      { url: "/api/decision?market=BTC-EUR", method: "GET", body: undefined },
+      { url: "/api/decision?market=A%20B%2FC", method: "GET", body: undefined },
+    ]);
+  });
+
   it("een serverfout komt als ApiError met de Nederlandse melding terug", async () => {
     vi.stubGlobal("fetch", async () => ({
       ok: false,

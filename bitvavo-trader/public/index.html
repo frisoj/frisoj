@@ -9,6 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/panels.css" />
+    <link rel="stylesheet" href="/css/radar.css" />
   </head>
   <body>
     <header class="app-header">
@@ -70,7 +71,7 @@
       <section id="tab-live" class="tab-page" role="tabpanel" aria-label="Live">
         <div class="live-grid">
           <div class="live-col live-main">
-            <div id="market-tabs" class="market-tabs" role="tablist" aria-label="Markten"></div>
+            <div id="market-tabs" class="market-bar" aria-label="Markten"></div>
             <div class="panel chart-panel">
               <div id="chart-toolbar" class="chart-toolbar"></div>
               <div id="chart-stack" class="chart-stack">
@@ -79,6 +80,9 @@
                 <div id="chart-macd" class="chart-pane chart-pane-sub chart-pane-last"></div>
               </div>
             </div>
+            <section id="panel-radar" class="panel slot" aria-label="Munten-radar">
+              <div class="panel-loading"><span class="spinner"></span></div>
+            </section>
             <section id="panel-positions" class="panel" aria-label="Open posities"></section>
             <section id="panel-trades" class="panel" aria-label="Laatste trades"></section>
           </div>

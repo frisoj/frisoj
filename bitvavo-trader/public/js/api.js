@@ -87,6 +87,8 @@ export const api = {
   /** CandlesResponse */
   getCandles: (market, interval, limit = 300) =>
     request("GET", `/api/candles?${qs({ market, interval, limit })}`),
+  /** Laatste beslissing van de engine voor één markt → { decision: EnsembleDecision | null } (null = nog niet beoordeeld) */
+  getDecision: (market) => request("GET", `/api/decision?${qs({ market })}`),
   /** ScannerRow[] */
   getScanner: (limit = 30) => request("GET", `/api/scanner?${qs({ limit })}`),
   /** StrategyMeta[] */

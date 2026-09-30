@@ -1,6 +1,17 @@
 // Paneel "Signaal" (live tab): ensemble-beslissing voor de geselecteerde markt.
 // Toont een grote actie-badge, een halve-cirkelmeter van de score (−1..+1) met
 // de koop/verkoop-drempels, het marktregime en de stem van elke strategie.
+//
+// v2 (tot 400 munten): de snapshot bevat dan niet voor elke markt een beslissing.
+// Ontbreekt die voor de gekozen markt, dan halen we hem op met GET /api/decision
+// en houden hem daarna bij met de "decision"-events.
+
+import { botMarkets } from "../format.js";
+
+/** Zelfde als SNAPSHOT_DECISIONS_LIMIT in de engine: tot zoveel markten staan ALLE beslissingen in de snapshot */
+const SNAPSHOT_DECISIONS_LIMIT = 40;
+/** Zo lang wachten voor we een ontbrekende beslissing opnieuw vragen */
+const DECISION_REFETCH_MS = 60_000;
 
 const INTERVAL_MS = {
   "1m": 6e4, "5m": 3e5, "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5,
@@ -75,8 +86,14 @@ export function mountSignals(ctx, el) {
 
   let snap = ctx.getState?.() || null;
   let config = snap?.config || null;
-  let market = ctx.getSelectedMarket?.() || config?.markets?.[0] || null;
+  /** config uit "config-changed" die nieuwer is dan die in de snapshot (tot de volgende snapshot) */
+  let newerConfig = null;
+  let lastInterval = config?.interval || null;
+  let market = ctx.getSelectedMarket?.() || botMarkets(snap)[0] || config?.markets?.[0] || null;
   const decisions = { ...(snap?.decisions || {}) };
+  /** market → { at, pending, result: "ok" | "none" | "error" } voor GET /api/decision */
+  const fetched = new Map();
+  let decisionRoute = true; // false = oudere server zonder /api/decision
   const names = { ...FALLBACK_NAMES };
   let lastSig = "";
   let lastGaugeSig = "";
@@ -218,22 +235,80 @@ export function mountSignals(ctx, el) {
     q.votes.innerHTML = `<div class="pn-empty">${esc(msg)}</div>`;
   }
 
+  /** Volgt de bot deze markt (actieve munten, of een open positie)? Onbekend → ja */
+  function inBot(m) {
+    const list = botMarkets(snap, newerConfig);
+    if (!list.length) return true;
+    if (list.includes(m)) return true;
+    return Array.isArray(snap?.positions) && snap.positions.some((p) => p && p.market === m);
+  }
+  const isAuto = () => (newerConfig || config)?.universe?.mode === "auto";
+
+  /** Ontbrekende beslissing ophalen (GET /api/decision), hooguit eens per DECISION_REFETCH_MS per markt */
+  function maybeFetch(m, force = false) {
+    if (!m || decisions[m] || !decisionRoute || typeof api?.getDecision !== "function") return;
+    const f = fetched.get(m);
+    const now = Date.now();
+    if (f && (f.pending || (!force && now - f.at < DECISION_REFETCH_MS) || (force && now - f.at < 10_000))) return;
+    fetched.set(m, { at: now, pending: true, result: f?.result || null });
+    let req;
+    try {
+      req = Promise.resolve(api.getDecision(m));
+    } catch (err) {
+      req = Promise.reject(err);
+    }
+    req
+      .then((res) => {
+        const d = res && typeof res === "object" ? res.decision : null;
+        const ok = !!(d && typeof d === "object" && (!d.market || d.market === m));
+        fetched.set(m, { at: Date.now(), pending: false, result: ok ? "ok" : "none" });
+        if (ok) {
+          const prev = decisions[m];
+          if (!prev || !(prev.time > d.time)) decisions[m] = { ...d, market: m };
+        }
+      })
+      .catch((err) => {
+        // 404 = oudere server zonder deze route: niet meer proberen
+        if (err && err.status === 404) decisionRoute = false;
+        fetched.set(m, { at: Date.now(), pending: false, result: "error" });
+      })
+      .finally(() => {
+        if (m === market) {
+          lastSig = "";
+          schedule();
+        }
+      });
+  }
+
+  /** Tekst als er (nog) geen beslissing is */
+  function missingText(m) {
+    const f = fetched.get(m);
+    if (f && f.pending && !f.result) return `Beslissing voor ${m} ophalen…`;
+    if (f && f.result === "none") {
+      return `${m} is nog niet beoordeeld. De bot bekijkt de munten na elke gesloten candle — start de bot of wacht op de volgende candle.`;
+    }
+    return `Nog geen beslissing voor ${m}. De bot beoordeelt alleen gesloten candles — start de bot of wacht op de volgende candle.`;
+  }
+
   function render() {
     raf = 0;
     renderGaugeStatic();
     q.market.textContent = market ? `· ${market}` : "";
     if (!market) return renderEmpty("Nog geen markt geselecteerd.");
     // Een markt die de bot niet volgt (bijv. geopend vanuit de Scanner) krijgt nooit een beslissing
-    if (Array.isArray(config?.markets) && !config.markets.includes(market)) {
+    if (!inBot(market)) {
       lastSig = "";
-      return renderEmpty("Deze markt zit niet in de bot — voeg hem toe via Scanner of Instellingen.");
+      return renderEmpty(
+        isAuto()
+          ? "Deze munt hoort nu niet bij de munten die de bot volgt — de bot kiest zelf de munten met de meeste handel (zie Instellingen)."
+          : "Deze markt zit niet in de bot — voeg hem toe via Scanner of Instellingen.",
+      );
     }
     const d = decisions[market];
     if (!d) {
       lastSig = "";
-      return renderEmpty(
-        `Nog geen beslissing voor ${market}. De bot beoordeelt alleen gesloten candles — start de bot of wacht op de volgende candle.`,
-      );
+      maybeFetch(market);
+      return renderEmpty(missingText(market));
     }
     // Veroudering vóór de signatuurcheck: anders verschijnt "verouderd" nooit na de eerste render
     const ivMs = INTERVAL_MS[config?.interval] || 0;
@@ -296,16 +371,46 @@ export function mountSignals(ctx, el) {
     if (!raf) raf = requestAnimationFrame(render);
   }
 
+  /** Ander candle-interval: alle oude beslissingen (ook opgehaalde) vervallen */
+  function noteInterval(cfg) {
+    const iv = cfg?.interval || null;
+    if (iv && lastInterval && iv !== lastInterval) {
+      for (const k of Object.keys(decisions)) delete decisions[k];
+      fetched.clear();
+      lastSig = "";
+    }
+    if (iv) lastInterval = iv;
+  }
+
   bus.on("snapshot", (s) => {
     if (!s) return;
     snap = s;
     config = s.config || config;
-    // snapshot.decisions is de volledige lijst van de engine: wat daar niet meer in staat
-    // (bijv. na een intervalwissel of een verwijderde markt) is vervallen.
+    newerConfig = null;
+    noteInterval(config);
     const next = s.decisions || {};
-    for (const k of Object.keys(decisions)) if (!(k in next)) delete decisions[k];
-    Object.assign(decisions, next);
-    if (!market) market = ctx.getSelectedMarket?.() || config?.markets?.[0] || null;
+    const active = Array.isArray(s.activeMarkets) ? s.activeMarkets : null;
+    if (!active || active.length <= SNAPSHOT_DECISIONS_LIMIT) {
+      // snapshot.decisions is de volledige lijst van de engine: wat daar niet meer in staat
+      // (bijv. na een intervalwissel of een verwijderde markt) is vervallen.
+      for (const k of Object.keys(decisions)) if (!(k in next)) delete decisions[k];
+    } else {
+      // Veel munten: de snapshot bevat maar een deel. Alleen markten die de bot niet meer volgt vervallen.
+      const keep = new Set(active);
+      for (const p of Array.isArray(s.positions) ? s.positions : []) if (p && p.market) keep.add(p.market);
+      for (const k of Object.keys(decisions)) if (!(k in next) && !keep.has(k)) delete decisions[k];
+    }
+    for (const [k, d] of Object.entries(next)) {
+      const prev = decisions[k];
+      if (!prev || !d || !(prev.time > d.time)) decisions[k] = d;
+    }
+    if (!market) market = ctx.getSelectedMarket?.() || botMarkets(s)[0] || null;
+    // Radar zegt dat de gekozen markt inmiddels beoordeeld is, maar wij hebben geen beslissing: opnieuw vragen
+    if (market && !decisions[market] && Array.isArray(s.radar)) {
+      const row = s.radar.find((r) => r && r.market === market);
+      const f = fetched.get(market);
+      if (row && row.evaluatedAt != null && f && f.result !== "ok") maybeFetch(market, true);
+    }
     schedule();
   });
   bus.on("decision", (d) => {
@@ -323,7 +428,11 @@ export function mountSignals(ctx, el) {
     }
   });
   bus.on("config-changed", (c) => {
-    if (c) config = c;
+    if (c) {
+      config = c;
+      newerConfig = c;
+      noteInterval(c);
+    }
     schedule();
   });
 

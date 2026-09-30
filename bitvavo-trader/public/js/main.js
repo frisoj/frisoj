@@ -3,7 +3,7 @@
 // geïmporteerd zodat een ontbrekend/kapot paneel nooit de pagina breekt.
 
 import { api, connectEvents, setToken, ApiError } from "./api.js";
-import { fmt, esc } from "./format.js";
+import { fmt, esc, botMarkets } from "./format.js";
 import { createBus } from "./bus.js";
 import { mountHeader } from "./header.js";
 import { mountLiveChart } from "./liveChart.js";
@@ -307,13 +307,15 @@ bus.on("snapshot", (snap) => {
   lastSnapshot = snap;
   document.body.classList.toggle("live-armed", snap.mode === "live" && !!snap.liveArmed);
   if (!selectedMarket) {
-    const first = snap.config && snap.config.markets && snap.config.markets[0];
+    // v2: de munten die de bot NU volgt (automatische keuze), anders de eigen lijst
+    const first = botMarkets(snap)[0] || (snap.config && Array.isArray(snap.config.markets) ? snap.config.markets[0] : null);
     if (first) queueMicrotask(() => bus.emit("market-selected", { market: first }));
   }
 });
+// Licht houden: met 400 munten komen er veel events; alleen de prijs in de laatste snapshot zetten
 bus.on("price", (p) => {
   if (lastSnapshot && p && p.market) {
-    lastSnapshot.prices = lastSnapshot.prices || {};
+    if (!lastSnapshot.prices) lastSnapshot.prices = {};
     lastSnapshot.prices[p.market] = p.price;
   }
 });
@@ -365,7 +367,6 @@ function scrollCue(el) {
 }
 const navEl = document.querySelector(".nav-tabs");
 const updateNavCue = scrollCue(navEl);
-scrollCue($("market-tabs"));
 function revealNavTab(btn) {
   if (!navEl || !btn || navEl.scrollWidth <= navEl.clientWidth + 1) return;
   const n = navEl.getBoundingClientRect();
@@ -503,10 +504,13 @@ safeMount("grafiek", () =>
     macdEl: $("chart-macd"),
   }),
 );
+// Vervaagde rand op de scrollende markttabs (liveChart zet ze in #market-tabs, naast "Alle munten")
+scrollCue($("market-tabs")?.querySelector(".market-tabs") || $("market-tabs"));
 safeMount("tabellen", () => mountTables(ctx, { positionsEl: $("panel-positions"), tradesEl: $("panel-trades") }));
 safeMount("logboek", () => mountLog(ctx, $("panel-log")));
 
 const PANELS = [
+  ["radar", "mountRadar", "panel-radar"],
   ["signals", "mountSignals", "panel-signals"],
   ["risk", "mountRisk", "panel-risk"],
   ["equity", "mountEquity", "panel-equity"],

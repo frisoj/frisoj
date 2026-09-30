@@ -1,7 +1,30 @@
 // Gedeelde formatters (nl-NL). Alle panelen gebruiken deze i.p.v. eigen opmaak.
 
-const nf = (min, max) =>
-  new Intl.NumberFormat("nl-NL", { minimumFractionDigits: min, maximumFractionDigits: max });
+// Intl.NumberFormat aanmaken is duur (met 400 munten duizenden keren per update): hergebruiken
+const nfCache = new Map();
+const nf = (min, max) => {
+  const key = `${min}|${max}`;
+  let f = nfCache.get(key);
+  if (!f) {
+    f = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: min, maximumFractionDigits: max });
+    nfCache.set(key, f);
+  }
+  return f;
+};
+const eurCache = new Map();
+const eurNf = (digits) => {
+  let f = eurCache.get(digits);
+  if (!f) {
+    f = new Intl.NumberFormat("nl-NL", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    eurCache.set(digits, f);
+  }
+  return f;
+};
 
 const isNum = (n) => typeof n === "number" && Number.isFinite(n);
 
@@ -9,12 +32,7 @@ export const fmt = {
   /** € 1.234,56 */
   eur(n, digits = 2) {
     if (!isNum(n)) return "–";
-    return new Intl.NumberFormat("nl-NL", {
-      style: "currency",
-      currency: "EUR",
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    }).format(n);
+    return eurNf(digits).format(n);
   },
   /** +€ 1,23 / -€ 0,45 */
   eurSigned(n, digits = 2) {
@@ -113,6 +131,23 @@ export const fmt = {
     );
   },
 };
+
+/**
+ * De markten die de bot volgt: `snapshot.activeMarkets ?? snapshot.config.markets`
+ * (v2: bij automatische muntkeuze is dat de keuze van de bot, niet de eigen lijst).
+ * `config` (optioneel) is een nieuwere config dan die in de snapshot (na "config-changed"):
+ * bij zelf gekozen munten geldt die lijst dan meteen, zonder op de volgende snapshot te wachten.
+ * @returns {string[]}
+ */
+export function botMarkets(snap, config = null) {
+  const cfg = config || (snap && snap.config) || null;
+  const own = cfg && Array.isArray(cfg.markets) ? cfg.markets : null;
+  const active = snap && Array.isArray(snap.activeMarkets) ? snap.activeMarkets : null;
+  const auto = !!(cfg && cfg.universe && cfg.universe.mode === "auto");
+  // Nieuwere config met zelf gekozen munten: actieve markten = die lijst (ontdubbeld)
+  if (config && own && !auto) return [...new Set(own)];
+  return active ?? (own ? [...new Set(own)] : []);
+}
 
 /** Escape tekst voor veilig gebruik in innerHTML */
 export function esc(s) {

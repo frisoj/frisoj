@@ -1,5 +1,7 @@
 // Header (A9): accountstatistieken, bot-status, bot-bediening en de mode-banner.
 
+import { botMarkets } from "./format.js";
+
 const svg = (p, extra = "") =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${p}</svg>`;
 const I = {
@@ -161,6 +163,31 @@ export function accountReturns(snap) {
   return { dayPnl, dayPct, totPnl, totPct, capital: start, skimmed };
 }
 
+/**
+ * Regel in de kaart "Bot-status": hoeveel munten de bot volgt en of het marktfilter
+ * (Bitcoin-trend) kopen toestaat. null = niets te tonen.
+ * @returns {null | { count: number, auto: boolean, filter: "ok" | "bad" | "unknown" | null, text: string, filterText: string, title: string }}
+ */
+export function coinsLine(snap) {
+  if (!snap || typeof snap !== "object") return null;
+  const n = botMarkets(snap).length;
+  if (!n) return null;
+  const mode = (snap.universe && snap.universe.mode) || (snap.config && snap.config.universe && snap.config.universe.mode);
+  const auto = mode === "auto";
+  const text = `${n} ${n === 1 ? "munt" : "munten"}`;
+  let title = `De bot volgt ${n} ${n === 1 ? "munt" : "munten"}${auto ? ", automatisch gekozen (meeste handel)" : ", zelf gekozen"}.`;
+  const mf = snap.marketFilter;
+  let filter = null;
+  let filterText = "";
+  if (mf && typeof mf === "object") {
+    filter = mf.ok === true ? "ok" : mf.ok === false ? "bad" : "unknown";
+    filterText = filter === "ok" ? "kopen mag" : filter === "bad" ? "koopt nu niet" : "trend onbekend";
+    const note = typeof mf.note === "string" ? mf.note.trim() : "";
+    title += ` Marktfilter (Bitcoin-trend): ${note || filterText}.`;
+  }
+  return { count: n, auto, filter, text, filterText, title };
+}
+
 export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
   const { fmt, esc, api, bus } = ctx;
   let snap = ctx.getState();
@@ -200,6 +227,7 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
           <span class="badge badge-red" data-halt hidden>HALTED</span>
         </div>
         <div class="stat-sub" data-tick>&nbsp;</div>
+        <div class="stat-sub stat-coins" data-coins hidden></div>
         <div class="stat-sub halt" data-haltreason hidden></div>
       </div>`;
   }
@@ -376,7 +404,25 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
       reason.textContent = halted ? snap.halted.reason || "Nieuwe trades gepauzeerd door risicobeheer" : "";
       reason.title = reason.textContent;
     }
+    renderCoins();
     renderTick();
+  }
+
+  let coinsKey = "";
+  function renderCoins() {
+    const el = q("bot", "[data-coins]");
+    if (!el) return;
+    const cl = coinsLine(snap);
+    const key = cl ? `${cl.text}|${cl.filter}|${cl.title}` : "";
+    if (key === coinsKey) return;
+    coinsKey = key;
+    el.hidden = !cl;
+    el.innerHTML = cl
+      ? `<span>${esc(cl.text)}</span>${
+          cl.filter ? ` · <span class="coins-mf ${cl.filter}">${cl.filter === "ok" ? "✓" : cl.filter === "bad" ? "✕" : "?"} ${esc(cl.filterText)}</span>` : ""
+        }`
+      : "";
+    el.title = cl ? cl.title : "";
   }
 
   function renderTick() {

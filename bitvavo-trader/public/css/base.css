@@ -1085,6 +1085,24 @@ body.live-armed {
 .stat-bot .stat-sub.warn {
   color: var(--yellow);
 }
+.stat-bot .stat-coins {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: help;
+}
+.stat-bot .coins-mf.ok {
+  color: var(--green);
+}
+.stat-bot .coins-mf.bad {
+  color: var(--red);
+}
+/* Telefoon: geen extra regel (de Munten-radar laat het ook zien) */
+@media (max-width: 600px) {
+  .stat-bot .stat-coins {
+    display: none;
+  }
+}
 .stat-bot .stat-sub.halt {
   color: var(--red);
   overflow-wrap: break-word;
@@ -1241,17 +1259,20 @@ body.live-armed {
   #panel-positions {
     order: 4;
   }
-  #panel-risk {
+  #panel-radar {
     order: 5;
   }
-  #panel-equity {
+  #panel-risk {
     order: 6;
   }
-  #panel-trades {
+  #panel-equity {
     order: 7;
   }
-  #panel-log {
+  #panel-trades {
     order: 8;
+  }
+  #panel-log {
+    order: 9;
   }
   .app-header {
     position: static;
@@ -1499,6 +1520,199 @@ body.live-armed {
 }
 .mkt-tab.extra {
   border-style: dashed;
+}
+.mkt-flag.buy {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+/* Marktbalk = scrollende tabs + knop "Alle munten" (met zoeklijst) */
+.market-bar {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+.market-bar > .market-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mkt-all-wrap {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+.mkt-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.mkt-all:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+}
+.mkt-all[aria-expanded="true"],
+.mkt-all.has-sel {
+  border-color: rgba(79, 134, 255, 0.65);
+  background: linear-gradient(180deg, rgba(79, 134, 255, 0.1), rgba(79, 134, 255, 0.02)), var(--panel);
+}
+.mkt-all-ico {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+.mkt-all-txt {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.mkt-all-txt b {
+  font-size: 12.5px;
+}
+.mkt-all-txt small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.mkt-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 20px));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.mkt-pop-head {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.mkt-pop-head .input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+}
+.mkt-pop-x {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mkt-pop-x:hover {
+  color: var(--text);
+  background: var(--panel-3);
+}
+.mkt-pop-meta {
+  padding: 6px 12px 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.mkt-pop-list {
+  max-height: min(420px, 55vh);
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+.mkp-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto 56px;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.mkp-item:hover,
+.mkp-item.active {
+  background: var(--panel-3);
+}
+.mkp-item.sel {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.mkp-item .mkt-icon {
+  grid-row: auto;
+  width: 26px;
+  height: 26px;
+  overflow: hidden;
+  font-size: 8.5px;
+  letter-spacing: -0.04em;
+}
+.mkp-name {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mkp-name small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.mkp-flag {
+  font-size: 11px;
+  font-weight: 700;
+}
+.mkp-flag.pos {
+  color: var(--accent);
+}
+.mkp-flag.buy {
+  color: var(--green);
+}
+.mkp-flag.blocked {
+  color: var(--red);
+}
+.mkp-price {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mkp-chg {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-align: right;
+  white-space: nowrap;
+}
+.mkp-empty {
+  padding: 16px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .mkt-all {
+    gap: 6px;
+    padding: 0 9px;
+  }
+  .mkt-all-ico {
+    display: none;
+  }
 }
 
 /* ─────────────────────────────── Grafiek ─────────────────────────────── */
