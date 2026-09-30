@@ -1,6 +1,6 @@
 # Review-verslag (afgerond)
 
-De bot is in vier rondes door meerdere onafhankelijke agents doorgelicht. Elke
+De bot is in vijf rondes door meerdere onafhankelijke agents doorgelicht (ronde 5: de uitbreiding naar 400 munten). Elke
 ronde had drie stappen:
 
 1. Vinden: reviewers zochten problemen, elk vanuit een eigen invalshoek.
@@ -19,7 +19,9 @@ ronde had drie stappen:
 | 3 | Onverkoopbaar altijd op de actuele koers, Bitvavo-fout 217, tijdregel voor onbekende orders, nieuw rendementsmodel, dashboard. | Regressiecontrole 8/8 groen. |
 | 4 | Verse koersen terwijl de bot stilstaat, afschrijven alleen op verse data, marge rond €5, heen-en-weer wijzigen van de kapitaallimiet, Start geblokkeerd tijdens een noodstop, telefoonweergave. | Geldcontrole 16/16 groen. Het ernstige dashboardprobleem (vensters vielen op een telefoon buiten beeld) is opgelost en gecontroleerd. |
 
-Tests: van 534 naar 1009, allemaal groen, plus een TypeScript-controle zonder fouten.
+| 5 | De uitbreiding "veel munten" (tot 400, automatische muntkeuze, trendfilter, spreadlimiet, kansen-ranglijst, munten-radar): 5 reviewers (geldveiligheid, schaal en rate-limits met een nagebootste Bitvavo met 400 markten, backtest, instellingen en bijwerken vanaf v1, dashboard in een echte browser). Elke bevinding met een aantoonbaar script. | 23 bevindingen (1 hoog, 7 middel, 15 laag). 22 opgelost en opnieuw gecontroleerd, 1 deels (zie hieronder). |
+
+Tests: van 534 naar 1438, allemaal groen, plus een TypeScript-controle zonder fouten.
 
 ## Belangrijkste reparaties
 
@@ -54,7 +56,25 @@ Tests: van 534 naar 1009, allemaal groen, plus een TypeScript-controle zonder fo
   - Er is bescherming tegen DNS-rebinding en tegen verzoeken van andere websites.
   - Zware berekeningen draaien in een aparte thread, zodat de bot blijft reageren.
 
+## Belangrijkste reparaties in ronde 5
+
+- **Stop-losses blijven snel, ook met 400 munten.** Posities worden elke ronde als eerste
+  bekeken; het scannen van andere munten heeft een tijdslimiet; loopt een ronde lang uit,
+  dan worden de stops tussendoor opnieuw gecontroleerd. Een verkoop of noodstop mag een
+  reserve van Bitvavo's verzoeken-budget gebruiken, zodat hij niet ~60 seconden hoeft te
+  wachten (gemeten: van 60 s naar 0,4 s).
+- **Trendfilter faalt veilig.** Kan de bot de Bitcoin-koers voor het filter niet ophalen,
+  dan koopt hij niet (eerst liet hij nog een dag lang aankopen door op oude data).
+- **Geen aankopen meer na een wijziging midden in een ronde** (oefengeld resetten, ander
+  interval, andere muntenlijst).
+- **Bijwerken vanaf v1:** je opgeslagen muntenlijst blijft gewoon staan; automatisch kiezen
+  zet je zelf aan in Instellingen → Munten.
+
 ## Bekende kleine punten (niet opgelost, geen risico voor je geld)
+
+- Met heel veel munten op een kort interval (bijv. 400 munten op 1-minuutcandles) haalt de
+  bot niet elke munt elke candle. De radar zegt dat dan. Kies minder munten of een langer
+  interval.
 
 - Verhoog je de kapitaallimiet en verlaag je hem daarna weer, dan blijft het
   **rendement-%** gerekend op het hoogste bedrag dat ooit is ingelegd. Het bedrag in

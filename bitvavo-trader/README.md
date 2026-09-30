@@ -30,8 +30,8 @@ computer en is te bedienen via een dashboard in je browser.
 
 > ## ✅ Status: gecontroleerd, maar nog nooit tegen de echte Bitvavo getest
 >
-> De code is in vier rondes door meerdere onafhankelijke reviewers doorgelicht; alle
-> gevonden kritieke problemen zijn opgelost en opnieuw gecontroleerd (1000+ tests, zie
+> De code is in vijf rondes door meerdere onafhankelijke reviewers doorgelicht; alle
+> gevonden kritieke problemen zijn opgelost en opnieuw gecontroleerd (1400+ tests, zie
 > [`docs/REVIEW-STATUS.md`](docs/REVIEW-STATUS.md)).
 >
 > **Maar:** de koppeling met Bitvavo is gebouwd volgens Bitvavo's API-documentatie en
@@ -189,7 +189,11 @@ minder zwaar meetellen, en blokkeert nieuwe aankopen in een dalende trend.
   en hoeveel munten al bekeken zijn.
 - Ook met 400 munten blijft de bot binnen Bitvavo's limieten: hij haalt alle koersen
   in één keer op, en de grafieken per munt verspreid over een paar rondes, één keer
-  per candle.
+  per candle. Open posities komen elke ronde als eerste aan de beurt, zodat stop-losses
+  snel blijven. Met heel veel munten op een kort interval (bijv. 400 op 1-minuutcandles)
+  lukt niet alles elke candle; de radar waarschuwt dan.
+- **Had je al een eigen muntenlijst opgeslagen** in een eerdere versie, dan blijft die
+  staan. Automatisch kiezen zet je aan in **Instellingen → Munten**.
 
 ### Risicobeheer (standaardinstellingen voor €50)
 

@@ -919,3 +919,37 @@ seen excluding it.
   plain Dutch explanation), risk field "Max. spread (%)" (0 = uit). Scanner: maximum 400; in auto mode adding a
   coin explains that the bot chooses automatically. Backtest: a "Trendfilter" toggle to compare with / without,
   and the result shows `blockedEntries`.
+
+### v2 — changes after the round-5 review (binding, supersede the text above where they differ)
+
+* **Tick order**: held markets (step 5) are processed **first**, right after the preamble, then steps 1–4
+  (universe, bulk prices, tickers, market filter), then the scan and the opportunity round. When a tick has run
+  longer than `min(pollMs, HELD_RECHECK_MS = 10 s)`, stops of open positions are re-checked after steps 1–4, after
+  the scan and after the flush (one bulk-price request, or the position candles when the feed has no `getPrices`).
+  A position whose candle fetch failed is still checked against the bulk price.
+* **Scan time budget**: no new candle fetches after `SCAN_TIME_BUDGET_MS` (effective `min(pollMs, 10 s)`); the rest
+  stays due for the next tick. Optional requests (scan candles, tickers, universe, trend candles, spread order book)
+  are **fast**: no retries, 5 s timeout, no waiting on the rate limit. A rate-limited scan fetch stops the scan and
+  is not an error. `BULK_RETRY_MS = 30 s` after a failed bulk-price request.
+* **Rate-limit reserve for selling**: `BitvavoClient` public endpoints take an optional last argument
+  `PublicRequestOptions { retries, noWait, timeoutMs, priority }`; `BitvavoFeed` methods take
+  `FeedRequestOptions { fast, priority }` (other feeds ignore it; `MarketDataFeed` is unchanged). `priority` may use
+  the public reserve down to `PRIVATE_RATE_LIMIT_FLOOR` (10) and is used for the fresh price of the kill switch,
+  a manual close, a write-off, missing prices and held-market candles — so a stop-loss or kill switch never waits
+  ~60 s for the public rate-limit reset.
+* **Trend data freshness** (engine and backtest share `isTrendDataStale` / `trendGate(…, { rejectStale, staleGraceMs })`
+  in `src/strategies/trendFilter.ts`): the newest trend candle may be missing only within `TREND_RETRY_MS` after it
+  closed **and** only when the last fetch succeeded (engine); the backtest uses grace 0. Otherwise: no data → no buy.
+  The dashboard's words for the 4-hour filter: "N blokken van 4 uur".
+* **Opportunity round**: after every wait it stops when the round is no longer current (reset, interval change,
+  stop/kill) and re-checks right before `tryEntry` that the market is still active; the trend-filter config is read
+  per candidate.
+* **Spread at the limit**: `spreadAboveLimit(pct, max)` with `SPREAD_EPS_PCT = 1e-9` (engine, universe selection and
+  backtest agree); the notes never show two equal numbers.
+* **Capacity warning**: when `floor(SCAN_BATCH_PER_TICK × interval / (pollMs + 3 s))` is below the number of active
+  markets, `universe.note` says (in Dutch) that not every coin is evaluated every candle (also in manual mode).
+* **Radar**: a buy decision without a current-round note shows as `"blocked"` with a note (e.g. after Stop → Start
+  within the same candle).
+* **Config**: a v1 `config.json` (markets, no `universe`) loads as **manual** with its saved list, with an info line
+  at startup. In live mode the "coins the bot does not manage" check covers the auto-selected markets too.
+* **Scanner**: skips `EXCLUDED_BASES` (stablecoins, gold, wrapped BTC/ETH), like the automatic selection.
