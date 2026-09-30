@@ -140,6 +140,13 @@ export interface MarketDataFeed {
   getTickers24h(markets?: string[]): Promise<Ticker24h[]>;
   getPrice(market: string): Promise<number>;
   getOrderBook(market: string, depth?: number): Promise<OrderBook>;
+  /**
+   * Optioneel: de actuele prijs van ALLE markten in één verzoek (Bitvavo:
+   * `GET /ticker/price` zonder markt, gewicht 1). Markt → prijs; markten zonder
+   * geldige prijs (> 0) ontbreken. Nodig om honderden markten te volgen zonder
+   * per markt een verzoek te doen.
+   */
+  getPrices?(): Promise<Record<string, number>>;
 }
 
 // ─────────────────────────────── Signalen ───────────────────────────────
@@ -207,6 +214,30 @@ export interface EnsembleConfig {
   sellThreshold: number;
   /** Regimefilter: weeg strategieën buiten hun regime minder, geen buys in trend-down */
   regimeFilter: boolean;
+  /**
+   * Optioneel: trendfilter op een hogere tijdschaal (zie `src/strategies/trendFilter.ts`).
+   * Ontbreekt of beide vlaggen uit = geen filter.
+   */
+  trendFilter?: TrendFilterConfig;
+}
+
+/** Tijdschalen die het trendfilter kan gebruiken */
+export type TrendFilterInterval = "4h" | "1d";
+export const TREND_FILTER_INTERVALS: readonly TrendFilterInterval[] = ["4h", "1d"];
+
+/**
+ * Trendfilter: alleen NIEUWE aankopen als de slotkoers van de laatst GESLOTEN
+ * candle op `interval` boven het gemiddelde (SMA) van de laatste `period`
+ * gesloten candles ligt. Verkopen, stops en take-profits worden nooit geblokkeerd.
+ */
+export interface TrendFilterConfig {
+  /** Marktfilter: Bitcoin (`MARKET_FILTER_MARKET`, BTC-EUR) moet boven zijn gemiddelde staan */
+  market: boolean;
+  /** Muntfilter: de munt zelf moet boven zijn gemiddelde staan */
+  coin: boolean;
+  interval: TrendFilterInterval;
+  /** Aantal candles voor het gemiddelde (geheel getal, 5..200) */
+  period: number;
 }
 
 export interface EnsembleDecision {
@@ -265,6 +296,12 @@ export interface RiskConfig {
   minOrderQuote: number;
   /** Sluit positie na N candles als hij niet in de winst staat (0 = uit) */
   timeStopCandles: number;
+  /**
+   * Optioneel: koop niet als de bid/ask-spread groter is dan dit PERCENTAGE
+   * (0.3 = 0,3%; 0 of ontbreekt = geen limiet). Ook gebruikt bij de
+   * automatische muntkeuze.
+   */
+  maxSpreadPct?: number;
 }
 
 export interface Position {
@@ -467,6 +504,28 @@ export interface EngineConfig {
   historyCandles: number;
   ensemble: EnsembleConfig;
   risk: RiskConfig;
+  /**
+   * Optioneel: welke munten de bot volgt. Ontbreekt = "manual" (precies `markets`).
+   * `markets` blijft altijd de zelfgekozen lijst, ook als mode "auto" is.
+   */
+  universe?: UniverseConfig;
+}
+
+/** Hoe de bot zijn munten kiest */
+export type UniverseMode = "manual" | "auto";
+
+export interface UniverseConfig {
+  /**
+   * "manual": precies `EngineConfig.markets` (1..MAX_MARKETS).
+   * "auto": de `count` EUR-markten met het hoogste 24h-volume, zonder stablecoins,
+   * met minstens `minVolumeEur` volume en een spread ≤ `risk.maxSpreadPct`;
+   * elk uur opnieuw gekozen.
+   */
+  mode: UniverseMode;
+  /** auto: aantal markten (geheel getal, 1..MAX_MARKETS) */
+  count: number;
+  /** auto: minimaal 24h-volume in EUR (≥ 0) */
+  minVolumeEur: number;
 }
 
 export interface AccountState {
@@ -567,6 +626,90 @@ export interface EngineSnapshot {
   stateRecovery?: { reason: string; quarantinedTo?: string; at: number } | null;
   /** Live: totaal aan winst dat boven de kapitaallimiet buiten het handelsbudget is gehouden */
   skimmedQuote?: number;
+  // ── v2: veel munten (alle optioneel) ──
+  /** De markten die de bot NU volgt (manual: = config.markets; auto: de automatische keuze) */
+  activeMarkets?: string[];
+  /** Eén compacte rij per actieve markt (plus markten met een open positie) */
+  radar?: RadarRow[];
+  /** Status van het marktfilter (Bitcoin-trend); null als het filter uit staat */
+  marketFilter?: MarketFilterView | null;
+  universe?: UniverseView;
+  /** Voortgang van het beoordelen van alle markten voor de laatste candle */
+  scan?: ScanProgress;
+}
+
+/**
+ * Status van een markt in de munten-radar:
+ * - "position": er staat een positie open;
+ * - "candidate": koopsignaal, wacht op de kansenronde of op een vrije plek;
+ * - "blocked": koopsignaal, maar tegengehouden (trendfilter, spread, risicobeheer…);
+ * - "watching": beoordeeld, geen koopsignaal;
+ * - "pending": nog niet beoordeeld (net toegevoegd / ronde loopt nog);
+ * - "error": koersdata ophalen mislukte.
+ */
+export type RadarStatus = "position" | "candidate" | "blocked" | "watching" | "pending" | "error";
+
+export interface RadarRow {
+  market: string;
+  price: number | null;
+  /** 24h-verandering in % (uit de 24h-tickers) */
+  changePct24h: number | null;
+  volumeQuote24h: number | null;
+  /** Bid/ask-spread in % (uit de 24h-tickers), null = onbekend */
+  spreadPct: number | null;
+  /** Laatste ensemble-beslissing voor deze markt */
+  action: SignalAction | null;
+  score: number | null;
+  regime: Regime | null;
+  /** Openingstijd van de laatst beoordeelde candle */
+  evaluatedAt: number | null;
+  /** Muntfilter: true = boven gemiddelde, false = eronder, null = uit/onbekend */
+  trendOk: boolean | null;
+  status: RadarStatus;
+  /** Plek in de laatste kansenronde (1 = beste koopkans) */
+  rank?: number;
+  /** Korte Nederlandse uitleg, bijv. waarom een koopsignaal tegengehouden is */
+  note?: string;
+}
+
+export interface MarketFilterView {
+  market: string;
+  /** true = Bitcoin boven zijn gemiddelde (kopen mag), false = eronder, null = onbekend (niet kopen) */
+  ok: boolean | null;
+  close: number | null;
+  sma: number | null;
+  interval: TrendFilterInterval;
+  period: number;
+  checkedAt: number | null;
+  /** Nederlandse zin voor het dashboard */
+  note: string;
+}
+
+export interface UniverseView {
+  mode: UniverseMode;
+  /** Aantal actieve markten */
+  count: number;
+  /** auto: gevraagd aantal; manual: lengte van config.markets */
+  requested: number;
+  /** auto: moment van de laatste automatische keuze */
+  updatedAt: number | null;
+  /** auto: markten die door de filters kwamen (vóór het afkappen op `count`) */
+  eligible?: number;
+  /** auto: markten die door een filter vielen (stablecoin, volume, spread) */
+  excluded?: number;
+  /** Nederlandse toelichting, bijv. waarom de automatische keuze mislukte */
+  note?: string;
+}
+
+export interface ScanProgress {
+  /** Actieve markten die voor hun laatste gesloten candle al beoordeeld (of mislukt) zijn */
+  done: number;
+  total: number;
+  /** Moment waarop de lopende ronde begon (null = geen ronde bezig) */
+  roundStartedAt: number | null;
+  lastRoundCompletedAt: number | null;
+  /** Aantal koopkandidaten in de laatst afgeronde kansenronde */
+  candidates: number;
 }
 
 /** Wat de StateStore op schijf bewaart */
@@ -606,6 +749,8 @@ export interface PersistedState {
   skimmedQuote?: number;
   /** Staat was onbruikbaar bij het laden en wacht op bevestiging van de gebruiker */
   stateRecovery?: { reason: string; quarantinedTo?: string; at: number };
+  /** Laatste automatische muntkeuze (gebruikt bij een herstart zolang hij < 24 uur oud is) */
+  autoUniverse?: { markets: string[]; at: number };
 }
 
 /**
@@ -750,6 +895,11 @@ export interface BacktestResult {
   note?: string;
   /** Trades waarvan de verkoop eerst geweigerd werd (waarde onder het beursminimum) */
   stuckTrades?: number;
+  /**
+   * Koopsignalen die NIET tot een aankoop leidden door een filter: `trend` =
+   * trendfilter (markt of munt), `spread` = spread boven `risk.maxSpreadPct`.
+   */
+  blockedEntries?: { trend: number; spread: number };
 }
 
 export type OptimizeObjective = "sharpe" | "return" | "profitFactor" | "calmar";

@@ -763,3 +763,159 @@ DOM-free helper modules:
   `closeRefusalInfo`, `writeOffRefusalInfo`, `tradeNotify.js`, `equityFigures`, `api.js`) is tested
   directly; panels (`backtest`, `settings`, `signals`, `equity`, header alerts, tables) are mounted against the fakes.
   Keep new UI logic in such pure modules so it can be tested the same way.
+
+## v2 — Veel munten (tot 400), automatische muntkeuze, trendfilter, spreadlimiet, kansen-ranglijst, munten-radar
+
+Everything in this section is **binding** for v2. Contract additions are in `src/core/types.ts` /
+`src/core/defaults.ts` (all optional fields, see the JSDoc there). Pure, already tested modules (use them, do
+not change their behaviour without a very good reason; if you must, update their tests):
+
+* `src/strategies/trendFilter.ts` — `trendFilterActive(cfg)`, `trendStateAt(candles, interval, period, atMs)`,
+  `trendGate(cfg, { market?, coin? }, atMs, coinMarket?)` → `{ allowed, reason?, market?, coin? }`,
+  `describeTrend(who, state, cfg)`, `trendCandlesNeeded(cfg)` (= period + 5), `trendWarmupMs(cfg)` (= (period + 3) × interval).
+  Only candles **closed at `atMs`** count; too little data = unknown = **not allowed** (fail-closed). The reason
+  starts with `"Marktfilter: "` (Bitcoin) or `"Muntfilter: "` (the coin).
+* `src/engine/universe.ts` — `selectUniverse(markets, tickers, cfg.universe, cfg.risk.maxSpreadPct)` →
+  `{ markets (volume order, max count), eligible, excluded[] }`, `EXCLUDED_BASES` (stablecoins, gold, wrapped BTC/ETH),
+  `tickerSpreadPct(ticker)` (% of mid, null = unknown).
+* `src/engine/ranking.ts` — `rankCandidates(candidates)` (score in 0.05 buckets desc → relative strength desc →
+  24h volume desc → name), `relativeStrengthPct(coinChangePct, btcChangePct)`, `EntryCandidate`.
+
+New defaults: `DEFAULT_ENSEMBLE_CONFIG.trendFilter = DEFAULT_TREND_FILTER` (`{ market: true, coin: false, interval: "1d", period: 50 }`),
+`DEFAULT_RISK_CONFIG.maxSpreadPct = 0.3` (percent), `DEFAULT_ENGINE_CONFIG.universe = DEFAULT_UNIVERSE_CONFIG`
+(`{ mode: "auto", count: 30, minVolumeEur: 250_000 }`), `MAX_MARKETS = 400`, `MARKET_FILTER_MARKET = "BTC-EUR"`.
+`EngineConfig.markets` stays the user's own list (1..400) in every mode. A config **without** `universe` is manual;
+an ensemble **without** `trendFilter` has no trend filter; a risk config **without** `maxSpreadPct` has no spread limit.
+Tests that need the old behaviour set `universe: { mode: "manual", … }` / `trendFilter: { market: false, coin: false, … }`.
+
+### Terms
+
+* **active markets** — manual: `config.markets` (deduplicated, in order). auto: the last successful
+  `selectUniverse` result (volume order). Before the first auto selection: `PersistedState.autoUniverse.markets`
+  when it is < 24 h old, otherwise `config.markets`. Markets with an open position are always *processed*
+  (exits, stops) even when they are not active; only active markets may be **bought**.
+* **round** — per candle of the engine interval: `roundKey = floor(now / ms) × ms − ms` (open time of the newest
+  closed candle). A market is **due** when it has not been fetched for the current `roundKey`.
+* **candidate** — a buy decision (`action === "buy"`) for an active market without a position, not already traded
+  (same rules as today's `tryEntry` pre-checks incl. `evaluatedBeforeRestart`).
+* **gates** — in this order: trend filter (`trendGate`), spread (`risk.maxSpreadPct`), then everything `tryEntry`
+  already checks (halt, unknown orders, risk plan, cash…). Gates only block **new buys**; exits are never blocked.
+
+### Engine (`src/engine/tradingEngine.ts`)
+
+Constants (exported): `SCAN_CONCURRENCY = 4`, `SCAN_BATCH_PER_TICK = 80`, `ENTRY_ROUND_MAX_WAIT_MS = 180_000`,
+`TICKERS_REFRESH_MS = 60_000`, `UNIVERSE_REFRESH_MS = 3_600_000`, `SNAPSHOT_DECISIONS_LIMIT = 40`,
+`TREND_RETRY_MS = 300_000`, `FETCH_RETRY_MS = 60_000`.
+
+`runTick(now)`, after the existing preamble (unknown orders, rollover, markets, halt):
+1. **Universe** (auto only): (re)select when never selected, every `UNIVERSE_REFRESH_MS`, or after a change of
+   `config.universe` / `risk.maxSpreadPct` / mode: `feed.getMarkets()` + `feed.getTickers24h()` → `selectUniverse`.
+   Error or empty result → keep the previous set (or `config.markets`), `universe.note` in Dutch, throttled warn log.
+   When the set changes: one info log, e.g. `Automatische muntkeuze: 30 munten (meeste handel) — erbij: A, B; eraf: C`
+   (max ~8 names per list, then "+N"). Persist `autoUniverse`.
+2. **Prices**: `feed.getPrices?.()` once per tick when available → `this.prices` for active + position markets.
+   No per-market `"price"` events for these bulk prices (the snapshot carries them).
+3. **Tickers**: `feed.getTickers24h()` at most every `TICKERS_REFRESH_MS` (radar: 24h change, volume, spread;
+   ranking: relative strength vs `MARKET_FILTER_MARKET`). Failure → keep the old ones.
+4. **Market filter** (when `trendFilter.market`): candles of `MARKET_FILTER_MARKET` on `trendFilter.interval`
+   (`getCandles(…, trendCandlesNeeded(tf))`, keep only closed ones). Refetch when a newer candle of that interval
+   has closed since the last fetch; after a failure retry at most every `TREND_RETRY_MS`. Keep `MarketFilterView`
+   for the snapshot (`note` from `describeTrend`).
+5. **Held markets** (open position or unknown sell): `processMarket` every tick, sequentially, exactly as today.
+6. **Due active markets** (not held), in active order, at most `SCAN_BATCH_PER_TICK` per tick: fetch candles with
+   at most `SCAN_CONCURRENCY` requests in parallel (**I/O only**), then process them **sequentially** (all state
+   changes stay sequential, as today). Stop early when the engine is no longer running. A market is done for the
+   round once fetched — also when Bitvavo has no candle for that period (illiquid coins) — or when the fetch
+   failed (retry after `FETCH_RETRY_MS`, counts as done for round completion, radar `"error"`). Exception: a fetch
+   within 30 s after the candle closed whose newest closed candle is older than `roundKey` gets **one** retry on a
+   later tick.
+7. `processMarket` no longer buys directly: a buy decision becomes a **candidate** in the pool (`market → decision`).
+   Sell signals, stops, pending exits: unchanged.
+8. **Opportunity round**: when no active market is due anymore (round complete), or `ENTRY_ROUND_MAX_WAIT_MS` after
+   the round started, flush the pool:
+   * drop candidates whose signal is too old (`now > decision.time + 2 × ms`, radar note "signaal verlopen");
+   * `rankCandidates` (relative strength from the tickers: coin `changePct` − BTC `changePct`; volume from the tickers);
+   * for each candidate in rank order: stop when buying is no longer possible (`!buyAllowed()`, halted, or
+     `positions.length >= risk.maxOpenPositions`) — the rest stay `"candidate"` with note
+     `Koopsignaal, maar geen vrije plek (max. N posities)`; otherwise apply the **trend gate**
+     (`atMs = decision.time + ms`; coin candles fetched lazily per market and cached like the market filter),
+     then the **spread gate** (`feed.getOrderBook(market, 1)`: spread % = (ask − bid) / mid × 100 > `maxSpreadPct`
+     → blocked `Spread te groot (0,62% > 0,30%)`; book not available → blocked `Spread onbekend (orderboek niet
+     opgehaald)`), then `tryEntry(market, decision, this.prices[market] ?? decision.price, now)`;
+   * a rejection by a gate or by `tryEntry` → radar `"blocked"` with the Dutch reason (store the last rejection
+     message per market, e.g. from `logRejection`);
+   * **logging**: market-filter blocks are logged **once per round** (`Marktfilter: 5 koopsignalen genegeerd —
+     Bitcoin staat onder …`), not per market; other rejections as today (deduplicated per market and candle);
+   * then `scan.candidates` = number of candidates in this round, `lastRoundCompletedAt = now`, clear the pool.
+   With ≤ 80 active markets the whole round (incl. entries) happens in one tick, so behaviour for small universes
+   is the same as before, except that the best candidate goes first.
+9. `stop()`, `killSwitch()`, `resetPaper()`, an interval change: clear the pool and the round state.
+
+Snapshot (`snapshot()`): `activeMarkets`, `radar` (one row per active market plus position markets; status
+priority: position > blocked/candidate (current round only) > error > watching > pending), `marketFilter`
+(null when `trendFilter.market` is off), `universe` (`UniverseView`), `scan` (`ScanProgress`). `decisions`: all
+markets when there are ≤ `SNAPSHOT_DECISIONS_LIMIT` active markets; otherwise only markets with an open position,
+decisions with `action !== "hold"`, and the first `SNAPSHOT_DECISIONS_LIMIT` active markets. New public method
+`decisionFor(market: string): EnsembleDecision | null` (last decision of any market). `"decision"` and `"candle"`
+events: as today (only for markets whose candles were fetched this tick).
+
+Also: `refreshPricesWhileStopped` uses `getPrices` when available (one request); otherwise only position markets
+and the first 40 active markets. `reconcileLiveBalances` loops over the active markets. `updateConfig` with a
+changed `universe` / `markets` / `risk.maxSpreadPct` forces a new universe selection on the next tick.
+
+### Data feeds
+
+`MarketDataFeed.getPrices?()` — `BitvavoFeed`: one `GET /ticker/price` without market (weight 1), concurrent
+calls share one request, cached ~2 s; `SimulatedFeed`: all simulated markets. `SimulatedFeed` gets ~60 markets
+(existing markets' price paths must stay **identical**) plus a stablecoin `USDC-EUR` so the auto selection can be
+seen excluding it.
+
+### Backtest
+
+* `BacktestInput.trendCandles?: { market?: Candle[]; coin?: Candle[] }` (closed candles on `trendFilter.interval`,
+  ascending, starting ≥ `trendWarmupMs(tf)` before the first trade candle). When `trendFilterActive(ensemble.trendFilter)`
+  **and** `trendCandles` is given, a buy decision of candle `i−1` executed at the open of candle `i` is skipped when
+  `trendGate(tf, input.trendCandles, decision.time + ms, input.market)` is not allowed. Not given → no trend filter,
+  and `note` says `Trendfilter niet toegepast: geen koersdata voor het filter.`
+* Spread: `risk.maxSpreadPct > 0` and `input.spreadPct × 100 > maxSpreadPct` → no entries at all, with a Dutch `note`.
+* `BacktestResult.blockedEntries = { trend, spread }` (buy decisions that would otherwise have been tried).
+  Present whenever the trend filter is active with data, or `maxSpreadPct > 0`.
+* Optimizer and walk-forward go through `simulate`, so they get the same gates; `trendCandles` is passed along
+  unchanged (time based, no slicing needed).
+* `src/backtest/trendData.ts`: `loadTrendCandles(feed, market, tf, fromMs, toMs)` →
+  `Promise<{ trendCandles?: { market?: Candle[]; coin?: Candle[] }; note?: string }>` — used by the API routes and the
+  CLIs. Loads `MARKET_FILTER_MARKET` (when `tf.market`) and `market` (when `tf.coin`) with
+  `feed.getHistory(m, tf.interval, fromMs − trendWarmupMs(tf), toMs)`; a failed load leaves that part out and adds a
+  Dutch note (the gate then blocks, fail-closed, and the note says why).
+
+### Config, validation, API
+
+* `.env` `MARKETS`: `auto` (count 30) or `auto:N` (1..400) → `universe.mode = "auto"`; a comma list (1..400) →
+  `universe.mode = "manual"` with that list; absent → defaults (auto, 30). Saved dashboard settings still win.
+* Saved overrides (`config.json`) and `PUT /api/config` accept `markets` (1..400), `universe` (partial: `mode`
+  "manual" | "auto", `count` integer 1..400, `minVolumeEur` 0..1e12), `ensemble.trendFilter` (partial: `market`,
+  `coin` booleans, `interval` "4h" | "1d", `period` integer 5..200) and `risk.maxSpreadPct` (0..5). Backtest /
+  optimize / walk-forward requests accept `ensemble.trendFilter` too. `mergeEngineConfig` merges `universe` and
+  `ensemble.trendFilter` field by field.
+* `GET /api/decision?market=BTC-EUR` → `{ decision: EnsembleDecision | null }` (`engine.decisionFor`).
+* `loadHistory` (backtest / optimize / walk-forward) fills `input.trendCandles` via `loadTrendCandles` when the
+  trend filter is active.
+
+### Dashboard
+
+* Wherever the UI means "the bot's markets" it uses `snapshot.activeMarkets ?? snapshot.config.markets`.
+* **Munten-radar** (`public/js/panels/radar.js`, pure helpers in `public/js/panels/radarLogic.js`, container
+  `#panel-radar`, own stylesheet `public/css/radar.css`): summary (number of coins, mode, buy signals,
+  positions), market-filter badge, round progress, filter chips (Alles / Koopsignaal / In positie / Tegengehouden),
+  search, sort (Kans / 24u % / Volume / Naam) and one tile per market (symbol, price, 24h %, score bar, status /
+  rank / note). Clicking a tile selects the market. Must stay fast with 400 tiles (throttled, in-place updates).
+* Live chart market bar: at most 12 tabs (selected market, position markets, best-ranked candidates, then active
+  order) plus an "Alle munten (N)" button with a searchable list. Per-market extra requests (24h stats,
+  sparklines) only for the visible tabs.
+* Signals panel: when `snapshot.decisions[market]` is missing, fetch `GET /api/decision?market=`.
+* Settings: section "Munten" (mode switch Automatisch / Zelf kiezen; auto: count 1..400 with quick buttons
+  10 / 30 / 100 / 400 and minimum volume; manual: chips (collapsed above 30), search, "Alle markten toevoegen",
+  "Alles wissen", counter N/400), section "Trendfilter" (Bitcoin filter, coin filter, Dag / 4 uur, period 5..200,
+  plain Dutch explanation), risk field "Max. spread (%)" (0 = uit). Scanner: maximum 400; in auto mode adding a
+  coin explains that the bot chooses automatically. Backtest: a "Trendfilter" toggle to compare with / without,
+  and the result shows `blockedEntries`.

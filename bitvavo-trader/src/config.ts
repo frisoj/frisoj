@@ -308,7 +308,7 @@ export function repairRiskConfig(risk: RiskConfig): (keyof RiskConfig)[] {
   if (validateRiskConfig(risk).ok) return fixed;
   for (const k of Object.keys(DEFAULT_ENGINE_CONFIG.risk) as (keyof RiskConfig)[]) {
     if (!validateRiskConfig({ [k]: risk[k] }).ok) {
-      risk[k] = DEFAULT_ENGINE_CONFIG.risk[k];
+      (risk as unknown as Record<string, number | undefined>)[k] = DEFAULT_ENGINE_CONFIG.risk[k];
       fixed.push(k);
     }
   }

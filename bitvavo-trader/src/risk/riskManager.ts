@@ -128,6 +128,7 @@ const BOUNDS: Record<keyof RiskConfig, Bound> = {
   slippagePct: { label: "Slippage (fractie)", min: 0, max: 0.02 },
   minOrderQuote: { label: "Minimale orderwaarde (EUR)", min: 0, max: Number.POSITIVE_INFINITY },
   timeStopCandles: { label: "Tijdstop (candles)", min: 0, max: 10000, integer: true },
+  maxSpreadPct: { label: "Max. spread (%)", min: 0, max: 5 },
 };
 
 const RISK_KEYS = Object.keys(BOUNDS) as (keyof RiskConfig)[];

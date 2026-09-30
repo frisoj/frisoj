@@ -1,4 +1,4 @@
-import type { EngineConfig, EnsembleConfig, RiskConfig } from "./types";
+import type { EngineConfig, EnsembleConfig, RiskConfig, TrendFilterConfig, UniverseConfig } from "./types";
 
 /**
  * Standaard risico-instellingen, afgestemd op een klein account (~€50) bij
@@ -22,6 +22,19 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   slippagePct: 0.0005,
   minOrderQuote: 5,
   timeStopCandles: 48,
+  maxSpreadPct: 0.3,
+};
+
+/**
+ * Trendfilter: alleen kopen als Bitcoin boven zijn gemiddelde van 50 dagen staat.
+ * In ons onderzoek op echte dagkoersen (2016–2026) was dit het enige idee dat
+ * ook buiten de testperiode standhield, vooral doordat het grote dalingen ontweek.
+ */
+export const DEFAULT_TREND_FILTER: TrendFilterConfig = {
+  market: true,
+  coin: false,
+  interval: "1d",
+  period: 50,
 };
 
 export const DEFAULT_ENSEMBLE_CONFIG: EnsembleConfig = {
@@ -37,6 +50,18 @@ export const DEFAULT_ENSEMBLE_CONFIG: EnsembleConfig = {
   buyThreshold: 0.35,
   sellThreshold: -0.3,
   regimeFilter: true,
+  trendFilter: DEFAULT_TREND_FILTER,
+};
+
+/** Maximum aantal markten dat de bot tegelijk kan volgen */
+export const MAX_MARKETS = 400;
+/** De markt waarop het marktfilter kijkt */
+export const MARKET_FILTER_MARKET = "BTC-EUR";
+
+export const DEFAULT_UNIVERSE_CONFIG: UniverseConfig = {
+  mode: "auto",
+  count: 30,
+  minVolumeEur: 250_000,
 };
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -46,6 +71,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   historyCandles: 300,
   ensemble: DEFAULT_ENSEMBLE_CONFIG,
   risk: DEFAULT_RISK_CONFIG,
+  universe: DEFAULT_UNIVERSE_CONFIG,
 };
 
 export const DEFAULT_PAPER_CAPITAL = 50;
