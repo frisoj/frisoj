@@ -50,6 +50,13 @@ computer en is te bedienen via een dashboard in je browser.
 
 ## Snel starten (oefenmodus)
 
+**Windows, zonder typen:** installeer Node.js (stap 1 hieronder) en dubbelklik daarna
+in de map `bitvavo-trader` op **`start-bot.bat`**. Dat bestand installeert de
+onderdelen, start de bot en opent het dashboard vanzelf in je browser. Laat het
+zwarte venster open: sluit je het, dan stopt de bot.
+
+Met de hand:
+
 1. Installeer **Node.js 22 of nieuwer**: <https://nodejs.org>
 2. Open een terminal in deze map en installeer de onderdelen:
    ```bash
@@ -79,6 +86,16 @@ gebruik het tabblad **Instellingen** in het dashboard.
 > (let op: dan vervallen ook je andere opgeslagen instellingen, zoals risico en
 > strategieën).
 
+### Bijwerken naar een nieuwe versie
+
+1. Stop de bot (sluit het zwarte venster, of druk daarin op Ctrl+C).
+2. Download de nieuwe zip en pak hem uit **over de oude map heen**. Kies
+   "Bestanden vervangen" als Windows dat vraagt. Je `.env` (instellingen) en de map
+   `data` (je trades en opgeslagen instellingen) zitten niet in de zip, dus die
+   blijven gewoon staan.
+3. Start opnieuw met `start-bot.bat` (dat doet ook `npm install`), of met
+   `npm install` en daarna `npm start`.
+
 ### Op je telefoon bekijken
 
 De bot draait op je computer; je telefoon is het scherm en de afstandsbediening.
@@ -104,10 +121,10 @@ buiten je eigen wifi is het niet bedoeld om te bedienen.
 
 | Tabblad | Wat je ziet |
 |---|---|
-| **Live** | Candlestick-grafiek met EMA 9/21/200, Bollinger-banden, VWAP en volume; RSI- en MACD-panelen; koop- en verkoopsignalen en je trades als markeringen; lijnen voor instap, stop-loss en koersdoel van open posities. Daarnaast: je equity, P&L vandaag en totale P&L, een meter met de stemmen van alle strategieën, het marktregime, risicometers (dagverlies, blootstelling, aantal trades), je equity-curve met de grootste daling ("Max. daling"), open posities (met de knoppen **Sluit** en, als een positie onverkoopbaar is, **Afschrijven**), tradehistorie en een live logboek. Knoppen voor Start, Stop en **Noodstop**. |
+| **Live** | Candlestick-grafiek met EMA 9/21/200, Bollinger-banden, VWAP en volume; RSI- en MACD-panelen; koop- en verkoopsignalen en je trades als markeringen; lijnen voor instap, stop-loss en koersdoel van open posities. Daarnaast: je equity, P&L vandaag en totale P&L, een meter met de stemmen van alle strategieën, het marktregime, risicometers (dagverlies, blootstelling, aantal trades), je equity-curve met de grootste daling ("Max. daling"), open posities (met de knoppen **Sluit** en, als een positie onverkoopbaar is, **Afschrijven**), tradehistorie, een live logboek en de **munten-radar** met alle munten die de bot volgt. Knoppen voor Start, Stop en **Noodstop**. |
 | **Backtest-lab** | Test de strategie op historische data: rendement tegenover buy & hold, max drawdown, Sharpe, winrate, profit factor en betaalde fees; grafieken met trades, equity en drawdown; een histogram van trade-resultaten. **Optimaliseer** zoekt de beste parameters (met heatmap). **Walk-forward** controleert of die parameters ook werken op data waarop ze níét getraind zijn, en geeft een eerlijk oordeel. |
 | **Scanner** | De 30 meest verhandelde EUR-markten met koers, 24u-verandering, volatiliteit, spread, regime, signaal, RSI en een mini-grafiek, als tabel of heatmap. |
-| **Instellingen** | Markten, interval, alle risico-instellingen met uitleg, strategieën aan/uit met gewichten en drempels, en de live-modus. |
+| **Instellingen** | Munten (automatisch of zelf kiezen, tot 400), interval, het trendfilter, alle risico-instellingen met uitleg (ook de spreadlimiet), strategieën aan/uit met gewichten en drempels, en de live-modus. |
 
 **Ook als de bot stilstaat, blijven de koersen ververst.** Vóór je op Start
 drukt, na Stop en na de Noodstop haalt de bot elke ronde (standaard elke 15
@@ -145,6 +162,34 @@ strategieën die iets vinden, zodat één duidelijk verkoopsignaal niet wordt
 "weggestemd" door strategieën die afwachten. Een **regimefilter** (trend omhoog,
 trend omlaag, zijwaarts of volatiel) laat strategieën die niet bij de markt passen
 minder zwaar meetellen, en blokkeert nieuwe aankopen in een dalende trend.
+
+### Veel munten (tot 400) en slimmer kopen
+
+- **Automatisch munten kiezen** (standaard): elk uur kiest de bot de 30 munten met
+  de meeste handel op Bitvavo. Stablecoins (zoals USDC), goud-tokens en munten met
+  weinig handel of een grote spread laat hij weg. In **Instellingen → Munten** kies
+  je hoeveel (1 tot 400), of je schakelt naar **Zelf kiezen** en zet er tot 400
+  munten in. In `.env` kan het ook: `MARKETS=auto:100`, of een lijst zoals
+  `MARKETS=BTC-EUR,ETH-EUR`.
+- **Meer munten betekent meer keus, niet meer posities.** Met €50 houdt de bot er
+  maar een paar tegelijk vast (standaard 2). Geven meerdere munten tegelijk een
+  koopsignaal, dan koopt hij eerst **de sterkste kans**: het hoogste signaal, en bij
+  gelijke stand de munt die het beter doet dan Bitcoin.
+- **Trendfilter (Bitcoin):** de bot koopt alleen als Bitcoin boven zijn gemiddelde van
+  de laatste 50 dagen staat. Zakt de hele markt weg, dan wacht hij. Dat kan betekenen
+  dat hij weken niets koopt; verkopen, stop-losses en koersdoelen gaan altijd gewoon
+  door. In ons onderzoek op echte dagkoersen (2016–2026) was dit het enige idee dat
+  ook buiten de testperiode standhield, vooral doordat het grote dalingen ontweek.
+  Optioneel kan hetzelfde filter ook per munt (Muntfilter).
+- **Spreadlimiet:** bij kleine munten ligt de koop- en verkoopprijs soms ver uit
+  elkaar. Is dat verschil (de spread) groter dan 0,3%, dan koopt de bot die munt niet.
+- **Munten-radar** (tabblad Live): één tegel per munt met koers, 24-uursverandering,
+  signaalsterkte en status: in positie, koopsignaal (met plek in de ranglijst) of
+  tegengehouden, met de reden erbij. Bovenaan zie je of het trendfilter kopen toestaat
+  en hoeveel munten al bekeken zijn.
+- Ook met 400 munten blijft de bot binnen Bitvavo's limieten: hij haalt alle koersen
+  in één keer op, en de grafieken per munt verspreid over een paar rondes, één keer
+  per candle.
 
 ### Risicobeheer (standaardinstellingen voor €50)
 
