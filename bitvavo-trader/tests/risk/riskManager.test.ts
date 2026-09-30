@@ -1055,3 +1055,41 @@ describe("validateRiskConfig", () => {
     expect(validateRiskConfig([] as unknown as Partial<RiskConfig>).ok).toBe(false);
   });
 });
+
+// ─────────────────────────────── v2: maxSpreadPct ───────────────────────────────
+
+describe("validateRiskConfig — maxSpreadPct (v2)", () => {
+  it("0 (uit) tot en met 5 procent is geldig", () => {
+    for (const v of [0, 0.05, 0.3, 1, 5]) expect(validateRiskConfig({ maxSpreadPct: v }).ok).toBe(true);
+  });
+
+  it("buiten 0..5 of geen getal → Nederlandse fout met het veld", () => {
+    for (const v of [-0.01, 5.01, 50, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const res = validateRiskConfig({ maxSpreadPct: v });
+      expect(res.ok).toBe(false);
+      expect(res.errors[0]).toContain("Max. spread (%) (maxSpreadPct)");
+    }
+    expect(validateRiskConfig({ maxSpreadPct: 6 }).errors[0]).toContain("tussen 0 en 5");
+    expect(validateRiskConfig({ maxSpreadPct: "0.3" as unknown as number }).ok).toBe(false);
+  });
+
+  it("optioneel: ontbreken (of undefined) is geldig, verplichte velden niet", () => {
+    const { maxSpreadPct: _omit, ...withoutSpread } = DEFAULT_RISK_CONFIG;
+    expect(validateRiskConfig(withoutSpread)).toEqual({ ok: true, errors: [] });
+    expect(validateRiskConfig({ maxSpreadPct: undefined }).ok).toBe(true);
+    expect(validateRiskConfig({ riskPerTradePct: undefined }).ok).toBe(false);
+  });
+
+  it("planEntry keurt goed met een config zonder maxSpreadPct (geen spreadlimiet)", () => {
+    const { maxSpreadPct: _omit, ...withoutSpread } = DEFAULT_RISK_CONFIG;
+    const plan = new RiskManager(withoutSpread as RiskConfig, "15m").planEntry(decision(), account(), marketInfo(), NOW);
+    expect(plan.approved).toBe(true);
+    expect(plan.reasons.join(" ")).not.toMatch(/Ongeldige risico-instellingen/);
+  });
+
+  it("planEntry weigert met een ongeldige maxSpreadPct in de config", () => {
+    const plan = rm({ maxSpreadPct: 9 }).planEntry(decision(), account(), marketInfo(), NOW);
+    expect(plan.approved).toBe(false);
+    expect(plan.reasons.join(" ")).toMatch(/Ongeldige risico-instellingen: .*maxSpreadPct/);
+  });
+});

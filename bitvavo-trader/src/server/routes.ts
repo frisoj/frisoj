@@ -32,7 +32,9 @@ import { APP_VERSION } from "../core/defaults";
 import { INTERVAL_MS } from "../core/types";
 import { closedCandles } from "../core/util";
 import { spreadFromTicker } from "../backtest/backtester";
+import { loadTrendCandles, type TrendCandles } from "../backtest/trendData";
 import { foldWindows } from "../backtest/walkForward";
+import { trendFilterActive } from "../strategies/trendFilter";
 import type { AppConfig } from "../config";
 import { HttpError, Router, type RequestContext } from "./router";
 import { Scanner, SCANNER_DEFAULT_LIMIT, SCANNER_MAX_LIMIT } from "./scanner";
@@ -41,6 +43,7 @@ import { backtestWarmupCandles } from "./warmup";
 import {
   fail,
   isPlainObject,
+  normalizeMarket,
   parseBacktestRequest,
   parseInterval,
   parseLimit,
@@ -83,6 +86,11 @@ export interface EngineLike {
    * (bijv. "onverkoopbaar: waarde €4,78 < minimum €5,00"), of null.
    */
   readonly lastCloseFailure?: string | null;
+  /**
+   * Laatste beslissing van een markt (ook als de snapshot hem bij veel markten
+   * weglaat). Ontbreekt → de route valt terug op `snapshot().decisions`.
+   */
+  decisionFor?(market: string): EnsembleDecision | null;
 }
 
 /** Zelfde vorm als BacktestInput in src/backtest/backtester.ts */
@@ -98,6 +106,11 @@ export interface BacktestInputLike {
   tradeFromIndex?: number;
   /** Huidige bid/ask-spread als fractie ((ask − bid) / mid), best effort uit de 24h-ticker */
   spreadPct?: number;
+  /**
+   * Candles voor het trendfilter (`ensemble.trendFilter.interval`, gesloten, oplopend), vanaf
+   * `trendWarmupMs` vóór de eerste handelscandle. Alleen als het trendfilter aan staat.
+   */
+  trendCandles?: TrendCandles;
 }
 
 export interface OptimizeOptsLike {
@@ -284,14 +297,25 @@ export function buildApiRouter(deps: ApiDeps): Router {
           `(minimaal ${MIN_PERIOD_CANDLES}). Kies meer dagen of een korter interval.`,
       );
     }
-    let note: string | undefined;
+    const notes: string[] = [];
     if (tradeFromIndex > firstInPeriod) {
       const start = candles[tradeFromIndex].time;
       const days = (to - start) / 86_400_000;
-      note =
+      notes.push(
         `Periode ingekort: ${p.market} heeft pas historie vanaf ${dateNl(candles[0].time)}. Na ${required} candles ` +
-        `opwarmtijd begint de test op ${dateNl(start)} (${days.toLocaleString("nl-NL", { maximumFractionDigits: 1 })} ` +
-        `dagen in plaats van ${p.days}).`;
+          `opwarmtijd begint de test op ${dateNl(start)} (${days.toLocaleString("nl-NL", { maximumFractionDigits: 1 })} ` +
+          `dagen in plaats van ${p.days}).`,
+      );
+    }
+    // Trendfilter: Bitcoin en/of de munt zelf op de tijdschaal van het filter, vanaf
+    // ruim vóór de eerste handelscandle. Mislukt laden → het filter blokkeert
+    // (voor de zekerheid) en de note zegt waarom.
+    let trendCandles: TrendCandles | undefined;
+    const tf = p.ensemble.trendFilter;
+    if (trendFilterActive(tf)) {
+      const trend = await loadTrendCandles(feed, p.market, tf, candles[tradeFromIndex].time, to);
+      trendCandles = trend.trendCandles;
+      if (trend.note) notes.push(trend.note);
     }
     const marketInfo = (await allMarkets()).find((m) => m.market === p.market);
     const spreadPct = await spreadPromise;
@@ -307,13 +331,23 @@ export function buildApiRouter(deps: ApiDeps): Router {
         dataSource: feed.source,
         tradeFromIndex,
         ...(spreadPct !== undefined ? { spreadPct } : {}),
+        ...(trendCandles !== undefined ? { trendCandles } : {}),
       },
-      note,
+      note: notes.length > 0 ? notes.join(" ") : undefined,
     };
   };
 
-  const withNote = <T extends object>(result: T, note: string | undefined): T =>
-    note ? { ...result, note } : result;
+  /**
+   * Zet de uitleg van het ophalen (periode ingekort, trendfilter-data) vóór een
+   * eventuele eigen `note` van de berekening (bijv. over de spread); geen van
+   * beide gaat verloren.
+   */
+  const withNote = <T extends object>(result: T, note: string | undefined): T => {
+    if (!note) return result;
+    const own = (result as { note?: unknown }).note;
+    const combined = typeof own === "string" && own.trim() !== "" && own !== note ? `${note} ${own}` : note;
+    return { ...result, note: combined };
+  };
 
   const backtestDeps = async () => ({
     knownMarkets: new Set((await allMarkets()).map((m) => m.market)),
@@ -482,6 +516,17 @@ export function buildApiRouter(deps: ApiDeps): Router {
   });
 
   router.get("/api/markets", () => eurTradingMarkets());
+
+  // Laatste beslissing van één markt: bij veel markten staat niet elke markt in snapshot.decisions.
+  router.get("/api/decision", ({ query }) => {
+    const market = normalizeMarket(query.get("market"));
+    if (!market) fail("Geef een geldige markt op, bijv. BTC-EUR.");
+    const decision =
+      typeof engine.decisionFor === "function"
+        ? engine.decisionFor(market)
+        : (engine.snapshot().decisions[market] ?? null);
+    return { decision: decision ?? null };
+  });
 
   router.get("/api/candles", async ({ query }) => {
     const known = new Set((await allMarkets()).map((m) => m.market));

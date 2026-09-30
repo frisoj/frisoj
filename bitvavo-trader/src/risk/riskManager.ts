@@ -133,7 +133,15 @@ const BOUNDS: Record<keyof RiskConfig, Bound> = {
 
 const RISK_KEYS = Object.keys(BOUNDS) as (keyof RiskConfig)[];
 
+/**
+ * Optionele instellingen: ontbreken (of `undefined`) is geldig en betekent
+ * "uit" (bijv. geen spreadlimiet). Een opgegeven waarde moet wel binnen de
+ * grenzen liggen.
+ */
+const OPTIONAL_KEYS: ReadonlySet<keyof RiskConfig> = new Set<keyof RiskConfig>(["maxSpreadPct"]);
+
 function checkValue(key: keyof RiskConfig, value: unknown): string | null {
+  if (value === undefined && OPTIONAL_KEYS.has(key)) return null;
   const b = BOUNDS[key];
   const name = `${b.label} (${key})`;
   if (typeof value !== "number" || !Number.isFinite(value)) {

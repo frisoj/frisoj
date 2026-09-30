@@ -13,8 +13,18 @@ import {
   type StrategyId,
   type StrategyMeta,
   type StrategyParams,
+  type TrendFilterConfig,
+  type UniverseConfig,
 } from "../core/types";
-import { DEFAULT_RISK_CONFIG } from "../core/defaults";
+import { DEFAULT_RISK_CONFIG, MAX_MARKETS } from "../core/defaults";
+import {
+  TREND_PERIOD_MAX,
+  TREND_PERIOD_MIN,
+  UNIVERSE_MIN_VOLUME_MAX,
+  isTrendFilterInterval,
+  trendFilterOrOff,
+  universeOrManual,
+} from "../config";
 import { HttpError } from "./router";
 
 export type RiskValidator = (partial: Partial<RiskConfig>) => { ok: boolean; errors: string[] };
@@ -118,6 +128,87 @@ export function parseMarket(v: unknown, known: ReadonlySet<string>): string {
   return m;
 }
 
+// ─────────────────────────────── trendfilter ───────────────────────────────
+
+/**
+ * Legt een gedeeltelijk trendfilter (`market`, `coin`, `interval`, `period`)
+ * over `current` heen (ontbreekt `current`: filter uit). Fouten gaan naar `errors`.
+ */
+export function mergeTrendFilter(
+  patch: unknown,
+  current: TrendFilterConfig | undefined,
+  errors: string[],
+): TrendFilterConfig {
+  const out = trendFilterOrOff(current);
+  if (!isPlainObject(patch)) {
+    errors.push("ensemble.trendFilter moet een object zijn (market, coin, interval, period).");
+    return out;
+  }
+  const known = new Set(["market", "coin", "interval", "period"]);
+  for (const k of Object.keys(patch)) if (!known.has(k)) errors.push(`Onbekende trendfilter-instelling: ${inputLabel(k)}.`);
+  if (patch.market !== undefined) {
+    if (typeof patch.market !== "boolean") errors.push("Marktfilter (trendFilter.market) moet true of false zijn.");
+    else out.market = patch.market;
+  }
+  if (patch.coin !== undefined) {
+    if (typeof patch.coin !== "boolean") errors.push("Muntfilter (trendFilter.coin) moet true of false zijn.");
+    else out.coin = patch.coin;
+  }
+  if (patch.interval !== undefined) {
+    if (!isTrendFilterInterval(patch.interval)) {
+      errors.push('Tijdschaal van het trendfilter (trendFilter.interval) moet "4h" (4 uur) of "1d" (dag) zijn.');
+    } else out.interval = patch.interval;
+  }
+  if (patch.period !== undefined) {
+    const n = numberInRange(
+      errors,
+      "Periode van het trendfilter (trendFilter.period)",
+      patch.period,
+      TREND_PERIOD_MIN,
+      TREND_PERIOD_MAX,
+      true,
+    );
+    if (n !== undefined) out.period = n;
+  }
+  return out;
+}
+
+// ─────────────────────────────── muntkeuze ───────────────────────────────
+
+/**
+ * Legt een gedeeltelijke muntkeuze (`mode`, `count`, `minVolumeEur`) over
+ * `current` heen (ontbreekt `current`: "manual"). Fouten gaan naar `errors`.
+ */
+export function mergeUniverse(patch: unknown, current: UniverseConfig | undefined, errors: string[]): UniverseConfig {
+  const out = universeOrManual(current);
+  if (!isPlainObject(patch)) {
+    errors.push("universe moet een object zijn (mode, count, minVolumeEur).");
+    return out;
+  }
+  const known = new Set(["mode", "count", "minVolumeEur"]);
+  for (const k of Object.keys(patch)) if (!known.has(k)) errors.push(`Onbekende muntkeuze-instelling: ${inputLabel(k)}.`);
+  if (patch.mode !== undefined) {
+    if (patch.mode !== "manual" && patch.mode !== "auto") {
+      errors.push('Muntkeuze (universe.mode) moet "manual" (zelf kiezen) of "auto" (automatisch) zijn.');
+    } else out.mode = patch.mode;
+  }
+  if (patch.count !== undefined) {
+    const n = numberInRange(errors, "Aantal munten (universe.count)", patch.count, 1, MAX_MARKETS, true);
+    if (n !== undefined) out.count = n;
+  }
+  if (patch.minVolumeEur !== undefined) {
+    const n = numberInRange(
+      errors,
+      "Minimale handel per dag in euro (universe.minVolumeEur)",
+      patch.minVolumeEur,
+      0,
+      UNIVERSE_MIN_VOLUME_MAX,
+    );
+    if (n !== undefined) out.minVolumeEur = n;
+  }
+  return out;
+}
+
 // ─────────────────────────────── ensemble ───────────────────────────────
 
 /** Legt een gedeeltelijke ensemble-config over `current` en valideert het resultaat. */
@@ -130,7 +221,7 @@ export function mergeEnsemble(
   if (!isPlainObject(patch)) fail("ensemble moet een object zijn.");
   const errors: string[] = [];
   const out: EnsembleConfig = structuredClone(current);
-  const known = new Set(["enabled", "weights", "params", "buyThreshold", "sellThreshold", "regimeFilter"]);
+  const known = new Set(["enabled", "weights", "params", "buyThreshold", "sellThreshold", "regimeFilter", "trendFilter"]);
   for (const k of Object.keys(patch)) if (!known.has(k)) errors.push(`Onbekende ensemble-instelling: ${k}.`);
 
   if (patch.enabled !== undefined) {
@@ -198,6 +289,7 @@ export function mergeEnsemble(
     if (typeof patch.regimeFilter !== "boolean") errors.push("regimeFilter moet true of false zijn.");
     else out.regimeFilter = patch.regimeFilter;
   }
+  if (patch.trendFilter !== undefined) out.trendFilter = mergeTrendFilter(patch.trendFilter, current.trendFilter, errors);
   if (out.enabled.length === 0) errors.push("Kies minstens één strategie.");
   if (errors.length > 0) fail(errors);
   return out;
@@ -231,7 +323,8 @@ export function mergeRisk(patch: unknown, current: RiskConfig, validateRisk: Ris
 
 /**
  * Valideert een `Partial<EngineConfig>` voor PUT /api/config. Het resultaat
- * bevat ensemble/risk volledig samengevoegd met de huidige config.
+ * bevat ensemble (incl. trendFilter), risk en universe volledig samengevoegd
+ * met de huidige config.
  */
 export function validateConfigPatch(
   body: unknown,
@@ -241,7 +334,7 @@ export function validateConfigPatch(
   if (!isPlainObject(body)) fail("Stuur de instellingen als JSON-object.");
   const errors: string[] = [];
   const out: Partial<EngineConfig> = {};
-  const known = new Set(["markets", "interval", "pollMs", "historyCandles", "ensemble", "risk"]);
+  const known = new Set(["markets", "interval", "pollMs", "historyCandles", "ensemble", "risk", "universe"]);
   for (const k of Object.keys(body)) if (!known.has(k)) errors.push(`Onbekende instelling: ${k}.`);
 
   if (body.markets !== undefined) {
@@ -253,7 +346,7 @@ export function validateConfigPatch(
         const markets = list as string[];
         const unknown = markets.filter((m) => !m.endsWith("-EUR") || !deps.knownEurMarkets.has(m));
         if (unknown.length > 0) errors.push(`Onbekende of niet-verhandelbare EUR-markt(en): ${unknown.join(", ")}.`);
-        else if (markets.length < 1 || markets.length > 8) errors.push("Kies 1 tot 8 markten.");
+        else if (markets.length < 1 || markets.length > MAX_MARKETS) errors.push(`Kies 1 tot ${MAX_MARKETS} markten.`);
         else out.markets = markets;
       }
     }
@@ -270,6 +363,7 @@ export function validateConfigPatch(
     const n = numberInRange(errors, "historyCandles", body.historyCandles, 100, 1000, true);
     if (n !== undefined) out.historyCandles = n;
   }
+  if (body.universe !== undefined) out.universe = mergeUniverse(body.universe, current.universe, errors);
   if (errors.length > 0) fail(errors);
   if (body.ensemble !== undefined) out.ensemble = mergeEnsemble(body.ensemble, current.ensemble, deps.strategies);
   if (body.risk !== undefined) out.risk = mergeRisk(body.risk, current.risk, deps.validateRisk);

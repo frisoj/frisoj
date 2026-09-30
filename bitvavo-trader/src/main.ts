@@ -4,7 +4,15 @@
  */
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
-import { ConfigError, loadConfig, repairRiskConfig, type AppConfig } from "./config";
+import {
+  ConfigError,
+  describeAutoUniverse,
+  loadConfig,
+  repairRiskConfig,
+  shortList,
+  universeOrManual,
+  type AppConfig,
+} from "./config";
 import { APP_VERSION, DEFAULT_ENGINE_CONFIG } from "./core/defaults";
 import type {
   BacktestResult,
@@ -76,7 +84,12 @@ async function createFeed(config: AppConfig, client: BitvavoClient): Promise<Mar
   return new SimulatedFeed();
 }
 
-/** Houdt alleen markten over die bestaan en verhandelbaar zijn in EUR. */
+/**
+ * Houdt in de eigen marktlijst (`config.markets`, 1..400) alleen markten over
+ * die bestaan en verhandelbaar zijn in EUR. Bij de automatische muntkeuze is
+ * dat de reservelijst (tot de eerste automatische keuze); die keuze zelf
+ * gebruikt altijd de actuele marktlijst van Bitvavo.
+ */
 async function sanitizeMarkets(feed: MarketDataFeed, engine: EngineConfig): Promise<void> {
   let known: Set<string>;
   try {
@@ -86,18 +99,28 @@ async function sanitizeMarkets(feed: MarketDataFeed, engine: EngineConfig): Prom
     console.warn(`⚠ Kon de marktlijst niet ophalen (${(err as Error).message}); markten niet gecontroleerd.`);
     return;
   }
+  const auto = universeOrManual(engine.universe).mode === "auto";
+  const which = auto ? "je eigen marktlijst (reserve voor de automatische keuze)" : "je marktlijst";
   const ok = engine.markets.filter((m) => known.has(m));
   const dropped = engine.markets.filter((m) => !known.has(m));
-  if (dropped.length > 0) console.warn(`⚠ Onbekende of niet-verhandelbare markten overgeslagen: ${dropped.join(", ")}`);
+  if (dropped.length > 0) {
+    console.warn(`⚠ Onbekende of niet-verhandelbare markten overgeslagen in ${which}: ${shortList(dropped)}`);
+  }
   if (ok.length === 0) {
     const fallback = DEFAULT_ENGINE_CONFIG.markets.filter((m) => known.has(m));
     const list = fallback.length > 0 ? fallback : [...known].sort().slice(0, 3);
     if (list.length === 0) throw new StartupError("Er zijn geen verhandelbare EUR-markten gevonden.");
-    console.warn(`⚠ Geen geldige markten ingesteld; de bot gebruikt ${list.join(", ")}.`);
+    console.warn(`⚠ Geen geldige markten in ${which}; de bot gebruikt ${list.join(", ")}.`);
     engine.markets = list;
   } else {
     engine.markets = ok;
   }
+}
+
+/** De "Markten:"-regel van het startscherm. */
+function marketsLine(engineCfg: EngineConfig): string {
+  const u = universeOrManual(engineCfg.universe);
+  return u.mode === "auto" ? describeAutoUniverse(u) : shortList(engineCfg.markets);
 }
 
 function printBanner(
@@ -125,7 +148,7 @@ function printBanner(
   out.push(
     `  Marktdata:  ${feed.source === "bitvavo" ? "Bitvavo (echte koersen)" : "SIMULATIE (nep-koersen, geen echte markt)"}`,
   );
-  out.push(`  Markten:    ${engineCfg.markets.join(", ")}`);
+  out.push(`  Markten:    ${marketsLine(engineCfg)}`);
   out.push(`  Interval:   ${engineCfg.interval}`);
   out.push(
     `  Bot:        ${

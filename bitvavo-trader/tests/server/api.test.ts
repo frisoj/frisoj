@@ -135,7 +135,7 @@ describe("API: PUT /api/config", () => {
     [{ markets: ["DOGE-EUR"] }, /Onbekende/],
     [{ markets: ["XRP-EUR"] }, /niet-verhandelbare/],
     [{ markets: ["BTC-USDC"] }, /EUR/],
-    [{ markets: [] }, /1 tot 8/],
+    [{ markets: [] }, /Kies 1 tot 400 markten/],
     [{ markets: "BTC-EUR" }, /lijst/],
     [{ interval: "3m" }, /interval/],
     [{ pollMs: 1000 }, /pollMs/],
