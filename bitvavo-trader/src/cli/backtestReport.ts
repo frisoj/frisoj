@@ -1,8 +1,13 @@
 /**
- * Pure helpers voor de CLI-backtest (`backtest.ts`), los gehouden zodat ze
- * zonder netwerk of terminal getest kunnen worden.
+ * Pure helpers voor de CLI-backtest (`backtest.ts`) en het toernooi
+ * (`tournament.ts`), los gehouden zodat ze zonder netwerk of terminal getest
+ * kunnen worden (het laden van de trendfilter-data krijgt de feed mee).
  */
-import type { Candle } from "../core/types";
+import { MARKET_FILTER_MARKET } from "../core/defaults";
+import type { Candle, EnsembleConfig, MarketDataFeed, TrendFilterConfig } from "../core/types";
+import type { BlockedEntries } from "../backtest/simulator";
+import { loadTrendCandles, type TrendCandles } from "../backtest/trendData";
+import { describeTrend, trendFilterActive, trendStateAt } from "../strategies/trendFilter";
 
 export interface BacktestWindow {
   /** Eerste candle van de gevraagde periode (candles.length als die er niet is) */
@@ -86,4 +91,93 @@ export function stuckTradesWarning(c: StuckCounts): string | null {
       `kleinere stop-afstand voorkomt dit.`,
   );
   return parts.join(" ");
+}
+
+// ─────────────────────────────── Trendfilter ───────────────────────────────
+
+/** Het ensemble met het trendfilter uit (beide vlaggen false); zonder filter ongewijzigd. */
+export function withoutTrendFilter(ensemble: EnsembleConfig): EnsembleConfig {
+  const tf = ensemble.trendFilter;
+  if (!tf) return ensemble;
+  return { ...ensemble, trendFilter: { ...tf, market: false, coin: false } };
+}
+
+function periodText(tf: TrendFilterConfig): string {
+  return tf.interval === "1d" ? `${tf.period} dagen` : `${tf.period} candles van 4 uur`;
+}
+
+/** Korte Nederlandse omschrijving van het trendfilter, bijv. voor de kop van het rapport. */
+export function trendFilterLabel(tf: TrendFilterConfig | undefined | null, disabledByFlag = false): string {
+  if (!trendFilterActive(tf)) return disabledByFlag ? "Trendfilter: uit (--no-trend)" : "Trendfilter: uit";
+  const who: string[] = [];
+  if (tf.market) who.push(`Bitcoin (${MARKET_FILTER_MARKET})`);
+  if (tf.coin) who.push("de munt zelf");
+  return `Trendfilter: alleen kopen als ${who.join(" en ")} boven het gemiddelde van ${periodText(tf)} staat`;
+}
+
+export interface CliTrendSetup {
+  /** Het ensemble voor de backtest (met `--no-trend`: filter uit) */
+  ensemble: EnsembleConfig;
+  /** Voor `BacktestInput.trendCandles` (alleen als het filter aan staat) */
+  trendCandles?: TrendCandles;
+  /** Nederlandse uitleg als (een deel van) de data niet geladen kon worden */
+  note?: string;
+  /** Regels voor het rapport: het filter en de stand aan het einde van de periode */
+  lines: string[];
+}
+
+/**
+ * Trendfilter voor een CLI-run: met `disabled` (vlag `--no-trend`) gaat het
+ * filter uit; anders worden de candles geladen met `loadTrendCandles`
+ * (Bitcoin en/of de munt, vanaf ruim vóór `fromMs` = de eerste handelscandle).
+ */
+export async function prepareTrendFilter(
+  feed: Pick<MarketDataFeed, "getHistory">,
+  market: string,
+  ensemble: EnsembleConfig,
+  fromMs: number,
+  toMs: number,
+  opts: { disabled?: boolean } = {},
+): Promise<CliTrendSetup> {
+  if (opts.disabled) {
+    const off = withoutTrendFilter(ensemble);
+    return { ensemble: off, lines: [trendFilterLabel(off.trendFilter, trendFilterActive(ensemble.trendFilter))] };
+  }
+  const tf = ensemble.trendFilter;
+  if (!trendFilterActive(tf)) return { ensemble, lines: [trendFilterLabel(tf)] };
+  const { trendCandles, note } = await loadTrendCandles(feed, market, tf, fromMs, toMs);
+  const lines = [trendFilterLabel(tf)];
+  const coinName = market.includes("-") ? market.slice(0, market.indexOf("-")) : market;
+  if (tf.market && trendCandles?.market) {
+    lines.push(`Nu: ${describeTrend(`Bitcoin (${MARKET_FILTER_MARKET})`, trendStateAt(trendCandles.market, tf.interval, tf.period, toMs), tf)}`);
+  }
+  if (tf.coin && trendCandles?.coin) {
+    lines.push(`Nu: ${describeTrend(coinName, trendStateAt(trendCandles.coin, tf.interval, tf.period, toMs), tf)}`);
+  }
+  return { ensemble, ...(trendCandles ? { trendCandles } : {}), ...(note ? { note } : {}), lines };
+}
+
+/** Optellen van `blockedEntries` (bijv. over markten of deelnemers); null als geen enkele er een had. */
+export function sumBlockedEntries(list: (BlockedEntries | undefined | null)[]): BlockedEntries | null {
+  let out: BlockedEntries | null = null;
+  for (const b of list) {
+    if (!b) continue;
+    out ??= { trend: 0, spread: 0 };
+    out.trend += b.trend;
+    out.spread += b.spread;
+  }
+  return out;
+}
+
+/**
+ * Nederlandse regel over koopsignalen die door een filter niet tot een aankoop
+ * leidden, of null als het resultaat geen `blockedEntries` heeft.
+ */
+export function blockedEntriesText(b: BlockedEntries | undefined | null, prefix = "Koopsignalen tegengehouden"): string | null {
+  if (!b) return null;
+  const n = (x: number) => Math.max(0, Math.floor(Number.isFinite(x) ? x : 0));
+  const trend = n(b.trend);
+  const spread = n(b.spread);
+  if (trend === 0 && spread === 0) return `${prefix}: geen (trendfilter 0, spreadlimiet 0).`;
+  return `${prefix}: ${trend} door het trendfilter, ${spread} door de spreadlimiet.`;
 }

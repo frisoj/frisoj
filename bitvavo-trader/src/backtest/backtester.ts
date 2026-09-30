@@ -14,15 +14,26 @@ import {
   type SimulationOutput,
 } from "./simulator";
 
-export type { BacktestDeps, BacktestInput, ResolvedBacktestDeps, SimulationOutput } from "./simulator";
+export type {
+  BacktestDeps,
+  BacktestInput,
+  BlockedEntries,
+  EntryGates,
+  ResolvedBacktestDeps,
+  SimulationOutput,
+} from "./simulator";
 export {
   DEFAULT_EXCHANGE_MIN_QUOTE,
   MAX_CHART_CANDLES,
+  TREND_NOT_APPLIED_NOTE,
   aggregateCandles,
+  appendNote,
   effectiveSlippagePct,
+  entryGates,
   exchangeMinOrderQuote,
   exitMarkerLabel,
   fmtPctNl,
+  spreadBlockedNote,
   spreadFromTicker,
   withSpreadCosts,
 } from "./simulator";

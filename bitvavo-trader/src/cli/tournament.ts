@@ -7,12 +7,15 @@
  * optimizer niet gezien heeft (eerlijker dan "de beste achteraf").
  *
  *   npm run tournament -- [--source auto|bitvavo|simulated] [--markets BTC-EUR,ETH-EUR]
- *                         [--capital 50] [--quick] [--no-walkforward] [--json pad.json]
+ *                         [--capital 50] [--quick] [--no-walkforward] [--no-trend] [--json pad.json]
+ *
+ * Alle deelnemers gebruiken het trendfilter en de spreadlimiet van de bot
+ * (DEFAULT_ENGINE_CONFIG); `--no-trend` zet het trendfilter uit om te vergelijken.
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { runBacktestDetailed, spreadFromTicker, type BacktestInput } from "../backtest/backtester";
+import { runBacktestDetailed, spreadFromTicker, type BacktestInput, type BlockedEntries } from "../backtest/backtester";
 import { walkForward } from "../backtest/walkForward";
 import { DEFAULT_ENGINE_CONFIG, DEFAULT_PAPER_CAPITAL } from "../core/defaults";
 import {
@@ -31,7 +34,15 @@ import { SimulatedFeed } from "../data/simulatedFeed";
 import { BitvavoClient } from "../exchange/bitvavoClient";
 import { backtestWarmupCandles } from "../server/warmup";
 import { listStrategies } from "../strategies";
-import { backtestWindow } from "./backtestReport";
+import { trendFilterActive } from "../strategies/trendFilter";
+import {
+  backtestWindow,
+  blockedEntriesText,
+  prepareTrendFilter,
+  sumBlockedEntries,
+  trendFilterLabel,
+  withoutTrendFilter,
+} from "./backtestReport";
 
 const DAY_MS = 86_400_000;
 
@@ -61,8 +72,7 @@ export interface Contender {
   optimizeStrategy?: StrategyId;
 }
 
-export function contenders(): Contender[] {
-  const base = DEFAULT_ENGINE_CONFIG.ensemble;
+export function contenders(base: EnsembleConfig = DEFAULT_ENGINE_CONFIG.ensemble): Contender[] {
   const names = new Map(listStrategies().map((s) => [s.id, s.name]));
   return [
     { id: "ensemble", name: "Bot (alle 5 samen)", ensemble: base },
@@ -89,6 +99,8 @@ export interface TournamentRow {
   trades: number;
   feesPaid: number;
   winRatePct: number;
+  /** Koopsignalen die het trendfilter / de spreadlimiet tegenhielden (als een filter actief was) */
+  blockedEntries?: BlockedEntries;
 }
 
 export interface WalkForwardRow {
@@ -104,6 +116,8 @@ export interface WalkForwardRow {
   folds: number;
   trades: number;
   verdict: string;
+  /** Out-of-sample tegengehouden koopsignalen (som over de testvensters) */
+  blockedEntries?: BlockedEntries;
 }
 
 export interface TournamentResult {
@@ -114,6 +128,8 @@ export interface TournamentResult {
   rows: TournamentRow[];
   walkForward: WalkForwardRow[];
   notes: string[];
+  /** Omschrijving van het trendfilter dat gebruikt is */
+  trendFilter?: string;
 }
 
 export interface TournamentOptions {
@@ -121,6 +137,8 @@ export interface TournamentOptions {
   capital: number;
   periods: PeriodSpec[];
   walkForward: boolean;
+  /** Trendfilter van de bot gebruiken (standaard true; false = uit, zoals --no-trend) */
+  trendFilter?: boolean;
   now?: number;
   log?: (msg: string) => void;
 }
@@ -133,12 +151,32 @@ async function safe<T>(fn: () => Promise<T>): Promise<T | undefined> {
   }
 }
 
+/** getHistory met geheugen: de Bitcoin-candles voor het marktfilter worden maar één keer opgehaald. */
+function memoHistory(feed: MarketDataFeed): Pick<MarketDataFeed, "getHistory"> {
+  const cache = new Map<string, Promise<Candle[]>>();
+  return {
+    getHistory: (market, interval, fromMs, toMs) => {
+      const key = `${market}|${interval}|${fromMs}|${toMs}`;
+      let p = cache.get(key);
+      if (!p) {
+        p = feed.getHistory(market, interval, fromMs, toMs);
+        cache.set(key, p);
+      }
+      return p;
+    },
+  };
+}
+
 /** Voert het hele toernooi uit. Puur rekenwerk; printen doet de CLI. */
 export async function runTournament(feed: MarketDataFeed, opts: TournamentOptions): Promise<TournamentResult> {
   const now = opts.now ?? Date.now();
   const log = opts.log ?? (() => {});
   const cfg = DEFAULT_ENGINE_CONFIG;
-  const all = contenders();
+  const trendOff = opts.trendFilter === false;
+  const baseEnsemble = trendOff ? withoutTrendFilter(cfg.ensemble) : cfg.ensemble;
+  const all = contenders(baseEnsemble);
+  const trendFeed = memoHistory(feed);
+  const maxDays = Math.max(0, ...opts.periods.map((p) => p.days));
   const warmup = backtestWarmupCandles(cfg.ensemble);
   const rows: TournamentRow[] = [];
   const wfRows: WalkForwardRow[] = [];
@@ -149,6 +187,11 @@ export async function runTournament(feed: MarketDataFeed, opts: TournamentOption
     const marketInfo: MarketInfo | undefined = infos.find((m) => m.market === market);
     const ticker = await safe(async () => (await feed.getTickers24h([market])).find((t) => t.market === market));
     const spreadPct = spreadFromTicker(ticker);
+    // Trendfilter: één keer per markt, voor de langste periode (tijdgebaseerd, geldt voor elke run).
+    if (!trendOff) log(`${market}: trendfilter-data ophalen…`);
+    const trend = await prepareTrendFilter(trendFeed, market, cfg.ensemble, now - maxDays * DAY_MS, now, { disabled: trendOff });
+    if (trend.note) notes.push(`${market}: ${trend.note}`);
+    const trendCandles = trend.trendCandles ? { trendCandles: trend.trendCandles } : {};
 
     // Eén keer ophalen per interval, voor de langste periode die dat interval gebruikt
     const needDays = new Map<Interval, number>();
@@ -194,8 +237,10 @@ export async function runTournament(feed: MarketDataFeed, opts: TournamentOption
             dataSource: feed.source,
             tradeFromIndex: tfi,
             spreadPct,
+            ...trendCandles,
           };
-          const m = runBacktestDetailed(input).result.metrics;
+          const res = runBacktestDetailed(input).result;
+          const m = res.metrics;
           rows.push({
             period: p.key,
             interval: iv,
@@ -210,6 +255,7 @@ export async function runTournament(feed: MarketDataFeed, opts: TournamentOption
             trades: m.trades,
             feesPaid: m.feesPaid,
             winRatePct: m.winRatePct,
+            ...(res.blockedEntries ? { blockedEntries: res.blockedEntries } : {}),
           });
         }
       }
@@ -237,6 +283,7 @@ export async function runTournament(feed: MarketDataFeed, opts: TournamentOption
               dataSource: feed.source,
               tradeFromIndex: tfi,
               spreadPct,
+              ...trendCandles,
             },
             { folds: 4, trainRatio: 0.7, objective: "sharpe", maxCombos: 40, strategy: c.optimizeStrategy },
           );
@@ -253,13 +300,23 @@ export async function runTournament(feed: MarketDataFeed, opts: TournamentOption
             folds: wf.folds.length,
             trades: wf.oosMetrics.trades,
             verdict: wf.verdict,
+            ...(wf.blockedEntries ? { blockedEntries: wf.blockedEntries } : {}),
           });
         }
       }
     }
   }
 
-  return { dataSource: feed.source, capital: opts.capital, generatedAt: now, markets: opts.markets, rows, walkForward: wfRows, notes };
+  return {
+    dataSource: feed.source,
+    capital: opts.capital,
+    generatedAt: now,
+    markets: opts.markets,
+    rows,
+    walkForward: wfRows,
+    notes,
+    trendFilter: trendFilterLabel(baseEnsemble.trendFilter, trendOff && trendFilterActive(cfg.ensemble.trendFilter)),
+  };
 }
 
 // ─────────────────────────────── Samenvatten ───────────────────────────────
@@ -336,6 +393,7 @@ function table(header: string[], rows: string[][]): string {
 }
 
 function printReport(res: TournamentResult): void {
+  if (res.trendFilter) console.log(dim(res.trendFilter));
   for (const p of PERIODS) {
     if (!res.rows.some((r) => r.period === p.key)) continue;
     const { ranking, buyHoldAvgPct } = summarize(res.rows, p.key);
@@ -365,6 +423,11 @@ function printReport(res: TournamentResult): void {
         rows,
       ),
     );
+    const blocked = blockedEntriesText(
+      sumBlockedEntries(res.rows.filter((r) => r.period === p.key).map((r) => r.blockedEntries)),
+      "Koopsignalen tegengehouden (alle deelnemers en markten samen)",
+    );
+    if (blocked) console.log(dim(blocked));
   }
 
   if (res.walkForward.length > 0) {
@@ -395,6 +458,11 @@ function printReport(res: TournamentResult): void {
         ]);
       console.log(dim(`${p.label} · ${wf[0].interval} · 4 vensters per markt, 70% trainen / 30% testen`));
       console.log(table(["Strategie", "Rendement (ongezien)", `Op €${res.capital}`, "Kopen & vasth.", "Winstgevende vensters", "Trades"], rows));
+      const blocked = blockedEntriesText(
+        sumBlockedEntries(wf.map((w) => w.blockedEntries)),
+        "Out-of-sample koopsignalen tegengehouden (alle deelnemers en markten samen)",
+      );
+      if (blocked) console.log(dim(blocked));
       console.log();
     }
   }
@@ -431,12 +499,15 @@ async function main(): Promise<void> {
       capital: { type: "string", default: String(DEFAULT_PAPER_CAPITAL) },
       quick: { type: "boolean", default: false },
       "no-walkforward": { type: "boolean", default: false },
+      "no-trend": { type: "boolean", default: false },
       json: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
   if (values.help) {
-    console.log("npm run tournament -- [--source auto|bitvavo|simulated] [--markets BTC-EUR,ETH-EUR] [--capital 50] [--quick] [--no-walkforward] [--json uitvoer.json]");
+    console.log(
+      "npm run tournament -- [--source auto|bitvavo|simulated] [--markets BTC-EUR,ETH-EUR] [--capital 50] [--quick] [--no-walkforward] [--no-trend] [--json uitvoer.json]",
+    );
     return;
   }
   const markets = String(values.markets).split(",").map((m) => m.trim().toUpperCase()).filter(Boolean);
@@ -457,6 +528,7 @@ async function main(): Promise<void> {
     capital,
     periods,
     walkForward: !values["no-walkforward"],
+    trendFilter: !values["no-trend"],
     log: (m) => process.stdout.write(dim(`\r${m}`.padEnd(70)) + (useColor ? "" : "\n")),
   });
   process.stdout.write("\r" + " ".repeat(72) + "\r");

@@ -22,7 +22,16 @@
  *   stops / signals any more, just a new attempt as soon as
  *   `amount × price >= minimum`;
  * - slippage per side is never below half the market's bid/ask spread
- *   (`spreadPct`, optional).
+ *   (`spreadPct`, optional);
+ * - entry gates (docs/ARCHITECTURE.md "v2 — Backtest"), checked in this order
+ *   for every buy decision that would otherwise be tried (no position open),
+ *   before the risk manager: the trend filter (`ensemble.trendFilter`, only
+ *   with `trendCandles`; evaluated at the moment the entry would be executed,
+ *   `decision.time + interval` — only trend candles CLOSED at that moment
+ *   count, so no lookahead), then the spread limit (`risk.maxSpreadPct`).
+ *   Blocked buys are counted in `result.blockedEntries`. The trend filter is
+ *   the one pure helper imported from the strategy modules
+ *   (`src/strategies/trendFilter.ts`, shared with the live engine).
  */
 import type {
   AccountSnapshot,
@@ -41,12 +50,15 @@ import type {
   SignalMarker,
   Ticker24h,
   Trade,
+  TrendFilterConfig,
 } from "../core/types";
 import { EXCHANGE_MIN_ORDER_QUOTE } from "../core/defaults";
 import { INTERVAL_MS } from "../core/types";
 import { dayKey } from "../core/util";
 import { exchangeMinQuote } from "../exchange/minimums";
+import { trendFilterActive, trendGate } from "../strategies/trendFilter";
 import { buyHoldFactor, computeMetrics, emptyMetrics } from "./metrics";
+import type { TrendCandles } from "./trendData";
 
 export interface BacktestInput {
   market: string;
@@ -64,8 +76,91 @@ export interface BacktestInput {
    * ((ask − bid) / mid). A market order pays about half of it per side, so the
    * backtest uses max(risk.slippagePct, spreadPct / 2) as slippage (also for
    * the risk manager's cost filter). Unknown → only risk.slippagePct.
+   * Also used for the spread limit `risk.maxSpreadPct` (percent): a known
+   * spread above it means no entries at all.
    */
   spreadPct?: number;
+  /**
+   * Candles for the trend filter (`ensemble.trendFilter`): closed candles on
+   * `trendFilter.interval`, ascending, starting at least `trendWarmupMs(tf)`
+   * before the first trade candle (see `loadTrendCandles`). `market` =
+   * `MARKET_FILTER_MARKET` (Bitcoin), `coin` = this market. Time based: the
+   * same arrays serve every optimizer combination and walk-forward fold.
+   * Absent while the filter is active → the filter is NOT applied (with a
+   * `note`); a missing part or too little data → the gate blocks (fail-closed).
+   */
+  trendCandles?: TrendCandles;
+}
+
+/** Buy decisions that did not lead to an entry because of an entry gate. */
+export interface BlockedEntries {
+  /** Blocked by the trend filter (market or coin) */
+  trend: number;
+  /** Blocked by the spread limit (`risk.maxSpreadPct`) */
+  spread: number;
+}
+
+/** `note` when the trend filter is on but the input carries no `trendCandles`. */
+export const TREND_NOT_APPLIED_NOTE = "Trendfilter niet toegepast: geen koersdata voor het filter.";
+
+/** Tolerance (in percentage points) for the spread limit, so 0.003 × 100 is not "above" 0.3. */
+const SPREAD_EPS = 1e-9;
+
+function pctNl(v: number, decimals: number): string {
+  return `${v.toFixed(decimals).replace(".", ",")}%`;
+}
+
+/** Dutch `note` when the spread limit blocks every entry, e.g. "… (0,62%) is groter dan je maximum (0,30%)." */
+export function spreadBlockedNote(spreadPercent: number, maxSpreadPct: number): string {
+  let d = 2;
+  while (d < 4 && spreadPercent.toFixed(d) === maxSpreadPct.toFixed(d)) d++;
+  return `Geen aankopen: de spread van deze markt (${pctNl(spreadPercent, d)}) is groter dan je maximum (${pctNl(maxSpreadPct, d)}).`;
+}
+
+/** Joins Dutch notes with a space, skipping empty ones and duplicates (undefined when nothing is left). */
+export function appendNote(...notes: (string | undefined | null)[]): string | undefined {
+  const out: string[] = [];
+  for (const n of notes) {
+    const t = typeof n === "string" ? n.trim() : "";
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out.length > 0 ? out.join(" ") : undefined;
+}
+
+/** How the entry gates apply to one backtest input (see the file header). */
+export interface EntryGates {
+  /** The active trend filter when it is applied (active AND `trendCandles` given), else null */
+  trend: TrendFilterConfig | null;
+  /** The known spread is above `risk.maxSpreadPct`: no entries at all */
+  spreadBlocks: boolean;
+  /** `result.blockedEntries` is reported (trend filter applied, or a spread limit > 0) */
+  report: boolean;
+  /** Dutch explanation for `result.note` (undefined = nothing to say) */
+  note?: string;
+}
+
+export function entryGates(input: Pick<BacktestInput, "ensemble" | "risk" | "spreadPct" | "trendCandles">): EntryGates {
+  const tf = input.ensemble?.trendFilter;
+  const active = trendFilterActive(tf);
+  const trend = active && input.trendCandles ? tf : null;
+  const max = input.risk?.maxSpreadPct;
+  const limit = typeof max === "number" && Number.isFinite(max) && max > 0 ? max : 0;
+  const sp = input.spreadPct;
+  const spreadPercent = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp * 100 : null;
+  const spreadBlocks = limit > 0 && spreadPercent !== null && spreadPercent - limit > SPREAD_EPS;
+  const note = appendNote(
+    active && !input.trendCandles ? TREND_NOT_APPLIED_NOTE : undefined,
+    spreadBlocks ? spreadBlockedNote(spreadPercent!, limit) : undefined,
+  );
+  return { trend, spreadBlocks, report: trend !== null || limit > 0, ...(note ? { note } : {}) };
+}
+
+/** `blockedEntries` / `note` fields for a result (only the ones that apply). */
+function gateFields(gates: EntryGates, blocked: BlockedEntries): Pick<BacktestResult, "blockedEntries" | "note"> {
+  return {
+    ...(gates.report ? { blockedEntries: { trend: blocked.trend, spread: blocked.spread } } : {}),
+    ...(gates.note ? { note: gates.note } : {}),
+  };
 }
 
 /** Slippage per side the backtest uses: never less than half the market's bid/ask spread. */
@@ -246,6 +341,7 @@ export function aggregateCandles(candles: Candle[], k: number): Candle[] {
 
 function emptyResult(input: BacktestInput, startedAt: number): SimulationOutput {
   const c = input.candles;
+  const gates = entryGates(input);
   return {
     exposureCandles: 0,
     slippagePct: effectiveSlippagePct(input.risk, input.spreadPct),
@@ -268,6 +364,7 @@ function emptyResult(input: BacktestInput, startedAt: number): SimulationOutput 
       markers: [],
       durationMs: Date.now() - startedAt,
       stuckTrades: 0,
+      ...gateFields(gates, { trend: 0, spread: 0 }),
     },
   };
 }
@@ -305,6 +402,9 @@ export function simulate(
   const intervalMs = INTERVAL_MS[interval] ?? 0;
   const dayKeys = dayKeysFor(candles);
   const loopStart = Math.max(evalStart, 1);
+  const gates = entryGates(input);
+  const trendData = input.trendCandles ?? {};
+  const blocked: BlockedEntries = { trend: 0, spread: 0 };
 
   let cash = initialCapital;
   // `as` keeps TS from narrowing to null: the closures below assign it.
@@ -512,7 +612,17 @@ export function simulate(
         rangeCheck(i);
       }
     } else if (prev.action === "buy") {
-      if (tryEntry(i, prev)) rangeCheck(i, false); // entry at the open → this candle's range is checked (not counted as held)
+      // Gates first (like the engine): trend filter, then spread, then the risk plan in tryEntry.
+      // The trend is judged at the moment this entry would be executed: the close of the
+      // signal candle = the open of this candle (only trend candles closed by then count).
+      const atMs = (Number.isFinite(prev.time) ? prev.time : candles[i - 1].time) + intervalMs;
+      if (gates.trend && !trendGate(gates.trend, trendData, atMs, market).allowed) {
+        blocked.trend++;
+      } else if (gates.spreadBlocks) {
+        blocked.spread++;
+      } else if (tryEntry(i, prev)) {
+        rangeCheck(i, false); // entry at the open → this candle's range is checked (not counted as held)
+      }
     }
 
     lastEquity = cash + (pos ? pos.amount * c.close : 0);
@@ -596,6 +706,7 @@ export function simulate(
       markers,
       durationMs: Date.now() - startedAt,
       stuckTrades,
+      ...gateFields(gates, blocked),
     },
   };
 }

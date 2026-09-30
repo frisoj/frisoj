@@ -4,6 +4,11 @@
  * window the optimizer only sees the first `trainRatio` part, the best params
  * are then traded on the rest (out-of-sample). Earlier candles are only used
  * as indicator warmup, never traded twice.
+ *
+ * Entry gates: every train and test run goes through `simulate` with the same
+ * `trendCandles` / `spreadPct` (the trend candles are time based, so they are
+ * passed along unchanged, never sliced). `blockedEntries` of the result is the
+ * SUM over the out-of-sample (test) runs; each fold carries its own.
  */
 import type {
   BacktestMetrics,
@@ -23,12 +28,29 @@ import {
   type OptimizeOptions,
   type ResolvedOptimizerDeps,
 } from "./optimizerCore";
-import { runBacktestWith, type BacktestInput } from "./simulator";
+import { appendNote, runBacktestWith, type BacktestInput, type BlockedEntries } from "./simulator";
 import { walkForwardVerdict } from "./verdict";
 
 export interface WalkForwardOptions extends OptimizeOptions {
   folds: number;
   trainRatio: number;
+}
+
+/** A fold plus the buy decisions its out-of-sample run blocked (trend filter / spread limit). */
+export interface WalkForwardFoldWithGates extends WalkForwardFold {
+  /** Of the test run; present when the trend filter was applied or a spread limit is set */
+  blockedEntries?: BlockedEntries;
+}
+
+/**
+ * `WalkForwardResult` plus the entry-gate details (optional extras on top of
+ * the contract type): `blockedEntries` = sum over the out-of-sample runs,
+ * `note` = Dutch explanation of the gates (the same for every run).
+ */
+export interface WalkForwardOutput extends WalkForwardResult {
+  folds: WalkForwardFoldWithGates[];
+  note?: string;
+  blockedEntries?: BlockedEntries;
 }
 
 /** Candles before each train/test segment used purely as indicator warmup. */
@@ -73,7 +95,7 @@ export function walkForwardWith(
   input: BacktestInput,
   opts: WalkForwardOptions,
   deps: ResolvedOptimizerDeps,
-): WalkForwardResult {
+): WalkForwardOutput {
   const startedAt = Date.now();
   const base: BacktestInput = opts.strategy
     ? { ...input, ensemble: forceEnableStrategy(input.ensemble, opts.strategy) }
@@ -85,7 +107,7 @@ export function walkForwardWith(
   const gridKeys = Object.keys(buildParamGrid(opts.strategy, deps.paramSpace));
   const optOpts: OptimizeOptions = { strategy: opts.strategy, objective: opts.objective, maxCombos: opts.maxCombos };
 
-  const folds: WalkForwardFold[] = [];
+  const folds: WalkForwardFoldWithGates[] = [];
   const oosCurve: EquityCurvePoint[] = [];
   const oosTrades: Trade[] = [];
   const oosCandles: Candle[] = [];
@@ -93,6 +115,8 @@ export function walkForwardWith(
   let equity = input.initialCapital;
   let benchmark = input.initialCapital;
   let profitableFolds = 0;
+  let blocked: BlockedEntries | null = null;
+  let note: string | undefined;
 
   for (const w of windows) {
     // ── Train: optimise only on [winStart, trainEnd) (+ warmup before it) ──
@@ -144,6 +168,12 @@ export function walkForwardWith(
     exposureCandles += out.exposureCandles;
     for (let i = w.trainEnd; i < w.winEnd; i++) oosCandles.push(candles[i]);
     if (res.metrics.totalReturnPct > 0) profitableFolds++;
+    if (res.blockedEntries) {
+      blocked ??= { trend: 0, spread: 0 };
+      blocked.trend += res.blockedEntries.trend;
+      blocked.spread += res.blockedEntries.spread;
+    }
+    note = appendNote(note, res.note);
 
     folds.push({
       index: w.index,
@@ -154,6 +184,7 @@ export function walkForwardWith(
       bestParams,
       trainMetrics,
       testMetrics: res.metrics,
+      ...(res.blockedEntries ? { blockedEntries: { ...res.blockedEntries } } : {}),
     });
   }
 
@@ -185,5 +216,13 @@ export function walkForwardWith(
     simulatedData: (input.dataSource ?? "simulated") === "simulated",
   });
 
-  return { folds, oosMetrics, oosEquityCurve: oosCurve, verdict, durationMs: Date.now() - startedAt };
+  return {
+    folds,
+    oosMetrics,
+    oosEquityCurve: oosCurve,
+    verdict,
+    durationMs: Date.now() - startedAt,
+    ...(blocked ? { blockedEntries: blocked } : {}),
+    ...(note ? { note } : {}),
+  };
 }

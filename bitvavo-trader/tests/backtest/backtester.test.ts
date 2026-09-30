@@ -572,7 +572,8 @@ describe("runBacktest – spread-aware slippage", () => {
     const candles = [...flatCandles(6, 100), candle(6, 102, 102.4, 101.7, 102.2), ...flatCandles(2, 102, 7)];
     const decisions = decisionsFrom(candles, "..B..S...");
     const seen: RiskConfig[] = [];
-    const out = runBacktestWith(input(candles, { spreadPct: 0.004 }), {
+    // 0,4% spread is above the default spread limit (0,3%): switch the limit off, this test is about costs.
+    const out = runBacktestWith(input(candles, { spreadPct: 0.004, risk: riskCfg({ maxSpreadPct: 0 }) }), {
       decide: () => decisions,
       createRisk: (cfg) => {
         seen.push(cfg);

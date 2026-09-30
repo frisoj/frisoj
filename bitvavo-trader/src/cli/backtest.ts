@@ -4,9 +4,12 @@
  *   npm run backtest -- --market BTC-EUR --interval 15m --days 30 [--capital 50]
  *                       [--source auto|bitvavo|simulated] [--optimize] [--walkforward]
  *                       [--objective sharpe|return|profitFactor|calmar] [--strategy <id>]
- *                       [--folds 4] [--train 0.7] [--combos 120] [--seed 1]
+ *                       [--folds 4] [--train 0.7] [--combos 120] [--seed 1] [--no-trend]
  *
- * Gebruikt DEFAULT_ENGINE_CONFIG (ensemble + risico), dezelfde code als de bot.
+ * Gebruikt DEFAULT_ENGINE_CONFIG (ensemble + risico), dezelfde code als de bot,
+ * inclusief het trendfilter (koersdata van Bitcoin en/of de munt op de tijdschaal
+ * van het filter; `--no-trend` zet het filter uit om te vergelijken) en de
+ * spreadlimiet (`risk.maxSpreadPct`, tegen de huidige spread).
  */
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -39,7 +42,7 @@ import { isBitvavoReachable } from "../data/reachability";
 import { SimulatedFeed } from "../data/simulatedFeed";
 import { BitvavoClient } from "../exchange/bitvavoClient";
 import { backtestWarmupCandles } from "../server/warmup";
-import { backtestWindow, stuckTradesWarning } from "./backtestReport";
+import { backtestWindow, blockedEntriesText, prepareTrendFilter, stuckTradesWarning } from "./backtestReport";
 
 /** Minimaal aantal candles vóór de periode dat opgehaald wordt (indicatoren convergeren). */
 const WARMUP_CANDLES = 250;
@@ -133,7 +136,7 @@ const USAGE = `Gebruik:
   npm run backtest -- --market BTC-EUR --interval 15m --days 30 [--capital 50]
                       [--source auto|bitvavo|simulated] [--optimize] [--walkforward]
                       [--objective sharpe|return|profitFactor|calmar] [--strategy <id>]
-                      [--folds 4] [--train 0.7] [--combos 120] [--seed 1]`;
+                      [--folds 4] [--train 0.7] [--combos 120] [--seed 1] [--no-trend]`;
 
 interface CliOptions {
   market: string;
@@ -149,6 +152,8 @@ interface CliOptions {
   trainRatio: number;
   combos: number;
   seed?: number;
+  /** --no-trend: trendfilter uit */
+  noTrend: boolean;
 }
 
 function fail(message: string): never {
@@ -175,6 +180,7 @@ function rawArgs(argv: string[]) {
         train: { type: "string", default: "0.7" },
         combos: { type: "string", default: "120" },
         seed: { type: "string" },
+        "no-trend": { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: false,
@@ -222,6 +228,7 @@ function parseCli(argv: string[]): CliOptions {
     trainRatio: num("train", values.train, 0.1, 0.9),
     combos: Math.round(num("combos", values.combos, 1, 5000)),
     seed: values.seed !== undefined ? Math.round(num("seed", values.seed, 0, 2 ** 31)) : undefined,
+    noTrend: Boolean(values["no-trend"]),
   };
 }
 
@@ -368,17 +375,28 @@ async function main(): Promise<void> {
     spreadPct = undefined;
   }
 
+  // Trendfilter: koersdata van Bitcoin (marktfilter) en/of de munt (muntfilter) op de
+  // tijdschaal van het filter, vanaf ruim vóór de eerste handelscandle.
+  if (!opts.noTrend) process.stdout.write(dim("Trendfilter-data ophalen ... "));
+  const trend = await prepareTrendFilter(feed, opts.market, cfg.ensemble, candles[tradeFromIndex].time, now, {
+    disabled: opts.noTrend,
+  });
+  if (!opts.noTrend) console.log(dim(trend.trendCandles ? "klaar" : "niet nodig"));
+  for (const line of trend.lines) console.log(dim(line));
+  if (trend.note) console.log(yellow(trend.note));
+
   const input: BacktestInput = {
     market: opts.market,
     interval: opts.interval,
     candles,
     initialCapital: opts.capital,
-    ensemble: cfg.ensemble,
+    ensemble: trend.ensemble,
     risk: cfg.risk,
     marketInfo,
     dataSource: feed.source,
     tradeFromIndex,
     spreadPct,
+    ...(trend.trendCandles ? { trendCandles: trend.trendCandles } : {}),
   };
 
   const detail = runBacktestDetailed(input);
@@ -406,6 +424,9 @@ async function main(): Promise<void> {
     minOrderQuote: detail.minOrderQuote,
   });
   if (stuckWarning) console.log(yellow(stuckWarning));
+  if (result.note) console.log(yellow(result.note));
+  const blockedLine = blockedEntriesText(result.blockedEntries);
+  if (blockedLine) console.log(dim(blockedLine));
   printMetrics(result.metrics, benchmarkMetrics(result, cfg.risk.takerFee), opts.capital);
   console.log();
   console.log(bold(`── Laatste ${Math.min(10, result.trades.length)} trades ──`));
@@ -416,6 +437,8 @@ async function main(): Promise<void> {
     console.log(bold(`── Optimalisatie (${opts.strategy ?? "ensemble-drempels + risico"}, doel: ${opts.objective}) ──`));
     const opt = optimize(input, { strategy: opts.strategy, objective: opts.objective, maxCombos: opts.combos });
     console.log(dim(`${opt.combosTested} combinaties getest in ${opt.durationMs} ms (minder dan 5 trades telt niet mee)`));
+    const optBlocked = blockedEntriesText(opt.blockedEntries, opt.best ? "Beste combinatie, koopsignalen tegengehouden" : undefined);
+    if (optBlocked) console.log(dim(optBlocked));
     const top = opt.rows.slice(0, 10);
     if (top.length > 0) {
       const keys = Object.keys(top[0].params);
@@ -485,6 +508,8 @@ async function main(): Promise<void> {
         ],
       ),
     );
+    const wfBlocked = blockedEntriesText(wf.blockedEntries, "Out-of-sample koopsignalen tegengehouden");
+    if (wfBlocked) console.log(dim(wfBlocked));
     console.log(dim(`Walk-forward duurde ${wf.durationMs} ms`));
     verdict = wf.verdict;
   }

@@ -2,14 +2,25 @@
  * Public optimizer entry point: wires the real ensemble `classify` and the
  * strategies' parameter spaces into the dependency-free `optimizerCore.ts`.
  */
-import type { OptimizationResult } from "../core/types";
 import { getStrategy } from "../strategies";
 import { classify as ensembleClassify } from "../strategies/ensemble";
 import { resolveBacktestDeps } from "./backtester";
-import { optimizeWith, type OptimizeOptions, type OptimizerDeps, type ResolvedOptimizerDeps } from "./optimizerCore";
+import {
+  optimizeWith,
+  type OptimizationOutput,
+  type OptimizeOptions,
+  type OptimizerDeps,
+  type ResolvedOptimizerDeps,
+} from "./optimizerCore";
 import type { BacktestInput } from "./simulator";
 
-export type { OptimizeOptions, OptimizerDeps, ResolvedOptimizerDeps } from "./optimizerCore";
+export type {
+  OptimizationOutput,
+  OptimizationRowWithGates,
+  OptimizeOptions,
+  OptimizerDeps,
+  ResolvedOptimizerDeps,
+} from "./optimizerCore";
 export {
   DEFAULT_MAX_COMBOS,
   DEFAULT_PARAM_GRID,
@@ -30,6 +41,6 @@ export function resolveOptimizerDeps(deps?: OptimizerDeps): ResolvedOptimizerDep
   };
 }
 
-export function optimize(input: BacktestInput, opts: OptimizeOptions, deps?: OptimizerDeps): OptimizationResult {
+export function optimize(input: BacktestInput, opts: OptimizeOptions, deps?: OptimizerDeps): OptimizationOutput {
   return optimizeWith(input, opts, resolveOptimizerDeps(deps));
 }

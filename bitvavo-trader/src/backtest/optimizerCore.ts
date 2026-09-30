@@ -16,7 +16,15 @@ import type {
 } from "../core/types";
 import { STRATEGY_IDS } from "../core/types";
 import { hashString, mulberry32 } from "../core/util";
-import { simulate, withSpreadCosts, type BacktestDeps, type BacktestInput, type ResolvedBacktestDeps } from "./simulator";
+import {
+  entryGates,
+  simulate,
+  withSpreadCosts,
+  type BacktestDeps,
+  type BacktestInput,
+  type BlockedEntries,
+  type ResolvedBacktestDeps,
+} from "./simulator";
 
 export interface OptimizeOptions {
   strategy?: StrategyId;
@@ -47,6 +55,27 @@ export interface OptimizerDeps extends BacktestDeps {
 export interface ResolvedOptimizerDeps extends ResolvedBacktestDeps {
   classify: ClassifyFn | null;
   paramSpace: ParamSpaceFn;
+}
+
+/** An optimizer row plus the buy decisions its backtest blocked (trend filter / spread limit). */
+export interface OptimizationRowWithGates extends OptimizationRow {
+  /** Present when the trend filter was applied or a spread limit is set (see `BacktestResult.blockedEntries`) */
+  blockedEntries?: BlockedEntries;
+}
+
+/**
+ * `OptimizationResult` plus the entry-gate details (optional extras on top of
+ * the contract type, so every consumer of `OptimizationResult` keeps working):
+ * - `note`: Dutch explanation of the gates, the same for every combination
+ *   (trend filter not applied for lack of data, or the spread blocks every entry);
+ * - `blockedEntries`: those of `best` (or of the top row when nothing scored);
+ *   each row carries its own.
+ */
+export interface OptimizationOutput extends OptimizationResult {
+  rows: OptimizationRowWithGates[];
+  best: OptimizationRowWithGates | null;
+  note?: string;
+  blockedEntries?: BlockedEntries;
 }
 
 export const DEFAULT_MAX_COMBOS = 120;
@@ -248,7 +277,7 @@ export function buildHeatmap(
 }
 
 /** Grid-search optimisation with resolved dependencies. */
-export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: ResolvedOptimizerDeps): OptimizationResult {
+export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: ResolvedOptimizerDeps): OptimizationOutput {
   const startedAt = Date.now();
   // Spread-aware costs once, so the risk manager of every combo sees them too.
   const costed = withSpreadCosts(input);
@@ -310,19 +339,31 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
     return decisions;
   };
 
-  const tested: (OptimizationRow & { order: number })[] = [];
+  // Every combination goes through simulate() with the same trendCandles / spreadPct, so the
+  // entry gates (trend filter, spread limit) apply to each of them exactly like in a backtest.
+  const tested: (OptimizationRowWithGates & { order: number })[] = [];
   indices.forEach((comboIndex, order) => {
     const params = decodeCombo(comboIndex, keys, grid);
     const comboInput = applyParams(base, params);
     const decisions = getDecisions(comboInput.ensemble);
     const risk = deps.createRisk(comboInput.risk, comboInput.interval);
     const { result } = simulate(comboInput, decisions, risk, { lite: true });
-    tested.push({ params, metrics: result.metrics, score: objectiveScore(result.metrics, opts.objective), order });
+    tested.push({
+      params,
+      metrics: result.metrics,
+      score: objectiveScore(result.metrics, opts.objective),
+      order,
+      ...(result.blockedEntries ? { blockedEntries: result.blockedEntries } : {}),
+    });
   });
 
   tested.sort((a, b) => b.score - a.score || a.order - b.order);
-  const rows: OptimizationRow[] = tested.slice(0, MAX_ROWS).map(({ params, metrics, score }) => ({ params, metrics, score }));
+  const rows: OptimizationRowWithGates[] = tested
+    .slice(0, MAX_ROWS)
+    .map(({ params, metrics, score, blockedEntries }) => ({ params, metrics, score, ...(blockedEntries ? { blockedEntries } : {}) }));
   const best = rows.length > 0 && rows[0].score > PENALTY_SCORE ? rows[0] : null;
+  const shown = best ?? rows[0];
+  const { note } = entryGates(base);
 
   return {
     objective: opts.objective,
@@ -331,5 +372,7 @@ export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: 
     combosTested: tested.length,
     heatmap: buildHeatmap(grid, tested, opts.objective),
     durationMs: Date.now() - startedAt,
+    ...(shown?.blockedEntries ? { blockedEntries: { ...shown.blockedEntries } } : {}),
+    ...(note ? { note } : {}),
   };
 }

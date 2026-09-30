@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { TREND_NOT_APPLIED_NOTE, runBacktest, type BacktestInput } from "../../src/backtest/backtester";
+import { walkForward, type WalkForwardOutput } from "../../src/backtest/walkForward";
 import { DEFAULT_ENGINE_CONFIG } from "../../src/core/defaults";
-import type { BacktestResult } from "../../src/core/types";
+import { INTERVAL_MS, type BacktestResult, type Candle } from "../../src/core/types";
 import { HeavyRunner } from "../../src/server/heavyRunner";
+import { T0, walkCandles } from "../backtest/helpers";
 import { HttpError } from "../../src/server/router";
 import type { BacktestInputLike } from "../../src/server/routes";
 import { json, makeCandles, makeServices, startTestServer, type TestServer } from "./helpers";
@@ -60,6 +63,64 @@ describe("HeavyRunner met de echte rekenwerker", () => {
     ).rejects.toThrow(/Te weinig candles/);
     await expect(runner.run("onbekend", backtestInput(200))).rejects.toThrow(/Onbekende berekening/);
   }, 30_000);
+});
+
+describe("HeavyRunner geeft de trendfilter-data ongeschonden door (structured clone)", () => {
+  const DAY = INTERVAL_MS["1d"];
+  /** Dagcandles van Bitcoin: dalend (onder het gemiddelde) tot de candle van T0 + 5 dagen sluit, daarna ver erboven. */
+  function btcDaily(): Candle[] {
+    const out: Candle[] = [];
+    for (let k = -60; k <= 14; k++) {
+      const c = k < 5 ? 1000 - (k + 60) : 2000 + k * 10;
+      out.push({ time: T0 + k * DAY, open: c, high: c, low: c, close: c, volume: 1 });
+    }
+    return out;
+  }
+  function trendInput(): BacktestInput {
+    return {
+      market: "ETH-EUR",
+      interval: "15m",
+      candles: walkCandles(1200, 2),
+      initialCapital: 50,
+      ensemble: structuredClone(DEFAULT_ENGINE_CONFIG.ensemble), // marktfilter aan (Bitcoin, 50 dagen)
+      risk: { ...DEFAULT_ENGINE_CONFIG.risk },
+      dataSource: "simulated",
+      tradeFromIndex: 250,
+      spreadPct: 0.001,
+      trendCandles: { market: btcDaily() },
+    };
+  }
+  const noDuration = <T extends { durationMs: number }>(r: T) => ({ ...r, durationMs: 0 });
+
+  it("backtest in de worker = backtest in dit proces, inclusief blockedEntries", async () => {
+    runner = new HeavyRunner();
+    const input = trendInput();
+    const viaWorker = await runner.run<BacktestResult>("backtest", input);
+    const local = runBacktest(input);
+    expect(noDuration(viaWorker)).toEqual(noDuration(local));
+    expect(viaWorker.blockedEntries!.trend).toBeGreaterThan(0); // het filter is echt toegepast in de worker
+    for (const t of viaWorker.trades) expect(t.entryTime).toBeGreaterThanOrEqual(T0 + 6 * DAY);
+    expect(viaWorker.note).toBeUndefined();
+
+    // Zonder trendCandles: filter niet toegepast, met uitleg.
+    const { trendCandles: _drop, ...plain } = input;
+    const noData = await runner.run<BacktestResult>("backtest", plain);
+    expect(noData.note).toBe(TREND_NOT_APPLIED_NOTE);
+    expect(noData.blockedEntries).toEqual({ trend: 0, spread: 0 });
+  }, 30_000);
+
+  it("walk-forward in de worker = in dit proces (som van de out-of-sample blokkades)", async () => {
+    runner = new HeavyRunner();
+    const input = trendInput();
+    const opts = { folds: 2, trainRatio: 0.7, objective: "sharpe" as const, maxCombos: 4 };
+    const viaWorker = await runner.run<WalkForwardOutput>("walkForward", input, opts);
+    const local = walkForward(input, opts);
+    expect(noDuration(viaWorker)).toEqual(noDuration(local));
+    expect(viaWorker.blockedEntries).toEqual({
+      trend: viaWorker.folds.reduce((s, f) => s + f.blockedEntries!.trend, 0),
+      spread: 0,
+    });
+  }, 60_000);
 });
 
 describe("HeavyRunner (test-worker)", () => {
