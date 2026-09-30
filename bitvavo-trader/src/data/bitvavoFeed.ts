@@ -11,6 +11,10 @@
  * - `getTickers24h` wordt ~30 s gecachet. Een verse lijst van ALLE markten
  *   (gewicht 25 bij Bitvavo) wordt ook voor gefilterde verzoeken gebruikt; één
  *   losse markt (gewicht 1) wordt apart opgehaald en gecachet.
+ * - `getPrices` haalt de prijs van ALLE markten op in één `GET /ticker/price`
+ *   zonder markt (gewicht 1). Gelijktijdige aanroepen delen één verzoek en het
+ *   resultaat wordt ~2 s hergebruikt. Fouten worden niet gecachet en gaan door
+ *   naar de aanroeper.
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -30,6 +34,8 @@ import { isClosedCandle, sleep } from "../core/util";
 const MARKETS_TTL_MS = 3_600_000;
 /** 24h-tickers veranderen langzaam: 30 s hergebruiken spaart rate-limit gewicht (alle markten = 25). */
 const TICKERS_TTL_MS = 30_000;
+/** Prijzen van alle markten: kort hergebruiken, zodat gelijktijdige vragers (engine, server) één verzoek delen. */
+const PRICES_TTL_MS = 2_000;
 const PAGE_LIMIT = 1440;
 const LOW_RATE_LIMIT = 100;
 const VERY_LOW_RATE_LIMIT = 20;
@@ -108,6 +114,9 @@ export class BitvavoFeed implements MarketDataFeed {
   private tickersAllInflight: Promise<Ticker24h[]> | null = null;
   /** Losse 24h-tickers (verzoeken voor één markt) */
   private readonly tickerOne = new Map<string, { at: number; data: Ticker24h[] }>();
+  /** Laatste prijzen van ALLE markten (markt → prijs) */
+  private pricesAll: { at: number; data: Record<string, number> } | null = null;
+  private pricesInflight: Promise<Record<string, number>> | null = null;
   private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(
@@ -384,6 +393,37 @@ export class BitvavoFeed implements MarketDataFeed {
       throw new Error(`Geen actuele prijs beschikbaar voor ${market}`);
     }
     return hit.price;
+  }
+
+  /**
+   * Actuele prijs van ALLE markten in één verzoek (`GET /ticker/price` zonder
+   * markt, gewicht 1). Alleen eindige prijzen > 0. Gelijktijdige aanroepen delen
+   * één verzoek; het resultaat wordt ~2 s hergebruikt (klok van de feed). Een
+   * fout wordt niet gecachet en gaat door naar de aanroeper.
+   */
+  async getPrices(): Promise<Record<string, number>> {
+    const now = this.nowFn();
+    const cached = this.pricesAll;
+    if (cached && now - cached.at >= 0 && now - cached.at < PRICES_TTL_MS) return { ...cached.data };
+    if (!this.pricesInflight) {
+      this.pricesInflight = (async () => {
+        try {
+          const list = await this.client.tickerPrice();
+          const data: Record<string, number> = {};
+          for (const p of Array.isArray(list) ? list : []) {
+            if (!p || typeof p.market !== "string" || p.market === "") continue;
+            const price = p.price;
+            if (typeof price === "number" && Number.isFinite(price) && price > 0) data[p.market] = price;
+          }
+          this.pricesAll = { at: this.nowFn(), data };
+          return data;
+        } finally {
+          this.pricesInflight = null;
+        }
+      })();
+    }
+    // Kopie: een aanroeper die het resultaat aanpast, verandert de cache niet.
+    return { ...(await this.pricesInflight) };
   }
 
   async getOrderBook(market: string, depth?: number): Promise<OrderBook> {

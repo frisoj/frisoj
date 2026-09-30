@@ -55,11 +55,12 @@ function autocorr(x: number[], lag: number): number {
 }
 
 describe("SimulatedFeed — markten", () => {
-  it("levert ~20 EUR-markten met realistische MarketInfo", async () => {
+  it("levert ~60 EUR-markten met realistische MarketInfo", async () => {
     const markets = await feedAt(NOW).getMarkets();
-    expect(markets.length).toBeGreaterThanOrEqual(20);
+    expect(markets.length).toBeGreaterThanOrEqual(55);
     const names = markets.map((m) => m.market);
-    for (const m of ["BTC-EUR", "ETH-EUR", "SOL-EUR", "XRP-EUR", "ADA-EUR", "DOGE-EUR", "PEPE-EUR", "SUI-EUR"]) {
+    expect(new Set(names).size).toBe(names.length);
+    for (const m of ["BTC-EUR", "ETH-EUR", "SOL-EUR", "XRP-EUR", "ADA-EUR", "DOGE-EUR", "PEPE-EUR", "SUI-EUR", "USDC-EUR", "BONK-EUR", "TAO-EUR"]) {
       expect(names).toContain(m);
     }
     for (const m of markets) {
@@ -383,7 +384,8 @@ describe("SimulatedFeed — tickers en orderboek", () => {
       expect(t.ask!).toBeGreaterThanOrEqual(t.last);
       const spreadPct = ((t.ask! - t.bid!) / t.last) * 100;
       expect(spreadPct).toBeGreaterThanOrEqual(0.01);
-      expect(spreadPct).toBeLessThanOrEqual(0.4);
+      // v2: een paar dunne markten (KAS, STX) hebben bewust een spread van ~0,3–0,55%
+      expect(spreadPct).toBeLessThanOrEqual(0.6);
     }
     const btc = tickers.find((t) => t.market === "BTC-EUR")!;
     const inj = tickers.find((t) => t.market === "INJ-EUR")!;

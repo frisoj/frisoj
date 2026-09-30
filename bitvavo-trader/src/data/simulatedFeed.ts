@@ -18,6 +18,12 @@
  *  4. "Nu" komt uit `opts.now`. Er wordt nooit toekomstige data teruggegeven: de
  *     candle in vorming aggregeert alleen de minuten tot nu (de lopende minuut
  *     via een deterministisch sub-minuutpad per seconde).
+ *  5. Het pad van een markt hangt alleen af van (seed, markt) en de gedeelde
+ *     marktfactor (alleen seed), nooit van de marktlijst of de volgorde van
+ *     opvragen: markten toevoegen verandert bestaande paden niet.
+ *  6. ~60 EUR-markten (`SIMULATED_MARKETS`), incl. kleinere munten met minder
+ *     volume en een grotere spread, en de stablecoin USDC-EUR. `getPrices` geeft
+ *     alle markten in één keer (dezelfde prijs als `getPrice`).
  */
 import {
   INTERVAL_MS,
@@ -61,6 +67,14 @@ const LV_PHI = 0.995;
 const LV_INNOV = 0.03;
 const LV_VAR = (LV_INNOV * LV_INNOV) / (1 - LV_PHI * LV_PHI);
 
+/*
+ * Cachegroottes: harde bovengrenzen, onafhankelijk van het aantal markten.
+ * - minuutdagen (~46 KB per markt-dag): max. ~41 MB. Een engine die ~60 markten
+ *   volgt gebruikt er ~4 per markt (15m × 300 candles + 24h-ticker + prijs); de
+ *   uurdagen (1h en hoger, trendfilter) vullen deze cache niet.
+ * - uurdagen (~1,2 KB per markt-dag): max. ~23 MB (jaren 1h/4h/1d-historie).
+ * - secondepaden: ≥ 4 minuten voor 60 markten (prijs + ticker-open van 24 uur terug).
+ */
 const LRU_MINUTE_DAYS = 900;
 const LRU_HOUR_DAYS = 20_000;
 const LRU_COMMON_DAYS = 128;
@@ -106,9 +120,57 @@ const PROFILES: Record<string, MarketProfile> = {
   XLM: { price: 0.3, vol: 0.05, volumeQuote: 1.2e6, spread: 0.0015, quantityDecimals: 4, rho: 0.62 },
   HBAR: { price: 0.18, vol: 0.065, volumeQuote: 1e6, spread: 0.0018, quantityDecimals: 4, rho: 0.62 },
   INJ: { price: 12, vol: 0.07, volumeQuote: 0.5e6, spread: 0.0025, quantityDecimals: 6, rho: 0.6 },
+  // ── v2: meer munten (echte Bitvavo-symbolen), grootste 24h-volume eerst. ──
+  // Het prijspad van een markt hangt alleen af van (seed, markt): nieuwe markten
+  // hier toevoegen verandert de paden van de markten hierboven NIET.
+  // Stablecoin: vrijwel vlak rond €0,92, (bijna) los van de markt, veel volume en
+  // een piepkleine spread. De automatische muntkeuze hoort hem over te slaan.
+  USDC: { price: 0.92, vol: 0.002, volumeQuote: 12e6, spread: 0.00015, quantityDecimals: 2, rho: 0.02 },
+  ENA: { price: 0.55, vol: 0.08, volumeQuote: 1.4e6, spread: 0.0014, quantityDecimals: 6, rho: 0.64 },
+  BONK: { price: 0.000018, vol: 0.085, volumeQuote: 1.3e6, spread: 0.0014, quantityDecimals: 2, rho: 0.6 },
+  ONDO: { price: 0.8, vol: 0.07, volumeQuote: 1.1e6, spread: 0.0015, quantityDecimals: 6, rho: 0.6 },
+  BCH: { price: 450, vol: 0.045, volumeQuote: 1e6, spread: 0.0012, quantityDecimals: 8, rho: 0.7 },
+  ETC: { price: 17, vol: 0.05, volumeQuote: 0.9e6, spread: 0.0014, quantityDecimals: 6, rho: 0.7 },
+  WIF: { price: 0.75, vol: 0.09, volumeQuote: 0.9e6, spread: 0.0016, quantityDecimals: 6, rho: 0.6 },
+  FET: { price: 0.6, vol: 0.075, volumeQuote: 0.85e6, spread: 0.0016, quantityDecimals: 6, rho: 0.65 },
+  TAO: { price: 350, vol: 0.07, volumeQuote: 0.8e6, spread: 0.0018, quantityDecimals: 8, rho: 0.6 },
+  RENDER: { price: 3.5, vol: 0.07, volumeQuote: 0.75e6, spread: 0.0017, quantityDecimals: 6, rho: 0.64 },
+  POL: { price: 0.22, vol: 0.06, volumeQuote: 0.7e6, spread: 0.0017, quantityDecimals: 4, rho: 0.66 },
+  APT: { price: 4.5, vol: 0.065, volumeQuote: 0.65e6, spread: 0.0018, quantityDecimals: 6, rho: 0.66 },
+  OP: { price: 0.7, vol: 0.07, volumeQuote: 0.6e6, spread: 0.0018, quantityDecimals: 6, rho: 0.68 },
+  ALGO: { price: 0.2, vol: 0.06, volumeQuote: 0.6e6, spread: 0.0018, quantityDecimals: 4, rho: 0.64 },
+  FIL: { price: 2.8, vol: 0.06, volumeQuote: 0.55e6, spread: 0.0018, quantityDecimals: 6, rho: 0.66 },
+  ICP: { price: 5, vol: 0.065, volumeQuote: 0.5e6, spread: 0.0019, quantityDecimals: 6, rho: 0.6 },
+  FLOKI: { price: 0.0001, vol: 0.085, volumeQuote: 0.5e6, spread: 0.0019, quantityDecimals: 2, rho: 0.6 },
+  CRV: { price: 0.6, vol: 0.075, volumeQuote: 0.45e6, spread: 0.0019, quantityDecimals: 6, rho: 0.62 },
+  SEI: { price: 0.25, vol: 0.075, volumeQuote: 0.45e6, spread: 0.0019, quantityDecimals: 4, rho: 0.62 },
+  LDO: { price: 1, vol: 0.07, volumeQuote: 0.42e6, spread: 0.002, quantityDecimals: 6, rho: 0.64 },
+  TIA: { price: 1.8, vol: 0.075, volumeQuote: 0.4e6, spread: 0.002, quantityDecimals: 6, rho: 0.62 },
+  GALA: { price: 0.018, vol: 0.07, volumeQuote: 0.4e6, spread: 0.002, quantityDecimals: 4, rho: 0.62 },
+  // Dunne orderboeken: spread (bijna) altijd > 0,3% → valt af op de spreadlimiet
+  KAS: { price: 0.07, vol: 0.07, volumeQuote: 0.4e6, spread: 0.004, quantityDecimals: 4, rho: 0.5 },
+  GRT: { price: 0.09, vol: 0.065, volumeQuote: 0.38e6, spread: 0.002, quantityDecimals: 4, rho: 0.64 },
+  SAND: { price: 0.25, vol: 0.065, volumeQuote: 0.36e6, spread: 0.002, quantityDecimals: 4, rho: 0.62 },
+  IMX: { price: 0.55, vol: 0.07, volumeQuote: 0.34e6, spread: 0.002, quantityDecimals: 6, rho: 0.64 },
+  JUP: { price: 0.45, vol: 0.075, volumeQuote: 0.33e6, spread: 0.002, quantityDecimals: 4, rho: 0.6 },
+  VET: { price: 0.022, vol: 0.06, volumeQuote: 0.32e6, spread: 0.002, quantityDecimals: 4, rho: 0.62 },
+  STX: { price: 0.6, vol: 0.07, volumeQuote: 0.3e6, spread: 0.0038, quantityDecimals: 6, rho: 0.6 },
+  CHZ: { price: 0.04, vol: 0.065, volumeQuote: 0.3e6, spread: 0.002, quantityDecimals: 4, rho: 0.6 },
+  MANA: { price: 0.28, vol: 0.065, volumeQuote: 0.3e6, spread: 0.002, quantityDecimals: 4, rho: 0.62 },
+  ENS: { price: 18, vol: 0.07, volumeQuote: 0.28e6, spread: 0.002, quantityDecimals: 6, rho: 0.6 },
+  // Weinig handel: 24h-volume (bijna) altijd onder de €250.000 van de automatische muntkeuze
+  AXS: { price: 2.5, vol: 0.065, volumeQuote: 0.11e6, spread: 0.0024, quantityDecimals: 6, rho: 0.6 },
+  COMP: { price: 45, vol: 0.06, volumeQuote: 0.1e6, spread: 0.0024, quantityDecimals: 8, rho: 0.62 },
+  EGLD: { price: 12, vol: 0.065, volumeQuote: 0.1e6, spread: 0.0026, quantityDecimals: 6, rho: 0.58 },
+  XTZ: { price: 0.6, vol: 0.06, volumeQuote: 0.09e6, spread: 0.0026, quantityDecimals: 6, rho: 0.58 },
+  THETA: { price: 0.7, vol: 0.065, volumeQuote: 0.08e6, spread: 0.0026, quantityDecimals: 6, rho: 0.58 },
 };
 
-/** De standaard gesimuleerde EUR-markten (grootste eerst). */
+/**
+ * De standaard gesimuleerde EUR-markten (~60). Eerst de oorspronkelijke 23
+ * (grote munten, volgorde ongewijzigd), daarna de kleinere munten en de
+ * stablecoin USDC-EUR, grootste 24h-volume eerst.
+ */
 export const SIMULATED_MARKETS: readonly string[] = Object.keys(PROFILES).map((b) => `${b}-EUR`);
 
 const MARKET_RE = /^([A-Z0-9]{1,16})-([A-Z]{2,6})$/;
@@ -395,13 +457,17 @@ interface MinuteDay {
   vol: Float64Array;
 }
 
-interface HourDay {
-  o: Float64Array;
-  h: Float64Array;
-  l: Float64Array;
-  c: Float64Array;
-  v: Float64Array;
-}
+/**
+ * Uur-OHLCV van één dag in één array (24 × open, high, low, close, volume):
+ * één allocatie per markt-dag i.p.v. vijf (scheelt ~40% geheugen).
+ */
+type HourDay = Float64Array;
+const HD_O = 0;
+const HD_H = 24;
+const HD_L = 48;
+const HD_C = 72;
+const HD_V = 96;
+const HD_LEN = 120;
 
 interface CommonDay {
   /** Gemeenschappelijke schokken per minuut (som = √1440 · x_d van de marktfactor) */
@@ -577,6 +643,22 @@ export class SimulatedFeed implements MarketDataFeed {
   async getPrice(market: string): Promise<number> {
     const st = this.state(market);
     return this.priceAt(st, this.nowFn());
+  }
+
+  /**
+   * Prijs van alle gesimuleerde markten (de marktlijst van deze feed) op "nu":
+   * exact dezelfde waarde als `getPrice` en de close van de candle in vorming.
+   * Goedkoop genoeg om elke tick aan te roepen (per markt alleen gecachete
+   * minuut- en secondepaden).
+   */
+  async getPrices(): Promise<Record<string, number>> {
+    const now = this.nowFn();
+    const out: Record<string, number> = {};
+    for (const m of this.marketList) {
+      const price = this.priceAt(this.state(m), now);
+      if (Number.isFinite(price) && price > 0) out[m] = price;
+    }
+    return out;
   }
 
   async getOrderBook(market: string, depth = 15): Promise<OrderBook> {
@@ -845,14 +927,16 @@ export class SimulatedFeed implements MarketDataFeed {
     const key = `${st.market}|${d}`;
     const hit = this.hourCache.get(key);
     if (hit) return hit;
-    const md = this.minuteDay(st, d);
-    const hd: HourDay = {
-      o: new Float64Array(24),
-      h: new Float64Array(24),
-      l: new Float64Array(24),
-      c: new Float64Array(24),
-      v: new Float64Array(24),
-    };
+    // Een oudere minuutdag die alleen voor deze uurdag nodig is, gaat NIET in de
+    // minuutcache: lange 1h/4h/1d-reeksen (trendfilter voor tientallen markten,
+    // backtests) zouden anders de minuutdagen verdringen die de engine elke
+    // ronde gebruikt. Vandaag en gisteren (candle in vorming, 24h-ticker) wel.
+    // Zelfde generator, dus dezelfde waarden.
+    const md =
+      d >= dayIndex(this.nowFn()) - 1
+        ? this.minuteDay(st, d)
+        : (this.minuteCache.get(`${st.market}|${d}`) ?? this.generateDay(st, d));
+    const hd: HourDay = new Float64Array(HD_LEN);
     for (let hr = 0; hr < 24; hr++) {
       const m0 = hr * 60;
       let h = -Infinity;
@@ -863,11 +947,11 @@ export class SimulatedFeed implements MarketDataFeed {
         if (md.lo[m] < l) l = md.lo[m];
         v += md.vol[m];
       }
-      hd.o[hr] = md.px[m0];
-      hd.c[hr] = md.px[m0 + 60];
-      hd.h[hr] = h;
-      hd.l[hr] = l;
-      hd.v[hr] = v;
+      hd[HD_O + hr] = md.px[m0];
+      hd[HD_C + hr] = md.px[m0 + 60];
+      hd[HD_H + hr] = h;
+      hd[HD_L + hr] = l;
+      hd[HD_V + hr] = v;
     }
     this.hourCache.set(key, hd);
     return hd;
@@ -965,11 +1049,11 @@ export class SimulatedFeed implements MarketDataFeed {
           let l = Infinity;
           let v = 0;
           for (let k = h0; k < h0 + nh; k++) {
-            if (hd.h[k] > h) h = hd.h[k];
-            if (hd.l[k] < l) l = hd.l[k];
-            v += hd.v[k];
+            if (hd[HD_H + k] > h) h = hd[HD_H + k];
+            if (hd[HD_L + k] < l) l = hd[HD_L + k];
+            v += hd[HD_V + k];
           }
-          out.push({ time: t, open: hd.o[h0], high: h, low: l, close: hd.c[h0 + nh - 1], volume: v });
+          out.push({ time: t, open: hd[HD_O + h0], high: h, low: l, close: hd[HD_C + h0 + nh - 1], volume: v });
         }
       } else {
         const md = this.minuteDay(st, d);

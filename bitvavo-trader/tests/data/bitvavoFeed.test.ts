@@ -395,6 +395,86 @@ describe("BitvavoFeed — overige methodes", () => {
     await expect(feed.getPrice("DOGE-EUR")).rejects.toThrow(/Geen actuele prijs/);
   });
 
+  it("getPrices: één /ticker/price zonder markt, alleen eindige prijzen > 0", async () => {
+    const { client, raw, counters } = fakeClient({ now: () => NOW });
+    const args: (string | undefined)[] = [];
+    raw.tickerPrice = async (market?: string) => {
+      counters.tickerPrice++;
+      args.push(market);
+      return [
+        { market: "BTC-EUR", price: 91234 },
+        { market: "ETH-EUR", price: 3456 },
+        { market: "NUL-EUR", price: 0 },
+        { market: "MIN-EUR", price: -1 },
+        { market: "NAN-EUR", price: Number.NaN },
+        { market: "INF-EUR", price: Number.POSITIVE_INFINITY },
+        { market: "", price: 5 },
+        { market: "PEPE-EUR", price: 0.0000091 },
+      ];
+    };
+    const feed = new BitvavoFeed(client, { now: () => NOW });
+    expect(await feed.getPrices()).toEqual({ "BTC-EUR": 91234, "ETH-EUR": 3456, "PEPE-EUR": 0.0000091 });
+    expect(args).toEqual([undefined]);
+    expect(counters.tickerPrice).toBe(1);
+  });
+
+  it("getPrices: gelijktijdige aanroepen delen één verzoek, daarna ~2 s cache (klok van de feed)", async () => {
+    let now = NOW;
+    const { client, raw, counters } = fakeClient({ now: () => now });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    let price = 100;
+    raw.tickerPrice = async () => {
+      counters.tickerPrice++;
+      await gate;
+      return [{ market: "BTC-EUR", price: price++ }];
+    };
+    const feed = new BitvavoFeed(client, { now: () => now });
+    const pending = [feed.getPrices(), feed.getPrices(), feed.getPrices()];
+    expect(counters.tickerPrice).toBe(1);
+    release();
+    const results = await Promise.all(pending);
+    for (const r of results) expect(r).toEqual({ "BTC-EUR": 100 });
+    // Elke aanroeper krijgt een eigen kopie; de cache blijft heel
+    results[0]["BTC-EUR"] = -5;
+    results[0]["XXX-EUR"] = 1;
+    now += 1_999;
+    expect(await feed.getPrices()).toEqual({ "BTC-EUR": 100 });
+    expect(counters.tickerPrice).toBe(1);
+    now += 1;
+    expect(await feed.getPrices()).toEqual({ "BTC-EUR": 101 });
+    expect(counters.tickerPrice).toBe(2);
+    // Klok die terugspringt: niet op de cache vertrouwen
+    now -= 10_000;
+    expect(await feed.getPrices()).toEqual({ "BTC-EUR": 102 });
+    expect(counters.tickerPrice).toBe(3);
+  });
+
+  it("getPrices: een fout gaat door naar alle wachtende aanroepers en wordt niet gecachet", async () => {
+    let now = NOW;
+    const { client, raw, counters } = fakeClient({ now: () => now });
+    let fail = true;
+    raw.tickerPrice = async () => {
+      counters.tickerPrice++;
+      await Promise.resolve();
+      if (fail) throw new Error("netwerkfout");
+      return [{ market: "ETH-EUR", price: 3456 }];
+    };
+    const feed = new BitvavoFeed(client, { now: () => now });
+    const [a, b] = await Promise.allSettled([feed.getPrices(), feed.getPrices()]);
+    expect(a.status).toBe("rejected");
+    expect(b.status).toBe("rejected");
+    expect((a as PromiseRejectedResult).reason.message).toBe("netwerkfout");
+    expect(counters.tickerPrice).toBe(1);
+    fail = false;
+    expect(await feed.getPrices()).toEqual({ "ETH-EUR": 3456 }); // direct opnieuw, geen cache van de fout
+    expect(counters.tickerPrice).toBe(2);
+    // Een latere fout (na de cache) gaat ook gewoon door: geen verouderde prijzen
+    fail = true;
+    now += 5_000;
+    await expect(feed.getPrices()).rejects.toThrow("netwerkfout");
+  });
+
   it("getOrderBook via book (met depth)", async () => {
     const { client, counters } = fakeClient({ now: () => NOW });
     const feed = new BitvavoFeed(client, { now: () => NOW });
