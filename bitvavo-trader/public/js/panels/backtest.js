@@ -1103,7 +1103,7 @@ export function mountBacktest(ctx, el) {
           : ""
       }
       <p class="pn-hint">Een tegengehouden koopsignaal werd geen aankoop. Verkopen en stop-losses tegenhouden doet een filter nooit.
-        Vergelijk: zet het trendfilter links ${on ? "uit" : "aan"} en test opnieuw.</p>
+        Vergelijk: zet het trendfilter bij de testinstellingen ${on ? "uit" : "aan"} en test opnieuw.</p>
     </div>`;
   }
 

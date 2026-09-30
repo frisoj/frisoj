@@ -427,7 +427,7 @@ describe("v2 Backtest-lab: trendfilter vergelijken met / zonder", () => {
     expect(t).toContain("Tegengehouden door trendfilter: 12 koopsignalen");
     expect(t).toContain("Tegengehouden door spread: 1 koopsignaal");
     expect(t).toContain("Trendfilter aan: alleen kopen als Bitcoin boven het gemiddelde van 50 dagen staat.");
-    expect(t).toContain("zet het trendfilter links uit en test opnieuw");
+    expect(t).toContain("zet het trendfilter bij de testinstellingen uit en test opnieuw");
   });
 
   it("zonder blockedEntries (filter uit, geen spreadlimiet): wel de stand van het filter, geen aantallen", async () => {

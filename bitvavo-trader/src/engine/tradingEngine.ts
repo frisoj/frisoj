@@ -2102,7 +2102,14 @@ export class TradingEngine extends EventEmitter {
     const ask = book?.asks?.[0]?.[0];
     if (!isNum(bid) || !isNum(ask) || bid <= 0 || ask <= 0 || ask < bid) return unknown;
     const spread = ((ask - bid) / ((ask + bid) / 2)) * 100;
-    return spreadAboveLimit(spread, max) ? `Spread te groot (${fmtPct2(spread)} > ${fmtPct2(max)})` : null;
+    if (!spreadAboveLimit(spread, max)) return null;
+    // Zelfde afronding zou "0,30% > 0,30%" geven: dan meer decimalen tonen
+    for (let d = 2; d <= 4; d++) {
+      const a = spread.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+      const b = max.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+      if (a !== b) return `Spread te groot (${a}% > ${b}%)`;
+    }
+    return `Spread te groot (net boven je maximum van ${fmtPct2(max)})`;
   }
 
   // ───────────────────────────── v2: rondes ─────────────────────────────

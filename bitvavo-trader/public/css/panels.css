@@ -3099,3 +3099,13 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Lange knoptekst mag op een smal scherm over twee regels (geen zijwaarts scrollen) */
+.pn-btn-sm.pn-btn-wrap {
+  height: auto;
+  min-height: 26px;
+  padding: 4px 9px;
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+}

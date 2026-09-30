@@ -401,6 +401,8 @@ const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateStrin
  */
 export function isPlainUniverseNote(note) {
   const n = String(note ?? "").trim();
+  // De engine plakt een capaciteitswaarschuwing achter de gewone zin: dan is het een waarschuwing
+  if (/Te veel munten/i.test(n)) return false;
   return /^Nog geen automatische keuze\b/i.test(n) || /^Opgeslagen automatische keuze\b/i.test(n);
 }
 

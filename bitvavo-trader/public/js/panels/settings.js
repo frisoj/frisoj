@@ -348,7 +348,7 @@ export function mountSettings(ctx, el) {
     return `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-all" ${n ? "" : "disabled"}
         title="Meeste handel eerst; zonder stablecoins, goud- en verpakte munten (net als Automatisch)">Alle markten toevoegen (${n})</button>
       <button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-clear" ${sel.length ? "" : "disabled"}>Alles wissen</button>
-      ${canCopy ? `<button type="button" class="btn btn-ghost pn-btn-sm" data-act="markets-copy-active" title="Vervang je lijst door de munten die de bot nu automatisch volgt">Neem de ${copyN} munten van de automatische keuze over</button>` : ""}`;
+      ${canCopy ? `<button type="button" class="btn btn-ghost pn-btn-sm pn-btn-wrap" data-act="markets-copy-active" title="Vervang je lijst door de munten die de bot nu automatisch volgt">Neem de ${copyN} munten van de automatische keuze over</button>` : ""}`;
   }
 
   function manualHtml() {

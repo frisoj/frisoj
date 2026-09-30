@@ -658,6 +658,16 @@ describe("Spreadlimiet", () => {
     expect(h.risk.planCalls.map((c) => c.market?.market)).toEqual(["CCC-EUR"]);
   });
 
+  it("een spread net boven de limiet toont geen twee gelijke getallen", async () => {
+    const h = v2(["AAA-EUR"]);
+    // (100.3009 − 100) / 100.15045 ≈ 0,3004% bij een limiet van 0,30%
+    h.feed.books.set("AAA-EUR", { market: "AAA-EUR", bids: [[100, 1]], asks: [[100.3009, 1]], timestamp: 0 });
+    h.signals.buyAt.add(h.lastClosed());
+    await h.engine.tick();
+    expect(bought(h)).toEqual([]);
+    expect(row(h, "AAA-EUR")).toMatchObject({ status: "blocked", note: "Spread te groot (0,3004% > 0,3000%)" });
+  });
+
   it("maxSpreadPct 0 of ontbrekend = geen limiet (geen orderboek nodig)", async () => {
     for (const risk of [{ ...DEFAULT_RISK_CONFIG, maxSpreadPct: 0 }, (({ maxSpreadPct: _x, ...r }) => r)(DEFAULT_RISK_CONFIG)]) {
       const h = v2(["AAA-EUR"], { config: { risk } });

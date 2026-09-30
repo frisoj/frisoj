@@ -409,6 +409,11 @@ describe("ronde 5: mislukte automatische muntkeuze is een waarschuwing (UI-3)", 
     expect(L.isPlainUniverseNote("  Opgeslagen automatische keuze; de bot kiest opnieuw zodra hij draait")).toBe(true);
     expect(L.isPlainUniverseNote(fail)).toBe(false);
     expect(L.isPlainUniverseNote("Maar 12 munten voldoen aan de filters (…); gevraagd: 30")).toBe(false);
+    expect(
+      L.isPlainUniverseNote(
+        "Opgeslagen automatische keuze; de bot kiest opnieuw zodra hij draait. Te veel munten voor dit interval: de bot bekijkt ongeveer 266 van de 400 munten per candle",
+      ),
+    ).toBe(false);
     expect(L.isPlainUniverseNote("")).toBe(false);
     expect(L.isPlainUniverseNote(undefined)).toBe(false);
   });

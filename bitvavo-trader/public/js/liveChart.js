@@ -1386,6 +1386,15 @@ export function mountLiveChart(ctx, els) {
       if (m !== st.market) bus.emit("market-selected", { market: m });
     });
     allBtn && allBtn.addEventListener("click", () => (st.pickerOpen ? closePicker() : openPicker()));
+    // Op een touchscherm blijft de focus op de knop (geen autofocus): Escape moet ook dan sluiten
+    allBtn &&
+      allBtn.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && st.pickerOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          closePicker();
+        }
+      });
     tabsEl.querySelector("[data-pop-x]")?.addEventListener("click", () => closePicker());
     popQ &&
       popQ.addEventListener("input", () => {
