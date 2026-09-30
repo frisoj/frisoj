@@ -1,5 +1,9 @@
 // Gedeelde API-client voor het dashboard. Alle panelen gebruiken deze module;
 // praat nooit rechtstreeks met fetch vanuit een paneel.
+//
+// Meerdere bots (v3): staat de pagina onder /bot/<id>/, dan gaat elk verzoek voor
+// "deze bot" (en de SSE-stream) naar /bot/<id>/api/…; de wedstrijdroutes
+// (/api/bots…) gaan altijd naar de root.
 
 const TOKEN_KEY = "bvt-dashboard-token";
 
@@ -20,6 +24,33 @@ export function setToken(token) {
   }
 }
 
+/**
+ * BASE voor een URL-pad: `/bot/<id>` als het pad met /bot/<id> begint, anders "".
+ * Alleen veilige ids (letters, cijfers, - en _), zoals de profielen in src/bots/profiles.ts.
+ */
+export function basePath(pathname) {
+  const m = /^\/bot\/([A-Za-z0-9_-]+)(?:\/|$)/.exec(String(pathname || ""));
+  return m ? `/bot/${m[1]}` : "";
+}
+
+/** Bot-id uit de BASE ("" = de root, dus de standaardbot) */
+export function baseBotId(pathname) {
+  const b = basePath(pathname);
+  return b ? b.slice("/bot/".length) : "";
+}
+
+/** BASE van deze pagina (verandert niet zonder herladen; een #hash telt niet mee) */
+export function apiBase() {
+  try {
+    return basePath(globalThis.location ? globalThis.location.pathname : "");
+  } catch {
+    return "";
+  }
+}
+
+/** BASE bij het laden van de pagina: `/bot/<id>` of "" */
+export const BASE = apiBase();
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -27,12 +58,16 @@ export class ApiError extends Error {
   }
 }
 
-async function request(method, path, body) {
+/** Opties voor routes die niet bij één bot horen (altijd de root) */
+const ROOT = { root: true };
+
+async function request(method, path, body, opts) {
   const headers = { Accept: "application/json" };
   const token = getToken();
   if (token) headers["x-dashboard-token"] = token;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(path, {
+  const url = opts && opts.root ? path : apiBase() + path;
+  const res = await fetch(url, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -99,6 +134,16 @@ export const api = {
   optimize: (req) => request("POST", "/api/optimize", req),
   /** WalkForwardRequest → WalkForwardResult */
   walkForward: (req) => request("POST", "/api/walkforward", req),
+
+  // ── Bot-wedstrijd (altijd de root, ook vanaf /bot/<id>/) ──
+  /** BotSummary[] (volgorde van BOTS); 404 = server zonder meerdere bots */
+  getBots: () => request("GET", "/api/bots", undefined, ROOT),
+  /** → { results: { id, ok, error? }[] } */
+  startAll: () => request("POST", "/api/bots/start-all", undefined, ROOT),
+  /** → { results: { id, ok, error? }[] } (open posities blijven staan) */
+  stopAll: () => request("POST", "/api/bots/stop-all", undefined, ROOT),
+  /** Noodstop van elke bot (ook als er één mislukt) → { results: { id, ok, error?, killResult? }[] } */
+  killAll: () => request("POST", "/api/bots/kill-all", undefined, ROOT),
 };
 
 /** Alle event-types die de server via SSE stuurt (zie ServerEvent in src/core/types.ts) */
@@ -120,7 +165,8 @@ export const EVENT_TYPES = [
  */
 export function connectEvents(onEvent, onStatus) {
   const token = getToken();
-  const url = token ? `/api/events?${qs({ token })}` : "/api/events";
+  const path = `${apiBase()}/api/events`;
+  const url = token ? `${path}?${qs({ token })}` : path;
   const es = new EventSource(url);
   es.onopen = () => onStatus && onStatus("open");
   es.onerror = () => onStatus && onStatus("closed");

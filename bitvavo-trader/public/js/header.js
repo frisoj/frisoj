@@ -1,6 +1,8 @@
-// Header (A9): accountstatistieken, bot-status, bot-bediening en de mode-banner.
+// Header (A9): accountstatistieken, bot-status, bot-bediening, de mode-banner en
+// (v3, meerdere bots) de botwisselaar naast het logo.
 
 import { botMarkets } from "./format.js";
+import { normalizeBots, botHref, currentBotId } from "./bots.js";
 
 const svg = (p, extra = "") =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${p}</svg>`;
@@ -904,4 +906,201 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
   });
   renderControls();
   if (snap) onSnapshot(snap);
+}
+
+// ─────────────────────────────── Botwisselaar (v3: meerdere bots) ───────────────────────────────
+
+/** Elke ~15 s de lijst van bots verversen (alleen als de pagina zichtbaar is) */
+export const SWITCHER_POLL_MS = 15_000;
+
+/**
+ * Titel van het browsertabblad: korte botnaam eerst (zo zie je bij meerdere tabbladen
+ * welke bot het is), dan het tabblad (niet bij Live), dan "Bitvavo Trader".
+ * pageTitle("", "Scalper") → "Scalper · Bitvavo Trader"; pageTitle("Wedstrijd", "Trend") → "Trend · Wedstrijd · Bitvavo Trader".
+ */
+export function pageTitle(tabTitle, botShort) {
+  const clean = (v) => (typeof v === "string" ? v.trim() : "");
+  return [clean(botShort), clean(tabTitle), "Bitvavo Trader"].filter(Boolean).join(" · ");
+}
+
+/**
+ * Wat de botwisselaar toont; null = verbergen (geen lijst, fout of maar één bot).
+ * Links gaan naar /bot/<id>/ met hetzelfde tabblad (vanaf Wedstrijd naar Live: de
+ * wedstrijd is voor elke bot hetzelfde).
+ */
+export function switcherView(bots, currentId, fmt, tab = "") {
+  const list = normalizeBots(bots);
+  if (!list || list.length < 2) return null;
+  const linkTab = tab && tab !== "compete" ? tab : "live";
+  const cur = list.find((b) => b.id === currentId) || null;
+  const pctOf = (b) => (isNum(b.totalReturnPct) ? Math.round(b.totalReturnPct * 100) / 100 : NaN);
+  return {
+    current: cur ? { id: cur.id, name: cur.name, short: cur.short, color: cur.color } : null,
+    items: list.map((b) => ({
+      id: b.id,
+      name: b.name,
+      short: b.short,
+      color: b.color,
+      href: botHref(b, linkTab),
+      pct: fmt.pct(pctOf(b)),
+      cls: fmt.pnlClass(pctOf(b)),
+      running: !!b.running,
+      live: b.mode === "live" && !!b.liveArmed,
+      current: b.id === currentId,
+    })),
+  };
+}
+
+const CHEV = svg('<path d="m6 9 6 6 6-6"/>', 'class="bs-chev"');
+
+/**
+ * Botwisselaar in de kopbalk: naam + kleur van de bot van dit dashboard en een lijst van
+ * alle bots met hun totaal rendement (GET /api/bots, elke ~15 s). Verborgen bij één bot
+ * of als de server geen /api/bots kent (404). Deelt de lijst via het bus-event
+ * "bots" { bots, error, at } (ook het tabblad Wedstrijd gebruikt dat).
+ */
+export function mountBotSwitcher(ctx, el) {
+  if (!el) return null;
+  const { api, bus, esc, fmt } = ctx;
+  let bots = null;
+  let lastAt = 0;
+  let errors = 0;
+  let loading = false;
+  let open = false;
+  let key = "";
+
+  const doc = typeof document !== "undefined" ? document : null;
+  const pathname = () => {
+    try {
+      return globalThis.location ? globalThis.location.pathname : "";
+    } catch {
+      return "";
+    }
+  };
+  const pageHidden = () => !!(doc && doc.hidden);
+
+  function render() {
+    const tab = ctx.getActiveTab ? ctx.getActiveTab() : "";
+    const v = switcherView(bots, currentBotId(bots, ctx.getInfo ? ctx.getInfo() : null, pathname()), fmt, tab);
+    el.hidden = !v;
+    try {
+      doc && doc.body && doc.body.classList && doc.body.classList.toggle("multi-bot", !!v);
+    } catch {
+      /* geen body */
+    }
+    if (!v) {
+      open = false;
+      if (key) el.innerHTML = "";
+      key = "";
+      return;
+    }
+    const k = JSON.stringify([v, open]);
+    if (k === key) return;
+    key = k;
+    const cur = v.current;
+    el.innerHTML = `
+      <button type="button" class="bs-btn" data-bs="toggle" aria-haspopup="true" aria-expanded="${open}" aria-controls="bs-menu"
+        title="${esc(cur ? `Je bekijkt ${cur.name}. Klik om van bot te wisselen.` : "Kies een bot")}">
+        <span class="bs-dot" style="background:${cur ? cur.color : "var(--muted)"}" aria-hidden="true"></span>
+        <span class="bs-label"><span class="bs-kicker">Bot</span><span class="bs-name">${esc(cur ? cur.short : "Kies…")}</span></span>
+        ${CHEV}
+      </button>
+      <div class="bs-menu" id="bs-menu" ${open ? "" : "hidden"}>
+        <div class="bs-menu-head"><span>Kies een bot</span><span>resultaat</span></div>
+        ${v.items
+          .map(
+            (i) => `<a class="bs-item${i.current ? " is-current" : ""}" href="${esc(i.href)}"${i.current ? ' aria-current="page"' : ""}>
+              <span class="bs-dot" style="background:${i.color}" aria-hidden="true"></span>
+              <span class="bs-item-name">${esc(i.name)}<small>${i.running ? "actief" : "gestopt"}${i.live ? " · echt geld" : ""}${
+                i.current ? " · je kijkt hier" : ""
+              }</small></span>
+              <span class="bs-item-ret mono ${i.cls}">${esc(i.pct)}</span>
+            </a>`,
+          )
+          .join("")}
+        <a class="bs-all" href="#compete" data-bs="compete">Vergelijk alle bots</a>
+      </div>`;
+  }
+
+  function setOpen(v) {
+    if (open === v) return;
+    open = v;
+    render();
+    // Openen: laat verse cijfers zien
+    if (open && Date.now() - lastAt > 5000) load();
+  }
+
+  async function load() {
+    if (loading || !api || typeof api.getBots !== "function") return;
+    loading = true;
+    let list = null;
+    let err = null;
+    try {
+      list = normalizeBots(await api.getBots());
+      if (!list) err = { status: 0, message: "Onverwacht antwoord van de server" };
+    } catch (e) {
+      err = { status: e && isNum(e.status) ? e.status : 0, message: (e && e.message) || String(e) };
+    } finally {
+      loading = false;
+    }
+    bus.emit("bots", { bots: list, error: err, at: Date.now() });
+  }
+
+  bus.on("bots", (d) => {
+    if (!d || typeof d !== "object") return;
+    lastAt = Date.now();
+    if (Array.isArray(d.bots)) {
+      bots = normalizeBots(d.bots);
+      errors = 0;
+    } else if (d.error) {
+      errors++;
+      // 404: deze server heeft geen meerdere bots → wisselaar weg. Andere fout: laatste lijst houden.
+      if (d.error.status === 404) bots = null;
+    }
+    render();
+  });
+  bus.on("tab-changed", () => {
+    open = false;
+    render();
+  });
+  bus.on("app-info", () => render());
+
+  // Klik binnen de wisselaar: hier afgehandeld. Het tekenen vervangt de knop, dus de
+  // "klik ernaast"-handler op document mag dit event niet nog eens zien (anders gaat het
+  // menu meteen weer dicht: het doel hangt dan niet meer in de pagina).
+  let handled = null;
+  el.addEventListener("click", (e) => {
+    handled = e;
+    const t = e && e.target;
+    if (!t || typeof t.closest !== "function") return;
+    if (t.closest('[data-bs="toggle"]')) setOpen(!open);
+    else if (t.closest('[data-bs="compete"]') || t.closest(".bs-item")) setOpen(false);
+  });
+  if (doc && typeof doc.addEventListener === "function") {
+    doc.addEventListener("click", (e) => {
+      if (e === handled) return;
+      if (open && !(typeof el.contains === "function" && el.contains(e.target))) setOpen(false);
+    });
+    doc.addEventListener("keydown", (e) => {
+      if (open && e.key === "Escape") {
+        setOpen(false);
+        const b = typeof el.querySelector === "function" ? el.querySelector('[data-bs="toggle"]') : null;
+        if (b && typeof b.focus === "function") b.focus();
+      }
+    });
+    doc.addEventListener("visibilitychange", () => {
+      if (!pageHidden() && Date.now() - lastAt > SWITCHER_POLL_MS) load();
+    });
+  }
+
+  // Verversen: elke 15 s (na fouten trager, tot 1× per minuut); overslaan als de pagina
+  // verborgen is of het tabblad Wedstrijd net nog ververste.
+  setInterval(() => {
+    if (pageHidden()) return;
+    const wait = SWITCHER_POLL_MS * Math.min(4, Math.max(1, errors));
+    if (Date.now() - lastAt < wait - 1000) return;
+    load();
+  }, SWITCHER_POLL_MS);
+  load();
+  return { load, render };
 }

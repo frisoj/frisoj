@@ -2,18 +2,20 @@
 // modals en het mounten van alle panelen. A10-panelen worden DYNAMISCH
 // geïmporteerd zodat een ontbrekend/kapot paneel nooit de pagina breekt.
 
-import { api, connectEvents, setToken, ApiError } from "./api.js";
+import { api, connectEvents, setToken, ApiError, BASE } from "./api.js";
 import { fmt, esc, botMarkets } from "./format.js";
 import { createBus } from "./bus.js";
-import { mountHeader } from "./header.js";
+import { mountHeader, mountBotSwitcher, pageTitle } from "./header.js";
+import { normalizeBots, currentBotId } from "./bots.js";
 import { mountLiveChart } from "./liveChart.js";
 import { mountTables } from "./tables.js";
 import { mountLog } from "./log.js";
 import { createTradeNotifier } from "./tradeNotify.js";
 
-const TABS = ["live", "backtest", "scanner", "settings"];
-const TAB_TITLES = { live: "Live", backtest: "Backtest-lab", scanner: "Scanner", settings: "Instellingen" };
-const MARKET_KEY = "bvt-selected-market";
+const TABS = ["live", "compete", "backtest", "scanner", "settings"];
+const TAB_TITLES = { live: "Live", compete: "Wedstrijd", backtest: "Backtest-lab", scanner: "Scanner", settings: "Instellingen" };
+// Meerdere bots: elk dashboard (/bot/<id>/) onthoudt zijn eigen gekozen munt
+const MARKET_KEY = BASE ? `bvt-selected-market:${BASE}` : "bvt-selected-market";
 
 const $ = (id) => document.getElementById(id);
 
@@ -339,9 +341,36 @@ bus.on("config-changed", (cfg) => {
 bus.on("connection", (d) => setConnection(d && d.status));
 bus.on("app-info", (info) => {
   if (info && typeof info === "object") appInfo = { ...(appInfo || {}), ...info };
+  updateBotTitle();
+});
+// Meerdere bots (v3): de lijst van GET /api/bots (botwisselaar / tabblad Wedstrijd)
+let knownBots = null;
+bus.on("bots", (d) => {
+  const list = d && Array.isArray(d.bots) ? normalizeBots(d.bots) : null;
+  if (list) knownBots = list;
+  else if (d && d.error && d.error.status === 404) knownBots = null;
+  updateBotTitle();
 });
 
 // ─────────────────────────────── Tabs ───────────────────────────────
+
+/** Korte naam van de bot van dit dashboard (voor de paginatitel); "" = onbekend */
+let botShort = "";
+function updateBotTitle() {
+  const bot = appInfo && appInfo.bot && typeof appInfo.bot === "object" ? appInfo.bot : null;
+  let short = bot && typeof bot.short === "string" ? bot.short.trim() : "";
+  if (knownBots) {
+    const id = currentBotId(knownBots, appInfo, location.pathname);
+    const b = knownBots.find((x) => x.id === id);
+    if (b && b.short) short = b.short;
+  }
+  if (short === botShort) return;
+  botShort = short;
+  if (activeTab) setTitle(activeTab);
+}
+function setTitle(tab) {
+  document.title = pageTitle(tab === "live" ? "" : TAB_TITLES[tab], botShort);
+}
 
 function tabFromHash() {
   const h = location.hash.replace(/^#\/?/, "").toLowerCase();
@@ -390,7 +419,7 @@ function applyTab(tab) {
   });
   updateNavCue();
   if (location.hash !== `#${tab}`) history.replaceState(null, "", `#${tab}`);
-  document.title = tab === "live" ? "Bitvavo Trader" : `${TAB_TITLES[tab]} · Bitvavo Trader`;
+  setTitle(tab);
 }
 
 document.querySelectorAll("[data-tab]").forEach((btn) => {
@@ -506,6 +535,7 @@ safeMount("grafiek", () =>
 );
 // Vervaagde rand op de scrollende markttabs (liveChart zet ze in #market-tabs, naast "Alle munten")
 scrollCue($("market-tabs")?.querySelector(".market-tabs") || $("market-tabs"));
+safeMount("botwisselaar", () => mountBotSwitcher(ctx, $("bot-switch")));
 safeMount("tabellen", () => mountTables(ctx, { positionsEl: $("panel-positions"), tradesEl: $("panel-trades") }));
 safeMount("logboek", () => mountLog(ctx, $("panel-log")));
 
@@ -517,6 +547,7 @@ const PANELS = [
   ["backtest", "mountBacktest", "backtest-root"],
   ["scanner", "mountScanner", "scanner-root"],
   ["settings", "mountSettings", "settings-root"],
+  ["compete", "mountCompete", "compete-root"],
 ];
 
 const panelsReady = Promise.all(
