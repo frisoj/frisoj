@@ -5,8 +5,8 @@
 import { api, connectEvents, setToken, ApiError, BASE } from "./api.js";
 import { fmt, esc, botMarkets } from "./format.js";
 import { createBus } from "./bus.js";
-import { mountHeader, mountBotSwitcher, pageTitle } from "./header.js";
-import { normalizeBots, currentBotId } from "./bots.js";
+import { mountHeader, mountBotSwitcher, pageTitle, titleBotShort } from "./header.js";
+import { normalizeBots } from "./bots.js";
 import { mountLiveChart } from "./liveChart.js";
 import { mountTables } from "./tables.js";
 import { mountLog } from "./log.js";
@@ -357,13 +357,8 @@ bus.on("bots", (d) => {
 /** Korte naam van de bot van dit dashboard (voor de paginatitel); "" = onbekend */
 let botShort = "";
 function updateBotTitle() {
-  const bot = appInfo && appInfo.bot && typeof appInfo.bot === "object" ? appInfo.bot : null;
-  let short = bot && typeof bot.short === "string" ? bot.short.trim() : "";
-  if (knownBots) {
-    const id = currentBotId(knownBots, appInfo, location.pathname);
-    const b = knownBots.find((x) => x.id === id);
-    if (b && b.short) short = b.short;
-  }
+  // Alleen bij meerdere bots; met één bot blijft de titel zoals vroeger
+  const short = titleBotShort(appInfo, knownBots, location.pathname);
   if (short === botShort) return;
   botShort = short;
   if (activeTab) setTitle(activeTab);
@@ -418,6 +413,8 @@ function applyTab(tab) {
     if (on && navEl && navEl.contains(btn)) revealNavTab(btn);
   });
   updateNavCue();
+  // Voor CSS: bijv. tabblad Wedstrijd zonder de cijferbalk van één bot (zie compete.css)
+  document.body.dataset.tab = tab;
   if (location.hash !== `#${tab}`) history.replaceState(null, "", `#${tab}`);
   setTitle(tab);
 }

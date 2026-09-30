@@ -4,6 +4,13 @@
    Botkleuren komen uit de data en staan inline op het element (style="background:…").
    ========================================================================== */
 
+/* Op het tabblad Wedstrijd geen cijferbalk van één bot boven de vergelijking van alle bots
+   (die bot staat als kaart met "Hier" in de ranglijst; op een telefoon scheelt het een scherm).
+   main.js zet data-tab op <body>. */
+body[data-tab="compete"] #header-stats {
+  display: none;
+}
+
 .cp {
   display: flex;
   flex-direction: column;
@@ -265,6 +272,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Waarde uit meer delen ("2 vandaag · 2 afgesloten", "50% 3W / 3V"): liever naar een
+   tweede regel tussen de delen dan afkappen met "…" (smalle kaarten op 1280–1366 px) */
+.cp-stats dd.cp-wrap {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.cp-stats dd.cp-wrap > * {
+  white-space: nowrap;
+}
 .cp-stats small {
   color: var(--muted);
   font-family: var(--font);
@@ -342,6 +359,17 @@
   text-decoration: none;
 }
 .cp-open svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Noodstop deels mislukt: knoppen naar het dashboard van die bot(s) in het venster */
+.cp-kill-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cp-kill-links .btn svg {
   width: 13px;
   height: 13px;
 }

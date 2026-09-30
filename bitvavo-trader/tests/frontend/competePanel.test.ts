@@ -217,6 +217,9 @@ describe("weergave", () => {
     expect(board).toContain("+3,24%");
     expect(board).toContain('href="/bot/trend/#live"');
     expect(board).toContain(">Gestopt<");
+    // trades: vandaag geopend · afgesloten (niet "totaal": 2 vandaag · 0 totaal klopte niet)
+    expect(board).toContain("<small>afgesloten</small>");
+    expect(board).not.toContain("<small>totaal</small>");
     // "Hier" alleen bij de bot van dit dashboard (info.bot.id = trend)
     expect(board.match(/>Hier</g)).toHaveLength(1);
     expect(board.indexOf(">Hier<")).toBeLessThan(board.indexOf("Dip-koper"));
@@ -402,7 +405,13 @@ describe("Alles starten / stoppen / noodstop", () => {
   it("Noodstop alle bots: rood venster; deels mislukt → venster blijft open met per bot wat niet lukte", async () => {
     const killAll = vi.fn(async () => ({
       results: [
-        { id: "scalper", ok: true, killResult: { closed: 0, failed: [{ id: "p1", market: "PEPE-EUR", reason: "onder het minimum" }] } },
+        // zoals de server het stuurt: ok:false + error + killResult.failed
+        {
+          id: "scalper",
+          ok: false,
+          error: "Niet alles verkocht: PEPE-EUR (onder het minimum)",
+          killResult: { closed: 0, failed: [{ id: "p1", market: "PEPE-EUR", reason: "onder het minimum" }] },
+        },
         { id: "trend", ok: true, killResult: { closed: 0, failed: [] } },
         { id: "dip", ok: true, killResult: { closed: 0, failed: [] } },
         { id: "allround", ok: true, killResult: { closed: 0, failed: [] } },
@@ -420,6 +429,12 @@ describe("Alles starten / stoppen / noodstop", () => {
     expect(modal.parts['[data-m="ok"]'].remove).toHaveBeenCalled();
     expect(modal.parts['[data-m="cancel"]'].textContent).toBe("Sluiten");
     expect(p.toasts.some((t) => t.startsWith("error: Scalper: gestopt, maar 1 positie NIET verkocht"))).toBe(true);
+    // de bot is wel gestopt: geen "noodstop mislukt" (ook niet in het venster)
+    expect(p.toasts.some((t) => t.includes("noodstop mislukt"))).toBe(false);
+    expect(modal.parts[".modal-body"].innerHTML).not.toContain("mislukt");
+    // meteen naar het dashboard van de bot met de onverkochte positie
+    expect(modal.parts[".modal-body"].innerHTML).toContain('href="/bot/scalper/#live"');
+    expect(norm(modal.parts[".modal-body"].innerHTML)).toContain("Open Snelle scalper");
     expect(p.toasts).toContain("info: Noodstop gelukt bij Trend, Dip en Allround (er stonden geen posities open)");
   });
 

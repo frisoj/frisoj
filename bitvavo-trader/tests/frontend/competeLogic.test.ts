@@ -197,6 +197,11 @@ describe("opmaak per bot", () => {
     );
     expect(subtitle(bots, Date.UTC(2026, 8, 30, 12, 0, 5))).toMatch(/^4 bots · oefengeld · 3 actief · bijgewerkt \d\d:\d\d:\d\d$/);
     expect(subtitle([])).toBe("");
+    // niemand actief: geen "0 actief"
+    expect(subtitle([bot("scalper", 0, 0, 0, { running: false }), bot("trend", 0, 0, 0, { running: false })])).toBe(
+      "2 bots · oefengeld · allemaal gestopt",
+    );
+    expect(subtitle([bot("dip", 0, 0, 0, { running: false })])).toBe("1 bot · oefengeld · gestopt");
   });
 });
 
@@ -229,7 +234,7 @@ describe("analyse in gewoon Nederlands", () => {
     expect(t).toContain("Snelle scalper en Allrounder maken vóór kosten wel winst, maar de kosten eten die op.");
     // samen: vóór kosten 2,43, kosten 2,11 → 87%
     expect(t).toContain("Alle bots samen: € 2,43 winst vóór kosten, waarvan € 2,11 (87%) naar kosten ging. Dat is meer dan de helft.");
-    expect(t).toContain("Snelle scalper betaalde de meeste kosten: € 1,21 bij 38 trades.");
+    expect(t).toContain("Snelle scalper betaalde de meeste kosten: € 1,21 bij 38 afgesloten trades.");
     expect(t.some((x: string) => x.startsWith("Let op:"))).toBe(false); // 69 trades: genoeg
   });
 
@@ -288,6 +293,19 @@ describe("analyse in gewoon Nederlands", () => {
     expect(t).toContain("Allrounder maakt vóór kosten winst, maar de kosten eten die op.");
     expect(t).toContain("€ 0,27 winst vóór kosten, maar € 0,42 aan kosten: de kosten zijn groter dan de winst.");
     expect(t.some((x: string) => x.includes("meeste kosten"))).toBe(false);
+    // ook vóór kosten verlies: de zin begint met een hoofdletter (geen "Alle bots samen:" ervoor)
+    const loss = texts(analysis([bot("allround", -0.21, 0.11, 0, { openPositions: 2 })]));
+    expect(loss).toContain("Vóór kosten al € 0,10 verlies; de kosten (€ 0,11) maken het verlies groter.");
+    const zero = texts(analysis([bot("allround", -0.11, 0.11, 3)]));
+    expect(zero).toContain("Vóór kosten stond het resultaat op nul; het verlies komt helemaal door de kosten (€ 0,11).");
+  });
+
+  it("één bot: geen gouden medaille (geen wedstrijd zonder tegenstanders)", async () => {
+    const { cardView, medal } = await L();
+    expect(medal(1, false, true, true)).toEqual({ cls: "plain", text: "1", label: "Er draait maar één bot" });
+    const v = cardView({ ...bot("allround", 1, 0.1, 2), rank: 1, tied: false }, "allround", true, true);
+    expect(v.medal.cls).toBe("plain");
+    expect(cardView({ ...bot("allround", 1, 0.1, 2), rank: 1, tied: false }, "allround", true).medal.cls).toBe("gold");
   });
 });
 
@@ -431,7 +449,7 @@ describe("Alles starten / stoppen / noodstop", () => {
     const { bulkOutcome } = await L();
     const bots = [bot("scalper"), bot("trend"), bot("dip"), bot("allround")];
     const all = bulkOutcome("start", { results: bots.map((b) => ({ id: b.id, ok: true })) }, bots);
-    expect(all).toEqual({ toasts: [["Alle 4 bots gestart", "success"]], failed: false });
+    expect(all).toEqual({ toasts: [["Alle 4 bots gestart", "success"]], failed: false, failedIds: [] });
     const some = bulkOutcome(
       "start",
       {
@@ -465,7 +483,13 @@ describe("Alles starten / stoppen / noodstop", () => {
       "kill",
       {
         results: [
-          { id: "scalper", ok: true, killResult: { closed: 1, failed: [{ id: "p1", market: "PEPE-EUR", reason: "onder het minimum van € 5" }] } },
+          // zoals de server het stuurt: ok:false + error + killResult.failed (de bot is wel gestopt)
+          {
+            id: "scalper",
+            ok: false,
+            error: "Niet alles verkocht: PEPE-EUR (onder het minimum van € 5)",
+            killResult: { closed: 1, failed: [{ id: "p1", market: "PEPE-EUR", reason: "onder het minimum van € 5" }] },
+          },
           { id: "trend", ok: true, killResult: { closed: 2, failed: [] } },
           { id: "dip", ok: false, error: "Time-out" },
         ],
@@ -477,8 +501,34 @@ describe("Alles starten / stoppen / noodstop", () => {
     expect(msgs[0]).toBe("warn: Noodstop gelukt bij Trend (alles verkocht)");
     expect(msgs[1]).toContain("error: Scalper: gestopt, maar 1 positie NIET verkocht — PEPE-EUR: onder het minimum van € 5.");
     expect(msgs[2]).toBe("error: Dip: noodstop mislukt — Time-out");
+    expect(msgs).toHaveLength(3);
+    expect(out.failedIds).toEqual(["scalper", "dip"]);
+    // de bot met onverkochte posities is gestopt: geen "noodstop mislukt" voor Scalper
+    expect(msgs.some((m: string) => m.includes("Scalper: noodstop mislukt"))).toBe(false);
     const none = bulkOutcome("kill", { results: [{ id: "trend", ok: true, killResult: { closed: 0, failed: [] } }] }, bots);
     expect(none.toasts).toEqual([["Noodstop: Trend gestopt, er stonden geen posities open", "info"]]);
+    // oudere vorm (ok:true met failed): net zo
+    const old = bulkOutcome(
+      "kill",
+      { results: [{ id: "dip", ok: true, killResult: { closed: 0, failed: [{ id: "p", market: "EPIC-EUR", reason: "geen koper" }] } }] },
+      bots,
+    );
+    expect(old.failed).toBe(true);
+    expect(old.toasts).toHaveLength(1);
+    expect(norm(old.toasts[0][0])).toContain("Dip: gestopt, maar 1 positie NIET verkocht — EPIC-EUR: geen koper.");
+  });
+
+  it("meeste kosten zonder afgesloten trades: geen 'bij 0 trades' (kosten worden ook bij het kopen betaald)", async () => {
+    const { analysis } = await L();
+    const texts = (a: Fake) => a.points.map((p: Fake) => norm(p.text));
+    const a = analysis([
+      bot("scalper", 0, 0, 0),
+      bot("trend", -0.05, 0.05, 0, { openPositions: 2 }),
+      bot("allround", -0.07, 0.06, 0, { openPositions: 2 }),
+    ]);
+    const t = texts(a);
+    expect(t).toContain("Allrounder betaalde de meeste kosten: € 0,06.");
+    expect(t.some((x: string) => x.includes("bij 0"))).toBe(false);
   });
 
   it("onverwacht antwoord of een onbekende bot-id", async () => {

@@ -91,8 +91,10 @@ export function raceStarted(bots) {
 /**
  * Medaille voor een plaats: goud / zilver / brons, daarna een gewoon nummer.
  * `started` = false (nog niemand gehandeld): een neutrale medaille zonder plaats.
+ * `solo` = er draait maar één bot: geen goud voor een wedstrijd zonder tegenstanders.
  */
-export function medal(rank, tied = false, started = true) {
+export function medal(rank, tied = false, started = true, solo = false) {
+  if (solo) return { cls: "plain", text: "1", label: "Er draait maar één bot" };
   if (!started) return { cls: "plain", text: "–", label: "Nog geen plaats: er is nog niet gehandeld" };
   const cls = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "plain";
   return { cls, text: String(rank), label: `${rank}e plaats${tied ? " (gedeeld)" : ""}` };
@@ -151,9 +153,9 @@ export function costView(b) {
 
 /**
  * Alles wat een kaart op de ranglijst toont, als tekst (Nederlandse opmaak).
- * `b` = een regel uit rankBots(); `currentId` = de bot van dit dashboard.
+ * `b` = een regel uit rankBots(); `currentId` = de bot van dit dashboard; `solo` = er draait maar één bot.
  */
-export function cardView(b, currentId = "", started = true) {
+export function cardView(b, currentId = "", started = true, solo = false) {
   const trades = Math.max(0, Math.round(n0(b.trades)));
   const wins = Math.max(0, Math.round(n0(b.wins)));
   const losses = Math.max(0, Math.round(n0(b.losses)));
@@ -171,7 +173,7 @@ export function cardView(b, currentId = "", started = true) {
     href: botHref(b, "live"),
     current: !!currentId && b.id === currentId,
     rank,
-    medal: medal(rank, !!b.tied, started),
+    medal: medal(rank, !!b.tied, started, solo),
     status: statusView(b),
     live: liveBadge(b),
     paceTip: b.interval ? `Beslist na elke candle van ${intervalLabel(b.interval)}` : "",
@@ -212,7 +214,9 @@ export function subtitle(bots, at = null) {
     parts.push(armed.length ? `${listNames(armed.map(shortOf))} met echt geld` : `${listNames(live.map(shortOf))} live (alleen signalen)`);
   }
   const running = l.filter((b) => b.running).length;
-  parts.push(running === l.length ? (l.length === 1 ? "actief" : "allemaal actief") : `${running} actief`);
+  if (running === l.length) parts.push(l.length === 1 ? "actief" : "allemaal actief");
+  else if (running === 0) parts.push(l.length === 1 ? "gestopt" : "allemaal gestopt");
+  else parts.push(`${running} actief`);
   if (isNum(at)) parts.push(`bijgewerkt ${fmt.timeSec(at)}`);
   return parts.join(" · ");
 }
@@ -325,6 +329,8 @@ export function analysis(bots) {
   if (totalFees >= CENT) {
     const gross = l.reduce((s, b) => s + grossOf(b), 0);
     const who = multi ? "Alle bots samen: " : "";
+    // "Alle bots samen: vóór kosten …" of, met één bot, "Vóór kosten …"
+    const withWho = (text) => (who ? who + text : text.charAt(0).toUpperCase() + text.slice(1));
     if (gross > CENT) {
       const share = (totalFees / gross) * 100;
       let text;
@@ -338,22 +344,26 @@ export function analysis(bots) {
     } else if (gross < -CENT) {
       points.push({
         key: "fees",
-        text: `${who}vóór kosten al ${fmt.eur(-gross)} verlies; de kosten (${fmt.eur(totalFees)}) maken het verlies groter.`,
+        text: withWho(`vóór kosten al ${fmt.eur(-gross)} verlies; de kosten (${fmt.eur(totalFees)}) maken het verlies groter.`),
         tone: "neg",
       });
     } else {
       points.push({
         key: "fees",
-        text: `${who}vóór kosten stond het resultaat op nul; het verlies komt helemaal door de kosten (${fmt.eur(totalFees)}).`,
+        text: withWho(`vóór kosten stond het resultaat op nul; het verlies komt helemaal door de kosten (${fmt.eur(totalFees)}).`),
         tone: "neg",
       });
     }
     if (multi) {
       const most = [...l].sort((a, b) => n0(b.feesPaid) - n0(a.feesPaid))[0];
       if (n0(most.feesPaid) >= CENT) {
+        // Kosten worden ook bij het kopen betaald: zonder afgesloten trades geen "bij 0 trades"
+        const closed = Math.round(n0(most.trades));
         points.push({
           key: "mostFees",
-          text: `${nameOf(most)} betaalde de meeste kosten: ${fmt.eur(most.feesPaid)} bij ${plural(Math.round(n0(most.trades)), "trade", "trades")}.`,
+          text: `${nameOf(most)} betaalde de meeste kosten: ${fmt.eur(most.feesPaid)}${
+            closed > 0 ? ` bij ${plural(closed, "afgesloten trade", "afgesloten trades")}` : ""
+          }.`,
           tone: "flat",
         });
       }
@@ -561,18 +571,22 @@ const VERB = { start: "starten", stop: "stoppen", kill: "noodstop" };
  * NIET verkocht zijn, met markt en reden).
  * @param {"start" | "stop" | "kill"} action
  * @param {{ results?: { id: string, ok: boolean, error?: string, killResult?: { closed?: number, failed?: { market?: string, reason?: string }[] } }[] }} res
- * @returns {{ toasts: [string, "info" | "success" | "warn" | "error"][], failed: boolean }}
+ * `failedIds` = de bots waar iets misging (voor een link naar hun dashboard).
+ * @returns {{ toasts: [string, "info" | "success" | "warn" | "error"][], failed: boolean, failedIds: string[] }}
  */
 export function bulkOutcome(action, res, bots) {
   const byId = new Map(list(bots).map((b) => [b.id, b]));
   const who = (id) => (byId.has(id) ? shortOf(byId.get(id)) : String(id));
   const results = res && Array.isArray(res.results) ? res.results.filter((r) => r && typeof r.id === "string") : null;
-  if (!results) return { toasts: [["Onverwacht antwoord van de server; kijk bij elke bot of het gelukt is.", "warn"]], failed: true };
-  if (!results.length) return { toasts: [["Er zijn geen bots om te bedienen.", "warn"]], failed: false };
+  if (!results) return { toasts: [["Onverwacht antwoord van de server; kijk bij elke bot of het gelukt is.", "warn"]], failed: true, failedIds: [] };
+  if (!results.length) return { toasts: [["Er zijn geen bots om te bedienen.", "warn"]], failed: false, failedIds: [] };
   const failedOf = (r) => (r.killResult && Array.isArray(r.killResult.failed) ? r.killResult.failed.filter(Boolean) : []);
-  const partial = action === "kill" ? results.filter((r) => r.ok && failedOf(r).length) : [];
+  // Noodstop met posities die niet verkocht konden worden: de server geeft dan ok:false
+  // (met error "Niet alles verkocht: …") én killResult.failed. De bot IS gestopt; alleen
+  // die posities staan nog open → een eigen melding met markt en reden, niet "mislukt".
+  const partial = action === "kill" ? results.filter((r) => failedOf(r).length) : [];
   const ok = results.filter((r) => r.ok && !partial.includes(r));
-  const bad = results.filter((r) => !r.ok);
+  const bad = results.filter((r) => !r.ok && !partial.includes(r));
   const toasts = [];
   if (ok.length) {
     const all = ok.length === results.length;
@@ -599,5 +613,6 @@ export function bulkOutcome(action, res, bots) {
     ]);
   }
   for (const r of bad) toasts.push([`${who(r.id)}: ${VERB[action] || action} mislukt — ${r.error || "onbekende fout"}`, "error"]);
-  return { toasts, failed: partial.length + bad.length > 0 };
+  const failedIds = [...partial, ...bad].map((r) => r.id);
+  return { toasts, failed: failedIds.length > 0, failedIds };
 }

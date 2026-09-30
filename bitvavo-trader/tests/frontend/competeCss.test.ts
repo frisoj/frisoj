@@ -45,6 +45,18 @@ describe("compete.css", () => {
     expect(competeCss).toMatch(/\.cp-board\.is-single \{\s*grid-template-columns: minmax\(0, 460px\);/);
   });
 
+  it("cijfers uit meer delen lopen door naar een tweede regel in plaats van afgekapt te worden (1280–1366 px)", () => {
+    expect(competeCss).toMatch(/\.cp-stats dd\.cp-wrap \{\s*overflow: visible;\s*text-overflow: clip;\s*white-space: normal;/);
+    expect(competeCss).toMatch(/\.cp-stats dd\.cp-wrap > \* \{\s*white-space: nowrap;/);
+    const js = read("js/panels/compete.js");
+    expect(js.match(/<dd class="cp-wrap">/g)).toHaveLength(3); // winrate, trades, vandaag
+  });
+
+  it("tabblad Wedstrijd zonder de cijferbalk van één bot (main.js zet data-tab op body)", () => {
+    expect(competeCss).toMatch(/body\[data-tab="compete"\] #header-stats \{\s*display: none;/);
+    expect(mainJs).toContain("document.body.dataset.tab = tab;");
+  });
+
   it("telefoon: knoppen in een raster, Noodstop over de volle breedte", () => {
     const phone = media(competeCss, "(max-width: 699px)");
     expect(phone).toMatch(/\.cp-actions \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);

@@ -3,6 +3,7 @@
 
 import { botMarkets } from "./format.js";
 import { normalizeBots, botHref, currentBotId } from "./bots.js";
+import { baseBotId } from "./api.js";
 
 const svg = (p, extra = "") =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${p}</svg>`;
@@ -910,8 +911,14 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
 
 // ─────────────────────────────── Botwisselaar (v3: meerdere bots) ───────────────────────────────
 
-/** Elke ~15 s de lijst van bots verversen (alleen als de pagina zichtbaar is) */
+/** Menu open (of nog geen lijst): elke ~15 s de lijst van bots verversen (alleen als de pagina zichtbaar is) */
 export const SWITCHER_POLL_MS = 15_000;
+/**
+ * Menu dicht: de bots veranderen niet terwijl het programma draait en de knop toont geen
+ * cijfers, dus hooguit elke 5 min (GET /api/bots is met de grafiekdata ~50 kB). Openen
+ * ververst altijd meteen; het tabblad Wedstrijd deelt zijn gegevens via het bus-event.
+ */
+export const SWITCHER_IDLE_MS = 300_000;
 
 /**
  * Titel van het browsertabblad: korte botnaam eerst (zo zie je bij meerdere tabbladen
@@ -921,6 +928,23 @@ export const SWITCHER_POLL_MS = 15_000;
 export function pageTitle(tabTitle, botShort) {
   const clean = (v) => (typeof v === "string" ? v.trim() : "");
   return [clean(botShort), clean(tabTitle), "Bitvavo Trader"].filter(Boolean).join(" · ");
+}
+
+/**
+ * Korte botnaam voor de paginatitel, alleen als er meer bots zijn (pad /bot/<id>/ of een
+ * lijst van ≥ 2 bots). Met één bot blijft de titel zoals vroeger ("" = geen naam).
+ * Naam uit de lijst (GET /api/bots), anders uit GET /api/info (`info.bot`).
+ */
+export function titleBotShort(info, bots, pathname) {
+  const list = normalizeBots(bots);
+  const multi = !!baseBotId(pathname) || (!!list && list.length >= 2);
+  if (!multi) return "";
+  const id = currentBotId(list, info, pathname);
+  const fromList = list ? list.find((b) => b.id === id) : null;
+  if (fromList && fromList.short) return fromList.short;
+  const bot = info && info.bot && typeof info.bot === "object" ? info.bot : null;
+  const short = bot && typeof bot.short === "string" ? bot.short.trim() : "";
+  return bot && (!id || bot.id === id) ? short : "";
 }
 
 /**
@@ -965,6 +989,8 @@ export function mountBotSwitcher(ctx, el) {
   let bots = null;
   let lastAt = 0;
   let errors = 0;
+  /** Server kent GET /api/bots niet (404) */
+  let gone = false;
   let loading = false;
   let open = false;
   let key = "";
@@ -1052,10 +1078,12 @@ export function mountBotSwitcher(ctx, el) {
     if (Array.isArray(d.bots)) {
       bots = normalizeBots(d.bots);
       errors = 0;
+      gone = false;
     } else if (d.error) {
       errors++;
       // 404: deze server heeft geen meerdere bots → wisselaar weg. Andere fout: laatste lijst houden.
-      if (d.error.status === 404) bots = null;
+      gone = d.error.status === 404;
+      if (gone) bots = null;
     }
     render();
   });
@@ -1089,16 +1117,24 @@ export function mountBotSwitcher(ctx, el) {
       }
     });
     doc.addEventListener("visibilitychange", () => {
-      if (!pageHidden() && Date.now() - lastAt > SWITCHER_POLL_MS) load();
+      if (!pageHidden() && Date.now() - lastAt > refreshAfter()) load();
     });
   }
 
-  // Verversen: elke 15 s (na fouten trager, tot 1× per minuut); overslaan als de pagina
-  // verborgen is of het tabblad Wedstrijd net nog ververste.
+  /**
+   * Hoe oud de lijst mag worden: menu open of nog geen lijst (bijv. server nog niet klaar)
+   * → 15 s (na fouten trager, tot 1× per minuut); menu dicht met lijst, of een server
+   * zonder wedstrijd (404) → 5 min.
+   */
+  function refreshAfter() {
+    if ((bots && !open) || gone) return SWITCHER_IDLE_MS;
+    return SWITCHER_POLL_MS * Math.min(4, Math.max(1, errors));
+  }
+
+  // Overslaan als de pagina verborgen is of het tabblad Wedstrijd net nog ververste.
   setInterval(() => {
     if (pageHidden()) return;
-    const wait = SWITCHER_POLL_MS * Math.min(4, Math.max(1, errors));
-    if (Date.now() - lastAt < wait - 1000) return;
+    if (Date.now() - lastAt < refreshAfter() - 1000) return;
     load();
   }, SWITCHER_POLL_MS);
   load();

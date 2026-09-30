@@ -23,7 +23,7 @@ import {
   bulkConfirm,
   bulkOutcome,
 } from "./competeLogic.js";
-import { normalizeBots, currentBotId } from "../bots.js";
+import { normalizeBots, currentBotId, botHref } from "../bots.js";
 
 const LS_MODE = "bvt-compete-chart";
 
@@ -386,12 +386,12 @@ export function mountCompete(ctx, el) {
       <dl class="cp-stats">
         <div><dt>Vóór kosten</dt><dd class="mono ${v.grossCls}">${esc(v.grossEur)}</dd></div>
         <div><dt>Kosten</dt><dd class="mono">${esc(v.fees)}</dd></div>
-        <div><dt>Winrate</dt><dd><span class="mono ${v.winCls}">${esc(v.winRate)}</span> <small>${esc(v.winLoss)}</small></dd></div>
-        <div><dt>Trades</dt><dd><span class="mono">${esc(v.tradesToday)}</span> <small>vandaag</small> · <span class="mono">${esc(
-          v.tradesTotal,
-        )}</span> <small>totaal</small></dd></div>
+        <div><dt>Winrate</dt><dd class="cp-wrap"><span class="mono ${v.winCls}">${esc(v.winRate)}</span> <small>${esc(v.winLoss)}</small></dd></div>
+        <div title="Vandaag: trades die de bot vandaag opende. Afgesloten: trades die al verkocht zijn (sinds de start)."><dt>Trades</dt><dd class="cp-wrap"><span><span class="mono">${esc(
+          v.tradesToday,
+        )}</span> <small>vandaag</small> ·</span> <span><span class="mono">${esc(v.tradesTotal)}</span> <small>afgesloten</small></span></dd></div>
         <div title="Grootste daling van een piek naar een dal"><dt>Max. daling</dt><dd class="mono ${v.ddCls}">${esc(v.maxDd)}</dd></div>
-        <div><dt>Vandaag</dt><dd><span class="mono ${v.dayCls}">${esc(v.dayEur)}</span> <small class="${v.dayCls}">${esc(v.dayPct)}</small></dd></div>
+        <div><dt>Vandaag</dt><dd class="cp-wrap"><span class="mono ${v.dayCls}">${esc(v.dayEur)}</span> <small class="${v.dayCls}">${esc(v.dayPct)}</small></dd></div>
       </dl>
       ${s.reason ? `<p class="cp-halt is-${s.key}">${esc(s.reason)}</p>` : ""}
       <div class="cp-card-foot">
@@ -467,7 +467,8 @@ export function mountCompete(ctx, el) {
     }
     const cur = currentId();
     const started = raceStarted(bots);
-    const views = rankBots(bots).map((b) => cardView(b, cur, started));
+    const solo = bots.length === 1;
+    const views = rankBots(bots).map((b) => cardView(b, cur, started, solo));
     const key = JSON.stringify([views, [...openDesc]]);
     if (board) board.classList.toggle("is-single", views.length === 1);
     if (board && key !== boardKey) {
@@ -624,7 +625,16 @@ export function mountCompete(ctx, el) {
       const out = bulkOutcome(action, res, before || bots || []);
       for (const [msg, kind] of out.toasts) ctx.toast(msg, kind);
       if (out.failed && action === "kill" && modalEl && typeof modalEl.querySelector === "function") {
-        showKillFailures(modalEl, out.toasts.filter(([, k]) => k === "error").map(([m]) => m));
+        const list = before || bots || [];
+        const links = (out.failedIds || [])
+          .map((id) => list.find((b) => b.id === id))
+          .filter(Boolean)
+          .map((b) => ({ name: b.name || b.short || b.id, href: botHref(b, "live") }));
+        showKillFailures(
+          modalEl,
+          out.toasts.filter(([, k]) => k === "error").map(([m]) => m),
+          links,
+        );
         return false;
       }
       return undefined;
@@ -634,15 +644,21 @@ export function mountCompete(ctx, el) {
     }
   }
 
-  /** Noodstop deels mislukt: het venster blijft open met per bot wat er NIET lukte */
-  function showKillFailures(modalEl, lines) {
+  /** Noodstop deels mislukt: het venster blijft open met per bot wat er NIET lukte (en een link naar die bot) */
+  function showKillFailures(modalEl, lines, links = []) {
     const title = modalEl.querySelector(".modal-head h3");
     if (title) title.textContent = "Noodstop: niet alles gelukt";
     const body = modalEl.querySelector(".modal-body");
     if (body) {
       body.innerHTML = `<p class="neg"><strong>Niet alles is gelukt:</strong></p>
         <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-        <p>Open het dashboard van die bot om de posities te controleren en zo nodig zelf te sluiten.</p>`;
+        <p>Open het dashboard van die bot om de posities te controleren en zo nodig zelf te sluiten.</p>${
+          links.length
+            ? `<p class="cp-kill-links">${links
+                .map((l) => `<a class="btn btn-sm" href="${esc(l.href)}">Open ${esc(l.name)}${I.arrow}</a>`)
+                .join("")}</p>`
+            : ""
+        }`;
     }
     const errEl = modalEl.querySelector(".modal-error");
     if (errEl) errEl.hidden = true;

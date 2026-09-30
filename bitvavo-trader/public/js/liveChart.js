@@ -184,6 +184,47 @@ export function revealDelta(strip, tab, pad = REVEAL_PAD) {
   return 0;
 }
 
+/** Standaardbreedte van een candle (px) voor de eerste weergave */
+export const BAR_PX = 7;
+/** Bij weinig candles worden ze breder, maar niet breder dan dit (px per candle) */
+export const MAX_BAR_PX = 80;
+
+/**
+ * Welk deel van de grafiek (logische indexen) we tonen als er gegevens van een (andere)
+ * munt binnenkomen.
+ *  - Genoeg candles: de laatste breedte/7 (40..170), met 5 candles ruimte rechts.
+ *  - Minder candles dan dat (een illiquide munt zoals EPIC-EUR: weinig candles, met
+ *    gaten waar niet gehandeld is): allemaal tonen over de volle breedte, met een beetje
+ *    ruimte rechts, in plaats van klein links met een grote lege vlakte ernaast. Hooguit
+ *    MAX_BAR_PX per candle; bij een handvol candles staan ze dus rechts (nieuwste rechts).
+ * @param {number} n      aantal candles
+ * @param {number} width  breedte van de grafiek in px (0 / onbekend → 800)
+ * @returns {{ from: number, to: number }}
+ */
+export function initialRange(n, width) {
+  const count = isNum(n) ? Math.max(0, Math.floor(n)) : 0;
+  const w = isNum(width) && width > 0 ? width : 800;
+  const bars = Math.max(40, Math.min(170, Math.round(w / BAR_PX)));
+  if (count > bars) return { from: count - bars, to: count + 5 };
+  const right = Math.min(5, Math.max(1, Math.round(count / 20)));
+  const slots = Math.max(count + right + 1, Math.ceil(w / MAX_BAR_PX));
+  return { from: count + right - slots, to: count + right };
+}
+
+/**
+ * Mag de huidige weergave na het verversen van DEZELFDE munt blijven staan (de gebruiker
+ * kan ingezoomd of verschoven hebben)? Alleen als er dan nog minstens twee candles in
+ * beeld zijn; anders null (→ initialRange).
+ * @param {{ from: number, to: number } | null} prev
+ * @param {number} n  aantal candles na het verversen
+ */
+export function keepRange(prev, n) {
+  if (!prev || !isNum(prev.from) || !isNum(prev.to) || !(prev.to > prev.from)) return null;
+  const count = isNum(n) ? Math.floor(n) : 0;
+  if (count < 1 || prev.from > count - 2 || prev.to < 1) return null;
+  return { from: prev.from, to: prev.to };
+}
+
 const nfCache = new Map();
 function nf(d) {
   if (!nfCache.has(d)) {
@@ -274,6 +315,10 @@ export function mountLiveChart(ctx, els) {
     reqSeq: 0,
     loadedAt: 0,
     loadedKey: "",
+    /** Munt|interval waarvan de candles nu in de grafiek staan (de weergave hoort daarbij) */
+    shownKey: "",
+    /** Eerste weergave nog niet gezet: de grafiek had geen breedte (tabblad Live verborgen) */
+    rangePending: false,
     hoverIdx: null,
     hoverNote: "",
     toggles: loadToggles(),
@@ -611,6 +656,61 @@ export function mountLiveChart(ctx, els) {
     }
   }
 
+  /**
+   * Breedte van de hoofdgrafiek volgens lightweight-charts zelf (0 = nog niet gemeten of
+   * verborgen). Niet timeScale().width(): die is 0 bij een verborgen tijdas (hoofd- en RSI-grafiek).
+   */
+  function chartWidth() {
+    try {
+      const s = main.paneSize();
+      return s && isNum(s.width) ? s.width : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Eerste weergave voor de candles in de grafiek (initialRange). Zonder breedte (tabblad
+   * Live verborgen, bijv. munt gekozen in de Scanner) gaat een weergave verloren: dan
+   * later, zodra de grafiek een breedte heeft (subscribeSizeChange / terug naar Live).
+   */
+  function showInitialRange() {
+    const w = mainEl.clientWidth || 0;
+    if (!st.candles.length) {
+      st.rangePending = false;
+      return;
+    }
+    if (!(w > 0) || !(chartWidth() > 0)) {
+      st.rangePending = true;
+      return;
+    }
+    st.rangePending = false;
+    setRangeAll(initialRange(st.candles.length, w));
+  }
+  const pendingRange = () => {
+    if (st.rangePending) showInitialRange();
+  };
+  // Grafiek krijgt (weer) een breedte: in de volgende frame de weergave zetten. Alleen de
+  // MACD-grafiek heeft een zichtbare tijdas en meldt dus zelf een nieuwe maat; de
+  // ResizeObserver op het vak van de hoofdgrafiek is het vangnet.
+  const onSized = () => {
+    if (st.rangePending) requestAnimationFrame(pendingRange);
+  };
+  for (const c of charts) {
+    try {
+      c.timeScale().subscribeSizeChange(onSized);
+    } catch {
+      /* oudere lightweight-charts */
+    }
+  }
+  if (typeof ResizeObserver === "function") {
+    try {
+      new ResizeObserver(onSized).observe(mainEl);
+    } catch {
+      /* dan bij terugkeer naar Live */
+    }
+  }
+
   // Legendes nooit over de prijsschaal (die is op een telefoon breder dan de CSS-marge):
   // rechterrand = actuele breedte van de prijsschaal + marge. De tijdas krimpt/groeit mee
   // als de prijsschaal breder/smaller wordt, dus dat event dekt ook een andere markt.
@@ -737,6 +837,8 @@ export function mountLiveChart(ctx, els) {
       st.candles = [];
       st.times = [];
       st.timeIndex = new Map();
+      st.shownKey = "";
+      st.rangePending = false;
       for (const s of [candleSeries, volSeries, rsiSeries, histSeries, macdSeries, sigSeries, ...Object.values(ser)]) {
         s.setData([]);
       }
@@ -747,7 +849,15 @@ export function mountLiveChart(ctx, els) {
       return;
     }
 
-    const prevRange = reset ? null : main.timeScale().getVisibleLogicalRange();
+    // De huidige weergave hoort alleen bij de munt die nu in beeld staat. Komt er een
+    // verversing binnen voor een ANDERE munt (bijv. munt gekozen in de Scanner: het
+    // verversen bij "terug naar Live" haalde het eerste laden in), dan is dit een nieuwe
+    // weergave. Anders stonden de candles van een illiquide munt (weinig candles) in het
+    // bereik van de vorige munt (bijv. 157–305): klein links met een grote lege vlakte.
+    const key = `${st.market}|${st.interval}`;
+    const sameView = !reset && st.shownKey === key && !st.rangePending;
+    const prevRange = sameView ? main.timeScale().getVisibleLogicalRange() : null;
+    st.shownKey = key;
     st.candles = raw.map((c) => ({ ...c, volume: isNum(c.volume) ? c.volume : 0 }));
     st.times = st.candles.map((c) => Math.floor(c.time / 1000));
     st.timeIndex = new Map(st.times.map((t, i) => [t, i]));
@@ -791,14 +901,9 @@ export function mountLiveChart(ctx, els) {
     syncPositions(true);
     applyToggles(); // bouwt ook de markers
 
-    const n = st.candles.length;
-    if (reset || !prevRange) {
-      const w = mainEl.clientWidth || 800;
-      const bars = Math.max(40, Math.min(170, Math.round(w / 7)));
-      setRangeAll({ from: Math.max(-2, n - bars), to: n + 5 });
-    } else {
-      setRangeAll(prevRange);
-    }
+    const kept = keepRange(prevRange, st.candles.length);
+    if (kept) setRangeAll(kept);
+    else showInitialRange();
     if (watermark) {
       try {
         watermark.applyOptions({
@@ -1652,6 +1757,8 @@ export function mountLiveChart(ctx, els) {
     if (!d || d.tab !== "live") return;
     // Munt gekozen terwijl Live verborgen was (bijv. vanuit de Scanner): nu pas is er iets te meten
     queueReveal();
+    // …en pas nu kan de grafiek zijn eerste weergave zetten (anders via subscribeSizeChange)
+    if (st.rangePending) requestAnimationFrame(pendingRange);
     if (st.market && st.interval && Date.now() - st.loadedAt > 60_000) load(false);
   });
 

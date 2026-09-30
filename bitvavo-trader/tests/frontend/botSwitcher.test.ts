@@ -100,6 +100,21 @@ describe("switcherView en paginatitel", () => {
     expect(pageTitle("Scanner", "")).toBe("Scanner · Bitvavo Trader");
     expect(pageTitle("", null)).toBe("Bitvavo Trader");
   });
+
+  it("botnaam in de titel alleen bij meerdere bots (één bot: titel zoals vroeger)", async () => {
+    const { titleBotShort } = await loadPublic("js/header.js");
+    const info = (id: string, short: string) => ({ mode: "paper", bot: { id, name: `${short}-bot`, short, color: "#2fb67c" } });
+    // één bot (BOTS=allround): geen naam, ook al stuurt /api/info de bot mee
+    expect(titleBotShort(info("allround", "Allround"), [B("allround", "Allround", 0)], "/")).toBe("");
+    expect(titleBotShort(info("allround", "Allround"), null, "/")).toBe("");
+    // meerdere bots: de bot van deze pagina (pad), anders de standaardbot van /api/info
+    expect(titleBotShort(info("trend", "Trend"), FOUR(), "/bot/trend/")).toBe("Trend");
+    expect(titleBotShort(info("scalper", "Scalper"), FOUR(), "/")).toBe("Scalper");
+    // /bot/<id>/ vóórdat de lijst er is: naam uit /api/info
+    expect(titleBotShort(info("dip", "Dip"), null, "/bot/dip/")).toBe("Dip");
+    // info van een andere bot dan het pad (kan niet, maar dan liever geen naam dan een verkeerde)
+    expect(titleBotShort(info("dip", "Dip"), null, "/bot/trend/")).toBe("");
+  });
 });
 
 describe("mountBotSwitcher", () => {
@@ -191,14 +206,33 @@ describe("mountBotSwitcher", () => {
   });
 
   it("server geeft later 404 → wisselaar verdwijnt; tijdelijke fout → laatste lijst blijft", async () => {
+    const { SWITCHER_IDLE_MS } = await loadPublic("js/header.js");
     const s = await mount(FOUR());
     s.setResult(new Error("Failed to fetch"));
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(SWITCHER_IDLE_MS);
+    expect(s.api.getBots).toHaveBeenCalledTimes(2);
     expect(s.el.hidden).toBe(false);
     s.setResult(Object.assign(new Error("Niet gevonden"), { status: 404 }));
-    await vi.advanceTimersByTimeAsync(30_000); // na een fout trager (30 s)
+    await vi.advanceTimersByTimeAsync(SWITCHER_IDLE_MS);
     expect(s.api.getBots).toHaveBeenCalledTimes(3);
     expect(s.el.hidden).toBe(true);
+    // zonder wedstrijd (404) niet elke 15 s opnieuw proberen
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(s.api.getBots).toHaveBeenCalledTimes(3);
+  });
+
+  it("nog geen lijst (server nog niet klaar): elke 15 s opnieuw, na fouten trager", async () => {
+    const s = await mount(new Error("Failed to fetch"));
+    expect(s.el.hidden).toBe(true);
+    expect(s.api.getBots).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(15_000); // na 1 fout: 15 s
+    expect(s.api.getBots).toHaveBeenCalledTimes(2);
+    s.setResult(FOUR());
+    await vi.advanceTimersByTimeAsync(15_000); // na 2 fouten: 30 s
+    expect(s.api.getBots).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(s.api.getBots).toHaveBeenCalledTimes(3);
+    expect(s.el.hidden).toBe(false);
   });
 
   it("openen en sluiten: klik op de knop, klik ernaast, Escape", async () => {
@@ -226,23 +260,41 @@ describe("mountBotSwitcher", () => {
     expect(s.html()).toContain('href="/bot/scalper/#live"');
   });
 
-  it("ververst elke ~15 s, maar niet als de pagina verborgen is of het tabblad Wedstrijd net ververste", async () => {
+  it("menu dicht: hooguit elke 5 min verversen (de knop toont geen cijfers)", async () => {
+    const { SWITCHER_IDLE_MS } = await loadPublic("js/header.js");
+    expect(SWITCHER_IDLE_MS).toBe(300_000);
     const s = await mount(FOUR());
     expect(s.api.getBots).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(s.api.getBots).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(SWITCHER_IDLE_MS - 120_000);
     expect(s.api.getBots).toHaveBeenCalledTimes(2);
+  });
+
+  it("menu open: meteen verse cijfers en daarna elke ~15 s; niet als de pagina verborgen is of Wedstrijd net ververste", async () => {
+    const s = await mount(FOUR());
+    await vi.advanceTimersByTimeAsync(10_000);
+    s.click('[data-bs="toggle"]'); // openen: lijst is 10 s oud → verversen
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.api.getBots).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(20_000); // ronde van 15 s na het openen
+    expect(s.api.getBots).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(10_000);
     // het tabblad Wedstrijd haalde net de lijst op (bus-event) → volgende ronde overslaan
     s.bus.emit("bots", { bots: FOUR(), error: null, at: Date.now() });
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(s.api.getBots).toHaveBeenCalledTimes(2);
+    expect(s.api.getBots).toHaveBeenCalledTimes(3);
     doc.hidden = true;
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(s.api.getBots).toHaveBeenCalledTimes(2);
+    expect(s.api.getBots).toHaveBeenCalledTimes(3);
     doc.hidden = false;
     doc.fire("visibilitychange");
     await vi.advanceTimersByTimeAsync(0);
-    expect(s.api.getBots).toHaveBeenCalledTimes(3);
+    expect(s.api.getBots).toHaveBeenCalledTimes(4);
+    // weer dicht: terug naar 1× per 5 min
+    doc.fire("click", { target: {} });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(s.api.getBots).toHaveBeenCalledTimes(4);
   });
 
   it("gegevens van elders (bus-event 'bots') tonen zonder zelf op te halen", async () => {
