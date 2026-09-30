@@ -24,7 +24,9 @@ function config(): EngineConfig {
     markets: MARKETS,
     interval: "15m" as const,
     historyCandles: 200,
-    ensemble: { ...DEFAULT_ENSEMBLE_CONFIG },
+    // v2: precies deze markten, zonder trendfilter (de defaults kiezen automatisch en filteren op Bitcoin)
+    universe: { mode: "manual", count: 30, minVolumeEur: 0 },
+    ensemble: { ...DEFAULT_ENSEMBLE_CONFIG, trendFilter: { market: false, coin: false, interval: "1d", period: 50 } },
     risk: {
       ...DEFAULT_RISK_CONFIG,
       stopAtrMult: 3,

@@ -10,6 +10,7 @@ function nf(opts: Intl.NumberFormatOptions): Intl.NumberFormat {
 
 const EUR_FMT = nf({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PCT_FMT = nf({ minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const PCT2_FMT = nf({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const SCORE_FMT = nf({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PRICE_BIG = nf({ maximumFractionDigits: 0 });
 const PRICE_MID = nf({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -40,6 +41,17 @@ export function fmtSignedPct(v: number): string {
   if (!finite(v)) return "?%";
   const s = PCT_FMT.format(Math.abs(v));
   return `${v < 0 && s !== "0,0" ? "-" : "+"}${s}%`;
+}
+
+/** 0,62% (twee decimalen, zonder plusteken; bijv. voor een spread) */
+export function fmtPct2(v: number): string {
+  return finite(v) ? `${PCT2_FMT.format(v)}%` : "?%";
+}
+
+/** "A, B, C" — hooguit `max` namen, daarna " +N" */
+export function fmtNameList(names: readonly string[], max = 8): string {
+  const shown = names.slice(0, Math.max(0, max)).join(", ");
+  return names.length > max ? `${shown} +${names.length - max}` : shown;
 }
 
 /** Koers: 91.234 · 150,23 · 0,5123 · 0,00001234 */

@@ -3,7 +3,7 @@
  * risk manager + een bestuurbare klok. Geen afhankelijkheid van andere modules.
  */
 import { vi } from "vitest";
-import { DEFAULT_ENGINE_CONFIG } from "../../src/core/defaults";
+import { DEFAULT_ENGINE_CONFIG, DEFAULT_ENSEMBLE_CONFIG } from "../../src/core/defaults";
 import type {
   AccountSnapshot,
   Balance,
@@ -28,6 +28,8 @@ import type {
   SignalAction,
   Ticker24h,
   TradingMode,
+  TrendFilterConfig,
+  UniverseConfig,
 } from "../../src/core/types";
 import { TradingEngine, type EngineDeps } from "../../src/engine/tradingEngine";
 
@@ -86,10 +88,24 @@ export class Deferred {
 export class FakeFeed implements MarketDataFeed {
   readonly source = "simulated" as const;
   series = new Map<string, Candle[]>();
+  /** Candles per `${market}|${interval}` (bijv. dagcandles voor het trendfilter); gaan vóór `series` */
+  intervalSeries = new Map<string, Candle[]>();
   failing = new Set<string>();
+  /** Alleen dit interval laten falen: `${market}|${interval}` */
+  failingInterval = new Set<string>();
   calls: { market: string; interval: Interval; limit: number }[] = [];
   gate: Promise<void> | null = null;
   marketsFail = false;
+  /** 24h-tickers (standaard geen) */
+  tickers: Ticker24h[] = [];
+  tickersFail = false;
+  tickerCalls = 0;
+  /** Orderboek per markt (standaard: een krappe spread van 0,02% rond de laatste koers) */
+  books = new Map<string, OrderBook>();
+  bookFail = new Set<string>();
+  bookCalls: { market: string; depth?: number }[] = [];
+  /** Extra markten voor getMarkets (bijv. een stablecoin zonder candles) */
+  extraMarkets: MarketInfo[] = [];
 
   /** `n` candles van 15m met slotkoers `close`; de laatste heeft tijd `lastTime`. */
   setSeries(market: string, close: number, lastTime: number, n = 60): void {
@@ -120,14 +136,26 @@ export class FakeFeed implements MarketDataFeed {
 
   async getMarkets(): Promise<MarketInfo[]> {
     if (this.marketsFail) throw new Error("markets down");
-    return [...this.series.keys()].map(marketInfo);
+    return [...[...this.series.keys()].map(marketInfo), ...this.extraMarkets];
   }
 
   async getCandles(market: string, interval: Interval, limit: number): Promise<Candle[]> {
     this.calls.push({ market, interval, limit });
     if (this.gate) await this.gate;
-    if (this.failing.has(market)) throw new Error(`HTTP 503 voor ${market}`);
-    return (this.series.get(market) ?? []).slice(-limit).map((c) => ({ ...c }));
+    if (this.failing.has(market) || this.failingInterval.has(`${market}|${interval}`)) {
+      throw new Error(`HTTP 503 voor ${market}`);
+    }
+    const src = this.intervalSeries.get(`${market}|${interval}`) ?? this.series.get(market) ?? [];
+    return src.slice(-limit).map((c) => ({ ...c }));
+  }
+
+  /** Candles op een eigen interval (bijv. "1d" voor het trendfilter): slotkoersen oplopend, de laatste opent op `lastTime`. */
+  setIntervalSeries(market: string, interval: Interval, closes: number[], lastTime: number, ms: number): void {
+    const n = closes.length;
+    this.intervalSeries.set(
+      `${market}|${interval}`,
+      closes.map((c, i) => mkCandle(lastTime - (n - 1 - i) * ms, c)),
+    );
   }
 
   async getHistory(): Promise<Candle[]> {
@@ -135,7 +163,9 @@ export class FakeFeed implements MarketDataFeed {
   }
 
   async getTickers24h(): Promise<Ticker24h[]> {
-    return [];
+    this.tickerCalls++;
+    if (this.tickersFail) throw new Error("tickers down");
+    return this.tickers.map((t) => ({ ...t }));
   }
 
   async getPrice(market: string): Promise<number> {
@@ -144,9 +174,50 @@ export class FakeFeed implements MarketDataFeed {
     return arr[arr.length - 1].close;
   }
 
-  async getOrderBook(market: string): Promise<OrderBook> {
-    return { market, bids: [], asks: [], timestamp: 0 };
+  async getOrderBook(market: string, depth?: number): Promise<OrderBook> {
+    this.bookCalls.push({ market, depth });
+    if (this.bookFail.has(market)) throw new Error(`orderboek ${market} niet beschikbaar`);
+    const own = this.books.get(market);
+    if (own) return own;
+    const arr = this.series.get(market);
+    const px = arr?.length ? arr[arr.length - 1].close : 1;
+    return { market, bids: [[px * 0.9999, 1]], asks: [[px * 1.0001, 1]], timestamp: 0 };
   }
+}
+
+/** FakeFeed mét `getPrices` (één verzoek voor alle koersen), zoals BitvavoFeed/SimulatedFeed in v2. */
+export class BulkFeed extends FakeFeed {
+  priceCalls = 0;
+  pricesFail = false;
+  /** Koersen die afwijken van de laatste candle */
+  priceOverride = new Map<string, number>();
+
+  async getPrices(): Promise<Record<string, number>> {
+    this.priceCalls++;
+    if (this.pricesFail) throw new Error("prijzen down");
+    const out: Record<string, number> = {};
+    for (const [m, arr] of this.series) if (arr.length) out[m] = arr[arr.length - 1].close;
+    for (const [m, p] of this.priceOverride) out[m] = p;
+    return out;
+  }
+}
+
+/** 24h-ticker voor tests. */
+export function ticker(market: string, o: Partial<Ticker24h> = {}): Ticker24h {
+  const last = o.last ?? 100;
+  return {
+    market,
+    last,
+    open: o.open ?? last,
+    high: o.high ?? last,
+    low: o.low ?? last,
+    volume: o.volume ?? 1000,
+    volumeQuote: o.volumeQuote ?? 1_000_000,
+    bid: o.bid === undefined ? last * 0.9999 : o.bid,
+    ask: o.ask === undefined ? last * 1.0001 : o.ask,
+    changePct: o.changePct ?? 0,
+    timestamp: o.timestamp ?? 0,
+  };
 }
 
 export class FakeBroker implements Broker {
@@ -257,6 +328,10 @@ export class FakeBroker implements Broker {
 export class Signals {
   buyAt = new Set<number>();
   sellAt = new Set<number>();
+  /** Alleen deze markten geven een koopsignaal op `buyAt` (null = alle markten) */
+  buyMarkets: Set<string> | null = null;
+  /** Score per markt bij een koopsignaal (standaard 0,52) */
+  scores = new Map<string, number>();
   throwOnce = false;
   atr = 100;
   decide = vi.fn((market: string, candles: Candle[], _cfg: EnsembleConfig): EnsembleDecision[] => {
@@ -265,13 +340,14 @@ export class Signals {
       throw new Error("strategie kapot");
     }
     return candles.map((c) => {
-      const action: SignalAction = this.buyAt.has(c.time) ? "buy" : this.sellAt.has(c.time) ? "sell" : "hold";
+      const buy = this.buyAt.has(c.time) && (this.buyMarkets === null || this.buyMarkets.has(market));
+      const action: SignalAction = buy ? "buy" : this.sellAt.has(c.time) ? "sell" : "hold";
       return {
         market,
         time: c.time,
         price: c.close,
         action,
-        score: action === "buy" ? 0.52 : action === "sell" ? -0.5 : 0,
+        score: action === "buy" ? (this.scores.get(market) ?? 0.52) : action === "sell" ? -0.5 : 0,
         confidence: 0.6,
         regime: "trend-up",
         atr: this.atr,
@@ -336,6 +412,14 @@ export class StubRisk implements RiskManagerLike {
   }
 }
 
+/**
+ * v2: de standaardinstellingen kiezen munten automatisch en hebben een marktfilter.
+ * De bestaande tests gaan uit van precies de ingestelde markten zonder trendfilter
+ * (tests die de v2-functies testen zetten ze zelf aan).
+ */
+export const TEST_UNIVERSE: UniverseConfig = { mode: "manual", count: 30, minVolumeEur: 0 };
+export const NO_TREND_FILTER: TrendFilterConfig = { market: false, coin: false, interval: "1d", period: 50 };
+
 export function testConfig(over: Partial<EngineConfig> = {}): EngineConfig {
   return structuredClone({
     ...DEFAULT_ENGINE_CONFIG,
@@ -343,6 +427,8 @@ export function testConfig(over: Partial<EngineConfig> = {}): EngineConfig {
     interval: "15m" as Interval,
     pollMs: 15_000,
     historyCandles: 50,
+    universe: TEST_UNIVERSE,
+    ensemble: { ...DEFAULT_ENSEMBLE_CONFIG, trendFilter: NO_TREND_FILTER },
     ...over,
   });
 }

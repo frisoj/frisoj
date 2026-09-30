@@ -622,7 +622,13 @@ describe("Meldingen en noodstop als de bot stilstaat", () => {
   });
 
   it("noodstop: KillResult met gesloten aantal en redenen (onverkoopbaar, afgewezen, onbekende uitkomst); ontwapent aan begin én eind", async () => {
-    const h = setup({ mode: "live", startingCapital: 100, markets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"] });
+    // v2: de kansenronde stopt bij risk.maxOpenPositions (standaard 2); deze test heeft er 3 nodig.
+    const h = setup({
+      mode: "live",
+      startingCapital: 100,
+      markets: ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
+      config: { risk: risk({ maxOpenPositions: 3 }) },
+    });
     h.engine.arm();
     h.risk.quote = 6;
     h.risk.stopDist = 20_000;

@@ -17,7 +17,7 @@ import { StateStore } from "../../src/engine/stateStore";
 import { TradingEngine, candlesToFetch, requiredWarmupCandles } from "../../src/engine/tradingEngine";
 import { RiskManager } from "../../src/risk/riskManager";
 import { runEnsemble } from "../../src/strategies/ensemble";
-import { Clock, Deferred, FakeBroker, FakeFeed, I15, T0, openBtcPosition, setup, testConfig, type Harness } from "./helpers";
+import { Clock, Deferred, FakeBroker, FakeFeed, I15, NO_TREND_FILTER, T0, TEST_UNIVERSE, openBtcPosition, setup, testConfig, type Harness } from "./helpers";
 
 /** Dagelijkse verlieslimiet via de echte RiskManager (standaard: 5%). */
 function realHalt(h: Harness): void {
@@ -641,7 +641,7 @@ describe("Warmup van de strategieën", () => {
       feed,
       broker: new FakeBroker("paper"),
       mode: "paper",
-      config: testConfig({ ...DEFAULT_ENGINE_CONFIG, markets: ["BTC-EUR"], historyCandles: 100 }),
+      config: testConfig({ ...DEFAULT_ENGINE_CONFIG, universe: TEST_UNIVERSE, ensemble: { ...DEFAULT_ENSEMBLE_CONFIG, trendFilter: NO_TREND_FILTER }, markets: ["BTC-EUR"], historyCandles: 100 }),
       startingCapital: 50,
       now,
       decide: runEnsemble,
