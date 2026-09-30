@@ -23,6 +23,7 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   minOrderQuote: 5,
   timeStopCandles: 48,
   maxSpreadPct: 0.3,
+  dailyProfitTargetPct: 1,
 };
 
 /**

@@ -1107,6 +1107,9 @@ body.live-armed {
   color: var(--red);
   overflow-wrap: break-word;
 }
+.stat-bot .stat-sub.halt.is-target {
+  color: var(--green);
+}
 .stat-skeleton {
   display: block;
   height: 14px;

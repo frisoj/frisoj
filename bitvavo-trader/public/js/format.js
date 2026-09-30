@@ -127,6 +127,7 @@ export const fmt = {
         "kill-switch": "Noodstop",
         "end-of-backtest": "Einde backtest",
         "write-off": "Afgeschreven",
+        "daily-target": "Dagdoel",
       }[r] || r
     );
   },

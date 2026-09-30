@@ -942,7 +942,7 @@ describe("shouldExitOnSignal", () => {
 
 describe("haltStatus", () => {
   it("grens van de dagelijkse verlieslimiet", () => {
-    const r = rm({ dailyLossLimitPct: 5 });
+    const r = rm({ dailyLossLimitPct: 5, dailyProfitTargetPct: 0 });
     const at = r.haltStatus(account({ equity: 47.5, dayStartEquity: 50 }));
     expect(at.halted).toBe(true);
     expect(at.dailyLimit).toBe(true);
@@ -953,6 +953,29 @@ describe("haltStatus", () => {
     expect(below.dailyLimit).toBe(true);
     expect(below.reason).toContain("(-6,2%");
     expect(r.haltStatus(account({ equity: 55, dayStartEquity: 50 })).halted).toBe(false);
+  });
+
+  it("dagdoel: stopt nieuwe trades zodra de dag het doel haalt; 0 of ontbrekend = uit", () => {
+    const r = rm({ dailyProfitTargetPct: 1 });
+    expect(r.haltStatus(account({ equity: 50.49, dayStartEquity: 50 }))).toEqual({ halted: false });
+    const hit = r.haltStatus(account({ equity: 50.5, dayStartEquity: 50 }));
+    expect(hit).toMatchObject({ halted: true, dailyTarget: true });
+    expect(hit.dailyLimit).toBeUndefined();
+    expect(hit.reason).toBe("Dagdoel gehaald (+1,00% vandaag, doel +1%): geen nieuwe trades meer tot morgen");
+    expect(rm({ dailyProfitTargetPct: 1.5 }).haltStatus(account({ equity: 51, dayStartEquity: 50 })).reason).toContain("doel +1,50%");
+    expect(rm({ dailyProfitTargetPct: 0 }).haltStatus(account({ equity: 60, dayStartEquity: 50 })).halted).toBe(false);
+    const { dailyProfitTargetPct: _t, ...noTarget } = DEFAULT_RISK_CONFIG;
+    expect(new RiskManager(noTarget as RiskConfig, "15m").haltStatus(account({ equity: 60, dayStartEquity: 50 })).halted).toBe(false);
+    // de verlieslimiet gaat altijd voor
+    expect(rm({ dailyProfitTargetPct: 1, dailyLossLimitPct: 5 }).haltStatus(account({ equity: 47, dayStartEquity: 50 })).dailyLimit).toBe(true);
+  });
+
+  it("dagdoel: grenzen in de validatie (0 = uit, anders 0,1–50)", () => {
+    expect(validateRiskConfig({ dailyProfitTargetPct: 0 }).ok).toBe(true);
+    expect(validateRiskConfig({ dailyProfitTargetPct: 1 }).ok).toBe(true);
+    expect(validateRiskConfig({ dailyProfitTargetPct: 0.05 }).ok).toBe(false);
+    expect(validateRiskConfig({ dailyProfitTargetPct: 51 }).ok).toBe(false);
+    expect(validateRiskConfig({ dailyProfitTargetPct: -1 }).ok).toBe(false);
   });
 
   it("equity ≤ 0 of ongeldig → gestopt", () => {

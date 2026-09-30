@@ -19,9 +19,9 @@ import { RiskManager } from "../../src/risk/riskManager";
 import { runEnsemble } from "../../src/strategies/ensemble";
 import { Clock, Deferred, FakeBroker, FakeFeed, I15, NO_TREND_FILTER, T0, TEST_UNIVERSE, openBtcPosition, setup, testConfig, type Harness } from "./helpers";
 
-/** Dagelijkse verlieslimiet via de echte RiskManager (standaard: 5%). */
+/** Dagelijkse verlieslimiet via de echte RiskManager (standaard: 5%; zonder dagdoel, dat is hier niet het onderwerp). */
 function realHalt(h: Harness): void {
-  const rm = new RiskManager({ ...DEFAULT_RISK_CONFIG }, "15m");
+  const rm = new RiskManager({ ...DEFAULT_RISK_CONFIG, dailyProfitTargetPct: 0 }, "15m");
   h.risk.haltStatus = (a) => rm.haltStatus(a);
 }
 

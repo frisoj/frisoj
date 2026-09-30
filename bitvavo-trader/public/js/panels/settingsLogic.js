@@ -48,6 +48,7 @@ export const FACTORY_DEFAULTS = {
     minOrderQuote: 5,
     timeStopCandles: 48,
     maxSpreadPct: 0.3,
+    dailyProfitTargetPct: 1,
   },
   universe: { mode: "auto", count: 30, minVolumeEur: 250_000 },
 };
@@ -55,7 +56,7 @@ export const FACTORY_DEFAULTS = {
 /**
  * Wat een ontbrekend veld BETEKENT (contract v2): een config zonder `universe` is
  * "zelf kiezen", een ensemble zonder `trendFilter` heeft geen trendfilter en een
- * risicoconfig zonder `maxSpreadPct` geen spreadlimiet. Dus niet de fabriekswaarden
+ * risicoconfig zonder `maxSpreadPct` geen spreadlimiet (en zonder `dailyProfitTargetPct` geen dagdoel). Dus niet de fabriekswaarden
  * invullen, maar deze "uit"-waarden (met nette standaarden voor de overige velden).
  */
 const UNIVERSE_WHEN_MISSING = { mode: "manual", count: 30, minVolumeEur: 250_000 };
@@ -64,7 +65,7 @@ const TREND_WHEN_MISSING = { market: false, coin: false, interval: "1d", period:
 /** Oudere/onvolledige configs aanvullen, zodat het concept altijd dezelfde vorm heeft. */
 export function withDefaults(cfg) {
   const c = clone(cfg) || {};
-  c.risk = { ...FACTORY_DEFAULTS.risk, maxSpreadPct: 0, ...(c.risk || {}) };
+  c.risk = { ...FACTORY_DEFAULTS.risk, maxSpreadPct: 0, dailyProfitTargetPct: 0, ...(c.risk || {}) };
   const tf = c.ensemble?.trendFilter;
   c.ensemble = { ...clone(FACTORY_DEFAULTS.ensemble), ...(c.ensemble || {}) };
   c.ensemble.trendFilter = { ...TREND_WHEN_MISSING, ...(tf && typeof tf === "object" ? tf : {}) };
@@ -110,6 +111,8 @@ export const RISK_GROUPS = [
   {
     title: "Dagelijkse limieten",
     fields: [
+      { key: "dailyProfitTargetPct", label: "Dagdoel", unit: "%", step: 0.1, min: 0.1, max: 50, zeroOff: true, optional: true,
+        help: "Staat je vandaag zoveel % in de plus (ná verkoopkosten), dan verkoopt de bot de open posities om de winst vast te zetten en doet hij tot morgen niets meer. Het doel zorgt er niet voor dat de bot vaker wint: het beschermt een goede dag. 0 = uit." },
       { key: "dailyLossLimitPct", label: "Max. dagverlies", unit: "%", step: 0.5, min: 0.5, max: 50,
         help: "Verlies je vandaag dit % van je saldo, dan stopt de bot met nieuwe trades tot morgen." },
       { key: "maxTradesPerDay", label: "Max. trades per dag", unit: "trades", step: 1, min: 1, max: 100, int: true,

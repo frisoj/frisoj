@@ -953,3 +953,20 @@ seen excluding it.
 * **Config**: a v1 `config.json` (markets, no `universe`) loads as **manual** with its saved list, with an info line
   at startup. In live mode the "coins the bot does not manage" check covers the auto-selected markets too.
 * **Scanner**: skips `EXCLUDED_BASES` (stablecoins, gold, wrapped BTC/ETH), like the automatic selection.
+
+### Daily profit target (`RiskConfig.dailyProfitTargetPct`, default 1)
+
+* `RiskManager.haltStatus` returns `{ halted: true, dailyTarget: true }` when the day result **net of the estimated
+  cost of selling all open positions** (`AccountSnapshot.exitCostQuote` = Σ amount × price × (takerFee + slippage),
+  filled by the engine) reaches the target (percent; 0 or missing = off). The daily loss limit is checked first.
+* Engine: the target halt is sticky until the day rollover (`targetDayKey`, persisted like `haltedDayKey`), so
+  selling costs or a price drop after it cannot re-open trading that day. `lockInDailyTarget()` runs after the held
+  markets / bulk prices and at the end of every tick: it sells every open position without a pending exit with
+  exit reason `"daily-target"` (a refused sell stays a pending exit and is retried). Radar note for candidates:
+  "Koopsignaal, maar het dagdoel is vandaag al gehaald — morgen koopt de bot weer". The dashboard shows the halt in
+  green ("DAGDOEL ✓", risk panel "Dagdoel gehaald") and the progress "x% van 1%".
+* Backtest (`simulate`): per candle, when cash + position × close × (1 − slippage) × (1 − fee) reaches the target
+  vs the day start, the position is sold at that close (`"daily-target"`, exit time = candle close) and no entries
+  follow that day (the engine notices it within a tick; the backtest at the candle close).
+* `BacktestResult.dailyStats` (`dailyStatsFrom`): per calendar day (Europe/Amsterdam) the day-end equity vs the
+  previous day end — days, days ≥ target (1% when the target is off), win / loss days, average / best / worst day.

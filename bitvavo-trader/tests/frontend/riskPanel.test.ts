@@ -50,7 +50,7 @@ describe("risicopaneel: dagresultaat", () => {
       },
     });
     const html = p.html();
-    expect(html).toContain('<span class="muted">Dagresultaat</span><b class="mono neg">-€ 0,06</b>');
+    expect(html).toContain('<span class="muted">Dagresultaat</span><b class="mono neg">-€ 0,06 <small>(-0,12%)</small></b>');
     expect(html).toMatch(/data-k="day"[^>]*>[\s\S]*?<div class="risk-g-val mono">0,1%<\/div>/);
     expect(html).toMatch(/<div class="risk-g" data-lv="ok" data-k="day"/);
     expect(html).not.toContain("-€ 3,31");
@@ -65,7 +65,35 @@ describe("risicopaneel: dagresultaat", () => {
       account: { equity: 48, cashQuote: 48, startingEquity: 50, dayStartEquity: 50, tradesToday: 1, feesPaid: 0.1 },
     });
     const html = p.html();
-    expect(html).toContain('<span class="muted">Dagresultaat</span><b class="mono neg">-€ 2,00</b>');
+    expect(html).toContain('<span class="muted">Dagresultaat</span><b class="mono neg">-€ 2,00 <small>(-4,00%)</small></b>');
     expect(html).toMatch(/data-k="day"[^>]*>[\s\S]*?<div class="risk-g-val mono">4,0%<\/div>/);
   });
 });
+
+describe("risicopaneel: dagdoel", () => {
+  const withTarget = { risk: { ...config.risk, dailyProfitTargetPct: 1 } };
+  const account = { equity: 50.2, cashQuote: 50.2, startingEquity: 50, dayStartEquity: 50, tradesToday: 1, feesPaid: 0.1, dayPnlQuote: 0.2, dayReturnPct: 0.4 };
+
+  it("toont de voortgang naar het dagdoel; zonder dagdoel geen regel", async () => {
+    const p = await mount({ mode: "paper", config: withTarget, positions: [], halted: { halted: false }, account });
+    expect(p.html()).toContain('<span class="muted">Dagdoel</span><b class="mono">+0,40% <small class="muted">van +1%</small></b>');
+    const off = await mount({ mode: "paper", config, positions: [], halted: { halted: false }, account });
+    expect(off.html()).not.toContain(">Dagdoel<");
+  });
+
+  it("gehaald: groene melding in plaats van 'Handel gepauzeerd'", async () => {
+    const p = await mount({
+      mode: "paper",
+      config: withTarget,
+      positions: [],
+      halted: { halted: true, dailyTarget: true, reason: "Dagdoel vandaag gehaald: geen nieuwe trades tot morgen" },
+      account: { ...account, equity: 50.6, dayPnlQuote: 0.6, dayReturnPct: 1.2 },
+    });
+    const html = p.html();
+    expect(html).toContain('class="pn-banner pn-banner-good pn-banner-ico risk-target"');
+    expect(html).toContain("<b>Dagdoel gehaald</b>");
+    expect(html).not.toContain("Handel gepauzeerd");
+    expect(html).toContain('<span class="pos">gehaald ✓</span>');
+  });
+});
+

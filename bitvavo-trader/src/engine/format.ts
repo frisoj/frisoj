@@ -95,6 +95,7 @@ export const EXIT_REASON_LABELS: Record<ExitReason, string> = {
   "kill-switch": "noodstop",
   "end-of-backtest": "einde backtest",
   "write-off": "afgeschreven",
+  "daily-target": "dagdoel gehaald",
 };
 
 export function exitReasonLabel(r: ExitReason): string {

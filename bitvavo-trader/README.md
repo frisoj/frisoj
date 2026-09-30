@@ -224,7 +224,16 @@ minder zwaar meetellen, en blokkeert nieuwe aankopen in een dalende trend.
   wel bewaakt. Winst die de bot buiten zijn budget zet ("afgeroomd") en een
   gewijzigde kapitaallimiet tellen niet als verlies; een afgeschreven positie wel
   (zie hieronder).
-- **Maximaal 6 trades per dag** en maximaal 2 posities tegelijk.
+- **Dagdoel** van +1%: staat je vandaag 1% in de plus (ná verkoopkosten, inclusief
+  open posities), dan verkoopt de bot de open posities om de winst vast te zetten en
+  doet hij tot de volgende dag niets meer. Het dashboard toont dan "Dagdoel gehaald ✓".
+  Instellen of uitzetten (0) bij **Instellingen → Risicobeheer → Dagdoel**.
+  **Eerlijk:** het doel beschermt een goede dag, maar maakt de bot niet vaker winstgevend.
+  In een gesimuleerd jaar (10 munten, 15-minutencandles) haalde de bot op ongeveer 1
+  op de 20 dagen +1%, en verloor hij op meer dagen dan hij won. Het Backtest-lab toont
+  per test hoeveel dagen het doel haalden ("Resultaat per dag").
+- **Maximaal 6 trades per dag** en maximaal 2 posities tegelijk. Meer trades kost meer
+  fees: in de tests verloor de bot mét meer trades juist meer.
 - **Afkoelperiode**: na een verlies koopt de bot 4 candles lang niet in dezelfde markt.
 - **Kostenfilter**: een trade gaat alleen door als het koersdoel minstens 3× de
   totale kosten (fees + slippage) oplevert.

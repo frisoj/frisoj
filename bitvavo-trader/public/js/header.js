@@ -393,14 +393,19 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     const tick = q("bot", "[data-tick]");
     const reason = q("bot", "[data-haltreason]");
     const halted = snap.halted && snap.halted.halted;
-    if (dot) dot.className = `dot ${snap.running ? (halted ? "warn" : "on") : "off"}`;
+    // Dagdoel gehaald is goed nieuws: groen in plaats van een rode "HALTED"
+    const target = halted && snap.halted.dailyTarget === true;
+    if (dot) dot.className = `dot ${snap.running ? (halted && !target ? "warn" : "on") : "off"}`;
     if (bs) bs.textContent = snap.running ? "Actief" : "Gestopt";
     if (halt) {
       halt.hidden = !halted;
+      halt.textContent = target ? "DAGDOEL ✓" : "HALTED";
+      halt.className = `badge ${target ? "badge-green" : "badge-red"}`;
       halt.title = halted ? snap.halted.reason || "Handel gepauzeerd door risicobeheer" : "";
     }
     if (reason) {
       reason.hidden = !halted;
+      reason.classList.toggle("is-target", !!target);
       reason.textContent = halted ? snap.halted.reason || "Nieuwe trades gepauzeerd door risicobeheer" : "";
       reason.title = reason.textContent;
     }

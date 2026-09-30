@@ -80,7 +80,7 @@ export function mountRisk(ctx, el) {
     const sig = JSON.stringify([
       dayLossPct.toFixed(2), dayPnl.toFixed(2), exposurePct.toFixed(1), tradesToday, openCount, s.halted, a.feesPaid,
       rc.dailyLossLimitPct, rc.maxTotalExposurePct, rc.maxTradesPerDay, rc.maxOpenPositions, rc.riskPerTradePct,
-      equity.toFixed(2), s.mode, s.liveArmed,
+      equity.toFixed(2), s.mode, s.liveArmed, rc.dailyProfitTargetPct, dayRet.toFixed(2),
     ]);
     if (sig === lastSig) return;
     lastSig = sig;
@@ -123,7 +123,14 @@ export function mountRisk(ctx, el) {
     const worstLv = level(worst);
 
     const halted = s.halted?.halted;
-    const banner = halted
+    const target = isNum(rc.dailyProfitTargetPct) && rc.dailyProfitTargetPct > 0 ? rc.dailyProfitTargetPct : 0;
+    const banner = halted && s.halted.dailyTarget === true
+      ? `<div class="pn-banner pn-banner-good pn-banner-ico risk-target" role="status">
+          <svg class="pn-ico pn-ico-lg" viewBox="0 0 15 15" aria-hidden="true"><polyline points="2.5,8 6,11.5 12.5,3.5"/></svg>
+          <div><b>Dagdoel gehaald</b><div>${esc(s.halted.reason || "Het dagdoel is gehaald.")}</div>
+          <div class="muted">De winst is vastgezet: open posities zijn verkocht. Morgen gaat de bot weer verder.</div></div>
+        </div>`
+      : halted
       ? `<div class="pn-banner pn-banner-bad pn-banner-ico risk-halt" role="alert">
           <svg class="pn-ico pn-ico-lg" viewBox="0 0 15 15" aria-hidden="true"><polygon points="4.6,1 10.4,1 14,4.6 14,10.4 10.4,14 4.6,14 1,10.4 1,4.6"/><line x1="5" y1="7.5" x2="10" y2="7.5"/></svg>
           <div><b>Handel gepauzeerd</b><div>${esc(s.halted.reason || "Een risicolimiet is bereikt.")}</div>
@@ -146,7 +153,14 @@ export function mountRisk(ctx, el) {
       ${banner}
       <div class="risk-grid">${gauges.map(ring).join("")}</div>
       <div class="risk-kv">
-        <div title="Resultaat sinds de start van de dag (incl. open posities)"><span class="muted">Dagresultaat</span><b class="mono ${fmt.pnlClass(dayPnl)}">${esc(fmt.eurSigned(dayPnl))}</b></div>
+        <div title="Resultaat sinds de start van de dag (incl. open posities)"><span class="muted">Dagresultaat</span><b class="mono ${fmt.pnlClass(dayPnl)}">${esc(fmt.eurSigned(dayPnl))} <small>(${esc(fmt.pct(dayRet, 2))})</small></b></div>
+        ${
+          target > 0
+            ? `<div title="Staat je vandaag zoveel in de plus (na verkoopkosten), dan zet de bot de winst vast en stopt hij tot morgen. Aanpassen bij Instellingen → Risicobeheer."><span class="muted">Dagdoel</span><b class="mono">${
+                s.halted?.dailyTarget === true ? `<span class="pos">gehaald ✓</span>` : `${esc(fmt.pct(dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
+              }</b></div>`
+            : ""
+        }
         <div title="Totaal betaalde fees sinds de start (Bitvavo rekent ${esc(fmt.pct((rc.takerFee || 0) * 100, 2, false))} per kant)"><span class="muted">Betaalde fees</span><b class="mono">${esc(fmt.eur(a.feesPaid))}${
           Number.isFinite(feesPct) ? ` <small class="muted">(${esc(fmt.pct(feesPct, 1, false))} van start)</small>` : ""
         }</b></div>

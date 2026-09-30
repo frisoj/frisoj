@@ -430,6 +430,19 @@ describe("v2 Backtest-lab: trendfilter vergelijken met / zonder", () => {
     expect(t).toContain("zet het trendfilter bij de testinstellingen uit en test opnieuw");
   });
 
+  it("toont hoe vaak het dagdoel gehaald werd (dailyStats)", async () => {
+    const dailyStats = { days: 30, targetPct: 1, targetDays: 4, winDays: 12, lossDays: 17, avgDayPct: -0.12, bestDayPct: 2.3, worstDayPct: -3.1 };
+    const p = await mount({ backtest: btResult({ dailyStats }) });
+    await p.run("backtest");
+    const t = text(p.out.innerHTML);
+    expect(t).toContain("Resultaat per dag");
+    expect(t).toContain("4 van de 30 dagen haalden het dagdoel van +1% (13%)");
+    expect(t).toContain("Winstdagen 12 · verliesdagen 17");
+    const none = await mount({ backtest: btResult() });
+    await none.run("backtest");
+    expect(text(none.out.innerHTML)).not.toContain("Resultaat per dag");
+  });
+
   it("zonder blockedEntries (filter uit, geen spreadlimiet): wel de stand van het filter, geen aantallen", async () => {
     const p = await mount({ backtest: btResult() });
     p.inputs.trendFilter.checked = false;

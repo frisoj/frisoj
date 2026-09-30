@@ -39,6 +39,7 @@ import type {
   AccountSnapshot,
   BacktestResult,
   Candle,
+  DailyStats,
   DataSource,
   EnsembleConfig,
   EnsembleDecision,
@@ -292,6 +293,7 @@ const EXIT_LABEL: Record<ExitReason, string> = {
   "kill-switch": "KILL",
   "end-of-backtest": "EINDE",
   "write-off": "AFGESCHREVEN",
+  "daily-target": "DAGDOEL",
 };
 
 export function exitMarkerLabel(reason: ExitReason, pnlPct: number): string {
@@ -312,6 +314,7 @@ const EXIT_NL: Record<ExitReason, string> = {
   "kill-switch": "noodstop",
   "end-of-backtest": "einde test",
   "write-off": "afgeschreven",
+  "daily-target": "dagdoel gehaald",
 };
 
 function eurNl(x: number): string {
@@ -447,6 +450,11 @@ export function simulate(
   let tradesToday = 0;
   let realizedPnlToday = 0;
   let lastEquity = initialCapital;
+  // Dagdoel (risk.dailyProfitTargetPct): zodra het resultaat van de dag (incl. de open
+  // positie, op de slotkoers) het doel haalt, wordt de positie verkocht en wordt er
+  // die dag niet meer gekocht — zoals de engine (die kijkt elke tick, hier per candle).
+  const targetPct = dailyTargetPct(input.risk);
+  let targetDay: string | null = null;
 
   const curveLen = n - evalStart;
   const eqValues = new Float64Array(curveLen);
@@ -628,7 +636,7 @@ export function simulate(
       } else {
         rangeCheck(i);
       }
-    } else if (prev.action === "buy") {
+    } else if (prev.action === "buy" && targetDay !== currentDay) {
       // Gates first (like the engine): trend filter, then spread, then the risk plan in tryEntry.
       // The trend is judged at the moment this entry would be executed: the close of the
       // signal candle = the open of this candle (only trend candles closed by then count).
@@ -641,6 +649,19 @@ export function simulate(
         blocked.spread++;
       } else if (tryEntry(i, prev)) {
         rangeCheck(i, false); // entry at the open → this candle's range is checked (not counted as held)
+      }
+    }
+
+    if (targetPct > 0 && dayStartEquity > 0) {
+      // Na verkoopkosten (fee + slippage), zoals de engine: de dag moet het doel ook ná het verkopen halen.
+      const eqNow = cash + (pos ? pos.amount * c.close * (1 - slip) * (1 - fee) : 0);
+      if (targetDay !== currentDay && ((eqNow - dayStartEquity) / dayStartEquity) * 100 >= targetPct - 1e-9) {
+        targetDay = currentDay;
+      }
+      if (targetDay === currentDay && pos && !pendingExit) {
+        // Winst vastzetten op de slotkoers van deze candle (de engine merkt het binnen een tick).
+        if (sellable(pos, c.close)) closePosition(i, c.close, "daily-target", prev.score, c.time + intervalMs);
+        else refuseExit("daily-target", prev.score);
       }
     }
 
@@ -725,8 +746,50 @@ export function simulate(
       markers,
       durationMs: Date.now() - startedAt,
       stuckTrades,
+      dailyStats: dailyStatsFrom(dayKeys, evalStart, eqValues, initialCapital, targetPct > 0 ? targetPct : 1),
       ...gateFields(gates, blocked),
     },
+  };
+}
+
+/** Het dagdoel in % uit de risico-instellingen (0 = uit). */
+export function dailyTargetPct(risk: RiskConfig): number {
+  const t = risk.dailyProfitTargetPct;
+  return typeof t === "number" && Number.isFinite(t) && t > 0 ? t : 0;
+}
+
+/**
+ * Resultaat per kalenderdag (Europe/Amsterdam): de equity aan het eind van de dag
+ * tegenover het eind van de vorige dag (de eerste dag: het startkapitaal).
+ * `equities[j]` hoort bij candle `evalStart + j`.
+ */
+export function dailyStatsFrom(
+  dayKeys: readonly string[],
+  evalStart: number,
+  equities: ArrayLike<number>,
+  initialCapital: number,
+  targetPct: number,
+): DailyStats {
+  const dayPcts: number[] = [];
+  let start = initialCapital;
+  for (let j = 0; j < equities.length; j++) {
+    const last = j === equities.length - 1 || dayKeys[evalStart + j + 1] !== dayKeys[evalStart + j];
+    if (!last) continue;
+    const end = equities[j];
+    if (start > 0 && Number.isFinite(end)) dayPcts.push((end / start - 1) * 100);
+    start = end;
+  }
+  const days = dayPcts.length;
+  const eps = 1e-9;
+  return {
+    days,
+    targetPct,
+    targetDays: dayPcts.filter((p) => p >= targetPct - eps).length,
+    winDays: dayPcts.filter((p) => p > eps).length,
+    lossDays: dayPcts.filter((p) => p < -eps).length,
+    avgDayPct: days > 0 ? dayPcts.reduce((a, b) => a + b, 0) / days : 0,
+    bestDayPct: days > 0 ? Math.max(...dayPcts) : 0,
+    worstDayPct: days > 0 ? Math.min(...dayPcts) : 0,
   };
 }
 

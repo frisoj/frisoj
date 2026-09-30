@@ -3109,3 +3109,18 @@
   text-align: left;
   max-width: 100%;
 }
+
+/* Dagdoel gehaald: goed nieuws (groen) */
+.pn-banner-good {
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  background: var(--green-bg);
+}
+.pn-banner-good > b:first-child,
+.pn-banner-good .pn-ico {
+  color: var(--green);
+}
+.pn-banner-good .pn-ico polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}

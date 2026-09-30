@@ -1107,6 +1107,28 @@ export function mountBacktest(ctx, el) {
     </div>`;
   }
 
+  /** Resultaat per kalenderdag: hoe vaak werd het dagdoel gehaald? (result.dailyStats) */
+  function dailyCard(res) {
+    const d = res?.dailyStats;
+    if (!d || !(d.days > 0)) return "";
+    const t = Number(d.targetPct) || 1;
+    const goal = fmt.pct(t, Number.isInteger(t) ? 0 : 2);
+    const share = d.targetDays / d.days;
+    return `<div class="panel bt-card bt-daily">
+      <div class="pn-head"><div class="panel-title">Resultaat per dag</div></div>
+      <p class="bt-daily-main"><b class="mono">${esc(fmt.num(d.targetDays, 0))}</b> van de <b class="mono">${esc(fmt.num(d.days, 0))}</b> ${
+        d.days === 1 ? "dag haalde" : "dagen haalden"
+      } het dagdoel van <b>${esc(goal)}</b> <span class="muted">(${esc(fmt.pct(share * 100, 0, false))})</span></p>
+      <div class="bt-filters-stats">
+        <div class="bt-fstat">Winstdagen <b class="mono pos">${esc(fmt.num(d.winDays, 0))}</b> · verliesdagen <b class="mono neg">${esc(fmt.num(d.lossDays, 0))}</b></div>
+        <div class="bt-fstat">Gemiddeld per dag <b class="mono ${fmt.pnlClass(d.avgDayPct)}">${esc(fmt.pct(d.avgDayPct, 2))}</b> · beste ${esc(
+          fmt.pct(d.bestDayPct, 2),
+        )} · slechtste ${esc(fmt.pct(d.worstDayPct, 2))}</div>
+      </div>
+      <p class="pn-hint">Dagen worden geteld van middernacht tot middernacht (Nederlandse tijd), inclusief kosten.</p>
+    </div>`;
+  }
+
   function stuckWarning(n) {
     if (!(Number(n) > 0)) return "";
     return `<div class="pn-banner pn-banner-warn bt-stuck"><b>${esc(fmt.num(n, 0))} ${n === 1 ? "trade kon" : "trades konden"} eerst niet verkocht worden.</b>
@@ -1140,6 +1162,7 @@ export function mountBacktest(ctx, el) {
       ${stuckWarning(res.stuckTrades)}
       ${kpiCards(m, res.initialCapital)}
       ${filtersCard(req, res)}
+      ${dailyCard(res)}
       <div class="panel bt-card">
         <div class="pn-head"><div class="panel-title">Koers &amp; trades</div>
           <div class="pn-legend"><span><i class="lg-arrow up"></i>koop</span><span><i class="lg-arrow down pos"></i>verkoop met winst</span><span><i class="lg-arrow down neg"></i>met verlies</span></div></div>

@@ -785,6 +785,8 @@ export class TradingEngine extends EventEmitter {
   private evaluatedBeforeRestart = new Map<string, number>();
   /** Dag waarop de dagelijkse verlieslimiet geraakt is: tot de dagwissel geen nieuwe trades */
   private haltedDayKey: string | null = null;
+  /** Dag waarop het dagdoel gehaald is: tot de dagwissel geen nieuwe aankopen */
+  private targetDayKey: string | null = null;
   /**
    * Live: cumulatief boven de kapitaallimiet gehouden WINST ("afgeroomd"). Samen met
    * `capitalReturned` = alles wat netto uit het handelsbudget is gegaan; ingelegd
@@ -1521,6 +1523,7 @@ export class TradingEngine extends EventEmitter {
     this.positions = [];
     this.trades = [];
     this.haltedDayKey = null;
+    this.targetDayKey = null;
     this.skimmedQuote = 0;
     this.skimmedToday = 0;
     this.capitalReturned = 0;
@@ -1576,6 +1579,8 @@ export class TradingEngine extends EventEmitter {
     const bulk = await this.refreshBulkPrices(active);
     // Candles van een positie niet opgehaald: dan de stop controleren met de verse koers van net.
     if (bulk && unchecked.length > 0) await this.checkHeldAtPrices(unchecked, bulk, now);
+    // Dagdoel gehaald (met de koersen van net)? Dan de winst vastzetten.
+    await this.lockInDailyTarget();
     // Live: nieuw gekozen munten ook controleren op coins die de bot niet beheert.
     if (this.mode === "live" && this.tickWhileRunning) await this.checkUnmanagedNew(active, now);
     await this.refreshTickers(now);
@@ -1599,6 +1604,28 @@ export class TradingEngine extends EventEmitter {
       this.log("error", `Fout in de kansenronde: ${errorMessage(err)}`);
     }
     await this.recheckHeld();
+    await this.lockInDailyTarget();
+  }
+
+  /**
+   * Dagdoel (risk.dailyProfitTargetPct) gehaald: open posities verkopen om de winst
+   * vast te zetten. Nieuwe aankopen blokkeert de halt zelf al (tot de dagwissel).
+   * Een verkoop die niet lukt (onverkoopbaar, live niet gearmd…) blijft als
+   * openstaande verkoop staan en wordt elke tick opnieuw geprobeerd.
+   */
+  private async lockInDailyTarget(): Promise<void> {
+    // Zelfde voorwaarde als voor kopen: niet meer als de gebruiker intussen op Stop/Noodstop drukte.
+    if (!this.buyAllowed()) return;
+    this.updateEquity();
+    const h = this.refreshHalt();
+    if (!h.halted || h.dailyTarget !== true) return;
+    for (const pos of [...this.positions]) {
+      if (!this.buyAllowed()) return;
+      if (!this.positions.includes(pos) || this.pendingExit.has(pos.id)) continue;
+      const price = this.prices[pos.market];
+      if (!isNum(price) || price <= 0) continue;
+      await this.exitPosition(pos, "daily-target", price, false);
+    }
   }
 
   /**
@@ -2351,6 +2378,7 @@ export class TradingEngine extends EventEmitter {
   private entryStopNote(reserved: number): string | null {
     if (!this.buyAllowed()) return "Koopsignaal, maar de bot is gestopt";
     const halt = this.refreshHalt();
+    if (halt.halted && halt.dailyTarget === true) return "Koopsignaal, maar het dagdoel is vandaag al gehaald — morgen koopt de bot weer";
     if (halt.halted) return `Koopsignaal, maar nieuwe aankopen zijn gepauzeerd (${halt.reason ?? "risicolimiet bereikt"})`;
     const max = this.config.risk.maxOpenPositions;
     if (isNum(max) && this.positions.length + reserved >= max) {
@@ -2675,6 +2703,7 @@ export class TradingEngine extends EventEmitter {
     this.returnedToday = 0;
     this.addedToday = 0;
     this.haltedDayKey = null;
+    this.targetDayKey = null;
     this.updateEquity();
     this.log("info", `Nieuwe handelsdag (${key}): dagtellers gereset, startequity ${fmtEur(this.account.equity)}`);
   }
@@ -4431,7 +4460,21 @@ export class TradingEngine extends EventEmitter {
       realizedPnlToday: this.account.realizedPnlToday,
       openPositions: this.positions.map((p) => ({ ...p })),
       lastLossAt: { ...this.account.lastLossAt },
+      exitCostQuote: this.exitCostEstimate(),
     };
+  }
+
+  /** Geschatte kosten (fee + slippage) om alle open posities nu tegen de actuele koers te verkopen. */
+  private exitCostEstimate(): number {
+    const r = this.config.risk;
+    const rate = (isNum(r.takerFee) ? r.takerFee : 0) + (isNum(r.slippagePct) ? r.slippagePct : 0);
+    let cost = 0;
+    for (const p of this.positions) {
+      const price = this.prices[p.market];
+      const px = isNum(price) && price > 0 ? price : p.entryPrice;
+      if (isNum(px) && isNum(p.amount)) cost += p.amount * px * rate;
+    }
+    return cost;
   }
 
   /** Heeft elke open positie een echte (opgehaalde) koers? Anders telt hij tegen de instapkoers. */
@@ -4495,11 +4538,24 @@ export class TradingEngine extends EventEmitter {
         dailyLimit: true,
       };
     }
+    // Het dagdoel geldt ook tot de dagwissel (na het vastzetten kan de equity door kosten iets dalen).
+    if (h.halted && h.dailyTarget === true) {
+      this.targetDayKey = this.account.dayKey;
+    } else if (!h.halted && this.targetDayKey !== null && this.targetDayKey === this.account.dayKey) {
+      h = { halted: true, reason: "Dagdoel vandaag gehaald: geen nieuwe trades tot morgen", dailyTarget: true };
+    }
     if (h.halted && !this.halted.halted) {
-      this.log(
-        "warn",
-        `Nieuwe trades gepauzeerd: ${h.reason ?? "risicolimiet bereikt"} (open posities worden nog wel bewaakt)`,
-      );
+      if (h.dailyTarget === true) {
+        this.log(
+          "info",
+          `${h.reason ?? "Dagdoel gehaald"}. Open posities worden verkocht om de winst vast te zetten; morgen gaat de bot weer verder.`,
+        );
+      } else {
+        this.log(
+          "warn",
+          `Nieuwe trades gepauzeerd: ${h.reason ?? "risicolimiet bereikt"} (open posities worden nog wel bewaakt)`,
+        );
+      }
     } else if (!h.halted && this.halted.halted) {
       this.log("info", "Handel hervat: de risicolimiet is niet meer actief");
     }
@@ -4711,6 +4767,8 @@ export class TradingEngine extends EventEmitter {
     this.positions = positions;
     this.haltedDayKey =
       typeof state.haltedDayKey === "string" && state.haltedDayKey === account.dayKey ? state.haltedDayKey : null;
+    this.targetDayKey =
+      typeof state.targetDayKey === "string" && state.targetDayKey === account.dayKey ? state.targetDayKey : null;
     if (this.mode === "live" && Array.isArray(state.unknownOrders)) {
       for (const u of state.unknownOrders as UnknownBuy[]) {
         if (!u || typeof u.market !== "string" || typeof u.clientOrderId !== "string" || !u.clientOrderId) continue;
@@ -4899,6 +4957,7 @@ export class TradingEngine extends EventEmitter {
       lastEvaluated: { interval: this.config.interval, candles: evaluated },
       ...(this.unknownBuys.size > 0 ? { unknownOrders: [...this.unknownBuys.values()].map((u) => ({ ...u })) } : {}),
       ...(this.haltedDayKey ? { haltedDayKey: this.haltedDayKey } : {}),
+      ...(this.targetDayKey ? { targetDayKey: this.targetDayKey } : {}),
       ledgerVersion: LEDGER_VERSION,
       ...(this.skimmedQuote > 0 ? { skimmedQuote: this.skimmedQuote } : {}),
       ...(this.skimmedToday > 0 ? { skimmedToday: this.skimmedToday } : {}),

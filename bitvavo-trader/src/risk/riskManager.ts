@@ -129,6 +129,7 @@ const BOUNDS: Record<keyof RiskConfig, Bound> = {
   minOrderQuote: { label: "Minimale orderwaarde (EUR)", min: 0, max: Number.POSITIVE_INFINITY },
   timeStopCandles: { label: "Tijdstop (candles)", min: 0, max: 10000, integer: true },
   maxSpreadPct: { label: "Max. spread (%)", min: 0, max: 5 },
+  dailyProfitTargetPct: { label: "Dagdoel (%)", min: 0.1, max: 50, zeroAllowed: true },
 };
 
 const RISK_KEYS = Object.keys(BOUNDS) as (keyof RiskConfig)[];
@@ -138,7 +139,7 @@ const RISK_KEYS = Object.keys(BOUNDS) as (keyof RiskConfig)[];
  * "uit" (bijv. geen spreadlimiet). Een opgegeven waarde moet wel binnen de
  * grenzen liggen.
  */
-const OPTIONAL_KEYS: ReadonlySet<keyof RiskConfig> = new Set<keyof RiskConfig>(["maxSpreadPct"]);
+const OPTIONAL_KEYS: ReadonlySet<keyof RiskConfig> = new Set<keyof RiskConfig>(["maxSpreadPct", "dailyProfitTargetPct"]);
 
 function checkValue(key: keyof RiskConfig, value: unknown): string | null {
   if (value === undefined && OPTIONAL_KEYS.has(key)) return null;
@@ -545,6 +546,17 @@ export class RiskManager implements RiskManagerLike {
           halted: true,
           reason: `Dagelijkse verlieslimiet bereikt (${pct(changePct)}, limiet -${pct(this.cfg.dailyLossLimitPct)})`,
           dailyLimit: true,
+        };
+      }
+      // Dagdoel: pas gehaald als de winst ook na het verkopen van de open posities er is.
+      const target = this.cfg.dailyProfitTargetPct;
+      const exitCost = isNum(account.exitCostQuote) && account.exitCostQuote > 0 ? account.exitCostQuote : 0;
+      const netPct = ((equity - exitCost - dayStart) / dayStart) * 100;
+      if (isNum(target) && target > 0 && netPct >= target - 1e-9) {
+        return {
+          halted: true,
+          reason: `Dagdoel gehaald (+${pct(netPct, 2)} vandaag, doel +${pct(target, Number.isInteger(target) ? 0 : 2)}): geen nieuwe trades meer tot morgen`,
+          dailyTarget: true,
         };
       }
     }

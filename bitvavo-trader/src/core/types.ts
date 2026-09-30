@@ -302,6 +302,13 @@ export interface RiskConfig {
    * automatische muntkeuze.
    */
   maxSpreadPct?: number;
+  /**
+   * Optioneel: dagdoel in PROCENT (1 = +1%; 0 of ontbreekt = uit). Zodra het
+   * resultaat van vandaag (incl. open posities) dit haalt, verkoopt de bot de open
+   * posities om de winst vast te zetten en doet hij tot de volgende dag geen
+   * nieuwe aankopen.
+   */
+  dailyProfitTargetPct?: number;
 }
 
 export interface Position {
@@ -339,7 +346,9 @@ export type ExitReason =
   | "kill-switch"
   | "end-of-backtest"
   /** Onverkoopbare positie door de gebruiker afgeschreven (er is niets verkocht) */
-  | "write-off";
+  | "write-off"
+  /** Verkocht om het gehaalde dagdoel vast te zetten (`RiskConfig.dailyProfitTargetPct`) */
+  | "daily-target";
 
 export interface Trade {
   id: string;
@@ -375,6 +384,11 @@ export interface AccountSnapshot {
   openPositions: Position[];
   /** Per markt: tijd (ms) van de laatste verliesgevende exit */
   lastLossAt: Record<string, number>;
+  /**
+   * Optioneel: geschatte kosten (EUR, fee + slippage) om alle open posities nu te
+   * verkopen. Het dagdoel telt pas als het ook NA die kosten gehaald is.
+   */
+  exitCostQuote?: number;
 }
 
 export interface EntryPlan {
@@ -406,6 +420,8 @@ export interface HaltStatus {
   reason?: string;
   /** True als de stop komt door de dagelijkse verlieslimiet (blijft de hele dag gelden) */
   dailyLimit?: boolean;
+  /** True als de stop komt doordat het dagdoel gehaald is (blijft de hele dag gelden) */
+  dailyTarget?: boolean;
 }
 
 export interface RiskManagerLike {
@@ -751,6 +767,8 @@ export interface PersistedState {
   stateRecovery?: { reason: string; quarantinedTo?: string; at: number };
   /** Laatste automatische muntkeuze (gebruikt bij een herstart zolang hij < 24 uur oud is) */
   autoUniverse?: { markets: string[]; at: number };
+  /** Dag (YYYY-MM-DD, Europe/Amsterdam) waarop het dagdoel gehaald is */
+  targetDayKey?: string;
 }
 
 /**
@@ -900,6 +918,26 @@ export interface BacktestResult {
    * trendfilter (markt of munt), `spread` = spread boven `risk.maxSpreadPct`.
    */
   blockedEntries?: { trend: number; spread: number };
+  /** Resultaat per kalenderdag (Europe/Amsterdam) in de testperiode */
+  dailyStats?: DailyStats;
+}
+
+/** Hoe vaak haalde de strategie per dag het dagdoel (of verloor hij)? */
+export interface DailyStats {
+  /** Aantal (deels) geteste dagen */
+  days: number;
+  /** Het gebruikte dagdoel in %: risk.dailyProfitTargetPct, of 1 als dat uit staat */
+  targetPct: number;
+  /** Dagen met een resultaat ≥ targetPct */
+  targetDays: number;
+  /** Dagen met winst (> 0) */
+  winDays: number;
+  /** Dagen met verlies (< 0) */
+  lossDays: number;
+  /** Gemiddeld resultaat per dag in % */
+  avgDayPct: number;
+  bestDayPct: number;
+  worstDayPct: number;
 }
 
 export type OptimizeObjective = "sharpe" | "return" | "profitFactor" | "calmar";
