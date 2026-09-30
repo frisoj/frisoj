@@ -1,0 +1,38 @@
+{
+  "name": "briefje",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "expo": "~57.0.26",
+    "expo-constants": "^57.0.20",
+    "expo-crypto": "^57.0.3",
+    "expo-dev-client": "^57.0.19",
+    "expo-haptics": "^57.0.3",
+    "expo-image-picker": "^57.0.20",
+    "expo-linking": "^57.0.11",
+    "expo-notifications": "^57.0.21",
+    "expo-router": "^57.0.24",
+    "expo-secure-store": "^57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-purchases": "^10.10.2",
+    "react-native-safe-area-context": "^5.10.1",
+    "react-native-screens": "^4.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test lib/*.test.ts"
+  },
+  "private": true
+}

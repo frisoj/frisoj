@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Briefje",
+    "slug": "briefje",
+    "scheme": "briefje",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#0F766E" },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "nl.briefje.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Briefje gebruikt de camera om je post te fotograferen en uit te leggen.",
+        "NSPhotoLibraryUsageDescription": "Briefje gebruikt je foto's om een brief of screenshot uit te leggen.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "nl.briefje.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["CAMERA", "POST_NOTIFICATIONS"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", { "color": "#0F766E" }],
+      ["expo-image-picker", { "cameraPermission": "Briefje gebruikt de camera om je post te fotograferen en uit te leggen.", "photosPermission": "Briefje gebruikt je foto's om een brief of screenshot uit te leggen." }]
+    ],
+    "extra": {
+      "apiUrl": "https://api.briefje.example",
+      "revenueCatIos": "",
+      "revenueCatAndroid": "",
+      "eas": { "projectId": "" }
+    }
+  }
+}
