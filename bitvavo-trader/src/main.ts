@@ -100,7 +100,13 @@ async function sanitizeMarkets(feed: MarketDataFeed, engine: EngineConfig): Prom
   }
 }
 
-function printBanner(config: AppConfig, feed: MarketDataFeed, engineCfg: EngineConfig, url: string, running: boolean) {
+function printBanner(
+  config: AppConfig,
+  feed: MarketDataFeed,
+  engineCfg: EngineConfig,
+  url: string,
+  running: boolean | "starting",
+) {
   const eur = (n: number) => `€${n.toLocaleString("nl-NL", { maximumFractionDigits: 2 })}`;
   const out: string[] = [];
   out.push("", LINE, `  Bitvavo Trader v${APP_VERSION}`, LINE);
@@ -121,7 +127,15 @@ function printBanner(config: AppConfig, feed: MarketDataFeed, engineCfg: EngineC
   );
   out.push(`  Markten:    ${engineCfg.markets.join(", ")}`);
   out.push(`  Interval:   ${engineCfg.interval}`);
-  out.push(`  Bot:        ${running ? "draait" : "gestopt (start hem in het dashboard)"}`);
+  out.push(
+    `  Bot:        ${
+      running === "starting"
+        ? "wordt gestart (eerste koersen ophalen…)"
+        : running
+          ? "draait"
+          : "gestopt (start hem in het dashboard)"
+    }`,
+  );
   if (config.dashboardToken) out.push("  Token:      dashboard vraagt om DASHBOARD_TOKEN uit .env");
   const phoneUrls = lanUrls(config);
   if (phoneUrls.length > 0) {
@@ -246,16 +260,27 @@ async function main(): Promise<void> {
     ]);
   }
 
-  let running = false;
+  // Eerst het adres tonen: de server draait al. De eerste tick (koersen ophalen)
+  // kan bij een trage verbinding even duren; daar mag het startscherm niet op wachten.
+  printBanner(config, feed, engine.snapshot().config, server.url, config.autostart ? "starting" : false);
   if (config.autostart) {
-    try {
-      await engine.start();
-      running = true;
-    } catch (err) {
-      console.error(`✖ Kon de bot niet automatisch starten: ${(err as Error).message}`);
-    }
+    const localUrl = lanUrls(config).length > 0 ? `http://127.0.0.1:${config.port}` : server.url;
+    const slow = setTimeout(() => {
+      console.log(
+        `⏳ Nog bezig met de eerste koersen ophalen${feed.source === "bitvavo" ? " bij Bitvavo" : ""}… ` +
+          `Het dashboard werkt al: ${localUrl}`,
+      );
+    }, 15_000);
+    slow.unref();
+    engine
+      .start()
+      .then(
+        () => console.log(`✔ De bot draait. Open het dashboard: ${localUrl}`),
+        (err: unknown) =>
+          console.error(`✖ Kon de bot niet automatisch starten: ${(err as Error).message}. Start hem in het dashboard.`),
+      )
+      .finally(() => clearTimeout(slow));
   }
-  printBanner(config, feed, engine.snapshot().config, server.url, running);
   if (config.mode === "live") {
     loud([
       "⚠  LIVE MODE: je handelt met ECHT geld. Verlies is mogelijk.",
