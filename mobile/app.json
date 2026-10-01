@@ -8,7 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#0F766E" },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F766E"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "nl.briefje.app",
@@ -26,19 +30,40 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "permissions": ["CAMERA", "POST_NOTIFICATIONS"]
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      ["expo-notifications", { "color": "#0F766E" }],
-      ["expo-image-picker", { "cameraPermission": "Briefje gebruikt de camera om je post te fotograferen en uit te leggen.", "photosPermission": "Briefje gebruikt je foto's om een brief of screenshot uit te leggen." }]
+      [
+        "expo-notifications",
+        {
+          "color": "#0F766E"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Briefje gebruikt de camera om je post te fotograferen en uit te leggen.",
+          "photosPermission": "Briefje gebruikt je foto's om een brief of screenshot uit te leggen."
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://api.briefje.example",
       "revenueCatIos": "",
       "revenueCatAndroid": "",
-      "eas": { "projectId": "" }
+      "eas": {
+        "projectId": ""
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
     }
   }
 }
