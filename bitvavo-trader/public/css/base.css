@@ -814,6 +814,10 @@ input[type="range"] {
   background: var(--yellow);
   animation: blink 1s steps(2) infinite;
 }
+/* Tabblad op de achtergrond: live-verbinding even uit (geen storing) */
+.conn.paused .dot {
+  background: var(--muted);
+}
 @keyframes blink {
   50% {
     opacity: 0.25;

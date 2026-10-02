@@ -5,7 +5,7 @@ import type { AppConfig } from "../../src/config";
 import type { KillResult, Trade } from "../../src/core/types";
 import { createApp, startHttpServer, type RunningServer } from "../../src/server/httpServer";
 import { botEntries, botInfo, createMultiApp, type MultiAppBot } from "../../src/server/multiApp";
-import type { BotEntry, HeavyGate } from "../../src/server/routes";
+import { BOT_ACTION_WAIT_MS, type BotEntry, type HeavyGate } from "../../src/server/routes";
 import { FakeEngine, FakeFeed, json, makeConfig, makePublicDir, makeServices, NOW, rawGet, rawRequest } from "./helpers";
 
 const TOKEN = "wedstrijd-geheim-1";
@@ -50,7 +50,7 @@ afterEach(async () => {
 async function startMulti(
   ids = ["scalper", "trend", "dip"],
   config: Partial<AppConfig> = {},
-  opts: { feed?: FakeFeed; heavyGate?: HeavyGate } = {},
+  opts: { feed?: FakeFeed; heavyGate?: HeavyGate; botActionWaitMs?: number } = {},
 ): Promise<Multi> {
   const publicDir = makePublicDir();
   const engines: Record<string, BotEngine> = {};
@@ -75,6 +75,7 @@ async function startMulti(
       info: () => ({ bot: botInfo(profile) }),
       bots: () => entries,
       ...(opts.heavyGate ? { heavyGate: opts.heavyGate } : {}),
+      ...(opts.botActionWaitMs !== undefined ? { botActionWaitMs: opts.botActionWaitMs } : {}),
     });
     const dispose = app.dispose;
     app.dispose = () => {
@@ -188,6 +189,35 @@ describe("multi-bot server — routering", () => {
     const root = await rawGet(srv.port, "/bot/../api/state", { Host: "localhost" });
     expect(root.status).toBe(200); // → /api/state: de standaardbot
     expect(JSON.parse(root.body).config.markets).toEqual(["SCALPER-EUR"]);
+  });
+
+  it("'//' (na /bot/<id>/ of aan het begin) blijft een pad: nooit als host gelezen, nooit 400 of een ander pad", async () => {
+    srv = await startMulti(["scalper", "trend"], { dashboardToken: TOKEN });
+    const H = { Host: "localhost" };
+    // Het dashboard: met of zonder extra slash
+    for (const path of ["/bot/trend//", "/bot/trend//index.html", "//"]) {
+      const page = await rawGet(srv.port, path, H);
+      expect(page.status, path).toBe(200);
+      expect(page.headers["content-type"], path).toMatch(/text\/html/);
+    }
+    // Geen API van deze (of een andere) bot via een "host" in het pad
+    for (const path of [
+      "/bot/trend//api/info",
+      "/bot/trend//evil.example/api/info",
+      `/bot/trend//x/api/events?token=${TOKEN}`,
+      "//x/api/info",
+      "//evil.example/bot/trend/api/info",
+      "/bot/trend/\\evil.example/api/info",
+    ]) {
+      const r = await rawGet(srv.port, path, H);
+      expect(r.status, path).toBe(404);
+      expect(r.body, path).not.toContain("Ongeldige URL");
+      expect(r.headers["content-type"], path).not.toMatch(/event-stream/);
+    }
+    // Het gewone pad werkt nog (met token)
+    const ok = await rawGet(srv.port, "/bot/trend/api/info", { ...H, "X-Dashboard-Token": TOKEN });
+    expect(ok.status).toBe(200);
+    expect(JSON.parse(ok.body).bot.id).toBe("trend");
   });
 
   it("één rekenwerker voor alle bots: met een gedeelde vergrendeling loopt er maar één berekening tegelijk", async () => {
@@ -457,6 +487,38 @@ describe("/api/bots — wedstrijd", () => {
         { id: "allround", ok: true },
       ],
     });
+  });
+
+  it("kill-all / stop-all wachten niet eindeloos op één hangende bot: die staat als 'loopt nog' in het antwoord", async () => {
+    srv = await startMulti(["scalper", "trend", "dip"], {}, { botActionWaitMs: 150 });
+    expect(BOT_ACTION_WAIT_MS).toBe(20_000);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    srv.engines.trend.killImpl = async () => {
+      await gate; // live order waar Bitvavo niet op antwoordt
+      throw new Error("pas na het antwoord mislukt");
+    };
+    const started = Date.now();
+    const r = await json(srv.base, "POST", "/api/bots/kill-all");
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(r.status).toBe(200);
+    expect(r.data.results[0]).toEqual({ id: "scalper", ok: true, killResult: { closed: 0, failed: [] } });
+    expect(r.data.results[1]).toMatchObject({ id: "trend", ok: false, pending: true });
+    expect(r.data.results[1].error).toMatch(/^Noodstop loopt nog .*Kijk in het dashboard van deze bot/);
+    expect(r.data.results[2]).toEqual({ id: "dip", ok: true, killResult: { closed: 0, failed: [] } });
+    // Alle noodstoppen zijn wel uitgevoerd; de hangende loopt gewoon door (een latere fout blijft netjes afgehandeld)
+    expect(Object.values(srv.engines).map((e) => e.killed)).toEqual([1, 1, 1]);
+    release();
+    await new Promise((res) => setTimeout(res, 20));
+
+    srv.engines.dip.stop = () => new Promise<void>(() => {}); // stopt nooit
+    const stop = await json(srv.base, "POST", "/api/bots/stop-all");
+    expect(stop.data.results.map((x: { id: string; ok: boolean; pending?: boolean }) => [x.id, x.ok, x.pending ?? false])).toEqual([
+      ["scalper", true, false],
+      ["trend", true, false],
+      ["dip", false, true],
+    ]);
+    expect(stop.data.results[2].error).toMatch(/^Stoppen loopt nog/);
   });
 
   it("een synchrone fout van één engine stopt de rest ook niet", async () => {

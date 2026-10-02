@@ -539,3 +539,134 @@ describe("Alles starten / stoppen / noodstop", () => {
     ]);
   });
 });
+
+// ───────────── Ronde 6 ─────────────
+
+describe("status: gestopt gaat voor 'Winst vastgezet'", () => {
+  it("winst vastgezet en daarna gestopt (of noodstop): 'Gestopt' (gaat morgen NIET vanzelf verder), reden blijft zichtbaar", async () => {
+    const { statusView } = await L();
+    const halted = { halted: true, dailyTarget: true, reason: "Dagwinst teruggevallen naar +0,65% (winstgrens +1%): winst vastgezet, geen nieuwe trades tot morgen" };
+    const st = statusView(bot("dip", 0, 0, 0, { running: false, halted }));
+    expect(st).toMatchObject({ key: "stopped", label: "Gestopt", cls: "badge-muted", dot: "off", reason: halted.reason });
+    expect(statusView(bot("dip", 0, 0, 0, { running: false, halted: { halted: true, dailyTarget: true } })).reason).toBe(
+      "Dagdoel gehaald: de winst is vastgezet tot morgen.",
+    );
+    // draait hij wel: groen 'Winst vastgezet'
+    expect(statusView(bot("dip", 0, 0, 0, { halted })).label).toBe("Winst vastgezet");
+  });
+
+  it("met de echte engine: winst vastgezet, dan noodstop → 'Gestopt'", async () => {
+    const { setup, I15 } = await import("../engine/helpers");
+    const { RiskManager } = await import("../../src/risk/riskManager");
+    const { DEFAULT_RISK_CONFIG } = await import("../../src/core/defaults");
+    const { summarize } = await import("../../src/bots/summary");
+    const { getProfile } = await import("../../src/bots/profiles");
+    const h = setup({
+      markets: ["AAA-EUR", "BBB-EUR"],
+      startingCapital: 100,
+      config: { risk: { ...DEFAULT_RISK_CONFIG, dailyProfitTargetPct: 1, maxSpreadPct: 0, takeProfitR: 5 } },
+      deps: { createRisk: (cfg: Fake, interval: Fake) => new RiskManager(cfg, interval) },
+    });
+    const last = Math.floor(h.clock.t / I15) * I15;
+    for (const m of ["AAA-EUR", "BBB-EUR"]) h.feed.setSeries(m, 100, last);
+    h.signals.atr = 1;
+    h.signals.buyMarkets = new Set(["AAA-EUR"]);
+    h.signals.buyAt.add(h.lastClosed());
+    await h.engine.tick();
+    h.signals.buyMarkets = new Set();
+    h.feed.setLast("AAA-EUR", 104);
+    await h.engine.tick();
+    h.feed.setLast("AAA-EUR", 102);
+    await h.engine.tick(); // winst vastgezet
+    await h.engine.killSwitch();
+    const sum = summarize(h.engine.snapshot() as Fake, getProfile("allround")!, { allTrades: h.engine.allTrades() } as Fake);
+    expect(sum.halted).toMatchObject({ halted: true, dailyTarget: true });
+    const { statusView } = await L();
+    expect(statusView(sum)).toMatchObject({ key: "stopped", label: "Gestopt" });
+    await h.engine.stop();
+  });
+});
+
+describe("kosten: vóór kosten quitte", () => {
+  it("vóór kosten € 0,00: niet 'Ook vóór kosten verlies' en geen '-€ 0,00'", async () => {
+    const { costView, cardView, rankBots } = await L();
+    // Snelle scalper: −€ 0,30 na kosten, € 0,30 kosten → vóór kosten quitte (afrondingsrest −0,004)
+    const b = bot("scalper", -0.3, 0.296, 4, { dayPnlQuote: -0.004 });
+    const c = costView(b);
+    expect(c.kind).toBe("zero");
+    expect(c.text).toBe("Vóór kosten quitte; het verlies komt door de kosten");
+    const v = cardView(rankBots([b])[0]);
+    expect(norm(v.grossEur)).toBe("€ 0,00");
+    expect(v.grossCls).toBe("flat");
+    expect(norm(v.dayEur)).toBe("€ 0,00");
+    // echte bedragen houden hun teken
+    expect(norm(cardView(rankBots([bot("dip", -0.5, 0.3, 5)])[0]).grossEur)).toBe("-€ 0,20");
+    expect(costView(bot("dip", -0.5, 0.3, 5)).kind).toBe("loss");
+    expect(costView(bot("dip", -0.1, 0.3, 5)).kind).toBe("eaten");
+  });
+});
+
+describe("grafiek: één gelijkmatige tijdas voor alle bots", () => {
+  const H = 3_600_000;
+  const NOW = Date.UTC(2026, 8, 30, 23, 30, 0);
+  /** `n` punten gelijk verdeeld over de laatste `hours` uur */
+  const hist = (n: number, hours: number, v0 = 25) =>
+    Array.from({ length: n }, (_, i) => ({ time: NOW - hours * H + Math.round((i * hours * H) / (n - 1)), value: v0 + i / 1000 }));
+
+  it("een korte geschiedenis (na 'Reset oefengeld') neemt niet meer een groot stuk van de breedte in", async () => {
+    const { chartSeries, chartIsEmpty } = await L();
+    const bots = [
+      bot("scalper", 0.3, 0.1, 3, { equityHistory: hist(300, 72) }),
+      bot("trend", 0.1, 0.1, 3, { equityHistory: hist(300, 72) }),
+      bot("allround", 0.2, 0.1, 3, { equityHistory: hist(300, 72) }),
+      bot("dip", 0, 0, 0, { equityHistory: hist(60, 1) }),
+    ];
+    const ser = chartSeries(bots, "pct", NOW + 1000);
+    const times = ser[0].data.map((d: Fake) => d.time);
+    // alle lijnen dezelfde tijden, ≤ 300, oplopend en gelijk verdeeld
+    for (const s of ser) expect(s.data.map((d: Fake) => d.time)).toEqual(times);
+    expect(times.length).toBeLessThanOrEqual(300);
+    const steps = times.slice(1).map((t: number, i: number) => t - times[i]);
+    expect(Math.max(...steps) - Math.min(...steps)).toBeLessThanOrEqual(1);
+    // "een uur geleden" ligt nu op ~98,6% van de breedte (was 82%: het laatste uur nam 18% in)
+    const hourAgo = Math.floor((NOW - H) / 1000);
+    const idx = times.findIndex((t: number) => t >= hourAgo);
+    expect(idx / (times.length - 1)).toBeGreaterThan(0.98);
+    // Dip-koper: lege punten vóór zijn eerste punt, daarna waarden; elke lijn eindigt bij de engine
+    const dip = ser.find((s: Fake) => s.id === "dip");
+    expect(dip.data[0]).toEqual({ time: times[0] });
+    expect(dip.data.slice(idx + 1).every((d: Fake) => typeof d.value === "number")).toBe(true);
+    for (const s of ser) expect(s.data.at(-1).value).toBe(s.last);
+    expect(ser.find((s: Fake) => s.id === "scalper").last).toBeCloseTo(1.2, 9); // totalReturnPct
+    expect(chartIsEmpty(ser)).toBe(false);
+    // lege punten tellen niet als gegevens
+    expect(chartIsEmpty([{ data: [{ time: 1 }, { time: 2 }, { time: 3, value: 1 }] }])).toBe(true);
+  });
+
+  it("waarde op elk rastermoment: rechte lijn tussen twee punten (zoals de grafiek tekent), daarna de laatste waarde", async () => {
+    const { sharedTimeGrid } = await L();
+    const a = { id: "a", data: [{ time: 0, value: 1 }, { time: 10, value: 2 }], last: 2 };
+    const b = { id: "b", data: [{ time: 5, value: 7 }, { time: 7, value: 8 }], last: 8 };
+    const [ga, gb] = sharedTimeGrid([a, b], 3);
+    expect(ga.data).toEqual([{ time: 0, value: 1 }, { time: 5, value: 1.5 }, { time: 10, value: 2 }]);
+    expect(gb.data).toEqual([{ time: 0 }, { time: 5, value: 7 }, { time: 10, value: 8 }]);
+    // één lijn, of lijnen zonder punten: ongewijzigd
+    expect(sharedTimeGrid([a], 3)[0]).toBe(a);
+    const none = { id: "c", data: [], last: null };
+    expect(sharedTimeGrid([a, none], 3)[1]).toBe(none);
+    // korte periode: niet meer rastertijden dan seconden
+    expect(sharedTimeGrid([{ data: [{ time: 0, value: 1 }] }, { data: [{ time: 2, value: 1 }] }], 300)[0].data.map((d: Fake) => d.time)).toEqual([0, 1, 2]);
+  });
+
+  it("marge na passend maken: eerste en laatste tijdlabel blijven heel", async () => {
+    const { edgePaddedRange } = await L();
+    const r = edgePaddedRange({ from: 0, to: 299 }, 834, 28);
+    // 299 punten passen in 834 − 2 × 28 px; marge ≈ 28 px aan elke kant
+    const pxPerPoint = 834 / (r.to - r.from);
+    expect(-r.from * pxPerPoint).toBeCloseTo(28, 6);
+    expect((r.to - 299) * pxPerPoint).toBeCloseTo(28, 6);
+    expect(edgePaddedRange({ from: 0, to: 3 }, 0)).toEqual({ from: -0.5, to: 3.5 });
+    expect(edgePaddedRange(null, 800)).toBeNull();
+    expect(edgePaddedRange({ from: 5, to: 5 }, 800)).toBeNull();
+  });
+});

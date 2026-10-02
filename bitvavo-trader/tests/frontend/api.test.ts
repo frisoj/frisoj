@@ -1,6 +1,6 @@
 /** public/js/api.js: de nieuwe routes (bevestigen, afschrijven) met een nep-fetch. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installBrowserGlobals, loadPublic } from "./helpers";
+import { installBrowserGlobals, loadPublic, type Fake } from "./helpers";
 
 let env: ReturnType<typeof installBrowserGlobals>;
 const calls: { url: string; method: string; body: unknown }[] = [];
@@ -166,5 +166,199 @@ describe("api: meerdere bots (v3) — BASE uit location.pathname", () => {
     for (const m of ["info", "getState", "getConfig", "putConfig", "start", "stop", "kill", "closePosition", "writeOffPosition", "arm", "disarm", "ackUnknownOrders", "ackStateRecovery", "resetPaper", "getMarkets", "getCandles", "getDecision", "getScanner", "getStrategies", "backtest", "optimize", "walkForward", "getBots", "startAll", "stopAll", "killAll"]) {
       expect(typeof mod.api[m], m).toBe("function");
     }
+  });
+});
+
+// Ronde 6: een browser opent maar 6 verbindingen per server. Elk dashboard-tabblad hield
+// een live-verbinding (SSE) open; met het overzicht + 4 bots + 1 tabblad kwam GEEN enkel
+// verzoek meer aan, ook de noodstop niet (die ging pas minuten later alsnog de deur uit).
+describe("api: nooit eindeloos wachten (tijdslimiet per verzoek)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** fetch die nooit antwoordt (verzoek staat in de wachtrij van de browser), maar wel afgebroken kan worden */
+  function hangingFetch() {
+    const seen: { url: string; aborted: () => boolean }[] = [];
+    vi.stubGlobal("fetch", (url: string, init: { signal?: AbortSignal }) => {
+      seen.push({ url, aborted: () => !!init.signal?.aborted });
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")));
+      });
+    });
+    return seen;
+  }
+
+  it("noodstop zonder antwoord: na de limiet afgebroken met een duidelijke Nederlandse fout (gaat dus ook niet later alsnog weg)", async () => {
+    vi.useFakeTimers();
+    const seen = hangingFetch();
+    const { api, ApiError, ACTION_TIMEOUT_MS } = await loadPublic("js/api.js");
+    const p = api.killAll().catch((e: Error) => e);
+    await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS - 1);
+    expect(seen[0].aborted()).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    const err = await p;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.timeout).toBe(true);
+    expect(err.status).toBe(0);
+    expect(err.message).toBe(
+      "Geen antwoord van de server binnen 90 seconden. Misschien is de opdracht toch uitgevoerd: controleer de status en de posities. " +
+        "Staan er veel dashboard-tabbladen open? Sluit er een paar en probeer het opnieuw.",
+    );
+    expect(seen[0].aborted()).toBe(true);
+  });
+
+  it("opvragen (GET): kortere limiet en een eigen melding", async () => {
+    vi.useFakeTimers();
+    hangingFetch();
+    const { api, READ_TIMEOUT_MS } = await loadPublic("js/api.js");
+    expect(READ_TIMEOUT_MS).toBe(20_000);
+    const p = api.getBots().catch((e: Error) => e);
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS);
+    const err = await p;
+    expect(err.timeout).toBe(true);
+    expect(err.message).toBe(
+      "De server reageert niet (geen antwoord binnen 20 seconden). Draait het programma nog? " +
+        "Staan er veel dashboard-tabbladen open? Sluit er een paar en probeer het opnieuw.",
+    );
+  });
+
+  it("backtest / optimaliseren / walk-forward mogen lang rekenen (15 minuten)", async () => {
+    vi.useFakeTimers();
+    const seen = hangingFetch();
+    const { api, HEAVY_TIMEOUT_MS, ACTION_TIMEOUT_MS } = await loadPublic("js/api.js");
+    expect(HEAVY_TIMEOUT_MS).toBe(15 * 60_000);
+    const ps = [api.backtest({}), api.optimize({}), api.walkForward({})].map((x: Promise<unknown>) => x.catch((e: Error) => e));
+    await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS * 5);
+    expect(seen.map((s) => s.aborted())).toEqual([false, false, false]);
+    await vi.advanceTimersByTimeAsync(HEAVY_TIMEOUT_MS);
+    const errs: Fake[] = await Promise.all(ps);
+    expect(errs.map((e) => e.timeout)).toEqual([true, true, true]);
+    expect(errs[0].message).toContain("binnen 15 minuten");
+  });
+
+  it("een gewoon antwoord ruimt de timer op; een netwerkfout blijft een netwerkfout", async () => {
+    vi.useFakeTimers();
+    const { api } = await loadPublic("js/api.js");
+    await expect(api.getState()).resolves.toEqual({ ok: 1 });
+    expect(vi.getTimerCount()).toBe(0);
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const err = await api.kill().catch((e: Error) => e);
+    expect(err).toBeInstanceOf(TypeError);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("connectEvents: live-verbinding alleen in een tabblad dat je bekijkt", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function setup(hidden = false) {
+    const streams: { url: string; closed: boolean; fire: (type: string, data: unknown) => void; src: Fake }[] = [];
+    class FakeEventSource {
+      onopen: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+      listeners: Record<string, ((ev: { data: string }) => void)[]> = {};
+      constructor(url: string) {
+        const self = this;
+        streams.push({
+          url,
+          closed: false,
+          src: self,
+          fire(type, data) {
+            for (const fn of self.listeners[type] || []) fn({ data: JSON.stringify(data) });
+          },
+        });
+      }
+      addEventListener(type: string, fn: (ev: { data: string }) => void) {
+        (this.listeners[type] ||= []).push(fn);
+      }
+      close() {
+        streams.find((s) => s.src === this)!.closed = true;
+      }
+    }
+    const docListeners: Record<string, (() => void)[]> = {};
+    const doc = {
+      hidden,
+      addEventListener: (t: string, fn: () => void) => (docListeners[t] ||= []).push(fn),
+      removeEventListener: (t: string, fn: () => void) => (docListeners[t] = (docListeners[t] || []).filter((f) => f !== fn)),
+    };
+    const setHidden = (h: boolean) => {
+      doc.hidden = h;
+      for (const fn of docListeners.visibilitychange || []) fn();
+    };
+    const events: [string, unknown][] = [];
+    const statuses: string[] = [];
+    return { streams, doc, docListeners, setHidden, events, statuses, FakeEventSource };
+  }
+
+  it("naar de achtergrond: na 5 s dicht ('paused'); weer zichtbaar: nieuwe verbinding (de server stuurt dan een verse snapshot)", async () => {
+    vi.useFakeTimers();
+    const t = setup(false);
+    const { connectEvents, HIDDEN_PAUSE_MS } = await loadPublic("js/api.js");
+    expect(HIDDEN_PAUSE_MS).toBe(5_000);
+    connectEvents((type: string, d: unknown) => t.events.push([type, d]), (s: string) => t.statuses.push(s), {
+      document: t.doc,
+      EventSource: t.FakeEventSource,
+    });
+    expect(t.streams).toHaveLength(1);
+    t.streams[0].src.onopen();
+    t.streams[0].fire("snapshot", { n: 1 });
+    expect(t.events).toEqual([["snapshot", { n: 1 }]]);
+
+    t.setHidden(true);
+    vi.advanceTimersByTime(HIDDEN_PAUSE_MS - 1);
+    expect(t.streams[0].closed).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(t.streams[0].closed).toBe(true);
+    expect(t.statuses).toEqual(["open", "paused"]);
+    // een late fout/event van de gesloten stream telt niet meer
+    t.streams[0].src.onerror();
+    t.streams[0].fire("price", { market: "X" });
+    expect(t.statuses).toEqual(["open", "paused"]);
+    expect(t.events).toHaveLength(1);
+
+    t.setHidden(false);
+    expect(t.streams).toHaveLength(2);
+    expect(t.statuses).toEqual(["open", "paused", "connecting"]);
+    t.streams[1].src.onopen();
+    t.streams[1].fire("snapshot", { n: 2 });
+    expect(t.statuses.at(-1)).toBe("open");
+    expect(t.events.at(-1)).toEqual(["snapshot", { n: 2 }]);
+  });
+
+  it("even wisselen van tabblad (korter dan 5 s): verbinding blijft, geen nieuwe", async () => {
+    vi.useFakeTimers();
+    const t = setup(false);
+    const { connectEvents } = await loadPublic("js/api.js");
+    connectEvents(() => {}, (s: string) => t.statuses.push(s), { document: t.doc, EventSource: t.FakeEventSource });
+    t.setHidden(true);
+    vi.advanceTimersByTime(3_000);
+    t.setHidden(false);
+    vi.advanceTimersByTime(10_000);
+    expect(t.streams).toHaveLength(1);
+    expect(t.streams[0].closed).toBe(false);
+    expect(t.statuses).toEqual([]);
+  });
+
+  it("geopend op de achtergrond (Ctrl+klik): pas verbinden zodra je kijkt; sluiten ruimt alles op", async () => {
+    vi.useFakeTimers();
+    const t = setup(true);
+    const { connectEvents } = await loadPublic("js/api.js");
+    const close = connectEvents(() => {}, (s: string) => t.statuses.push(s), { document: t.doc, EventSource: t.FakeEventSource });
+    expect(t.streams).toHaveLength(0);
+    expect(t.statuses).toEqual(["paused"]);
+    t.setHidden(false);
+    expect(t.streams).toHaveLength(1);
+    close();
+    expect(t.streams[0].closed).toBe(true);
+    expect(t.docListeners.visibilitychange).toEqual([]);
+    t.setHidden(true);
+    t.setHidden(false);
+    vi.advanceTimersByTime(10_000);
+    expect(t.streams).toHaveLength(1);
   });
 });

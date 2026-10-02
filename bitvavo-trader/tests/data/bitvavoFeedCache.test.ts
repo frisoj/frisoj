@@ -168,6 +168,79 @@ describe("BitvavoFeed.getCandles — gedeeld verzoek en 5 s cache (meerdere bots
     expect(await b).toEqual([]);
   });
 
+  it("een stop-loss-verzoek (priority) komt nooit uit de cache, maar deelt wel een lopend stop-loss-verzoek", async () => {
+    const { client, calls, make } = gatedClient();
+    const feed = new BitvavoFeed(client, { now: () => NOW });
+    // Een andere bot haalde net candles op (gewoon verzoek): in de cache
+    const plain = feed.getCandles("BTC-EUR", "15m", 10);
+    await tick();
+    calls[0].resolve(make("15m", 10));
+    await plain;
+    expect(await feed.getCandles("BTC-EUR", "15m", 10, { fast: true })).toHaveLength(10);
+    expect(calls).toHaveLength(1);
+    // De stop-loss van een open positie haalt toch vers op
+    const p1 = feed.getCandles("BTC-EUR", "15m", 10, { fast: true, priority: true });
+    const p2 = feed.getCandles("BTC-EUR", "15m", 10, { fast: true, priority: true });
+    await tick();
+    expect(calls).toHaveLength(2);
+    calls[1].resolve(make("15m", 10));
+    expect(await p1).toHaveLength(10);
+    expect(await p2).toHaveLength(10);
+    // Ook direct daarna: weer een eigen verzoek
+    const p3 = feed.getCandles("BTC-EUR", "15m", 10, { fast: true, priority: true });
+    await tick();
+    expect(calls).toHaveLength(3);
+    calls[2].resolve(make("15m", 10));
+    await p3;
+  });
+
+  it("een antwoord van vóór het sluiten van een candle wordt daarna niet hergebruikt (ook niet als lopend verzoek)", async () => {
+    const step = INTERVAL_MS["15m"];
+    const close = Math.ceil(NOW / step) * step;
+    let now = close - 3_000;
+    const { client, calls, make } = gatedClient();
+    const feed = new BitvavoFeed(client, { now: () => now });
+    const before = feed.getCandles("BTC-EUR", "15m", 10);
+    await tick();
+    calls[0].resolve(make("15m", 10));
+    await before;
+    now = close + 1_000; // 4 s later, maar in een nieuwe candle-periode
+    const after = feed.getCandles("BTC-EUR", "15m", 10);
+    await tick();
+    expect(calls).toHaveLength(2);
+    calls[1].resolve(make("15m", 10));
+    await after;
+
+    // Een verzoek dat vóór de sluiting startte en erna binnenkomt: na de sluiting niet delen…
+    now = close + step - 1_000;
+    const late = feed.getCandles("ETH-EUR", "15m", 10);
+    await tick();
+    now = close + step + 500;
+    const fresh = feed.getCandles("ETH-EUR", "15m", 10);
+    await tick();
+    expect(calls).toHaveLength(4);
+    calls[3].resolve(make("15m", 10));
+    await fresh;
+    // …en zijn (oudere) antwoord vervangt het nieuwere in de cache niet
+    calls[2].resolve(make("15m", 10));
+    await late;
+    expect(await feed.getCandles("ETH-EUR", "15m", 10)).toHaveLength(10);
+    expect(calls).toHaveLength(4);
+
+    // Alleen een laat antwoord van vóór de sluiting: telt niet als antwoord van na de sluiting
+    now = close + 2 * step - 1_000;
+    const late2 = feed.getCandles("SOL-EUR", "15m", 10);
+    await tick();
+    now = close + 2 * step + 500;
+    calls[4].resolve(make("15m", 10));
+    await late2;
+    const again = feed.getCandles("SOL-EUR", "15m", 10);
+    await tick();
+    expect(calls).toHaveLength(6);
+    calls[5].resolve(make("15m", 10));
+    await again;
+  });
+
   it("verlopen antwoorden worden opgeruimd (de cache groeit niet onbeperkt)", async () => {
     let now = NOW;
     const { client } = gatedClient({ auto: true });

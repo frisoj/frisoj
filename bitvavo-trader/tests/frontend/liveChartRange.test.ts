@@ -9,7 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { type Fake, fakeNode, installBrowserGlobals, loadPublic, makeBus, settle } from "./helpers";
 
-const { initialRange, keepRange, BAR_PX, MAX_BAR_PX } = await loadPublic("js/liveChart.js");
+const { initialRange, keepRange, fillsWidth, BAR_PX, MAX_BAR_PX } = await loadPublic("js/liveChart.js");
 
 describe("initialRange (eerste weergave van een munt)", () => {
   it("genoeg candles: de laatste breedte/7 candles met 5 candles ruimte rechts (zoals altijd)", () => {
@@ -92,7 +92,7 @@ function anyFake(): Fake {
 /** Grafiekbibliotheek die per grafiek het gezette logische bereik bijhoudt */
 function recordingCharts(paneWidth: () => number) {
   const any = anyFake();
-  const charts: { ts: Fake }[] = [];
+  const charts: { ts: Fake; opts: Fake[] }[] = [];
   const lib = new Proxy(
     {},
     {
@@ -109,18 +109,21 @@ function recordingCharts(paneWidth: () => number) {
               return any;
             },
           });
+          const opts: Fake[] = [];
           const chart = new Proxy(function () {}, {
             get: (_t2, k2) =>
               k2 === "timeScale"
                 ? () => tsApi
                 : k2 === "paneSize"
                   ? () => ({ width: paneWidth(), height: 300 })
-                  : k2 === "then"
-                    ? undefined
-                    : any,
+                  : k2 === "applyOptions"
+                    ? (o: Fake) => void opts.push(o)
+                    : k2 === "then"
+                      ? undefined
+                      : any,
             apply: () => any,
           });
-          charts.push({ ts });
+          charts.push({ ts, opts });
           return chart;
         };
       },
@@ -279,6 +282,46 @@ describe("live-grafiek: weergave bij een illiquide munt", () => {
       t.env.flushRaf();
       expect(t.main().range).toEqual(initialRange(40, 1022));
       expect(t.main().range.from).toBeLessThanOrEqual(0);
+    } finally {
+      vi.restoreAllMocks();
+      t.env.restore();
+    }
+  });
+});
+
+// Ronde 6: na het groter/kleiner maken van het venster stonden de candles van een illiquide munt
+// weer klein rechts (telefoon → desktop: 71% leeg links), want lightweight-charts houdt bij een
+// andere breedte de candlebreedte vast. Oplossing: dan de weergave vasthouden
+// (timeScale.lockVisibleTimeRangeOnResize), maar alleen als alle candles de breedte vullen.
+describe("live-grafiek: weergave blijft bij een andere vensterbreedte", () => {
+  it("fillsWidth: alleen bij minder candles dan er in beeld passen", () => {
+    expect(fillsWidth(25, 390)).toBe(true);
+    expect(fillsWidth(25, 1440)).toBe(true);
+    expect(fillsWidth(146, 1022)).toBe(true);
+    expect(fillsWidth(147, 1022)).toBe(false);
+    expect(fillsWidth(300, 1440)).toBe(false);
+    expect(fillsWidth(0, 1022)).toBe(false);
+    expect(fillsWidth(Number.NaN, Number.NaN)).toBe(false);
+  });
+
+  const lockOf = (c: { opts: Fake[] }) =>
+    c.opts.filter((o) => o && o.timeScale && "lockVisibleTimeRangeOnResize" in o.timeScale).map((o) => o.timeScale.lockVisibleTimeRangeOnResize);
+
+  it("illiquide munt: alle drie de grafieken houden hun weergave vast; daarna een gewone munt: weer los", async () => {
+    const t = await mountChart({ width: 390 });
+    try {
+      await t.answer(0, sparseCandles(25));
+      expect(t.main().range).toEqual(initialRange(25, 390));
+      for (const c of t.charts) expect(lockOf(c)).toEqual([true]);
+      // andere munt met genoeg candles: bij een breder venster gewoon meer candles in beeld
+      t.bus.emit("market-selected", { market: "EPIC-EUR" });
+      await t.answer(1, sparseCandles(300, 1));
+      for (const c of t.charts) expect(lockOf(c)).toEqual([true, false]);
+      // nog eens een gewone munt: geen overbodige aanroep
+      t.advance(61_000);
+      t.bus.emit("tab-changed", { tab: "live" });
+      await t.answer(2, sparseCandles(300, 1));
+      for (const c of t.charts) expect(lockOf(c)).toEqual([true, false]);
     } finally {
       vi.restoreAllMocks();
       t.env.restore();

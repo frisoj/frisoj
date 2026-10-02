@@ -19,7 +19,10 @@
  *   tegelijk lopen delen één verzoek, en een (niet-leeg) resultaat wordt ~5 s
  *   hergebruikt — bots op hetzelfde interval kosten dan samen één verzoek. Alleen
  *   verzoeken met dezelfde opties (`fast`/`priority`) delen een lopend verzoek, want
- *   die bepalen hoe het mag mislukken; een gelukt resultaat is voor iedereen bruikbaar.
+ *   die bepalen hoe het mag mislukken. Een bewaard resultaat geldt alleen binnen de
+ *   candle-periode waarin het verzoek startte (anders mist de net gesloten candle), en
+ *   nooit voor een `priority`-verzoek (stop-loss van een open positie): dat haalt altijd
+ *   vers op (of deelt een lopend stop-loss-verzoek uit dezelfde periode).
  *   Elke aanroeper krijgt eigen kopieën (de cache kan niet aangepast worden).
  * - Optioneel (buiten het MarketDataFeed-contract): een laatste argument
  *   {@link FeedRequestOptions} per verzoek. De engine geeft dat mee; andere feeds
@@ -207,17 +210,33 @@ export class BitvavoFeed implements MarketDataFeed {
   // ─────────────── Candles ───────────────
 
   async getCandles(market: string, interval: Interval, limit: number, req?: FeedRequestOptions): Promise<Candle[]> {
-    intervalMs(interval);
+    const step = intervalMs(interval);
     const n = Math.min(PAGE_LIMIT, Math.floor(Number(limit)));
     if (!(n >= 1)) return [];
     const key = `${market}|${interval}|${n}`;
     const now = this.nowFn();
+    const period = Math.floor(now / step);
+    const priority = req?.priority === true;
     const cached = this.candlesCache.get(key);
-    if (cached && now - cached.at >= 0 && now - cached.at < CANDLES_TTL_MS) return copyCandles(cached.data);
+    // Een stop-loss-verzoek (priority) nooit uit de cache: een paar seconden oude candles
+    // (bijv. opgehaald door een andere bot) kunnen een geraakte stop verbergen. En nooit een
+    // antwoord uit een vorige candle-periode: dan mist de net gesloten candle (of was hij
+    // nog niet af toen hij opgehaald werd).
+    if (
+      !priority &&
+      cached &&
+      now - cached.at >= 0 &&
+      now - cached.at < CANDLES_TTL_MS &&
+      Math.floor(cached.at / step) === period
+    ) {
+      return copyCandles(cached.data);
+    }
 
     // Alleen verzoeken met dezelfde opties delen een lopend verzoek: een `fast`-verzoek
-    // mag snel mislukken (geen herhaling, niet wachten), een stop-loss-verzoek niet.
-    const flightKey = `${key}|${req?.fast === true ? "f" : "-"}${req?.priority === true ? "p" : "-"}`;
+    // mag snel mislukken (geen herhaling, niet wachten), een stop-loss-verzoek niet. En
+    // alleen binnen dezelfde candle-periode (een verzoek van vóór het sluiten van een
+    // candle heeft die candle misschien nog niet af).
+    const flightKey = `${key}|${req?.fast === true ? "f" : "-"}${priority ? "p" : "-"}|${period}`;
     let flight = this.candlesInflight.get(flightKey);
     if (!flight) {
       // Het verzoek start pas na het registreren (then), zodat ook een synchrone fout
@@ -228,7 +247,9 @@ export class BitvavoFeed implements MarketDataFeed {
           const sorted = dedupeSort(candles ?? []);
           const data = sorted.length > n ? sorted.slice(sorted.length - n) : sorted;
           // Een leeg antwoord (nieuwe of illiquide markt, storing) niet hergebruiken.
-          if (data.length > 0) this.storeCandles(key, data);
+          // Bewaard met het tijdstip waarop het verzoek START: de gegevens kunnen van
+          // dat moment zijn (dus vóór een candle-sluiting die tijdens het verzoek viel).
+          if (data.length > 0) this.storeCandles(key, data, now);
           return data;
         })
         .finally(() => {
@@ -240,14 +261,19 @@ export class BitvavoFeed implements MarketDataFeed {
     return copyCandles(await flight);
   }
 
-  private storeCandles(key: string, data: Candle[]): void {
+  /** `at` = wanneer het verzoek startte (zie getCandles). */
+  private storeCandles(key: string, data: Candle[], at: number): void {
     const now = this.nowFn();
     if (this.candlesCache.size >= CANDLES_CACHE_SWEEP) {
       for (const [k, v] of this.candlesCache) {
         if (!(now - v.at >= 0 && now - v.at < CANDLES_TTL_MS)) this.candlesCache.delete(k);
       }
     }
-    this.candlesCache.set(key, { at: now, data });
+    // Een ouder antwoord (later binnengekomen) vervangt nooit een nieuwer (wel een uit de
+    // "toekomst" na een klok die terugsprong).
+    const prev = this.candlesCache.get(key);
+    if (prev && prev.at > at && prev.at <= now) return;
+    this.candlesCache.set(key, { at, data });
   }
 
   async getHistory(market: string, interval: Interval, fromMs: number, toMs: number): Promise<Candle[]> {

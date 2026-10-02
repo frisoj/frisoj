@@ -457,6 +457,8 @@ export function simulate(
   const targetPct = dailyTargetPct(input.risk);
   let targetArmedDay: string | null = null;
   let targetDay: string | null = null;
+  /** Dagen waarop de grens aanging: die haalden het dagdoel, ook als de winst daarna werd vastgezet. */
+  const armedDays = new Set<string>();
 
   const curveLen = n - evalStart;
   const eqValues = new Float64Array(curveLen);
@@ -660,7 +662,10 @@ export function simulate(
       const eqNow = cash + (pos ? pos.amount * c.close * (1 - slip) * (1 - fee) : 0);
       const netPct = ((eqNow - dayStartEquity) / dayStartEquity) * 100;
       if (targetArmedDay !== currentDay) {
-        if (netPct >= targetPct - 1e-9) targetArmedDay = currentDay;
+        if (netPct >= targetPct - 1e-9) {
+          targetArmedDay = currentDay;
+          armedDays.add(currentDay);
+        }
       } else if (netPct <= targetPct + 1e-9) {
         targetDay = currentDay;
       }
@@ -754,7 +759,7 @@ export function simulate(
       markers,
       durationMs: Date.now() - startedAt,
       stuckTrades,
-      dailyStats: dailyStatsFrom(dayKeys, evalStart, eqValues, initialCapital, targetPct > 0 ? targetPct : 1),
+      dailyStats: dailyStatsFrom(dayKeys, evalStart, eqValues, initialCapital, targetPct > 0 ? targetPct : 1, armedDays),
       ...gateFields(gates, blocked),
     },
   };
@@ -770,6 +775,9 @@ export function dailyTargetPct(risk: RiskConfig): number {
  * Resultaat per kalenderdag (Europe/Amsterdam): de equity aan het eind van de dag
  * tegenover het eind van de vorige dag (de eerste dag: het startkapitaal).
  * `equities[j]` hoort bij candle `evalStart + j`.
+ * Een dag haalde het dagdoel als hij eindigde op ≥ `targetPct`, of als hij in
+ * `reachedDays` staat: de winstgrens ging die dag aan (doel gehaald na verkoopkosten).
+ * Zo'n dag eindigt na het vastzetten juist op of net onder de grens, maar haalde het doel wel.
  */
 export function dailyStatsFrom(
   dayKeys: readonly string[],
@@ -777,22 +785,29 @@ export function dailyStatsFrom(
   equities: ArrayLike<number>,
   initialCapital: number,
   targetPct: number,
+  reachedDays?: ReadonlySet<string>,
 ): DailyStats {
   const dayPcts: number[] = [];
+  const eps = 1e-9;
+  let targetDays = 0;
   let start = initialCapital;
   for (let j = 0; j < equities.length; j++) {
-    const last = j === equities.length - 1 || dayKeys[evalStart + j + 1] !== dayKeys[evalStart + j];
+    const key = dayKeys[evalStart + j];
+    const last = j === equities.length - 1 || dayKeys[evalStart + j + 1] !== key;
     if (!last) continue;
     const end = equities[j];
-    if (start > 0 && Number.isFinite(end)) dayPcts.push((end / start - 1) * 100);
+    if (start > 0 && Number.isFinite(end)) {
+      const pct = (end / start - 1) * 100;
+      dayPcts.push(pct);
+      if (pct >= targetPct - eps || reachedDays?.has(key) === true) targetDays++;
+    }
     start = end;
   }
   const days = dayPcts.length;
-  const eps = 1e-9;
   return {
     days,
     targetPct,
-    targetDays: dayPcts.filter((p) => p >= targetPct - eps).length,
+    targetDays,
     winDays: dayPcts.filter((p) => p > eps).length,
     lossDays: dayPcts.filter((p) => p < -eps).length,
     avgDayPct: days > 0 ? dayPcts.reduce((a, b) => a + b, 0) / days : 0,

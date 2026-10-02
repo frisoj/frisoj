@@ -345,6 +345,8 @@ bus.on("app-info", (info) => {
 });
 // Meerdere bots (v3): de lijst van GET /api/bots (botwisselaar / tabblad Wedstrijd)
 let knownBots = null;
+// Voor panelen die na de eerste lijst mounten (bijv. Instellingen: teksten per bot)
+ctx.getBots = () => knownBots;
 bus.on("bots", (d) => {
   const list = d && Array.isArray(d.bots) ? normalizeBots(d.bots) : null;
   if (list) knownBots = list;
@@ -449,14 +451,22 @@ function setConnection(status) {
   if (el) {
     el.className = `conn ${connStatus}`;
     const text =
-      connStatus === "open" ? "Live verbonden" : connStatus === "closed" ? "Verbinding weg…" : "Verbinden…";
+      connStatus === "open"
+        ? "Live verbonden"
+        : connStatus === "closed"
+          ? "Verbinding weg…"
+          : connStatus === "paused"
+            ? "Gepauzeerd"
+            : "Verbinden…";
     el.querySelector(".conn-text").textContent = text;
     el.title =
       connStatus === "open"
         ? "Realtime verbinding met de bot actief"
         : connStatus === "closed"
           ? "Geen verbinding met de bot. Er wordt automatisch opnieuw verbonden. Draait de bot nog?"
-          : "Verbinden met de bot…";
+          : connStatus === "paused"
+            ? "Dit tabblad staat op de achtergrond: de live-verbinding staat even uit, zodat de knoppen in je andere tabbladen (ook de noodstop) blijven werken. De bot zelf draait gewoon door. Zodra je dit tabblad bekijkt, gaat de verbinding vanzelf weer aan."
+            : "Verbinden met de bot…";
   }
   if (connStatus === "open") {
     if (everOpen && prev === "closed") {

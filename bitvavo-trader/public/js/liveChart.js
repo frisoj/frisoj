@@ -212,6 +212,21 @@ export function initialRange(n, width) {
 }
 
 /**
+ * Toont initialRange() ALLE candles over de volle breedte (illiquide munt: minder candles
+ * dan er in beeld passen)? Dan moet die weergave bij het groter/kleiner maken van het
+ * venster blijven (lightweight-charts `lockVisibleTimeRangeOnResize`); anders houdt de
+ * grafiek de candlebreedte vast en staan de candles na telefoon → desktop weer klein
+ * rechts met tot 71% lege ruimte links. Met genoeg candles niet: dan komen er bij een
+ * breder venster gewoon meer candles in beeld.
+ */
+export function fillsWidth(n, width) {
+  const count = isNum(n) ? Math.max(0, Math.floor(n)) : 0;
+  const w = isNum(width) && width > 0 ? width : 800;
+  const bars = Math.max(40, Math.min(170, Math.round(w / BAR_PX)));
+  return count > 0 && count <= bars;
+}
+
+/**
  * Mag de huidige weergave na het verversen van DEZELFDE munt blijven staan (de gebruiker
  * kan ingezoomd of verschoven hebben)? Alleen als er dan nog minstens twee candles in
  * beeld zijn; anders null (→ initialRange).
@@ -685,7 +700,21 @@ export function mountLiveChart(ctx, els) {
       return;
     }
     st.rangePending = false;
+    setResizeLock(fillsWidth(st.candles.length, w));
     setRangeAll(initialRange(st.candles.length, w));
+  }
+  /** Weergave vasthouden bij een andere vensterbreedte (alleen als alle candles de breedte vullen, zie fillsWidth) */
+  let resizeLock = false;
+  function setResizeLock(on) {
+    if (on === resizeLock) return;
+    resizeLock = on;
+    for (const c of charts) {
+      try {
+        c.applyOptions({ timeScale: { lockVisibleTimeRangeOnResize: on } });
+      } catch {
+        /* oudere lightweight-charts */
+      }
+    }
   }
   const pendingRange = () => {
     if (st.rangePending) showInitialRange();

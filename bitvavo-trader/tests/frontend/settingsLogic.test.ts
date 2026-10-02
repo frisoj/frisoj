@@ -501,3 +501,26 @@ describe("ronde 5: 'Alle markten toevoegen' zoals de automatische keuze (UI-6)",
     expect(r.markets).toEqual(liquid.slice(0, 400));
   });
 });
+
+// Ronde 6: "Standaardwaarden" op het dashboard van een profiel-bot = zijn eigen handelsstijl
+describe("standaardwaarden per bot-profiel", () => {
+  it("profileDefaults(id) is precies profileEngineConfig van de server, voor elk profiel", async () => {
+    const { BOT_PROFILES, profileEngineConfig } = await import("../../src/bots/profiles");
+    for (const p of BOT_PROFILES) {
+      expect(L.profileDefaults(p.id), p.id).toEqual(JSON.parse(JSON.stringify(profileEngineConfig(p))));
+    }
+    expect(Object.keys(L.PROFILE_ENGINE).sort()).toEqual(BOT_PROFILES.map((p) => p.id).sort());
+    expect(L.profileDefaults("onbekend")).toBeNull();
+    expect(L.profileDefaults("__proto__")).toBeNull();
+  });
+
+  it("defaultsFor: van de server (info.bot.defaults), anders het profiel, anders de fabrieksinstellingen", () => {
+    const own = { ...cfg(), interval: "4h" };
+    expect(L.defaultsFor({ bot: { id: "trend", name: "Trendvolger", defaults: own } })).toMatchObject({ name: "Trendvolger", profile: true, config: { interval: "4h" } });
+    expect(L.defaultsFor({ bot: { id: "trend", name: "Trendvolger" } })).toMatchObject({ profile: true, config: { interval: "1h" } });
+    expect(L.defaultsFor({ bot: { id: "x", name: "X" } })).toEqual({ config: L.FACTORY_DEFAULTS, name: "", profile: false });
+    expect(L.defaultsFor(null)).toEqual({ config: L.FACTORY_DEFAULTS, name: "", profile: false });
+    // nooit dezelfde objecten als FACTORY_DEFAULTS (het concept wordt bewerkt)
+    expect(L.defaultsFor(null).config).not.toBe(L.FACTORY_DEFAULTS);
+  });
+});

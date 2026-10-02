@@ -21,6 +21,9 @@ const list = (bots) => (Array.isArray(bots) ? bots.filter((b) => b && typeof b =
 const nameOf = (b) => (b && (b.name || b.short || b.id)) || "?";
 const shortOf = (b) => (b && (b.short || b.name || b.id)) || "?";
 
+/** € met teken; minder dan een halve cent is gewoon "€ 0,00" (geen "-€ 0,00") */
+const eurSignedCent = (v) => fmt.eurSigned(isNum(v) && Math.abs(v) < CENT ? 0 : v);
+
 /** Totaal resultaat in € (engine) */
 const netOf = (b) => n0(b && b.totalPnlQuote);
 /** Resultaat vóór kosten (server: grossPnlQuote = totalPnlQuote + feesPaid) */
@@ -105,18 +108,21 @@ export function medal(rank, tied = false, started = true, solo = false) {
 /**
  * Status van een bot: actief / gestopt / gepauzeerd (risicobeheer) / winst vastgezet.
  * `reason` = de Nederlandse reden van de engine (leeg als er geen is).
+ * Een gestopte bot is altijd "Gestopt" (ook als de winst vandaag al vastgezet was: hij
+ * gaat morgen NIET vanzelf verder); de reden van de pauze blijft dan zichtbaar.
  */
 export function statusView(b) {
   const h = (b && b.halted && typeof b.halted === "object" && b.halted) || {};
   const reason = typeof h.reason === "string" ? h.reason.trim() : "";
-  if (h.halted && h.dailyTarget) {
-    return { key: "target", label: "Winst vastgezet", cls: "badge-green", dot: "on", reason: reason || "Dagdoel gehaald: de winst is vastgezet tot morgen." };
+  const targetReason = reason || "Dagdoel gehaald: de winst is vastgezet tot morgen.";
+  if (!(b && b.running)) {
+    return { key: "stopped", label: "Gestopt", cls: "badge-muted", dot: "off", reason: h.halted ? (h.dailyTarget ? targetReason : reason) : "" };
   }
-  if (b && b.running && h.halted) {
+  if (h.halted && h.dailyTarget) return { key: "target", label: "Winst vastgezet", cls: "badge-green", dot: "on", reason: targetReason };
+  if (h.halted) {
     return { key: "halted", label: "Gepauzeerd", cls: "badge-yellow", dot: "warn", reason: reason || "Nieuwe trades gepauzeerd door het risicobeheer." };
   }
-  if (b && b.running) return { key: "running", label: "Actief", cls: "badge-green", dot: "on", reason: "" };
-  return { key: "stopped", label: "Gestopt", cls: "badge-muted", dot: "off", reason: h.halted ? reason : "" };
+  return { key: "running", label: "Actief", cls: "badge-green", dot: "on", reason: "" };
 }
 
 /** Badge voor de bot die in live modus draait (null = oefengeld) */
@@ -132,6 +138,7 @@ export function liveBadge(b) {
  *  - "none":  nog geen kosten
  *  - "keeps": winst vóór kosten, en de bot houdt er iets van over (`keptPct` + `feePct` = 100)
  *  - "eaten": de kosten zijn even groot of groter dan de winst vóór kosten
+ *  - "zero":  vóór kosten quitte (minder dan een halve cent); het verlies komt door de kosten
  *  - "loss":  ook vóór kosten al verlies; de kosten maken het erger
  */
 export function costView(b) {
@@ -148,6 +155,7 @@ export function costView(b) {
     };
   }
   if (gross > CENT) return { kind: "eaten", keptPct: 0, feePct: 100, text: "De kosten zijn groter dan de winst vóór kosten" };
+  if (gross >= -CENT) return { kind: "zero", keptPct: 0, feePct: 100, text: "Vóór kosten quitte; het verlies komt door de kosten" };
   return { kind: "loss", keptPct: 0, feePct: 100, text: "Ook vóór kosten verlies; de kosten maken het erger" };
 }
 
@@ -182,10 +190,10 @@ export function cardView(b, currentId = "", started = true, solo = false) {
       isNum(b.startingEquity) ? `budget ${fmt.eur(b.startingEquity)}` : "",
       open ? `${plural(open, "positie", "posities")} open` : "",
     ].filter(Boolean),
-    resultEur: fmt.eurSigned(b.totalPnlQuote),
+    resultEur: eurSignedCent(b.totalPnlQuote),
     resultPct: fmt.pct(b.totalReturnPct),
     resultCls: fmt.pnlClass(isNum(b.totalReturnPct) ? shownPct(b.totalReturnPct) : b.totalPnlQuote),
-    grossEur: fmt.eurSigned(gross),
+    grossEur: eurSignedCent(gross),
     grossCls: fmt.pnlClass(Math.abs(gross) < CENT ? 0 : gross),
     fees: fmt.eur(n0(b.feesPaid)),
     cost: costView(b),
@@ -196,7 +204,7 @@ export function cardView(b, currentId = "", started = true, solo = false) {
     tradesTotal: String(trades),
     maxDd: fmt.pct(ddShown),
     ddCls: ddShown ? "neg" : "flat",
-    dayEur: fmt.eurSigned(b.dayPnlQuote),
+    dayEur: eurSignedCent(b.dayPnlQuote),
     dayPct: fmt.pct(b.dayReturnPct),
     dayCls: fmt.pnlClass(Math.abs(n0(b.dayPnlQuote)) < CENT ? 0 : b.dayPnlQuote),
   };
@@ -405,9 +413,62 @@ export const CHART_MODES = [
  * laatste punt − totalPnlQuote, zodat de storting geen nep-verlies wordt.
  * Met `nowMs` komt er een punt "nu" bij met de cijfers van de engine, zodat de lijn
  * precies eindigt bij wat de ranglijst toont.
- * @returns {{ id: string, name: string, short: string, color: string, data: { time: number, value: number }[], last: number | null }[]}
+ * Met twee of meer lijnen staan ze daarna samen op één gelijkmatig tijdraster
+ * (zie {@link sharedTimeGrid}); `data` kan dan lege punten `{ time }` bevatten.
+ * @returns {{ id: string, name: string, short: string, color: string, data: { time: number, value?: number }[], last: number | null }[]}
  */
-export function chartSeries(bots, mode = "pct", nowMs = null) {
+export function chartSeries(bots, mode = "pct", nowMs = null, maxPoints = CHART_POINTS) {
+  return sharedTimeGrid(ownSeries(bots, mode, nowMs), maxPoints);
+}
+
+/** Maximaal aantal tijden op de gezamenlijke tijdas van de grafiek */
+export const CHART_POINTS = 300;
+
+/**
+ * Alle lijnen op één gelijkmatig tijdraster. lightweight-charts zet punten op volgorde
+ * (index), niet op tijd: met elke bot zijn eigen tijden werd de tijdas de vereniging van
+ * ongelijke stappen. Een korte geschiedenis (bijv. na "Reset oefengeld": 60 punten in het
+ * laatste uur van 72) nam zo 18% van de breedte in voor 1,4% van de tijd en de tijdas kreeg
+ * rare sprongen. Daarom: ≤ `maxPoints` gelijk verdeelde tijden van het eerste tot het
+ * laatste punt (seconden), per lijn de waarde op dat moment (rechte lijn tussen twee
+ * punten, precies wat de grafiek ook tekent; na het laatste punt de laatste waarde), en
+ * vóór het eerste punt van een lijn een leeg punt `{ time }`. Eén lijn (of geen) blijft
+ * zoals hij is.
+ */
+export function sharedTimeGrid(series, maxPoints = CHART_POINTS) {
+  const all = Array.isArray(series) ? series : [];
+  const withData = all.filter((s) => s && Array.isArray(s.data) && s.data.length);
+  if (withData.length < 2) return all;
+  const t0 = Math.min(...withData.map((s) => s.data[0].time));
+  const t1 = Math.max(...withData.map((s) => s.data[s.data.length - 1].time));
+  if (!(t1 > t0)) return all;
+  const n = Math.max(2, Math.min(Math.max(2, Math.floor(maxPoints) || CHART_POINTS), t1 - t0 + 1));
+  const grid = [];
+  for (let i = 0; i < n; i++) {
+    const t = i === n - 1 ? t1 : Math.round(t0 + ((t1 - t0) * i) / (n - 1));
+    if (!grid.length || t > grid[grid.length - 1]) grid.push(t);
+  }
+  return all.map((s) => {
+    if (!s || !Array.isArray(s.data) || !s.data.length) return s;
+    const data = [];
+    let j = -1;
+    for (const t of grid) {
+      while (j + 1 < s.data.length && s.data[j + 1].time <= t) j++;
+      if (j < 0) {
+        data.push({ time: t });
+        continue;
+      }
+      const a = s.data[j];
+      const b = s.data[j + 1];
+      const value = b && b.time > a.time ? a.value + ((b.value - a.value) * (t - a.time)) / (b.time - a.time) : a.value;
+      data.push({ time: t, value });
+    }
+    return { ...s, data };
+  });
+}
+
+/** Lijn per bot met zijn eigen tijden (zie chartSeries) */
+function ownSeries(bots, mode, nowMs) {
   const eur = mode === "eur";
   return list(bots).map((b, i) => {
     const bySec = new Map();
@@ -445,9 +506,25 @@ export function chartValueText(v, mode = "pct") {
   return mode === "eur" ? fmt.eurSigned(v) : fmt.pct(v);
 }
 
-/** true als geen enkele lijn minstens twee punten heeft */
+/** true als geen enkele lijn minstens twee punten met een waarde heeft (lege punten tellen niet) */
 export function chartIsEmpty(series) {
-  return !(series || []).some((s) => s && Array.isArray(s.data) && s.data.length >= 2);
+  return !(series || []).some((s) => s && Array.isArray(s.data) && s.data.filter((d) => d && isNum(d.value)).length >= 2);
+}
+
+/**
+ * Weergave na "passend maken" (fitContent zet het eerste punt precies op de rand, dan
+ * valt het eerste en laatste tijdlabel half buiten beeld: "9:00" in plaats van "19:00").
+ * Geeft het logische bereik met links en rechts `padPx` pixels marge, of null.
+ * @param {{ from: number, to: number } | null} range  bereik na fitContent
+ * @param {number} widthPx  breedte van de tijdas
+ */
+export function edgePaddedRange(range, widthPx, padPx = 28) {
+  if (!range || !isNum(range.from) || !isNum(range.to) || !(range.to > range.from)) return null;
+  const span = range.to - range.from;
+  const w = isNum(widthPx) ? widthPx : 0;
+  // de oude breedte moet in (w − 2 × marge) passen: marge in punten = padPx / (pixels per punt)
+  const pad = w > 4 * padPx ? Math.max(0.5, (span * padPx) / (w - 2 * padPx)) : 0.5;
+  return { from: range.from - pad, to: range.to + pad };
 }
 
 // ─────────────────────────────── Lege staten ───────────────────────────────

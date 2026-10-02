@@ -158,7 +158,16 @@ export interface BotActionResult {
   ok: boolean;
   error?: string;
   killResult?: KillResult;
+  /**
+   * De actie liep na {@link BOT_ACTION_WAIT_MS} nog (bijv. een hangende order bij Bitvavo):
+   * het antwoord wacht er niet langer op, de actie zelf loopt gewoon door. Dan `ok: false`
+   * met een Nederlandse `error` die naar het dashboard van die bot verwijst.
+   */
+  pending?: boolean;
 }
+
+/** Zo lang wacht `POST /api/bots/start-all | stop-all | kill-all` hooguit op één bot. */
+export const BOT_ACTION_WAIT_MS = 20_000;
 
 export interface ApiDeps {
   config: AppConfig;
@@ -179,6 +188,8 @@ export interface ApiDeps {
    * met dezelfde beveiliging als elke andere API-route.
    */
   bots?: () => readonly BotEntry[];
+  /** Hoe lang de `/api/bots`-acties hooguit op één bot wachten (standaard {@link BOT_ACTION_WAIT_MS}). */
+  botActionWaitMs?: number;
   /**
    * Gedeelde vergrendeling voor backtest/optimalisatie/walk-forward (één tegelijk).
    * Meerdere bots in één proces delen één rekenwerker en dus ook deze vergrendeling;
@@ -223,29 +234,55 @@ function failedText(failed: KillResult["failed"]): string {
   return shown.join("; ");
 }
 
+const STILL_RUNNING = Symbol("bezig");
+
 /**
  * Voert een actie uit op ELKE bot tegelijk; een fout bij de ene bot houdt de andere
  * niet tegen (allSettled). De actie wordt voor alle bots synchroon in gang gezet, dus
- * bij de noodstop stoppen alle bots meteen met kopen.
+ * bij de noodstop stoppen alle bots meteen met kopen. Op een bot die na `waitMs` nog
+ * bezig is (bijv. een hangende order) wacht het antwoord niet langer: die krijgt
+ * `pending: true` met `pendingText`; zijn actie loopt gewoon door.
  */
 async function forEachBot<T>(
   bots: readonly BotEntry[],
   action: (bot: BotEntry) => Promise<T>,
   toResult: (bot: BotEntry, value: T) => BotActionResult,
+  wait: { ms: number; pendingText: string },
 ): Promise<{ results: BotActionResult[] }> {
   const runs = bots.map((bot) => {
     try {
-      return action(bot);
+      return Promise.resolve(action(bot));
     } catch (err) {
       return Promise.reject(err);
     }
   });
-  const settled = await Promise.allSettled(runs);
-  return {
-    results: settled.map((r, i) =>
-      r.status === "fulfilled" ? toResult(bots[i], r.value) : { id: bots[i].id, ok: false, error: errorMessage(r.reason) },
+  // Elke uitkomst krijgt meteen een handler: ook een fout NA het antwoord blijft netjes afgehandeld.
+  const outcomes = runs.map((p) =>
+    p.then(
+      (value): PromiseSettledResult<T> => ({ status: "fulfilled", value }),
+      (reason: unknown): PromiseSettledResult<T> => ({ status: "rejected", reason }),
     ),
-  };
+  );
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const deadline =
+    Number.isFinite(wait.ms) && wait.ms > 0
+      ? new Promise<typeof STILL_RUNNING>((resolve) => {
+          timer = setTimeout(() => resolve(STILL_RUNNING), wait.ms);
+        })
+      : null;
+  try {
+    const settled = await Promise.all(outcomes.map((o) => (deadline ? Promise.race([o, deadline]) : o)));
+    return {
+      results: settled.map((r, i): BotActionResult => {
+        if (r === STILL_RUNNING) return { id: bots[i].id, ok: false, pending: true, error: wait.pendingText };
+        return r.status === "fulfilled"
+          ? toResult(bots[i], r.value)
+          : { id: bots[i].id, ok: false, error: errorMessage(r.reason) };
+      }),
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export function buildApiRouter(deps: ApiDeps): Router {
@@ -589,12 +626,15 @@ export function buildApiRouter(deps: ApiDeps): Router {
   // ── Meerdere bots (wedstrijd) ──
   if (deps.bots) {
     const bots = deps.bots;
+    const waitMs = deps.botActionWaitMs ?? BOT_ACTION_WAIT_MS;
+    const later = "kijk in het dashboard van deze bot of het gelukt is";
     router.get("/api/bots", () => bots().map((b) => b.summary()));
     router.post("/api/bots/start-all", () =>
       forEachBot(
         bots(),
         (b) => b.engine.start(),
         (b) => ({ id: b.id, ok: true }),
+        { ms: waitMs, pendingText: `Starten loopt nog; ${later}` },
       ),
     );
     router.post("/api/bots/stop-all", () =>
@@ -602,6 +642,7 @@ export function buildApiRouter(deps: ApiDeps): Router {
         bots(),
         (b) => b.engine.stop(),
         (b) => ({ id: b.id, ok: true }),
+        { ms: waitMs, pendingText: `Stoppen loopt nog (een lopende order wordt eerst afgemaakt); ${later}` },
       ),
     );
     // Noodstop van ALLE bots: elke bot krijgt zijn noodstop, ook als die van een andere
@@ -619,6 +660,12 @@ export function buildApiRouter(deps: ApiDeps): Router {
             error: `Niet alles verkocht: ${failedText(killResult.failed)}`,
             killResult,
           };
+        },
+        {
+          ms: waitMs,
+          pendingText:
+            "Noodstop loopt nog (bijv. een verkooporder waar Bitvavo nog niet op antwoordde); de bot koopt niets meer. " +
+            "Kijk in het dashboard van deze bot welke posities nog open staan.",
         },
       ),
     );

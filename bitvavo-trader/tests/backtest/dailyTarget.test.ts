@@ -67,7 +67,52 @@ describe("Dagdoel als winstgrens in de backtest", () => {
     const r = run(1, [0, 10, 100]);
     expect(r.dailyStats).toMatchObject({ days: 3, targetPct: 1 });
     expect(r.dailyStats!.bestDayPct).toBeGreaterThan(0);
-    expect(r.dailyStats!.targetDays).toBe(0); // dag 1 eindigde na het vastzetten net onder +1%
+    // Dag 1 haalde het dagdoel (grens aan) en zette de winst vast; hij eindigde daardoor net onder +1%,
+    // maar telt wel als dag die het dagdoel haalde. Dag 2 en 3 haalden het niet.
+    expect(r.dailyStats!.bestDayPct).toBeLessThan(1);
+    expect(r.dailyStats!.targetDays).toBe(1);
+  });
+
+  it("dailyStats: een dag waarop de winst werd vastgezet telt als 'dagdoel gehaald' (niet als gemist)", () => {
+    // Candle 5 sluit op 103 (+1,35% na kosten: grens aan), candle 6 op 102,2: terug op de grens → vastzetten.
+    const c = flatCandles(N, 100);
+    c[5] = candle(5, 100, 103.1, 99.9, 103);
+    c[6] = candle(6, 103, 103, 102.1, 102.2);
+    for (let i = 7; i < N; i++) c[i] = candle(i, 102.2, 102.3, 102.1, 102.2);
+    const r = run(1, [0], c);
+    expect(r.trades).toHaveLength(1);
+    expect(r.trades[0]).toMatchObject({ exitReason: "daily-target" });
+    expect(r.dailyStats).toMatchObject({ days: 3, targetPct: 1, targetDays: 1, winDays: 1 });
+    expect(r.dailyStats!.bestDayPct).toBeLessThan(1); // eindigde onder +1%, maar haalde het doel wel
+  });
+
+  it("dailyStats: haalde de dag het doel en zakte hij daarna hard terug, dan telt hij nog steeds (één keer)", () => {
+    // Grens aan op candle 5; candle 6 zakt in één keer naar 99 (onder de start): verkocht met verlies.
+    const c = flatCandles(N, 100);
+    c[5] = candle(5, 100, 103.1, 99.9, 103);
+    c[6] = candle(6, 103, 103, 98.9, 99);
+    for (let i = 7; i < N; i++) c[i] = candle(i, 99, 99.1, 98.9, 99);
+    const r = run(1, [0], c);
+    expect(r.trades[0]).toMatchObject({ exitReason: "daily-target" });
+    expect(r.dailyStats).toMatchObject({ days: 3, targetDays: 1, winDays: 0, lossDays: 1 });
+  });
+
+  it("dailyStats: de grens ging niet aan (alleen +1% vóór kosten) → geen dagdoel-dag", () => {
+    const c = flatCandles(N, 100);
+    c[5] = candle(5, 100, 102.6, 99.9, 102.5);
+    for (let i = 6; i < N; i++) c[i] = candle(i, 100.5, 100.6, 100.4, 100.5);
+    const r = run(1, [0], c);
+    expect(r.dailyStats!.targetDays).toBe(0);
+  });
+
+  it("dailyStats met dagdoel uit: alleen het dagresultaat telt (≥ +1%), geen grens", () => {
+    // Zonder dagdoel wordt er niet om het dagdoel verkocht; de dag telt alleen op zijn slot.
+    const r = run(0, [0, 10, 100]);
+    expect(r.trades.some((t) => t.exitReason === "daily-target")).toBe(false);
+    expect(r.dailyStats).toMatchObject({ days: 3, targetPct: 1 });
+    // Dag 1 eindigt op ~+0,7% (50 euro in de munt, +1,5%, minus kosten): niet gehaald, en geen grens die meetelt.
+    expect(r.dailyStats!.bestDayPct).toBeLessThan(1);
+    expect(r.dailyStats!.targetDays).toBe(0);
   });
 });
 
@@ -86,5 +131,16 @@ describe("dailyStatsFrom", () => {
     // evalStart schuift de dagsleutels op
     expect(dailyStatsFrom(["x", "a", "a"], 1, [100, 102], 100, 1)).toMatchObject({ days: 1, targetDays: 1 });
     expect(dailyStatsFrom([], 0, [], 100, 1)).toMatchObject({ days: 0, avgDayPct: 0 });
+  });
+
+  it("telt een dag uit reachedDays (grens ging aan) mee, ook als hij onder het doel eindigde; nooit dubbel", () => {
+    const keys = ["a", "a", "b", "b", "c"];
+    const eq = [100, 101.5, 100.5, 99.5, 101];
+    // b eindigde op -1,97%, maar haalde het doel (grens aan); a haalde het al op het slot (+1,5%): één keer tellen
+    expect(dailyStatsFrom(keys, 0, eq, 100, 1, new Set(["a", "b"]))).toMatchObject({ days: 3, targetDays: 3 });
+    expect(dailyStatsFrom(keys, 0, eq, 100, 1, new Set(["b"]))).toMatchObject({ days: 3, targetDays: 3 });
+    expect(dailyStatsFrom(keys, 0, eq, 100, 1, new Set())).toMatchObject({ days: 3, targetDays: 2 });
+    // een dag buiten de testperiode (vóór evalStart) telt niet
+    expect(dailyStatsFrom(["x", "a", "a"], 1, [100, 100.2], 100, 1, new Set(["x"]))).toMatchObject({ days: 1, targetDays: 0 });
   });
 });

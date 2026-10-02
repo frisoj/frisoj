@@ -1179,6 +1179,7 @@ export class TradingEngine extends EventEmitter {
 
     const changed = Object.keys(p).filter((k) => k in prev || k === "universe");
     this.log("info", `Instellingen bijgewerkt${changed.length ? ` (${changed.join(", ")})` : ""}`);
+    this.onTargetChanged(prev.risk.dailyProfitTargetPct, next.risk.dailyProfitTargetPct);
     if (pollChanged && this.running && this.timer) this.scheduleNext();
     if (pollChanged && this.monitorTimer) this.scheduleMonitor();
     this.emitSnapshot();
@@ -1593,8 +1594,20 @@ export class TradingEngine extends EventEmitter {
     if (capacity) this.logThrottled("capacity", "warn", capacity, Number.POSITIVE_INFINITY);
     else this.throttle.delete("capacity");
     const bulk = await this.refreshBulkPrices(active);
-    // Candles van een positie niet opgehaald: dan de stop controleren met de verse koers van net.
-    if (bulk && unchecked.length > 0) await this.checkHeldAtPrices(unchecked, bulk, now);
+    // Stop-controle met de verse koers van net, voor ELKE positie: candles kunnen iets ouder
+    // zijn (vlak vóór het sluiten van een candle opgehaald, of gedeeld met een andere bot) en
+    // een oudere koers mag een geraakte stop nooit verbergen. Posities waarvan de candles niet
+    // opgehaald konden worden ("unchecked") krijgen zo hun enige controle. Een verkoop die al
+    // loopt (pendingExit) is deze tick bij de candles al geprobeerd: niet nog eens.
+    if (bulk && this.positions.length > 0) {
+      const retry = new Set(unchecked);
+      await this.checkHeldAtPrices(
+        uniq(this.positions.map((p) => p.market)),
+        bulk,
+        now,
+        (pos) => retry.has(pos.market) || !this.pendingExit.has(pos.id),
+      );
+    }
     // Dagdoel / winstgrens (met de koersen van net).
     await this.safeLockInDailyTarget();
     // Live: nieuw gekozen munten ook controleren op coins die de bot niet beheert.
@@ -1645,6 +1658,9 @@ export class TradingEngine extends EventEmitter {
   private async lockInDailyTarget(): Promise<void> {
     // Zelfde voorwaarde als voor kopen: niet meer als de gebruiker intussen op Stop/Noodstop drukte.
     if (!this.buyAllowed()) return;
+    // Dagwissel uitgesteld (nog geen koers bij het begin van de tick): de koersen van vandaag
+    // nooit tegen de winstgrens van gisteren afzetten.
+    if (dayKey(this.nowFn()) !== this.account.dayKey) return;
     this.updateEquity();
     this.checkTargetReached();
     const h = this.refreshHalt();
@@ -1656,6 +1672,28 @@ export class TradingEngine extends EventEmitter {
       if (!isNum(price) || price <= 0) continue;
       await this.exitPosition(pos, "daily-target", price, false);
     }
+  }
+
+  /**
+   * Dagdoel VERHOOGD (of aangezet) terwijl de winstgrens van vandaag al actief was: het nieuwe
+   * doel is nog niet gehaald, dus de grens gaat weer uit tot de dagwinst het nieuwe doel haalt
+   * (anders zou de bot meteen alles verkopen, want de dagwinst ligt onder het nieuwe doel).
+   * Verlagen houdt de grens actief (het lagere doel is vandaag al gehaald). Al vastgezette
+   * winst blijft tot morgen vastgezet.
+   */
+  private onTargetChanged(before: number | undefined, after: number | undefined): void {
+    const prevTarget = isNum(before) && before > 0 ? before : 0;
+    const nextTarget = isNum(after) && after > 0 ? after : 0;
+    if (!(nextTarget > prevTarget)) return;
+    const day = this.account.dayKey;
+    if (this.targetArmedDayKey !== day || this.targetDayKey === day) return;
+    this.targetArmedDayKey = null;
+    const t = Number.isInteger(nextTarget) ? String(nextTarget) : nextTarget.toFixed(2).replace(".", ",");
+    this.log(
+      "info",
+      `Dagdoel verhoogd naar +${t}%: de winstgrens van vandaag staat weer uit en gaat pas aan als de dagwinst +${t}% haalt`,
+    );
+    this.persistSync(true);
   }
 
   /** Dagdoel vandaag voor het eerst gehaald (na verkoopkosten)? Dan de winstgrens activeren. */
@@ -1704,11 +1742,16 @@ export class TradingEngine extends EventEmitter {
    * zonder gesloten candles): voor posities waarvan de candles niet opgehaald konden worden,
    * en tussendoor in een lange tick.
    */
-  private async checkHeldAtPrices(markets: readonly string[], prices: Record<string, number>, now: number): Promise<void> {
+  private async checkHeldAtPrices(
+    markets: readonly string[],
+    prices: Record<string, number>,
+    now: number,
+    include: (pos: Position) => boolean = () => true,
+  ): Promise<void> {
     for (const market of markets) {
       const price = Object.hasOwn(prices, market) ? prices[market] : undefined;
       if (!isNum(price) || price <= 0) continue;
-      for (const pos of this.positions.filter((p) => p.market === market)) {
+      for (const pos of this.positions.filter((p) => p.market === market && include(p))) {
         try {
           await this.managePosition(pos, [], new Map(), price, now);
         } catch (err) {
@@ -2756,8 +2799,26 @@ export class TradingEngine extends EventEmitter {
     this.haltedDayKey = null;
     this.targetDayKey = null;
     this.targetArmedDayKey = null;
+    // Een dagdoel-verkoop van gisteren die nog niet lukte (afgewezen, live niet gearmd…)
+    // vervalt: vandaag is het doel niet gehaald. De positie krijgt weer de gewone stop- en
+    // koersdoelbewaking. Een verkoop met onbekende uitkomst blijft wel staan.
+    const dropped: string[] = [];
+    for (const [id, reason] of [...this.pendingExit]) {
+      if (reason !== "daily-target" || this.unknownSellFor(id)) continue;
+      this.pendingExit.delete(id);
+      this.throttle.delete(`wouldsell:${id}`);
+      const pos = this.positions.find((p) => p.id === id);
+      if (pos) dropped.push(pos.market);
+    }
     this.updateEquity();
     this.log("info", `Nieuwe handelsdag (${key}): dagtellers gereset, startequity ${fmtEur(this.account.equity)}`);
+    if (dropped.length > 0) {
+      this.log(
+        "info",
+        `Verkoop om de winst van gisteren vast te zetten vervalt voor ${uniq(dropped).join(", ")}: ` +
+          "de positie blijft open en wordt weer gewoon bewaakt (stop-loss en koersdoel)",
+      );
+    }
   }
 
   /**
@@ -4580,6 +4641,25 @@ export class TradingEngine extends EventEmitter {
     } catch (err) {
       h = { halted: true, reason: `Risicocontrole mislukt: ${errorMessage(err)}` };
     }
+    // Een open positie zonder actuele koers (bijv. net na een herstart) telt tegen de
+    // instapkoers, en zolang de dagwissel wacht (dagstart van gisteren) is het dagresultaat
+    // een mengsel van twee dagen: dan is het dagresultaat niet echt. Daarop nooit de
+    // verlieslimiet of de winstgrens vastzetten (tot morgen) en nooit alles verkopen; wel
+    // voorzichtig: geen nieuwe aankopen tot het klopt. Al eerder vastgezet blijft gelden.
+    let unknownDay: string | null = null;
+    if (h.halted && (h.dailyTarget === true || this.isDailyLossHalt(h))) {
+      const missing = uniq(
+        this.positions.filter((p) => !(isNum(this.prices[p.market]) && this.prices[p.market] > 0)).map((p) => p.market),
+      );
+      if (missing.length > 0) {
+        unknownDay =
+          `Dagresultaat nog onbekend: nog geen actuele koers voor ${missing.join(", ")} — ` +
+          "geen nieuwe aankopen tot die koers er is";
+      } else if (dayKey(this.nowFn()) !== this.account.dayKey) {
+        unknownDay = "Nieuwe handelsdag nog niet verwerkt: geen nieuwe aankopen tot de dagwissel klaar is";
+      }
+      if (unknownDay !== null) h = { halted: false };
+    }
     // De dagelijkse verlieslimiet geldt tot de dagwissel, ook als open posities
     // daarna herstellen (de risk manager zelf kijkt alleen naar de huidige equity).
     if (h.halted && this.isDailyLossHalt(h)) {
@@ -4597,7 +4677,10 @@ export class TradingEngine extends EventEmitter {
     } else if (!h.halted && this.targetDayKey !== null && this.targetDayKey === this.account.dayKey) {
       h = { halted: true, reason: "Dagwinst vandaag vastgezet: geen nieuwe trades tot morgen", dailyTarget: true };
     }
-    if (h.halted && !this.halted.halted) {
+    // dailyLimit: false, zodat isDailyLossHalt hem niet alsnog als verlieslimiet ziet.
+    if (unknownDay !== null && !h.halted) h = { halted: true, reason: unknownDay, dailyLimit: false };
+    // Ook melden als een andere pauze overgaat in "winst vastgezet" (dan worden posities verkocht).
+    if (h.halted && (!this.halted.halted || (h.dailyTarget === true && this.halted.dailyTarget !== true))) {
       if (h.dailyTarget === true) {
         this.log(
           "info",
@@ -5153,20 +5236,31 @@ export class TradingEngine extends EventEmitter {
           }
         }
       }
-      // Intussen gestart (of een tick bezig): die werkt de koersen zelf bij.
-      if (this.running || this.tickInFlight) return;
-      if (fetched.length === 0) {
-        if (lastError !== null) {
-          this.logThrottled("monitor", "warn", `Koersen niet ververst terwijl de bot stilstaat: ${errorMessage(lastError)}`);
+      // Intussen gestart (of een tick bezig): die werkt de koersen zelf bij. Een positie die
+      // nog GEEN koers heeft (net na een herstart) krijgt deze echte koers wel: anders telt
+      // hij in de eerste tick tegen de instapkoers (verkeerd dagresultaat).
+      if (this.running || this.tickInFlight) {
+        for (const { market, price } of fetched) {
+          const known = this.prices[market];
+          if (!(isNum(known) && known > 0)) this.prices[market] = price;
         }
         return;
       }
       const now = this.nowFn();
+      if (fetched.length === 0) {
+        if (lastError !== null) {
+          this.logThrottled("monitor", "warn", `Koersen niet ververst terwijl de bot stilstaat: ${errorMessage(lastError)}`);
+        }
+        // Zonder open posities kan de dagwissel ook zonder koersen.
+        this.rolloverWhileStopped(now);
+        return;
+      }
       for (const { market, price, event } of fetched) {
         this.prices[market] = price;
         if (event) this.emitEvent("price", { market, price, time: now });
       }
       this.updateEquity();
+      this.rolloverWhileStopped(now);
       this.flushRebasePoint();
       this.recordEquity(now, false);
       this.emitSnapshot();
@@ -5178,6 +5272,21 @@ export class TradingEngine extends EventEmitter {
     });
     this.monitorRun = tracked;
     return tracked;
+  }
+
+  /**
+   * Dagwissel terwijl de bot stilstaat (koersbewaking): anders blijven "vandaag", de
+   * dagtellers en een dagdoel- of verlieslimiet-pauze van gisteren staan tot iemand op
+   * Start drukt. Alleen als er geen order of noodstop loopt; zonder actuele koers voor
+   * elke positie wacht checkDayRollover zelf.
+   */
+  private rolloverWhileStopped(now: number): void {
+    if (this.running || this.tickInFlight || this.ordersInFlight > 0 || this.killsInProgress > 0) return;
+    const day = this.account.dayKey;
+    this.checkDayRollover(now);
+    if (this.account.dayKey === day) return;
+    this.refreshHalt();
+    this.persistSync(false);
   }
 
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {

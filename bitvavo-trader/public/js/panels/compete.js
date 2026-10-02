@@ -18,6 +18,7 @@ import {
   chartSeries,
   chartValueText,
   chartIsEmpty,
+  edgePaddedRange,
   boardState,
   bulkDisabled,
   bulkConfirm,
@@ -158,6 +159,8 @@ export function mountCompete(ctx, el) {
   let hover = null; // { time, values: Map } tijdens het bewegen over de grafiek
   let lastSize = "";
   let lastSeries = [];
+  /** Aantal verschillende tijden in de grafiek (= logische punten 0 … n−1) */
+  let pointCount = 0;
 
   if (LC && chartEl && typeof LC.createChart === "function") {
     try {
@@ -226,7 +229,21 @@ export function mountCompete(ctx, el) {
       sizeChart();
       if (!lastSize) return; // nog geen afmetingen: later (tab-changed / ResizeObserver)
     }
-    chart.timeScale().fitContent();
+    const ts = chart.timeScale();
+    ts.fitContent();
+    // Marge links en rechts, zodat het eerste en laatste tijdlabel heel blijven. Uit het
+    // aantal punten (0 … n−1), niet uit getVisibleLogicalRange(): lightweight-charts past
+    // fitContent pas bij de volgende tekenbeurt toe.
+    try {
+      if (pointCount >= 2 && typeof ts.setVisibleLogicalRange === "function") {
+        const tw = typeof ts.width === "function" ? Number(ts.width()) : 0;
+        const w = tw > 0 ? tw : Math.max(0, (chartEl.clientWidth || 0) - 56);
+        const r = edgePaddedRange({ from: 0, to: pointCount - 1 }, w);
+        if (r) ts.setVisibleLogicalRange(r);
+      }
+    } catch {
+      /* oudere lightweight-charts: alleen passend maken */
+    }
     needFit = false;
   }
   if (chartEl && typeof ResizeObserver === "function") {
@@ -303,6 +320,9 @@ export function mountCompete(ctx, el) {
         const zero = isFinite(tMin) ? (tMax > tMin ? [{ time: tMin, value: 0 }, { time: tMax, value: 0 }] : [{ time: tMin, value: 0 }]) : [];
         zeroSeries.setData(zero);
       }
+      const times = new Set();
+      for (const s of ser) for (const d of s.data) times.add(d.time);
+      pointCount = times.size;
       if (needFit) fit();
     }
     const emptyEl = part("chartempty");

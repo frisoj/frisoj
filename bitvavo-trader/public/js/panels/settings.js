@@ -2,12 +2,12 @@
 // risicobeheer, strategieën, live handel (inschakelen/uitschakelen) en het
 // dashboard-token. Opslaan via PUT /api/config.
 
-import { setToken } from "../api.js";
+import { setToken, BASE } from "../api.js";
 import {
   RISK_GROUPS,
   MAX_MARKETS,
   UNIVERSE_COUNT_PRESETS,
-  FACTORY_DEFAULTS,
+  defaultsFor,
   clone,
   stable,
   getPath,
@@ -91,7 +91,37 @@ export function mountSettings(ctx, el) {
     /** Laatste snapshot (muntkeuze, actieve munten, marktfilter) */
     snap: ctx.getState?.() || null,
     loaded: false,
+    /** Aantal bots in dit programma (GET /api/bots via het bus-event "bots"); null = onbekend */
+    botCount: Array.isArray(ctx.getBots?.()) ? ctx.getBots().length : null,
   };
+
+  /** Draaien er meerdere bots (elk met eigen instellingen)? Onder /bot/<id>/ altijd. */
+  const multiBot = () => !!BASE || (Number.isFinite(state.botCount) && state.botCount > 1);
+  /** De bot van dit dashboard ({ id, name }) bij meerdere bots, anders null */
+  function thisBot() {
+    if (!multiBot()) return null;
+    const b = state.info && state.info.bot && typeof state.info.bot === "object" ? state.info.bot : null;
+    const id = b && typeof b.id === "string" && /^[A-Za-z0-9_-]+$/.test(b.id) ? b.id : BASE ? BASE.slice("/bot/".length) : "";
+    return id ? { id, name: (b && typeof b.name === "string" && b.name) || id } : null;
+  }
+  /** Waar de instellingen bewaard worden (HTML, alles ge-escapet) */
+  function whereHtml() {
+    const bot = thisBot();
+    if (bot) {
+      return `Dit zijn de instellingen van <b>${esc(bot.name)}</b>; de andere bots hebben elk hun eigen instellingen. Wijzigingen gelden pas na <b>Opslaan</b> en worden bewaard in
+        <span class="mono">&lt;DATA_DIR&gt;/bots/${esc(bot.id)}/config.json</span> (standaard <span class="mono">data/bots/${esc(bot.id)}/config.json</span>).`;
+    }
+    return `Pas aan hoe de bot handelt. Wijzigingen gelden pas na <b>Opslaan</b> en worden bewaard in <span class="mono">&lt;DATA_DIR&gt;/config.json</span>
+            (standaard <span class="mono">data/config.json</span>). Wat hier is opgeslagen gaat vóór <span class="mono">MARKETS</span> en
+            <span class="mono">INTERVAL</span> uit <span class="mono">.env</span>: die worden dan genegeerd.`;
+  }
+  /** Knop "Standaardwaarden": van deze bot (profiel) of de fabrieksinstellingen */
+  function defaultsTitle() {
+    const d = defaultsFor(state.info);
+    return d.profile && d.name
+      ? `Vul de standaardinstellingen van ${d.name} in (zijn eigen handelsstijl; nog niet opgeslagen)`
+      : "Vul de fabrieksinstellingen in (nog niet opgeslagen)";
+  }
 
   el.innerHTML = `<div class="panel st-loading"><span class="spinner"></span> Instellingen laden…</div>`;
 
@@ -140,12 +170,10 @@ export function mountSettings(ctx, el) {
       <div class="panel st-top">
         <div>
           <div class="panel-title">Instellingen</div>
-          <p class="pn-hint">Pas aan hoe de bot handelt. Wijzigingen gelden pas na <b>Opslaan</b> en worden bewaard in <span class="mono">&lt;DATA_DIR&gt;/config.json</span>
-            (standaard <span class="mono">data/config.json</span>). Wat hier is opgeslagen gaat vóór <span class="mono">MARKETS</span> en
-            <span class="mono">INTERVAL</span> uit <span class="mono">.env</span>: die worden dan genegeerd.</p>
+          <p class="pn-hint st-where">${whereHtml()}</p>
         </div>
         <div class="st-top-actions">
-          <button type="button" class="btn btn-ghost" data-act="defaults" title="Vul de fabrieksinstellingen in (nog niet opgeslagen)">↺ Standaardwaarden</button>
+          <button type="button" class="btn btn-ghost" data-act="defaults" title="${esc(defaultsTitle())}">↺ Standaardwaarden</button>
           <button type="button" class="btn btn-ghost" data-act="discard">Wijzigingen ongedaan maken</button>
           <button type="button" class="btn btn-primary" data-act="save">Opslaan</button>
         </div>
@@ -600,10 +628,16 @@ export function mountSettings(ctx, el) {
       ["Marktdata", esc(info?.dataSource === "simulated" || snap?.dataSource === "simulated" ? "Gesimuleerd (nep-koersen)" : "Bitvavo (echte koersen)")],
       ["API-sleutels", info ? (info.hasApiKeys ? '<span class="pos">✓ ingesteld</span>' : '<span class="muted">niet ingesteld</span>') : "–"],
       ["Live handel ingeschakeld", mode === "live" ? (armed ? '<span class="neg"><b>JA — plaatst echte orders</b></span>' : '<span class="pos">Nee — alleen signalen</span>') : '<span class="muted">n.v.t.</span>'],
-      ["Kapitaallimiet", info ? `<span class="mono">${esc(fmt.eur(info.capitalLimitQuote))}</span>` : "–"],
+      // Meerdere bots: een oefenbot heeft zijn eigen budget; de kapitaallimiet geldt alleen voor de live-bot
+      mode !== "live" && multiBot()
+        ? ["Budget (oefengeld)", info && Number.isFinite(info.paperStartingCapital) ? `<span class="mono">${esc(fmt.eur(info.paperStartingCapital))}</span>` : "–"]
+        : ["Kapitaallimiet", info ? `<span class="mono">${esc(fmt.eur(info.capitalLimitQuote))}</span>` : "–"],
       ["Versie", esc(info?.version || "–")],
     ];
-    const env = `TRADING_MODE=live
+    // Meerdere bots: LIVE_BOT kiest de ENE bot die met echt geld handelt (anders start het programma niet)
+    const bot = thisBot();
+    const env = `TRADING_MODE=live${bot ? `
+LIVE_BOT=${bot.id}` : ""}
 BITVAVO_API_KEY=jouw-api-key
 BITVAVO_API_SECRET=jouw-api-secret
 CAPITAL_LIMIT_EUR=50`;
@@ -627,6 +661,12 @@ CAPITAL_LIMIT_EUR=50`;
                 <li>Zet in het bestand <span class="mono">.env</span> (in de map bitvavo-trader):</li>
               </ol>
               <pre class="st-code mono">${esc(env)}</pre>
+              ${
+                bot
+                  ? `<p class="st-help"><span class="mono">LIVE_BOT=${esc(bot.id)}</span> kiest ${esc(bot.name)} als de enige bot die met echt geld handelt
+                     (er mag er maar één zijn); de andere bots blijven oefenen met nep-geld. <span class="mono">CAPITAL_LIMIT_EUR</span> is het budget van die live-bot.</p>`
+                  : ""
+              }
               <ol start="3">
                 <li>Herstart de bot. In live mode start hij nooit vanzelf en plaatst hij pas echte orders nadat je hier (of bovenaan) op <b>Live handel inschakelen…</b> klikt.</li>
               </ol>
@@ -1049,11 +1089,18 @@ CAPITAL_LIMIT_EUR=50`;
       renderAll();
       ctx.toast("Wijzigingen ongedaan gemaakt.", "info");
     } else if (t.dataset.act === "defaults") {
-      state.draft = clone(FACTORY_DEFAULTS);
+      // De standaard van DEZE bot (zijn profiel), niet de algemene fabrieksinstellingen
+      const d = defaultsFor(state.info);
+      state.draft = clone(d.config);
       state.errors = [];
       state.invalid.clear();
       renderAll();
-      ctx.toast("Standaardwaarden ingevuld. Klik op Opslaan om ze te bewaren.", "info");
+      ctx.toast(
+        d.profile && d.name
+          ? `Standaardwaarden van ${d.name} ingevuld. Klik op Opslaan om ze te bewaren.`
+          : "Standaardwaarden ingevuld. Klik op Opslaan om ze te bewaren.",
+        "info",
+      );
     }
   });
 
@@ -1061,11 +1108,25 @@ CAPITAL_LIMIT_EUR=50`;
     if (!cfg || !state.server) return;
     applyServerConfig({ ...state.server, ...cfg });
   });
+  /** Teksten die van de bot afhangen bijwerken, zonder het formulier opnieuw te tekenen */
+  function renderBotTexts() {
+    const where = el.querySelector(".st-where");
+    if (where) where.innerHTML = whereHtml();
+    const btn = el.querySelector('[data-act="defaults"]');
+    if (btn) btn.title = defaultsTitle();
+    renderLive();
+  }
   bus.on("app-info", (info) => {
     if (info && typeof info === "object") {
       state.info = info;
-      renderLive();
+      renderBotTexts();
     }
+  });
+  bus.on("bots", (d) => {
+    if (!d || !Array.isArray(d.bots)) return;
+    const was = multiBot();
+    state.botCount = d.bots.length;
+    if (multiBot() !== was) renderBotTexts();
   });
   let lastLive = "";
   bus.on("snapshot", (s) => {

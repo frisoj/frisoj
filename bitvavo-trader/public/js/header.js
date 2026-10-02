@@ -169,7 +169,9 @@ export function accountReturns(snap) {
 /**
  * Regel in de kaart "Bot-status": hoeveel munten de bot volgt en of het marktfilter
  * (Bitcoin-trend) kopen toestaat. null = niets te tonen.
- * @returns {null | { count: number, auto: boolean, filter: "ok" | "bad" | "unknown" | null, text: string, filterText: string, title: string }}
+ * Is de handel gepauzeerd (`snapshot.halted`: dagverlieslimiet, winst vastgezet…), dan
+ * geen groen "kopen mag" maar "gepauzeerd" (filter "paused"; de titel zegt tot wanneer).
+ * @returns {null | { count: number, auto: boolean, filter: "ok" | "bad" | "unknown" | "paused" | null, text: string, filterText: string, title: string }}
  */
 export function coinsLine(snap) {
   if (!snap || typeof snap !== "object") return null;
@@ -187,6 +189,14 @@ export function coinsLine(snap) {
     filterText = filter === "ok" ? "kopen mag" : filter === "bad" ? "koopt nu niet" : "trend onbekend";
     const note = typeof mf.note === "string" ? mf.note.trim() : "";
     title += ` Marktfilter (Bitcoin-trend): ${note || filterText}.`;
+  }
+  const h = snap.halted;
+  if (h && typeof h === "object" && h.halted === true) {
+    const allDay = h.dailyTarget === true || h.dailyLimit === true;
+    filter = "paused";
+    // kort (de regel eronder zegt waarom en tot wanneer)
+    filterText = "gepauzeerd";
+    title += ` ${h.dailyTarget === true ? "Winst van vandaag vastgezet" : "Handel gepauzeerd"}: de bot koopt ${allDay ? "niets meer tot morgen" : "nu niets"}.`;
   }
   return { count: n, auto, filter, text, filterText, title };
 }
@@ -427,7 +437,11 @@ export function mountHeader(ctx, { statsEl, controlsEl, bannerEl, alertEl }) {
     el.hidden = !cl;
     el.innerHTML = cl
       ? `<span>${esc(cl.text)}</span>${
-          cl.filter ? ` · <span class="coins-mf ${cl.filter}">${cl.filter === "ok" ? "✓" : cl.filter === "bad" ? "✕" : "?"} ${esc(cl.filterText)}</span>` : ""
+          cl.filter
+            ? ` · <span class="coins-mf ${cl.filter}">${
+                cl.filter === "ok" ? "✓ " : cl.filter === "bad" ? "✕ " : cl.filter === "paused" ? "" : "? "
+              }${esc(cl.filterText)}</span>`
+            : ""
         }`
       : "";
     el.title = cl ? cl.title : "";

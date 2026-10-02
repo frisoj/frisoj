@@ -60,7 +60,7 @@ const FOUR = () => [
 
 function fakeCharts() {
   const created: Fake[] = [];
-  const calls = { resize: [] as number[][], fit: 0 };
+  const calls = { resize: [] as number[][], fit: 0, ranges: [] as Fake[] };
   const chart = {
     addSeries: (_type: unknown, opts: Fake) => {
       const s: Fake = {
@@ -87,6 +87,8 @@ function fakeCharts() {
       fitContent: () => {
         calls.fit++;
       },
+      setVisibleLogicalRange: (r: Fake) => void calls.ranges.push(r),
+      width: () => 744,
     }),
     resize: (w: number, h: number) => calls.resize.push([w, h]),
     applyOptions: vi.fn(),
@@ -237,13 +239,26 @@ describe("weergave", () => {
     expect(zero.priceLines[0]).toMatchObject({ price: 0, title: "start" });
     expect(lines.map((s: Fake) => s.opts.color)).toEqual(["#e0a23a", "#3987e5", "#9b6ddf", "#2fb67c"]);
     const trend = lines[1];
-    expect(trend.data.slice(0, 3).map((d: Fake) => d.time)).toEqual([T / 1000, T / 1000 + 60, T / 1000 + 120]);
+    // tijd in seconden; alle lijnen op één gelijkmatige tijdas (ronde 6: niet meer elke bot
+    // zijn eigen tijden, dan werd de as niet-lineair), van het eerste punt tot "nu"
+    const times = trend.data.map((d: Fake) => d.time);
+    expect(times[0]).toBe(T / 1000);
+    expect(times.at(-1)).toBe((T + 600_000) / 1000);
+    for (const s of lines) expect(s.data.map((d: Fake) => d.time)).toEqual(times);
+    const steps = times.slice(1).map((t: number, i: number) => t - times[i]);
+    expect(Math.max(...steps) - Math.min(...steps)).toBeLessThanOrEqual(1);
     // laatste punt = "nu" met het rendement van de engine
     expect(trend.data[trend.data.length - 1].value).toBeCloseTo(3.24, 9);
     expect(p.html("legend")).toContain("Trend");
     expect(p.html("legend")).toContain("+3,24%");
     expect(p.charts.calls.resize).toContainEqual([800, 320]);
     expect(p.charts.calls.fit).toBeGreaterThan(0);
+    // ronde 6: marge links en rechts (≈ 28 px), zodat het eerste en laatste tijdlabel heel blijven
+    const r = p.charts.calls.ranges.at(-1);
+    const n = times.length;
+    const px = 744 / (r.to - r.from);
+    expect(-r.from * px).toBeCloseTo(28, 6);
+    expect((r.to - (n - 1)) * px).toBeCloseTo(28, 6);
   });
 
   it("escapet tekst van de server en gebruikt geen onveilige kleur", async () => {

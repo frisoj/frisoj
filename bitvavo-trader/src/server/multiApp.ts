@@ -20,7 +20,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AppConfig } from "../config";
 import type { AppInfo, Trade } from "../core/types";
 import { summarize, type SummaryProfile } from "../bots/summary";
-import { guardRequest, type App } from "./httpServer";
+import { guardRequest, parseRequestUrl, type App } from "./httpServer";
 import { HttpError, sendError } from "./router";
 import type { BotEntry, EngineLike } from "./routes";
 
@@ -100,7 +100,7 @@ export function createMultiApp(opts: MultiAppOptions): App {
   function handle(req: IncomingMessage, res: ServerResponse): void {
     let url: URL;
     try {
-      url = new URL(req.url ?? "/", "http://localhost");
+      url = parseRequestUrl(req.url);
     } catch {
       def.app.handle(req, res); // die geeft de 400 "Ongeldige URL" (met beveiligingsheaders)
       return;

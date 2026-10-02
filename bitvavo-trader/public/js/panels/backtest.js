@@ -27,7 +27,11 @@ import {
   describeTrendFilter,
   blockedEntriesView,
   noteKind,
+  formKey,
+  botBudget,
+  restoreForm,
 } from "./backtestLogic.js";
+import { BASE } from "../api.js";
 
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
 const INTERVAL_LABELS = {
@@ -78,7 +82,8 @@ const HONEST_NOTE =
 const MAX_CANDLES_WARN = 20000;
 // Server begrenst het aantal dagen per interval (src/server/validation.ts)
 const MAX_DAYS = { "1m": 7, "5m": 30, "15m": 120, "30m": 180, "1h": 365, "2h": 365, "4h": 365, "6h": 365, "8h": 365, "12h": 365, "1d": 365 };
-const FORM_KEY = "bvt-backtest-form";
+// Per bot (alle /bot/<id>/-dashboards delen één localStorage), zie formKey()
+const FORM_KEY = formKey(BASE);
 
 function ensureCss() {
   if (document.querySelector('link[href$="panels.css"]')) return;
@@ -246,7 +251,8 @@ export function mountBacktest(ctx, el) {
             <input id="bt-days" class="input" type="number" name="days" min="1" max="365" step="1" value="30"></div>
         </div>
         <div class="form-row"><label for="bt-capital">Startkapitaal (€)</label>
-          <input id="bt-capital" class="input" type="number" name="capital" min="5" step="5" value="50"></div>
+          <input id="bt-capital" class="input" type="number" name="capital" min="5" step="5" value="50">
+          <small class="bt-cap-hint muted" hidden></small></div>
         <div class="bt-est"></div>
         <label class="bt-tf">
           <span class="pn-switch"><input type="checkbox" name="trendFilter" checked><i></i></span>
@@ -358,10 +364,26 @@ export function mountBacktest(ctx, el) {
   }
 
   // ── Formulier ──
+  /** Budget van deze bot (startkapitaal oefengeld of kapitaallimiet live), zie botBudget() */
+  function budgetOfBot() {
+    return botBudget(state.info || ctx.getInfo?.() || null, ctx.getState?.() || null);
+  }
+  /** Startkapitaal = budget van de bot; met een regel eronder welk bedrag dat is */
+  function showBudgetHint() {
+    const hint = $(".bt-cap-hint");
+    if (!hint) return;
+    const b = budgetOfBot();
+    hint.hidden = !b;
+    hint.textContent = b ? `${b.live ? "Kapitaallimiet" : "Budget"} van deze bot: ${fmt.eur(b.amount)}` : "";
+  }
   function saveForm() {
     try {
       const data = {};
       for (const n of ["market", "interval", "days", "capital", "objective", "strategy", "folds", "trainRatio"]) data[n] = F(n)?.value;
+      // Bij welke bot-instelling dit formulier hoort (zie restoreForm)
+      data.botInterval = state.config?.interval || "";
+      const b = budgetOfBot();
+      if (b) data.botBudget = b.amount;
       localStorage.setItem(FORM_KEY, JSON.stringify(data));
     } catch {
       /* geen localStorage */
@@ -439,9 +461,13 @@ export function mountBacktest(ctx, el) {
     const saved = loadSavedForm() || {};
     const cfg = state.config;
     fillMarketSelect(saved.market || ctx.getSelectedMarket?.() || cfg?.markets?.[0] || "BTC-EUR");
-    F("interval").value = saved.interval || cfg?.interval || "15m";
+    // Interval en startkapitaal van DEZE bot, tenzij de gebruiker ze bij deze bot zelf anders koos
+    const budget = budgetOfBot();
+    const own = restoreForm(saved, { interval: cfg?.interval, budget: budget ? budget.amount : null });
+    F("interval").value = own.interval;
     if (saved.days) F("days").value = saved.days;
-    if (saved.capital) F("capital").value = saved.capital;
+    if (own.capital !== null) F("capital").value = own.capital;
+    showBudgetHint();
     if (saved.objective && OBJECTIVES[saved.objective]) F("objective").value = saved.objective;
     if (saved.folds) F("folds").value = saved.folds;
     if (saved.trainRatio) F("trainRatio").value = saved.trainRatio;
@@ -1620,7 +1646,12 @@ export function mountBacktest(ctx, el) {
   });
   $(".bt-adv-reset").addEventListener("click", () => {
     fillAdvanced(state.config);
-    ctx.toast("Geavanceerde velden gelijkgezet aan de huidige bot-instellingen.", "info");
+    // Ook het interval en het startkapitaal van deze bot
+    if (state.config?.interval) F("interval").value = state.config.interval;
+    const b = budgetOfBot();
+    if (b) F("capital").value = b.amount;
+    updateEstimate();
+    ctx.toast("Interval, startkapitaal en geavanceerde velden gelijkgezet aan de huidige bot-instellingen.", "info");
   });
   rtabs.addEventListener("click", (e) => {
     const b = e.target.closest("[data-view]");

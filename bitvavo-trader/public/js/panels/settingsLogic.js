@@ -54,6 +54,111 @@ export const FACTORY_DEFAULTS = {
 };
 
 /**
+ * Kopie van de handelsstijl per bot-profiel (BOT_PROFILES[].engine in src/bots/profiles.ts),
+ * voor "Standaardwaarden" op het dashboard van een bot: anders werd de Snelle scalper
+ * (5 min, eigen strategieën, krappe stop) daarmee een gewone 15-minutenbot, en kon je zijn
+ * stijl alleen terugkrijgen door data/bots/scalper/config.json met de hand te wissen.
+ * Een test bewaakt dat profileDefaults(id) gelijk is aan profileEngineConfig(getProfile(id)).
+ */
+export const PROFILE_ENGINE = {
+  scalper: {
+    interval: "5m",
+    ensemble: {
+      enabled: ["breakout", "macd-momentum", "ema-trend", "vwap-reversion"],
+      weights: { breakout: 1.3, "macd-momentum": 1.2, "ema-trend": 1, "vwap-reversion": 0.6 },
+      buyThreshold: 0.3,
+      sellThreshold: -0.25,
+      regimeFilter: true,
+      trendFilter: { market: false, coin: false, interval: "1d", period: 50 },
+    },
+    risk: {
+      stopAtrMult: 1.2,
+      takeProfitR: 1.5,
+      trailingAtrMult: 1.5,
+      breakEvenAtR: 0.8,
+      maxTradesPerDay: 30,
+      cooldownCandlesAfterLoss: 6,
+      timeStopCandles: 36,
+      maxSpreadPct: 0.15,
+    },
+    universe: { mode: "auto", count: 60, minVolumeEur: 1_000_000 },
+  },
+  trend: {
+    interval: "1h",
+    ensemble: {
+      enabled: ["ema-trend", "breakout", "macd-momentum"],
+      weights: { "ema-trend": 1.5, breakout: 1.2, "macd-momentum": 1 },
+      buyThreshold: 0.35,
+      regimeFilter: true,
+      trendFilter: { market: true, coin: true, interval: "1d", period: 50 },
+    },
+    risk: { stopAtrMult: 2.5, takeProfitR: 3, trailingAtrMult: 3, breakEvenAtR: 1.5, maxTradesPerDay: 6, timeStopCandles: 72 },
+    universe: { mode: "auto", count: 100, minVolumeEur: 250_000 },
+  },
+  dip: {
+    interval: "15m",
+    ensemble: {
+      enabled: ["rsi-reversion", "vwap-reversion"],
+      weights: { "rsi-reversion": 1.4, "vwap-reversion": 1.2 },
+      buyThreshold: 0.3,
+      sellThreshold: -0.25,
+      regimeFilter: true,
+      trendFilter: { market: true, coin: false, interval: "1d", period: 50 },
+    },
+    risk: { stopAtrMult: 1.5, takeProfitR: 1.5, trailingAtrMult: 0, breakEvenAtR: 1, maxTradesPerDay: 12, timeStopCandles: 32, maxSpreadPct: 0.25 },
+    universe: { mode: "auto", count: 100, minVolumeEur: 250_000 },
+  },
+  allround: {
+    interval: "15m",
+    risk: { stopAtrMult: 1.5, maxTradesPerDay: 20 },
+    universe: { mode: "auto", count: 150, minVolumeEur: 250_000 },
+  },
+};
+
+/**
+ * De standaardinstellingen van een bot-profiel: FACTORY_DEFAULTS met het profiel eroverheen,
+ * zoals profileEngineConfig() op de server. null = onbekend profiel.
+ */
+export function profileDefaults(id) {
+  const e = typeof id === "string" && Object.prototype.hasOwnProperty.call(PROFILE_ENGINE, id) ? PROFILE_ENGINE[id] : null;
+  if (!e) return null;
+  const c = clone(FACTORY_DEFAULTS);
+  if (e.interval) c.interval = e.interval;
+  if (e.pollMs !== undefined) c.pollMs = e.pollMs;
+  if (e.risk) c.risk = { ...c.risk, ...clone(e.risk) };
+  if (e.universe) c.universe = { ...c.universe, ...clone(e.universe) };
+  if (e.ensemble) {
+    const ens = clone(e.ensemble);
+    c.ensemble = {
+      ...c.ensemble,
+      ...(ens.enabled ? { enabled: ens.enabled } : {}),
+      // een profiel legt ALLE gewichten vast
+      ...(ens.weights ? { weights: ens.weights } : {}),
+      ...(ens.buyThreshold !== undefined ? { buyThreshold: ens.buyThreshold } : {}),
+      ...(ens.sellThreshold !== undefined ? { sellThreshold: ens.sellThreshold } : {}),
+      ...(ens.regimeFilter !== undefined ? { regimeFilter: ens.regimeFilter } : {}),
+      ...(ens.trendFilter ? { trendFilter: ens.trendFilter } : {}),
+    };
+  }
+  return c;
+}
+
+/**
+ * Wat "↺ Standaardwaarden" invult: de standaard van DEZE bot (van de server als die ze
+ * meestuurt in `info.bot.defaults`, anders zijn profiel), en alleen zonder bot-profiel
+ * (oudere server) de fabrieksinstellingen.
+ * @returns {{ config: object, name: string, profile: boolean }}
+ */
+export function defaultsFor(info) {
+  const bot = info && info.bot && typeof info.bot === "object" ? info.bot : null;
+  const name = bot && typeof bot.name === "string" ? bot.name : "";
+  if (bot && bot.defaults && typeof bot.defaults === "object") return { config: withDefaults(bot.defaults), name, profile: true };
+  const prof = bot ? profileDefaults(bot.id) : null;
+  if (prof) return { config: prof, name, profile: true };
+  return { config: clone(FACTORY_DEFAULTS), name: "", profile: false };
+}
+
+/**
  * Wat een ontbrekend veld BETEKENT (contract v2): een config zonder `universe` is
  * "zelf kiezen", een ensemble zonder `trendFilter` heeft geen trendfilter en een
  * risicoconfig zonder `maxSpreadPct` geen spreadlimiet (en zonder `dailyProfitTargetPct` geen dagdoel). Dus niet de fabriekswaarden

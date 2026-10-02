@@ -53,6 +53,10 @@ async function mount(opts: {
   markets?: string[];
   activeMarkets?: string[];
   config?: Fake;
+  /** AppInfo van deze bot (standaard alleen dataSource) */
+  info?: Fake;
+  /** Formulierwaarden NIET terugzetten na het laden (om te zien wat het paneel zelf invult) */
+  keepFilled?: boolean;
 }) {
   const { mountBacktest } = await loadPublic("js/panels/backtest.js");
   const { fmt, esc } = await loadPublic("js/format.js");
@@ -96,7 +100,7 @@ async function mount(opts: {
     getMarkets: async () => (opts.markets ?? ["BTC-EUR"]).map((market) => ({ market })),
     getStrategies: async () => listStrategies(),
     getConfig: async () => structuredClone(config),
-    info: async () => ({ dataSource: "simulated" }),
+    info: async () => structuredClone(opts.info ?? { dataSource: "simulated" }),
     optimize: async (req: Fake) => (calls.push("optimize"), reqs.push(structuredClone(req)), structuredClone(opts.optimize)),
     backtest: async (req: Fake) => (calls.push("backtest"), reqs.push(structuredClone(req)), structuredClone(opts.backtest)),
     putConfig: async (p: Fake) => {
@@ -128,8 +132,9 @@ async function mount(opts: {
   mountBacktest(ctx, el);
   await settle();
   // fillSelects() zet de formulierwaarden uit de config; zet ze terug op wat de gebruiker invulde
-  for (const [k, v] of Object.entries(form)) if (inputs[k]) inputs[k].value = v;
+  if (!opts.keepFilled) for (const [k, v] of Object.entries(form)) if (inputs[k]) inputs[k].value = v;
   return {
+    nodes,
     out: outEl,
     outNodes,
     calls,
@@ -509,5 +514,107 @@ describe("v2 Backtest-lab: marktkeuze met ~400 markten", () => {
     const html = flat(p.inputs.market.innerHTML);
     expect(html).toMatch(/^<optgroup label="In de bot \(2\)"><option value="C123-EUR">/);
     expect(p.inputs.market.value).toBe("C123-EUR");
+  });
+});
+
+// Ronde 6 (v3, meerdere bots): het backtest-formulier was één localStorage-sleutel voor alle
+// /bot/<id>/-dashboards (zelfde origin). De Trendvolger (1 uur) werd na een backtest bij de
+// scalper stilletjes op 5-minutencandles getest, en elk startkapitaal was € 50 terwijl de
+// bots € 25 hebben (bij € 25 remmen het minimum van € 5 en de max. positie veel meer).
+describe("backtest-formulier per bot: interval en startkapitaal van DEZE bot", () => {
+  const g = globalThis as Record<string, Fake>;
+  let store: Map<string, string>;
+  beforeEach(() => {
+    store = new Map();
+    g.localStorage = {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => void store.set(k, String(v)),
+      removeItem: (k: string) => void store.delete(k),
+    };
+  });
+  const trendCfg = () => ({ ...structuredClone(DEFAULT_ENGINE_CONFIG), interval: "1h" });
+  const info = { dataSource: "simulated", mode: "paper", paperStartingCapital: 25, capitalLimitQuote: 50, bot: { id: "trend", name: "Trendvolger", short: "Trend", color: "#3987e5" } };
+  const bt = { market: "BTC-EUR", interval: "1h", initialCapital: 25, metrics: metrics(), trades: [], equityCurve: [], candles: [], markers: [] };
+
+  it("formKey: per bot een eigen sleutel; de root houdt de oude", async () => {
+    const { formKey } = await loadPublic("js/panels/backtestLogic.js");
+    expect(formKey("/bot/trend")).toBe("bvt-backtest-form:/bot/trend");
+    expect(formKey("/bot/scalper")).not.toBe(formKey("/bot/trend"));
+    expect(formKey("")).toBe("bvt-backtest-form");
+  });
+
+  it("restoreForm: opgeslagen interval/kapitaal alleen bij dezelfde bot-instelling", async () => {
+    const { restoreForm } = await loadPublic("js/panels/backtestLogic.js");
+    // oud formulier (zonder bot-instelling) of van een andere bot: die van de bot zelf
+    expect(restoreForm({ interval: "5m", capital: "50" }, { interval: "1h", budget: 25 })).toEqual({ interval: "1h", capital: 25 });
+    expect(restoreForm({ interval: "5m", botInterval: "5m", capital: "50", botBudget: 25 }, { interval: "1h", budget: 25 })).toEqual({ interval: "1h", capital: "50" });
+    // zelf gekozen bij deze bot: blijft
+    expect(restoreForm({ interval: "15m", botInterval: "1h", capital: "100", botBudget: 25 }, { interval: "1h", budget: 25 })).toEqual({ interval: "15m", capital: "100" });
+    // budget van de bot veranderd (bijv. andere kapitaallimiet): het nieuwe budget
+    expect(restoreForm({ capital: "100", botBudget: 50, interval: "1h", botInterval: "1h" }, { interval: "1h", budget: 25 }).capital).toBe(25);
+    // niets bekend: zoals vroeger
+    expect(restoreForm(null, {})).toEqual({ interval: "15m", capital: null });
+    expect(restoreForm({ interval: "4h", capital: "75" }, {})).toEqual({ interval: "4h", capital: "75" });
+  });
+
+  it("botBudget: oefengeld → paperStartingCapital, live → kapitaallimiet, anders de snapshot", async () => {
+    const { botBudget } = await loadPublic("js/panels/backtestLogic.js");
+    expect(botBudget(info, null)).toEqual({ amount: 25, live: false });
+    expect(botBudget({ ...info, mode: "live" }, null)).toEqual({ amount: 50, live: true });
+    expect(botBudget(null, { mode: "paper", account: { startingEquity: 25 } })).toEqual({ amount: 25, live: false });
+    expect(botBudget(null, null)).toBeNull();
+  });
+
+  it("formulier van een andere bot in de opslag: toch het interval (1 uur) en het budget (€ 25) van deze bot", async () => {
+    // zoals na een backtest bij de scalper (5m, € 50) op een gedeelde sleutel
+    store.set("bvt-backtest-form", JSON.stringify({ market: "BTC-EUR", interval: "5m", days: "10", capital: "50" }));
+    const p = await mount({ config: trendCfg(), info, backtest: bt, keepFilled: true });
+    expect(p.inputs.interval.value).toBe("1h");
+    expect(String(p.inputs.capital.value)).toBe("25");
+    expect(p.nodes[".bt-cap-hint"].hidden).toBe(false);
+    expect(p.nodes[".bt-cap-hint"].textContent.replace(/\s+/g, " ")).toBe("Budget van deze bot: € 25,00");
+    await p.run("backtest");
+    expect(p.reqs[0]).toMatchObject({ interval: "1h", initialCapital: 25 });
+    // bewaard mét de bot-instelling, zodat een eigen keuze bij deze bot wel blijft
+    const saved = JSON.parse(store.get("bvt-backtest-form")!);
+    expect(saved).toMatchObject({ interval: "1h", botInterval: "1h", botBudget: 25 });
+    expect(String(saved.capital)).toBe("25"); // (een echt invoerveld maakt er tekst van)
+  });
+
+  it("zelf gekozen bij deze bot (15m, € 100): blijft staan bij het opnieuw openen", async () => {
+    store.set("bvt-backtest-form", JSON.stringify({ interval: "15m", capital: "100", botInterval: "1h", botBudget: 25 }));
+    const p = await mount({ config: trendCfg(), info, keepFilled: true });
+    expect(p.inputs.interval.value).toBe("15m");
+    expect(String(p.inputs.capital.value)).toBe("100");
+  });
+
+  it("'↺ Huidige bot-instellingen' zet ook interval en startkapitaal terug", async () => {
+    const p = await mount({ config: trendCfg(), info, keepFilled: true });
+    p.inputs.interval.value = "5m";
+    p.inputs.capital.value = "500";
+    p.nodes[".bt-adv-reset"].fire("click", {});
+    expect(p.inputs.interval.value).toBe("1h");
+    expect(String(p.inputs.capital.value)).toBe("25");
+    expect(p.toasts.at(-1)).toBe("info: Interval, startkapitaal en geavanceerde velden gelijkgezet aan de huidige bot-instellingen.");
+  });
+
+  it("onder /bot/<id>/ bewaart het formulier onder de sleutel van die bot", async () => {
+    const hadLoc = "location" in g;
+    const savedLoc = g.location;
+    g.location = { pathname: "/bot/trend/", hash: "#backtest" };
+    vi.resetModules();
+    try {
+      store.set("bvt-backtest-form", JSON.stringify({ interval: "5m", botInterval: "1h", capital: "50", botBudget: 25 }));
+      const p = await mount({ config: trendCfg(), info, backtest: bt, keepFilled: true });
+      // het formulier van de root (een andere bot) telt hier niet
+      expect(p.inputs.interval.value).toBe("1h");
+      await p.run("backtest");
+      expect(JSON.parse(store.get("bvt-backtest-form:/bot/trend")!)).toMatchObject({ interval: "1h", botInterval: "1h" });
+      expect(JSON.parse(store.get("bvt-backtest-form")!).interval).toBe("5m");
+    } finally {
+      if (hadLoc) g.location = savedLoc;
+      else delete g.location;
+      vi.resetModules();
+    }
   });
 });

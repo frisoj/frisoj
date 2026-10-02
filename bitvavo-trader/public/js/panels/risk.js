@@ -14,6 +14,62 @@ const RING_R = 30;
 const RING_C = 2 * Math.PI * RING_R;
 const RING_VIS = RING_C * 0.75; // 270° boog
 
+const isNum = (n) => typeof n === "number" && Number.isFinite(n);
+
+/**
+ * Dagresultaat in % NA de geschatte kosten om alle open posities nu te verkopen: zo telt de
+ * engine het dagdoel (netDayPct in src/risk/riskManager.ts). Zonder die kosten stond er
+ * "+1,10% van +1%" terwijl het doel nog niet gehaald was (na kosten ~0,97%).
+ * Kosten: `account.exitCostQuote` van de engine, anders zelf geschat zoals de engine
+ * (aantal × koers × (takerFee + slippage) per open positie). De dagbasis is die van de
+ * engine: equity / (1 + dag-%), zodat afromen (live) geen verschil geeft.
+ * @returns {{ pct: number, costQuote: number } | null}
+ */
+export function netDayView(snap) {
+  const a = snap && snap.account;
+  if (!a || typeof a !== "object") return null;
+  const equity = a.equity;
+  const dayStart = a.dayStartEquity;
+  const gross = isNum(a.dayReturnPct)
+    ? a.dayReturnPct
+    : isNum(equity) && isNum(dayStart) && dayStart > 0
+      ? ((equity - dayStart) / dayStart) * 100
+      : null;
+  if (!isNum(gross)) return null;
+  const base = isNum(equity) && equity > 0 && gross > -100 ? equity / (1 + gross / 100) : dayStart;
+  if (!isNum(base) || base <= 0) return null;
+  let cost = 0;
+  if (isNum(a.exitCostQuote)) cost = Math.max(0, a.exitCostQuote);
+  else {
+    const r = (snap.config && snap.config.risk) || {};
+    const rate = (isNum(r.takerFee) ? r.takerFee : 0) + (isNum(r.slippagePct) ? r.slippagePct : 0);
+    for (const p of Array.isArray(snap.positions) ? snap.positions : []) {
+      const px = isNum(p && p.currentPrice) && p.currentPrice > 0 ? p.currentPrice : p && p.entryPrice;
+      if (isNum(px) && isNum(p.amount)) cost += p.amount * px * rate;
+    }
+  }
+  return { pct: gross - (cost / base) * 100, costQuote: cost };
+}
+
+/**
+ * Tweede regel van de groene melding "Winst vastgezet". Alleen "open posities zijn
+ * verkocht" als er echt geen positie meer open staat; anders hoeveel er nog open staan en
+ * wat de gebruiker kan doen (stilstaande bot of live niet ingeschakeld: zelf sluiten).
+ */
+export function lockedLine(snap) {
+  const n = Array.isArray(snap && snap.positions) ? snap.positions.length : 0;
+  const tomorrow = "Morgen gaat de bot weer verder.";
+  if (!n) return { open: 0, text: `De dagwinst viel terug tot je winstgrens: open posities zijn verkocht. ${tomorrow}` };
+  const head = n === 1 ? "Er staat nog 1 positie open." : `Er staan nog ${n} posities open.`;
+  const it = n === 1 ? "die" : "ze";
+  let what;
+  if (!snap.running) what = `De bot staat stil en verkoopt ${it} niet vanzelf: sluit ${it} bij Posities (knop Sluit) of start de bot.`;
+  else if (snap.mode === "live" && !snap.liveArmed)
+    what = `Live handel staat uit, dus de bot verkoopt ${it} niet vanzelf: sluit ${it} bij Posities (knop Sluit) of zet live handel aan.`;
+  else what = `De bot probeert ${it} te verkopen (zie Posities).`;
+  return { open: n, text: `De dagwinst viel terug tot je winstgrens. ${head} ${what} ${tomorrow}` };
+}
+
 function level(ratio) {
   if (!Number.isFinite(ratio)) return "ok";
   if (ratio >= 0.85) return "bad";
@@ -65,7 +121,6 @@ export function mountRisk(ctx, el) {
     // Dagresultaat van de engine (live correct na afromen of een gewijzigde limiet: dat
     // is een overboeking, geen verlies; dezelfde % als de dagelijkse verlieslimiet
     // gebruikt). Alleen bij een oudere server zelf rekenen.
-    const isNum = (n) => typeof n === "number" && Number.isFinite(n);
     const dayPnl = isNum(a.dayPnlQuote) ? a.dayPnlQuote : equity - dayStart;
     const dayRet = isNum(a.dayReturnPct) ? a.dayReturnPct : dayStart > 0 ? (dayPnl / dayStart) * 100 : 0;
     const dayLossPct = Math.max(0, -dayRet);
@@ -76,11 +131,13 @@ export function mountRisk(ctx, el) {
     const exposurePct = equity > 0 ? (exposure / equity) * 100 : 0;
     const tradesToday = Number(a.tradesToday) || 0;
     const openCount = positions.length;
+    const net = netDayView(s);
 
     const sig = JSON.stringify([
       dayLossPct.toFixed(2), dayPnl.toFixed(2), exposurePct.toFixed(1), tradesToday, openCount, s.halted, a.feesPaid,
       rc.dailyLossLimitPct, rc.maxTotalExposurePct, rc.maxTradesPerDay, rc.maxOpenPositions, rc.riskPerTradePct,
       equity.toFixed(2), s.mode, s.liveArmed, rc.dailyProfitTargetPct, dayRet.toFixed(2), a.dayTargetReached,
+      s.running, net ? net.pct.toFixed(2) : null,
     ]);
     if (sig === lastSig) return;
     lastSig = sig;
@@ -124,11 +181,12 @@ export function mountRisk(ctx, el) {
 
     const halted = s.halted?.halted;
     const target = isNum(rc.dailyProfitTargetPct) && rc.dailyProfitTargetPct > 0 ? rc.dailyProfitTargetPct : 0;
-    const banner = halted && s.halted.dailyTarget === true
+    const locked = halted && s.halted.dailyTarget === true ? lockedLine(s) : null;
+    const banner = locked
       ? `<div class="pn-banner pn-banner-good pn-banner-ico risk-target" role="status">
           <svg class="pn-ico pn-ico-lg" viewBox="0 0 15 15" aria-hidden="true"><polyline points="2.5,8 6,11.5 12.5,3.5"/></svg>
           <div><b>Winst vastgezet</b><div>${esc(s.halted.reason || "De dagwinst is vastgezet.")}</div>
-          <div class="muted">De dagwinst viel terug tot je winstgrens: open posities zijn verkocht. Morgen gaat de bot weer verder.</div></div>
+          <div class="${locked.open ? "risk-target-open" : "muted"}">${esc(locked.text)}</div></div>
         </div>`
       : halted
       ? `<div class="pn-banner pn-banner-bad pn-banner-ico risk-halt" role="alert">
@@ -161,7 +219,9 @@ export function mountRisk(ctx, el) {
                   ? `<span class="pos">winst vastgezet ✓</span>`
                   : a.dayTargetReached === true
                     ? `<span class="pos">gehaald ✓</span> <small class="muted">grens ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
-                    : `${esc(fmt.pct(dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
+                    : `${esc(fmt.pct(net ? net.pct : dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}${
+                        net && net.costQuote >= 0.005 ? " · na verkoopkosten" : ""
+                      }</small>`
               }</b></div>`
             : ""
         }

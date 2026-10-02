@@ -61,18 +61,72 @@ export class ApiError extends Error {
 /** Opties voor routes die niet bij één bot horen (altijd de root) */
 const ROOT = { root: true };
 
+// Nooit eindeloos wachten: een browser opent maar 6 verbindingen tegelijk per server. Zijn
+// die allemaal bezet (bijv. veel dashboard-tabbladen met een live-verbinding), dan blijft een
+// verzoek — ook de noodstop — anders stil in de wachtrij staan en gaat het minuten later
+// alsnog de deur uit. Na de tijdslimiet wordt het afgebroken (een verzoek dat nog in de
+// wachtrij stond, gaat dan ook later niet meer weg) en krijgt de gebruiker een duidelijke fout.
+/** Opvragen (GET) */
+export const READ_TIMEOUT_MS = 20_000;
+/**
+ * Opdrachten (start, stop, noodstop, sluiten, opslaan…): de server kan even bezig zijn met
+ * verkopen (live tot ~65 s wachten op de rate limit van Bitvavo, zie bitvavoClient.ts).
+ */
+export const ACTION_TIMEOUT_MS = 90_000;
+/** Backtest, optimaliseren en walk-forward mogen lang rekenen */
+export const HEAVY_TIMEOUT_MS = 15 * 60_000;
+const HEAVY = { timeoutMs: HEAVY_TIMEOUT_MS };
+
+/** Nederlandse melding als de server niet op tijd antwoordt */
+export function timeoutMessage(method, ms) {
+  const s = Math.round(ms / 1000);
+  const when = s >= 120 ? `${Math.round(s / 60)} minuten` : `${s} seconden`;
+  const tabs = "Staan er veel dashboard-tabbladen open? Sluit er een paar en probeer het opnieuw.";
+  return String(method).toUpperCase() === "GET"
+    ? `De server reageert niet (geen antwoord binnen ${when}). Draait het programma nog? ${tabs}`
+    : `Geen antwoord van de server binnen ${when}. Misschien is de opdracht toch uitgevoerd: controleer de status en de posities. ${tabs}`;
+}
+
 async function request(method, path, body, opts) {
   const headers = { Accept: "application/json" };
   const token = getToken();
   if (token) headers["x-dashboard-token"] = token;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const url = opts && opts.root ? path : apiBase() + path;
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
+  const timeoutMs =
+    opts && typeof opts.timeoutMs === "number" && opts.timeoutMs > 0
+      ? opts.timeoutMs
+      : method === "GET"
+        ? READ_TIMEOUT_MS
+        : ACTION_TIMEOUT_MS;
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  let timedOut = false;
+  const timer = ctl
+    ? setTimeout(() => {
+        timedOut = true;
+        ctl.abort();
+      }, timeoutMs)
+    : null;
+  let res;
+  let text;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(ctl ? { signal: ctl.signal } : {}),
+    });
+    text = await res.text();
+  } catch (err) {
+    if (timedOut) {
+      const e = new ApiError(timeoutMessage(method, timeoutMs), 0);
+      e.timeout = true;
+      throw e;
+    }
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   let data = null;
   try {
     data = text ? JSON.parse(text) : null;
@@ -129,11 +183,11 @@ export const api = {
   /** StrategyMeta[] */
   getStrategies: () => request("GET", "/api/strategies"),
   /** BacktestRequest → BacktestResult */
-  backtest: (req) => request("POST", "/api/backtest", req),
+  backtest: (req) => request("POST", "/api/backtest", req, HEAVY),
   /** OptimizeRequest → OptimizationResult */
-  optimize: (req) => request("POST", "/api/optimize", req),
+  optimize: (req) => request("POST", "/api/optimize", req, HEAVY),
   /** WalkForwardRequest → WalkForwardResult */
-  walkForward: (req) => request("POST", "/api/walkforward", req),
+  walkForward: (req) => request("POST", "/api/walkforward", req, HEAVY),
 
   // ── Bot-wedstrijd (altijd de root, ook vanaf /bot/<id>/) ──
   /** BotSummary[] (volgorde van BOTS); 404 = server zonder meerdere bots */
@@ -159,25 +213,97 @@ export const EVENT_TYPES = [
 ];
 
 /**
- * Verbindt met de SSE-stream. `onEvent(type, data)` voor elk server-event,
- * `onStatus("open" | "closed")` bij verbindingswijzigingen. EventSource
- * herverbindt automatisch. Geeft een functie terug om te sluiten.
+ * Zo lang houdt een tabblad dat naar de achtergrond gaat zijn live-verbinding nog open
+ * (kort wisselen van tabblad kost dan geen nieuwe verbinding).
  */
-export function connectEvents(onEvent, onStatus) {
-  const token = getToken();
-  const path = `${apiBase()}/api/events`;
-  const url = token ? `${path}?${qs({ token })}` : path;
-  const es = new EventSource(url);
-  es.onopen = () => onStatus && onStatus("open");
-  es.onerror = () => onStatus && onStatus("closed");
-  for (const type of EVENT_TYPES) {
-    es.addEventListener(type, (ev) => {
-      try {
-        onEvent(type, JSON.parse(ev.data));
-      } catch (err) {
-        console.error("Kon event niet lezen", type, err);
-      }
-    });
+export const HIDDEN_PAUSE_MS = 5_000;
+
+/**
+ * Verbindt met de SSE-stream. `onEvent(type, data)` voor elk server-event,
+ * `onStatus("open" | "closed" | "connecting" | "paused")` bij verbindingswijzigingen.
+ * EventSource herverbindt automatisch. Geeft een functie terug om te sluiten.
+ *
+ * Een tabblad op de achtergrond (`document.hidden`) sluit zijn stream na
+ * {@link HIDDEN_PAUSE_MS} ("paused") en opent hem weer zodra het zichtbaar wordt; de server
+ * stuurt dan meteen een verse snapshot. Elke open stream houdt één van de maar 6
+ * verbindingen die een browser per server gebruikt: met het overzicht en de dashboards van
+ * vier bots in aparte tabbladen kwam anders geen enkel verzoek meer aan, ook de noodstop niet.
+ * `opts` (voor tests): { document, EventSource, pauseMs }.
+ */
+export function connectEvents(onEvent, onStatus, opts = {}) {
+  const doc = "document" in opts ? opts.document : typeof document !== "undefined" ? document : null;
+  const ES = opts.EventSource || globalThis.EventSource;
+  const pauseMs = typeof opts.pauseMs === "number" && opts.pauseMs >= 0 ? opts.pauseMs : HIDDEN_PAUSE_MS;
+  const status = (s) => {
+    try {
+      onStatus && onStatus(s);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  const hidden = () => !!(doc && doc.hidden);
+  let es = null;
+  let timer = null;
+  let ended = false;
+
+  function open() {
+    if (es || ended) return;
+    const token = getToken();
+    const path = `${apiBase()}/api/events`;
+    const url = token ? `${path}?${qs({ token })}` : path;
+    const src = new ES(url);
+    es = src;
+    // Alleen de huidige stream telt (een gesloten stream kan nog een laatste event geven)
+    src.onopen = () => es === src && status("open");
+    src.onerror = () => es === src && status("closed");
+    for (const type of EVENT_TYPES) {
+      src.addEventListener(type, (ev) => {
+        if (es !== src) return;
+        try {
+          onEvent(type, JSON.parse(ev.data));
+        } catch (err) {
+          console.error("Kon event niet lezen", type, err);
+        }
+      });
+    }
   }
-  return () => es.close();
+  function shut() {
+    if (!es) return;
+    const src = es;
+    es = null;
+    try {
+      src.close();
+    } catch {
+      /* al dicht */
+    }
+  }
+  function pause() {
+    timer = null;
+    if (ended || !es || !hidden()) return;
+    shut();
+    status("paused");
+  }
+  function onVisibility() {
+    if (ended) return;
+    clearTimeout(timer);
+    timer = null;
+    if (hidden()) {
+      if (es) timer = setTimeout(pause, pauseMs);
+    } else if (!es) {
+      status("connecting");
+      open();
+    }
+  }
+
+  if (doc && typeof doc.addEventListener === "function") doc.addEventListener("visibilitychange", onVisibility);
+  // Geopend op de achtergrond (bijv. Ctrl+klik op "Open dashboard"): pas verbinden als je kijkt
+  if (hidden()) status("paused");
+  else open();
+  return () => {
+    ended = true;
+    clearTimeout(timer);
+    timer = null;
+    if (doc && typeof doc.removeEventListener === "function") doc.removeEventListener("visibilitychange", onVisibility);
+    shut();
+  };
 }

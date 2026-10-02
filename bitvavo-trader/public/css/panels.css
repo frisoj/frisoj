@@ -1049,6 +1049,13 @@
 .bt-est.is-warn {
   color: var(--yellow);
 }
+/* Onder "Startkapitaal": het budget van deze bot */
+.bt-cap-hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
 .bt-adv {
   margin: 4px 0 12px;
   border: 1px solid var(--border);
@@ -3123,4 +3130,8 @@
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
+}
+/* Winst vastgezet, maar er staan nog posities open: die regel valt op */
+.pn-banner-good .risk-target-open {
+  color: var(--yellow);
 }

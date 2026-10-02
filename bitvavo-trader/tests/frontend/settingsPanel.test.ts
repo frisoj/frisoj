@@ -12,7 +12,7 @@ import { fakeNode, installBrowserGlobals, loadPublic, makeBus, settle, type Fake
 
 const KNOWN = new Set(["BTC-EUR", "ETH-EUR", "SOL-EUR", "TRX-EUR", "ADA-EUR"]);
 
-function fakeServer(opts: { config?: EngineConfig; known?: Set<string> } = {}) {
+function fakeServer(opts: { config?: EngineConfig; known?: Set<string>; info?: Fake } = {}) {
   let config: EngineConfig = structuredClone(opts.config ?? DEFAULT_ENGINE_CONFIG);
   const known = opts.known ?? KNOWN;
   const puts: unknown[] = [];
@@ -32,7 +32,7 @@ function fakeServer(opts: { config?: EngineConfig; known?: Set<string> } = {}) {
       return put(patch);
     },
     getStrategies: async () => listStrategies(),
-    info: async () => ({ mode: "paper", liveArmed: false, hasApiKeys: false, capitalLimitQuote: 50, dataSource: "simulated" }),
+    info: async () => structuredClone(opts.info ?? { mode: "paper", liveArmed: false, hasApiKeys: false, capitalLimitQuote: 50, dataSource: "simulated" }),
     getMarkets: async () => [...known].map((market) => ({ market })),
     arm: async () => ({}),
     disarm: async () => ({}),
@@ -55,7 +55,7 @@ beforeEach(() => {
 afterEach(() => env.restore());
 
 async function mount(
-  opts: { config?: EngineConfig; known?: Set<string>; snapshot?: Fake; boxes?: string[] } = {},
+  opts: { config?: EngineConfig; known?: Set<string>; snapshot?: Fake; boxes?: string[]; info?: Fake; bots?: Fake[] } = {},
 ) {
   const { mountSettings } = await loadPublic("js/panels/settings.js");
   const { fmt, esc } = await loadPublic("js/format.js");
@@ -80,6 +80,7 @@ async function mount(
     toast: (m: string, k: string) => toasts.push(`${k}: ${m}`),
     getInfo: () => null,
     getState: () => opts.snapshot ?? null,
+    getBots: () => opts.bots ?? null,
     openModal(o: Fake) {
       modals.push(o);
       return () => {};
@@ -264,7 +265,12 @@ const flat = (h: unknown) => String(h).replace(/\s+/g, " ");
 const names = (n: number, prefix = "M") => Array.from({ length: n }, (_, i) => `${prefix}${String(i).padStart(3, "0")}-EUR`);
 
 describe("v2 Instellingen: Munten — automatisch", () => {
-  const at = new Date(2026, 8, 30, 14, 5).getTime();
+  // vandaag om 14:05 (een vaste datum faalde na middernacht: dan staat de datum er terecht bij)
+  const at = (() => {
+    const d = new Date();
+    d.setHours(14, 5, 0, 0);
+    return d.getTime();
+  })();
   const snapshot = (over: Fake = {}) => ({
     mode: "paper",
     liveArmed: false,
@@ -527,5 +533,87 @@ describe("ronde 5: 'Alle markten toevoegen' (UI-6)", () => {
     const put = server.puts[0] as Fake;
     // bekend volume ≥ € 250.000, dan onbekend (op naam), dan te weinig handel; geen USDC/PAXG/WBTC
     expect(put.markets).toEqual(["BTC-EUR", "ETH-EUR", "SOL-EUR", "BIG-EUR", "AAA-EUR", "ILQ-EUR"]);
+  });
+});
+
+// ── Ronde 6: meerdere bots (elk met een eigen profiel en eigen instellingen) ──
+
+describe("Standaardwaarden op het dashboard van een profiel-bot", () => {
+  const scalperInfo = {
+    mode: "paper",
+    liveArmed: false,
+    hasApiKeys: false,
+    capitalLimitQuote: 50,
+    paperStartingCapital: 25,
+    dataSource: "simulated",
+    bot: { id: "scalper", name: "Snelle scalper", short: "Scalper", color: "#e0a23a" },
+  };
+
+  it("vult de handelsstijl van DIE bot in (5 min, eigen strategieën), niet de algemene 15-minutenbot", async () => {
+    const { profileEngineConfig, getProfile } = await import("../../src/bots/profiles");
+    const profile = profileEngineConfig(getProfile("scalper")!);
+    // de gebruiker heeft eerder de stop en het aantal trades aangepast
+    const config = { ...structuredClone(profile), risk: { ...profile.risk, stopAtrMult: 2, maxTradesPerDay: 6 } };
+    const { server, click, toasts, el } = await mount({ config, info: scalperInfo, known: new Set([...KNOWN, ...profile.markets]) });
+    expect(String(el.innerHTML)).toContain('title="Vul de standaardinstellingen van Snelle scalper in (zijn eigen handelsstijl; nog niet opgeslagen)"');
+    click("defaults");
+    expect(toasts.at(-1)).toBe("info: Standaardwaarden van Snelle scalper ingevuld. Klik op Opslaan om ze te bewaren.");
+    click("save");
+    await settle();
+    // alleen de eigen aanpassingen gaan terug naar het profiel; interval, strategieën en munten blijven die van de scalper
+    expect(server.puts).toEqual([{ risk: { stopAtrMult: 1.2, maxTradesPerDay: 30 } }]);
+    expect(server.config.interval).toBe("5m");
+    expect(server.config.ensemble.enabled).toEqual(["breakout", "macd-momentum", "ema-trend", "vwap-reversion"]);
+    expect(server.config.universe).toEqual({ mode: "auto", count: 60, minVolumeEur: 1_000_000 });
+  });
+
+  it("zonder bot-profiel (oudere server): de fabrieksinstellingen, zoals vroeger", async () => {
+    const { click, toasts } = await mount();
+    click("defaults");
+    expect(toasts.at(-1)).toBe("info: Standaardwaarden ingevuld. Klik op Opslaan om ze te bewaren.");
+  });
+});
+
+describe("Instellingen bij meerdere bots: teksten", () => {
+  const dipInfo = {
+    mode: "paper",
+    liveArmed: false,
+    hasApiKeys: false,
+    capitalLimitQuote: 50,
+    paperStartingCapital: 25,
+    dataSource: "simulated",
+    bot: { id: "dip", name: "Dip-koper", short: "Dip", color: "#9b6ddf" },
+  };
+  const four = ["scalper", "trend", "dip", "allround"].map((id) => ({ id, name: id }));
+
+  it("eigen bestand per bot, geen MARKETS/INTERVAL-uitleg, LIVE_BOT in het voorbeeld, budget € 25 in plaats van een limiet van € 50", async () => {
+    const { bus, boxes, liveBox } = await mount({ info: dipInfo, boxes: [".st-where"] });
+    // één bot (of nog onbekend): de oude tekst
+    expect(liveBox.innerHTML).toContain("CAPITAL_LIMIT_EUR=50");
+    expect(liveBox.innerHTML).not.toContain("LIVE_BOT");
+    bus.emit("bots", { bots: four, error: null, at: 1 });
+    const where = String(boxes[".st-where"].innerHTML).replace(/\s+/g, " ");
+    expect(where).toContain("Dit zijn de instellingen van <b>Dip-koper</b>; de andere bots hebben elk hun eigen instellingen.");
+    expect(where).toContain('<span class="mono">&lt;DATA_DIR&gt;/bots/dip/config.json</span> (standaard <span class="mono">data/bots/dip/config.json</span>)');
+    expect(where).not.toContain("MARKETS");
+    const live = String(liveBox.innerHTML).replace(/\s+/g, " ");
+    expect(live).toContain("TRADING_MODE=live LIVE_BOT=dip BITVAVO_API_KEY=");
+    expect(live).toContain("kiest Dip-koper als de enige bot die met echt geld handelt");
+    expect(live).toContain('<span class="muted">Budget (oefengeld)</span><span><span class="mono">€ 25,00</span></span>');
+    expect(live).not.toContain(">Kapitaallimiet<");
+  });
+
+  it("lijst van bots al bekend vóór het mounten (overzicht op /): meteen de teksten van deze bot", async () => {
+    const { el, liveBox } = await mount({ info: dipInfo, bots: four });
+    expect(String(el.innerHTML)).toContain("&lt;DATA_DIR&gt;/bots/dip/config.json");
+    expect(liveBox.innerHTML).toContain("LIVE_BOT=dip");
+  });
+
+  it("één bot (BOTS=allround): alles zoals vroeger", async () => {
+    const { bus, el, liveBox } = await mount({ info: { ...dipInfo, bot: { id: "allround", name: "Allrounder", short: "Allround", color: "#2fb67c" } } });
+    bus.emit("bots", { bots: [{ id: "allround" }], error: null, at: 1 });
+    expect(String(el.innerHTML)).toContain("&lt;DATA_DIR&gt;/config.json");
+    expect(liveBox.innerHTML).not.toContain("LIVE_BOT");
+    expect(liveBox.innerHTML).toContain(">Kapitaallimiet<");
   });
 });

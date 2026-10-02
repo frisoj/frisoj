@@ -1,6 +1,6 @@
 // Mini event-bus. Server-events (SSE) worden 1-op-1 doorgezet met hun type
 // ("snapshot", "price", ...). UI-events: "market-selected" {market},
-// "tab-changed" {tab}, "connection" {status: "open"|"closed"},
+// "tab-changed" {tab}, "connection" {status: "open"|"closed"|"connecting"|"paused"},
 // "config-changed" (EngineConfig).
 
 export function createBus() {

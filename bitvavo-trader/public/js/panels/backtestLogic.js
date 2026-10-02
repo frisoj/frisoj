@@ -381,3 +381,49 @@ export function noteKind(note) {
   if (filter && period) return "mixed";
   return filter ? "filter" : "period";
 }
+
+// ── Formulier per bot (v3: meerdere bots) ──
+
+/**
+ * localStorage-sleutel van het backtest-formulier. Alle /bot/<id>/-dashboards delen één
+ * origin en dus één localStorage: met één sleutel kreeg de Trendvolger (1 uur) na een
+ * backtest bij de scalper stilletjes diens interval (5 min). Daarom per bot (BASE uit api.js).
+ */
+export function formKey(base) {
+  return base ? `bvt-backtest-form:${base}` : "bvt-backtest-form";
+}
+
+/**
+ * Budget van deze bot als startkapitaal voor een backtest: oefengeld = `paperStartingCapital`,
+ * live = `capitalLimitQuote` (AppInfo); anders `account.startingEquity` uit de snapshot.
+ * null = onbekend.
+ * @returns {{ amount: number, live: boolean } | null}
+ */
+export function botBudget(info, snap) {
+  const live = (info && info.mode ? info.mode : snap && snap.mode) === "live";
+  const fromInfo = info ? (live ? info.capitalLimitQuote : info.paperStartingCapital) : undefined;
+  if (isNum(fromInfo) && fromInfo > 0) return { amount: fromInfo, live };
+  const eq = snap && snap.account ? snap.account.startingEquity : undefined;
+  if (isNum(eq) && eq > 0) return { amount: eq, live };
+  return null;
+}
+
+/**
+ * Interval en startkapitaal bij het openen van het backtest-formulier. Opgeslagen waarden
+ * gelden alleen als ze bewaard zijn bij DEZELFDE bot-instelling (`botInterval` / `botBudget`
+ * in het opgeslagen formulier); anders het interval en het budget van de bot zelf. Zo test
+ * een oud of ander opgeslagen formulier nooit stilletjes een andere handelsstijl.
+ * `capital` = null: niets invullen (budget onbekend en niets opgeslagen).
+ * @param {object | null} saved   opgeslagen formulier
+ * @param {{ interval?: string, budget?: number | null }} bot
+ * @returns {{ interval: string, capital: string | number | null }}
+ */
+export function restoreForm(saved, bot = {}) {
+  const s = saved && typeof saved === "object" ? saved : {};
+  const botIv = typeof bot.interval === "string" && bot.interval ? bot.interval : "";
+  const budget = isNum(bot.budget) && bot.budget > 0 ? bot.budget : null;
+  const interval = botIv ? (s.interval && s.botInterval === botIv ? s.interval : botIv) : s.interval || "15m";
+  const savedCap = s.capital !== undefined && s.capital !== null && String(s.capital) !== "" ? s.capital : null;
+  const capital = budget !== null ? (savedCap !== null && Number(s.botBudget) === budget ? savedCap : budget) : savedCap;
+  return { interval, capital };
+}

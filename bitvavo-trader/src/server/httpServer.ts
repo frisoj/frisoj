@@ -32,6 +32,8 @@ export interface CreateAppDeps {
   bots?: ApiDeps["bots"];
   /** Meerdere bots: gedeelde "één berekening tegelijk"-vergrendeling (zie ApiDeps.heavyGate) */
   heavyGate?: ApiDeps["heavyGate"];
+  /** Meerdere bots: zo lang wachten de `/api/bots`-acties hooguit op één bot (zie ApiDeps.botActionWaitMs) */
+  botActionWaitMs?: number;
 }
 
 export interface App {
@@ -138,6 +140,17 @@ export function tokensEqual(given: string, expected: string): boolean {
   return timingSafeEqual(digest(given), digest(expected));
 }
 
+/**
+ * Het verzoekdoel als URL. Een pad (origin-form, begint met "/") wordt achter een vaste
+ * basis gezet, zodat "//x/api/info" het PAD "//x/api/info" blijft en niet als host "x"
+ * met pad "/api/info" gelezen wordt. ".." wordt wel genormaliseerd. Gooit bij een
+ * ongeldig doel.
+ */
+export function parseRequestUrl(target: string | undefined): URL {
+  const raw = target ?? "/";
+  return raw.startsWith("/") ? new URL(`http://localhost${raw}`) : new URL(raw, "http://localhost");
+}
+
 /** Is dit een API-pad (`/api` of `/api/…`)? */
 export function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
@@ -213,6 +226,7 @@ export function createApp(deps: CreateAppDeps): App {
     persistConfig: deps.persistConfig ?? ((cfg) => saveEngineOverrides(config.dataDir, cfg)),
     bots: deps.bots,
     heavyGate: deps.heavyGate,
+    botActionWaitMs: deps.botActionWaitMs,
   });
   const publicDir = deps.publicDir ?? DEFAULT_PUBLIC_DIR;
   const vendorFile = deps.vendorFile === undefined ? resolveLightweightCharts() : deps.vendorFile;
@@ -225,7 +239,7 @@ export function createApp(deps: CreateAppDeps): App {
     const method = (req.method ?? "GET").toUpperCase();
     let url: URL;
     try {
-      url = new URL(req.url ?? "/", "http://localhost");
+      url = parseRequestUrl(req.url);
     } catch {
       throw new HttpError(400, "Ongeldige URL.");
     }
