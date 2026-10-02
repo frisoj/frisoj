@@ -730,7 +730,7 @@ export function mountBacktest(ctx, el) {
           <div class="bt-empty-card"><div class="bt-empty-ico">↗</div><b>Walk-forward</b>
             <p>De echte toets: werkt het ook op data die de optimizer nooit gezien heeft? Alleen dit resultaat zegt iets over de toekomst.</p></div>
         </div>
-        <p class="pn-hint">Kies links een markt en klik op <b>Backtest</b> om te beginnen. Met €50 zijn fees relatief duur: een strategie moet ruim boven de kosten verdienen.</p>
+        <p class="pn-hint">Kies links een markt en klik op <b>Backtest</b> om te beginnen. Met een klein budget zijn fees relatief duur: een strategie moet ruim boven de kosten verdienen.</p>
       </div>`;
   }
 

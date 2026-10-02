@@ -179,7 +179,8 @@ export const api = {
   /** Laatste beslissing van de engine voor één markt → { decision: EnsembleDecision | null } (null = nog niet beoordeeld) */
   getDecision: (market) => request("GET", `/api/decision?${qs({ market })}`),
   /** ScannerRow[] */
-  getScanner: (limit = 30) => request("GET", `/api/scanner?${qs({ limit })}`),
+  // De scan kan bij veel munten wachten op de rate limit van Bitvavo: langer dan een gewone GET
+  getScanner: (limit = 30) => request("GET", `/api/scanner?${qs({ limit })}`, undefined, { timeoutMs: ACTION_TIMEOUT_MS }),
   /** StrategyMeta[] */
   getStrategies: () => request("GET", "/api/strategies"),
   /** BacktestRequest → BacktestResult */

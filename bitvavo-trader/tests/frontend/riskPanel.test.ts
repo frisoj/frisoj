@@ -76,7 +76,7 @@ describe("risicopaneel: dagdoel", () => {
 
   it("toont de voortgang naar het dagdoel; zonder dagdoel geen regel", async () => {
     const p = await mount({ mode: "paper", config: withTarget, positions: [], halted: { halted: false }, account });
-    expect(p.html()).toContain('<span class="muted">Dagdoel</span><b class="mono">+0,40% <small class="muted">van +1%</small></b>');
+    expect(p.html()).toContain('<span class="muted">Dagdoel</span><b class="mono risk-kv-wrap">+0,40% <small class="muted">van +1%</small></b>');
     const off = await mount({ mode: "paper", config, positions: [], halted: { halted: false }, account });
     expect(off.html()).not.toContain(">Dagdoel<");
   });
@@ -90,7 +90,7 @@ describe("risicopaneel: dagdoel", () => {
       account: { ...account, equity: 51, dayPnlQuote: 1, dayReturnPct: 2, dayTargetReached: true },
     });
     const html = p.html();
-    expect(html).toContain('<span class="muted">Dagdoel</span><b class="mono"><span class="pos">gehaald ✓</span> <small class="muted">grens +1%</small></b>');
+    expect(html).toContain('<span class="muted">Dagdoel</span><b class="mono risk-kv-wrap"><span class="pos">gehaald ✓</span> <small class="muted">grens +1%</small></b>');
     expect(html).not.toContain("pn-banner-good");
   });
 
@@ -119,18 +119,18 @@ describe("risicopaneel: dagdoel na verkoopkosten", () => {
   const pos = { id: "p1", market: "AAA-EUR", amount: 1, entryPrice: 100, currentPrice: 102.7 };
   const account = { equity: 101.1, cashQuote: -1.6, startingEquity: 100, dayStartEquity: 100, tradesToday: 1, feesPaid: 0.25, dayPnlQuote: 1.1, dayReturnPct: 1.1 };
 
-  it("voortgang na verkoopkosten: '+0,79% van +1% · na verkoopkosten', niet het bruto '+1,10%'", async () => {
+  it("voortgang na verkoopkosten: 'Dagdoel (na kosten) +0,79% van +1%', niet het bruto '+1,10%'", async () => {
     const p = await mount({ mode: "paper", running: true, config: withTarget, positions: [pos], halted: { halted: false }, account });
     const html = p.html();
-    expect(html).toContain('<span class="muted">Dagdoel</span><b class="mono">+0,79% <small class="muted">van +1% · na verkoopkosten</small></b>');
-    expect(html).not.toMatch(/Dagdoel<\/span><b class="mono">\+1,10%/);
+    expect(html).toContain('<span class="muted">Dagdoel <small>(na kosten)</small></span><b class="mono risk-kv-wrap">+0,79% <small class="muted">van +1%</small></b>');
+    expect(html).not.toMatch(/Dagdoel.*?<\/span><b class="mono risk-kv-wrap">\+1,10%/);
     // het dagresultaat zelf blijft het bruto resultaat (incl. open posities)
     expect(html).toContain('<span class="muted">Dagresultaat</span><b class="mono pos">+€ 1,10 <small>(+1,10%)</small></b>');
   });
 
   it("de kosten van de engine (account.exitCostQuote) gaan voor de eigen schatting", async () => {
     const p = await mount({ mode: "paper", running: true, config: withTarget, positions: [pos], halted: { halted: false }, account: { ...account, exitCostQuote: 0.2 } });
-    expect(p.html()).toContain(">+0,90% <small class=\"muted\">van +1% · na verkoopkosten</small>");
+    expect(p.html()).toContain(">+0,90% <small class=\"muted\">van +1%</small></b>");
   });
 
   it("netDayView: dagbasis van de engine (equity / (1 + dag-%)), ook na afromen", async () => {
@@ -174,6 +174,12 @@ describe("risicopaneel: 'Winst vastgezet' met posities die nog open staan", () =
     const html = (await mount({ ...base, positions: [] })).html();
     expect(html).toContain('<div class="muted">De dagwinst viel terug tot je winstgrens: open posities zijn verkocht. Morgen gaat de bot weer verder.</div>');
   });
+
+  it("een stilstaande bot belooft niet dat hij morgen vanzelf verdergaat", async () => {
+    const html = (await mount({ ...base, running: false, positions: [] })).html();
+    expect(html).toContain("open posities zijn verkocht. Start de bot weer als je morgen verder wilt.");
+    expect(html).not.toContain("Morgen gaat de bot weer verder");
+  });
 });
 
 describe("risicopaneel met een echte engine-snapshot", () => {
@@ -206,7 +212,7 @@ describe("risicopaneel met een echte engine-snapshot", () => {
     expect(s.account.dayReturnPct).toBeGreaterThan(1);
     expect(s.account.dayTargetReached).toBe(false);
     const html = (await mount(s)).html();
-    const row = /<span class="muted">Dagdoel<\/span><b class="mono">([+-][\d,]+)% <small class="muted">van \+1% · na verkoopkosten<\/small><\/b>/.exec(html);
+    const row = /<span class="muted">Dagdoel <small>\(na kosten\)<\/small><\/span><b class="mono risk-kv-wrap">([+-][\d,]+)% <small class="muted">van \+1%<\/small><\/b>/.exec(html);
     expect(row).not.toBeNull();
     expect(Number(row![1].replace(",", "."))).toBeLessThan(1);
     await h.engine.stop();

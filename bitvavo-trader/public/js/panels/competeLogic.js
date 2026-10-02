@@ -568,7 +568,7 @@ export function boardState(bots, error = null) {
     return { kind: "auth", title: "Geen toegang", text: "Het dashboard-token ontbreekt of klopt niet. Herlaad de pagina en vul het token in." };
   }
   if (error) {
-    return { kind: "error", title: "Kon de bots niet ophalen", text: `${msg}. We proberen het elke ${POLL_MS / 1000} seconden opnieuw.` };
+    return { kind: "error", title: "Kon de bots niet ophalen", text: `${String(msg).replace(/[.\s]+$/, "")}. We proberen het elke ${POLL_MS / 1000} seconden opnieuw.` };
   }
   if (Array.isArray(bots)) return { kind: "empty", title: "Er draaien geen bots", text: "De server meldt geen enkele bot." };
   return { kind: "loading", title: "Bots laden…", text: "" };

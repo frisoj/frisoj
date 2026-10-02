@@ -58,7 +58,8 @@ export function netDayView(snap) {
  */
 export function lockedLine(snap) {
   const n = Array.isArray(snap && snap.positions) ? snap.positions.length : 0;
-  const tomorrow = "Morgen gaat de bot weer verder.";
+  // Een stilstaande bot gaat morgen niet vanzelf verder: dan zeggen hoe je hem weer start
+  const tomorrow = snap && snap.running ? "Morgen gaat de bot weer verder." : "Start de bot weer als je morgen verder wilt.";
   if (!n) return { open: 0, text: `De dagwinst viel terug tot je winstgrens: open posities zijn verkocht. ${tomorrow}` };
   const head = n === 1 ? "Er staat nog 1 positie open." : `Er staan nog ${n} posities open.`;
   const it = n === 1 ? "die" : "ze";
@@ -214,14 +215,12 @@ export function mountRisk(ctx, el) {
         <div title="Resultaat sinds de start van de dag (incl. open posities)"><span class="muted">Dagresultaat</span><b class="mono ${fmt.pnlClass(dayPnl)}">${esc(fmt.eurSigned(dayPnl))} <small>(${esc(fmt.pct(dayRet, 2))})</small></b></div>
         ${
           target > 0
-            ? `<div title="Haal je vandaag dit % (na verkoopkosten), dan handelt de bot door; zakt de dagwinst daarna terug tot deze grens, dan zet hij de winst vast en stopt hij tot morgen. Aanpassen bij Instellingen → Risicobeheer."><span class="muted">Dagdoel</span><b class="mono">${
+            ? `<div title="Haal je vandaag dit % (na verkoopkosten), dan handelt de bot door; zakt de dagwinst daarna terug tot deze grens, dan zet hij de winst vast en stopt hij tot morgen. Aanpassen bij Instellingen → Risicobeheer."><span class="muted">Dagdoel${net && net.costQuote >= 0.005 && !(s.halted?.dailyTarget === true) && a.dayTargetReached !== true ? " <small>(na kosten)</small>" : ""}</span><b class="mono risk-kv-wrap">${
                 s.halted?.dailyTarget === true
                   ? `<span class="pos">winst vastgezet ✓</span>`
                   : a.dayTargetReached === true
                     ? `<span class="pos">gehaald ✓</span> <small class="muted">grens ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
-                    : `${esc(fmt.pct(net ? net.pct : dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}${
-                        net && net.costQuote >= 0.005 ? " · na verkoopkosten" : ""
-                      }</small>`
+                    : `${esc(fmt.pct(net ? net.pct : dayRet, 2))} <small class="muted">van ${esc(fmt.pct(target, Number.isInteger(target) ? 0 : 2))}</small>`
               }</b></div>`
             : ""
         }

@@ -191,7 +191,7 @@ export const RISK_GROUPS = [
       { key: "maxPositionPct", label: "Max. positiegrootte", unit: "%", step: 5, min: 1, max: 100,
         help: "Maximaal deel van je saldo in één positie." },
       { key: "maxOpenPositions", label: "Max. open posities", unit: "stuks", step: 1, min: 1, max: 10, int: true,
-        help: "Hoeveel posities er tegelijk open mogen staan. Met €50 zijn 1–2 posities realistisch (min. order €5)." },
+        help: "Hoeveel posities er tegelijk open mogen staan. Met een klein budget (€25–€50) zijn 1–2 posities realistisch (min. order €5)." },
       { key: "maxTotalExposurePct", label: "Max. totale blootstelling", unit: "%", step: 5, min: 1, max: 100,
         help: "Maximaal deel van je saldo dat in alle posities samen zit; de rest blijft in euro's." },
       { key: "minOrderQuote", label: "Minimale ordergrootte", unit: "€", step: 1, min: 0, max: 100000,

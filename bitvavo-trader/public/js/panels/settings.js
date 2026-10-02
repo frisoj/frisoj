@@ -41,7 +41,7 @@ const FALLBACK_STRATEGIES = [
 ];
 
 const INTERVAL_HELP = {
-  "1m": "Zeer kort: veel ruis, veel trades en veel fees. Niet aan te raden met €50.",
+  "1m": "Zeer kort: veel ruis, veel trades en veel fees. Niet aan te raden met een klein budget.",
   "5m": "Kort: veel signalen, maar fees wegen zwaar bij een klein account.",
   "15m": "Goede balans voor daytrading (aanbevolen om mee te beginnen).",
   "30m": "Rustig daytraden: minder trades, betrouwbaardere signalen.",
