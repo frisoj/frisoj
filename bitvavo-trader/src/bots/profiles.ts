@@ -34,7 +34,8 @@ export const BOT_PROFILES: readonly BotProfile[] = [
       "Handelt op 5-minutencandles in de 60 meest verhandelde munten (kleinste spreads). Koopt bij korte uitbraken en " +
       "momentum, pakt kleine winsten snel (koersdoel 1,5× het risico) met een krappe stop, en handelt ook als de markt " +
       "daalt (geen trendfilter). Hij kijkt het vaakst van alle bots, maar koopt alleen als de verwachte winst minstens 3× " +
-      "de kosten is: zonder die regel verloor hij in de test 40% in drie maanden.",
+      "de kosten is. Dat lukt alleen bij grote uitschieters, dus vaak doet hij uren of dagen niets: zonder die regel " +
+      "verloor hij in de test 40% in drie maanden.",
     color: "#e0a23a",
     engine: {
       interval: "5m",
@@ -78,6 +79,8 @@ export const BOT_PROFILES: readonly BotProfile[] = [
         trendFilter: { market: true, coin: true, interval: "1d", period: 50 },
       },
       risk: {
+        // 2% risico per trade: met €25 en een ruime stop past anders ~1 op de 9 signalen niet boven het €5-minimum
+        riskPerTradePct: 2,
         stopAtrMult: 2.5,
         takeProfitR: 3,
         trailingAtrMult: 3,

@@ -624,6 +624,9 @@ export function simulate(
       dayStartEquity = lastEquity;
       tradesToday = 0;
       realizedPnlToday = 0;
+      // Zoals de engine: een geweigerde verkoop om de winst van GISTEREN vast te zetten vervalt;
+      // de positie valt terug op de gewone stop en het koersdoel.
+      if (pendingExit && pendingExit.reason === "daily-target") pendingExit = null;
     }
 
     if (pos) {

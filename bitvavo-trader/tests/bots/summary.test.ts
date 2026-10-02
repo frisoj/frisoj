@@ -224,6 +224,26 @@ describe("summarize — max. daling en equity-verloop", () => {
     expect(summarize(snap(), scalper).maxDrawdownPct).toBe(0);
   });
 
+  it("live: een hogere kapitaallimiet (storting) is geen daling; de % rekent met het geld dat meedoet (≥ −100%)", () => {
+    // Limiet 25 → 100 (skimmed −75), koop, koers −10%: equity + skimmed 25 → 25 → 24,78 → 15,60
+    const hist: EquityPoint[] = [
+      { time: 1, equity: 25, skimmed: 0 },
+      { time: 2, equity: 100, skimmed: -75 },
+      { time: 3, equity: 99.78, skimmed: -75 },
+      { time: 4, equity: 90.6, skimmed: -75 },
+    ];
+    const live = snap({ mode: "live", equityHistory: hist, account: { ...snap().account, startingEquity: 100, equity: 90.6 } });
+    expect(summarize(live, scalper).maxDrawdownPct).toBeCloseTo(-9.4, 10);
+    // Nooit lager dan −100%
+    const crash: EquityPoint[] = [
+      { time: 1, equity: 10, skimmed: 0 },
+      { time: 2, equity: 100, skimmed: -90 },
+      { time: 3, equity: -50, skimmed: -90 },
+    ];
+    const deep = snap({ mode: "live", equityHistory: crash, account: { ...snap().account, startingEquity: 100 } });
+    expect(summarize(deep, scalper).maxDrawdownPct).toBe(-100);
+  });
+
   it("max. daling over de VOLLEDIGE historie, ook als het dal bij het uitdunnen wegvalt; hooguit 300 punten, eerste en laatste blijven", () => {
     const hist: EquityPoint[] = Array.from({ length: 2000 }, (_, i) => ({ time: T0 + i * 60_000, equity: 100 + i * 0.01 }));
     hist[1001] = { time: hist[1001].time, equity: 50 }; // één diep dal

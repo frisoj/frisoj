@@ -17,7 +17,7 @@
  *   `time` in ms (zoals `EquityPoint.time`).
  */
 import type { BotSummary, EngineSnapshot, EquityPoint, Trade } from "../core/types";
-import { maxDrawdownPct, RATIO_CAP } from "../backtest/metrics";
+import { RATIO_CAP } from "../backtest/metrics";
 
 export const EQUITY_HISTORY_MAX_POINTS = 300;
 
@@ -121,6 +121,26 @@ function tradeStats(trades: readonly Trade[]) {
   };
 }
 
+/**
+ * Grootste daling van piek naar dal van (equity + skimmed), in % van max(piek, startkapitaal),
+ * nooit lager dan −100%. Een hogere kapitaallimiet (live) maakt `skimmed` negatief: die
+ * storting is dan geen "daling" en de % rekent met het geld dat echt meedoet.
+ */
+export function summaryDrawdownPct(values: readonly number[], startingEquity: number): number {
+  let peak = Number.NEGATIVE_INFINITY;
+  let worst = 0;
+  for (const v of values) {
+    if (!Number.isFinite(v)) continue;
+    if (v > peak) peak = v;
+    const base = Math.max(peak, Number.isFinite(startingEquity) ? startingEquity : 0);
+    if (base > 0) {
+      const dd = ((v - peak) / base) * 100;
+      if (dd < worst) worst = dd;
+    }
+  }
+  return Math.max(-100, worst);
+}
+
 export function summarize(snap: SummarySnapshot, profile: SummaryProfile, extra: SummaryExtra = {}): BotSummary {
   const a = snap.account;
   const startingEquity = finite(a.startingEquity);
@@ -158,7 +178,7 @@ export function summarize(snap: SummarySnapshot, profile: SummaryProfile, extra:
     feesPaid,
     grossPnlQuote: totalPnlQuote + feesPaid,
     ...tradeStats(trades),
-    maxDrawdownPct: values.length > 0 ? finite(maxDrawdownPct(values)) : 0,
+    maxDrawdownPct: values.length > 0 ? finite(summaryDrawdownPct(values, startingEquity)) : 0,
     tradesToday: finite(a.tradesToday),
     openPositions: Array.isArray(snap.positions) ? snap.positions.length : 0,
     activeMarkets: (snap.activeMarkets ?? snap.config.markets ?? []).length,

@@ -569,6 +569,8 @@ export interface AccountState {
   dayReturnPct?: number;
   /** Het dagdoel is vandaag gehaald: zakt de dagwinst terug tot de grens, dan wordt de winst vastgezet */
   dayTargetReached?: boolean;
+  /** Geschatte kosten (EUR) om alle open posities nu te verkopen (basis van het dagdoel "na verkoopkosten") */
+  exitCostQuote?: number;
   /**
    * Totale winst/verlies in EUR sinds de start (door de engine berekend: incl.
    * afgeroomde winst, en niet vertekend door wijzigingen van de kapitaallimiet)
@@ -935,7 +937,7 @@ export interface DailyStats {
   days: number;
   /** Het gebruikte dagdoel in %: risk.dailyProfitTargetPct, of 1 als dat uit staat */
   targetPct: number;
-  /** Dagen met een resultaat ≥ targetPct */
+  /** Dagen die het dagdoel haalden: de winstgrens ging aan (na verkoopkosten), of de dag eindigde op ≥ targetPct */
   targetDays: number;
   /** Dagen met winst (> 0) */
   winDays: number;
@@ -1075,7 +1077,10 @@ export interface BotSummary {
   avgLossPct: number;
   /** Bruto winst / bruto verlies (999 als er geen verlies is, 0 zonder trades) */
   profitFactor: number;
-  /** Grootste daling van piek naar dal van (equity + skimmed), in % van de piek (≤ 0) */
+  /**
+   * Grootste daling van piek naar dal van (equity + skimmed), in % van max(piek, startkapitaal),
+   * tussen −100 en 0 (een hogere live-kapitaallimiet telt niet als daling)
+   */
   maxDrawdownPct: number;
   tradesToday: number;
   openPositions: number;

@@ -92,7 +92,7 @@ export const PROFILE_ENGINE = {
       regimeFilter: true,
       trendFilter: { market: true, coin: true, interval: "1d", period: 50 },
     },
-    risk: { stopAtrMult: 2.5, takeProfitR: 3, trailingAtrMult: 3, breakEvenAtR: 1.5, maxTradesPerDay: 6, timeStopCandles: 72 },
+    risk: { riskPerTradePct: 2, stopAtrMult: 2.5, takeProfitR: 3, trailingAtrMult: 3, breakEvenAtR: 1.5, maxTradesPerDay: 6, timeStopCandles: 72 },
     universe: { mode: "auto", count: 100, minVolumeEur: 250_000 },
   },
   dip: {

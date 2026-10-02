@@ -1050,6 +1050,7 @@ export class TradingEngine extends EventEmitter {
         ...this.account,
         lastLossAt: { ...this.account.lastLossAt },
         dayTargetReached: this.targetArmedDayKey !== null && this.targetArmedDayKey === this.account.dayKey,
+        exitCostQuote: this.exitCostEstimate(),
       },
       positions: this.positions.map((p) => this.positionView(p)),
       trades: this.trades

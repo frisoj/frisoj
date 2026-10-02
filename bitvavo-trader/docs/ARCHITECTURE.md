@@ -1057,3 +1057,30 @@ result is reused for 5 s — several bots on the same interval then cost one req
   `PAPER_STARTING_CAPITAL`. Paper bots in a live process never get the API key.
 * `BitvavoFeed.getCandles`: identical concurrent requests share one call only when their `fast`/`priority` options
   match; a successful result is reused for 5 s (copies per caller); empty results are not cached.
+
+### v3 — changes after the round-6 review (binding)
+* **Profit floor / loss limit on unknown prices**: a daily-loss or floor halt that would be judged on an unknown
+  position price (e.g. right after a restart) or during a postponed day rollover is NOT sticky and sells nothing; its
+  reason is "Dagresultaat nog onbekend…" / "Nieuwe handelsdag nog niet verwerkt…" (`dailyLimit: false`) and buys stay
+  blocked. Prices fetched by the stopped-bot monitor are kept when the bot starts. `lockInDailyTarget` is skipped
+  while the rollover is postponed.
+* Raising the target (or switching it on) while the floor is armed but not locked switches the floor off until the
+  new target is reached; lowering keeps it armed (persisted at once).
+* The day rollover drops pending `"daily-target"` exits (unknown-outcome sells stay) — engine AND backtest — so a
+  lock-in sell of yesterday never executes today; the position returns to its normal stop / take-profit.
+* A stopped bot rolls the day over through the price monitor (fresh "Vandaag" numbers in /api/bots).
+* Every position gets a stop check at the fresh bulk price every tick.
+* `account.exitCostQuote` is in the snapshot (the dashboard shows the floor progress net of selling costs).
+* `BacktestResult.dailyStats.targetDays` = days that armed the floor (net of costs) or ended ≥ the target.
+* Feed: priority (stop-loss) candle requests never come from the shared cache; cache and in-flight sharing only
+  apply within the candle period in which the request started.
+* `POST /api/bots/*` waits at most 20 s per bot; a bot still busy returns `{ ok: false, pending: true, error }`.
+* `parseRequestUrl` keeps `//` inside a request path as part of the path (never as a host).
+* `BotSummary.maxDrawdownPct` = largest peak-to-trough drop of equity + skimmed, divided by max(peak, starting
+  capital), clamped at −100% (a raised live capital limit is no drawdown).
+* Dashboard: one SSE connection per visible tab (hidden tabs close theirs), every request times out (20 s GET, 90 s
+  actions); backtest form settings and the default start capital are per bot; "Standaardwaarden" on a profile bot
+  restores that bot's profile (`PROFILE_ENGINE` mirror in settingsLogic.js, checked by a test against
+  `profileEngineConfig`).
+* Profiles: the trend bot risks 2% per trade (otherwise ~1 in 9 signals cannot be opened above the €5 minimum with
+  €25); the scalper's description says it only trades on large 5-minute swings.

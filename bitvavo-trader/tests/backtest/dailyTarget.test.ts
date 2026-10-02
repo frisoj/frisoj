@@ -63,6 +63,22 @@ describe("Dagdoel als winstgrens in de backtest", () => {
     expect(r.trades.some((t) => t.exitReason === "daily-target")).toBe(false);
   });
 
+  it("een geweigerde dagdoel-verkoop vervalt bij de dagwissel (zoals de engine): de dag erna geen 'dagdoel'-verkoop", () => {
+    const c = flatCandles(N, 100);
+    c[5] = candle(5, 100, 104.1, 99.9, 104); // grens actief
+    c[6] = candle(6, 104, 104, 47, 48); // crash: positie < €5 → verkoop geweigerd
+    for (let i = 7; i < 120; i++) c[i] = candle(i, 48, 48.2, 47.8, 48);
+    for (let i = 120; i < N; i++) c[i] = candle(i, 60, 60.2, 59.8, 60); // volgende dag weer verkoopbaar
+    const d = decisionsFrom(c, acts(0));
+    const r = runBacktestWith(
+      input(c, { initialCapital: 10, risk: riskCfg({ dailyProfitTargetPct: 1, maxSpreadPct: 0, dailyLossLimitPct: 50 }) }),
+      { decide: () => d, createRisk: () => stubRisk({ quote: 9.9, stopDist: 95, tpDist: 200 }) },
+    ).result;
+    const t = r.trades[0];
+    expect(dayKey(t.exitTime)).not.toBe(dayKey(T0 + 6 * STEP)); // niet dezelfde dag verkocht (geweigerd)
+    expect(t.exitReason).not.toBe("daily-target");
+  });
+
   it("dailyStats telt de dagen", () => {
     const r = run(1, [0, 10, 100]);
     expect(r.dailyStats).toMatchObject({ days: 3, targetPct: 1 });
