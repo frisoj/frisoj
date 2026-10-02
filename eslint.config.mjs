@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone trading bot with its own tooling (see bitvavo-trader/).
+    "bitvavo-trader/**",
   ]),
 ]);
 

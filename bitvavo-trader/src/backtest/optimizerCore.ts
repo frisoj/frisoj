@@ -1,0 +1,378 @@
+/**
+ * Grid-search optimizer with fully injected dependencies (no imports from the
+ * strategy / risk modules). `optimizer.ts` wires in the real defaults.
+ */
+import type {
+  BacktestMetrics,
+  EnsembleConfig,
+  EnsembleDecision,
+  Heatmap,
+  OptimizationResult,
+  OptimizationRow,
+  OptimizeObjective,
+  Regime,
+  SignalAction,
+  StrategyId,
+} from "../core/types";
+import { STRATEGY_IDS } from "../core/types";
+import { hashString, mulberry32 } from "../core/util";
+import {
+  entryGates,
+  simulate,
+  withSpreadCosts,
+  type BacktestDeps,
+  type BacktestInput,
+  type BlockedEntries,
+  type ResolvedBacktestDeps,
+} from "./simulator";
+
+export interface OptimizeOptions {
+  strategy?: StrategyId;
+  objective: OptimizeObjective;
+  maxCombos?: number;
+}
+
+/**
+ * Score → action (the ensemble's `classify`). `exitScore` is the decision's
+ * optional `EnsembleDecision.exitScore` (the score selling is based on).
+ */
+export type ClassifyFn = (score: number, regime: Regime, cfg: EnsembleConfig, exitScore?: number) => SignalAction;
+
+export type ParamSpaceFn = (strategy: StrategyId) => Record<string, number[]>;
+
+/** BacktestDeps plus optional hooks for the optimizer (mainly for tests). */
+export interface OptimizerDeps extends BacktestDeps {
+  /**
+   * Score → action mapping used to re-threshold cached decisions. Defaults to
+   * the ensemble's `classify` only when `decide` is the default `runEnsemble`
+   * (re-classifying a custom `decide` with the real classify would be wrong).
+   */
+  classify?: ClassifyFn;
+  /** Parameter space of a strategy (default: STRATEGIES[id].paramSpace). */
+  paramSpace?: ParamSpaceFn;
+}
+
+export interface ResolvedOptimizerDeps extends ResolvedBacktestDeps {
+  classify: ClassifyFn | null;
+  paramSpace: ParamSpaceFn;
+}
+
+/** An optimizer row plus the buy decisions its backtest blocked (trend filter / spread limit). */
+export interface OptimizationRowWithGates extends OptimizationRow {
+  /** Present when the trend filter was applied or a spread limit is set (see `BacktestResult.blockedEntries`) */
+  blockedEntries?: BlockedEntries;
+}
+
+/**
+ * `OptimizationResult` plus the entry-gate details (optional extras on top of
+ * the contract type, so every consumer of `OptimizationResult` keeps working):
+ * - `note`: Dutch explanation of the gates, the same for every combination
+ *   (trend filter not applied for lack of data, or the spread blocks every entry);
+ * - `blockedEntries`: those of `best` (or of the top row when nothing scored);
+ *   each row carries its own.
+ */
+export interface OptimizationOutput extends OptimizationResult {
+  rows: OptimizationRowWithGates[];
+  best: OptimizationRowWithGates | null;
+  note?: string;
+  blockedEntries?: BlockedEntries;
+}
+
+export const DEFAULT_MAX_COMBOS = 120;
+/** Combos with fewer trades than this can never win (lucky 1-trade results). */
+export const MIN_TRADES_FOR_SCORE = 5;
+export const PENALTY_SCORE = -1e9;
+export const MAX_ROWS = 50;
+
+export const DEFAULT_PARAM_GRID: Readonly<Record<string, readonly number[]>> = {
+  "ensemble.buyThreshold": [0.25, 0.35, 0.45, 0.55],
+  "ensemble.sellThreshold": [-0.2, -0.3, -0.45],
+  "risk.stopAtrMult": [1.5, 2, 2.5, 3],
+  "risk.takeProfitR": [1.5, 2, 3],
+};
+
+function isStrategyId(s: string): s is StrategyId {
+  return (STRATEGY_IDS as readonly string[]).includes(s);
+}
+
+/** The parameter grid: a strategy's paramSpace ("<id>.<param>") or the default ensemble/risk grid. */
+export function buildParamGrid(strategy: StrategyId | undefined, paramSpace: ParamSpaceFn): Record<string, number[]> {
+  const grid: Record<string, number[]> = {};
+  if (strategy) {
+    const space = paramSpace(strategy) ?? {};
+    for (const [param, values] of Object.entries(space)) {
+      const vals = [...new Set(values.filter((v) => Number.isFinite(v)))];
+      if (vals.length > 0) grid[`${strategy}.${param}`] = vals;
+    }
+  } else {
+    for (const [k, v] of Object.entries(DEFAULT_PARAM_GRID)) grid[k] = [...v];
+  }
+  return grid;
+}
+
+/** Make sure `strategy` is part of the ensemble (with a positive weight). */
+export function forceEnableStrategy(ensemble: EnsembleConfig, strategy: StrategyId): EnsembleConfig {
+  const enabled = ensemble.enabled.includes(strategy) ? [...ensemble.enabled] : [...ensemble.enabled, strategy];
+  const weights = { ...ensemble.weights };
+  if (!((weights[strategy] ?? 0) > 0)) weights[strategy] = 1;
+  return { ...ensemble, enabled, weights };
+}
+
+/**
+ * Apply optimizer params ("ensemble.x", "risk.x", "<strategyId>.x") to a copy of
+ * the input. Strategies whose params are set are force-enabled.
+ */
+export function applyParams(input: BacktestInput, params: Record<string, number>): BacktestInput {
+  let ensemble: EnsembleConfig = { ...input.ensemble, params: { ...input.ensemble.params } };
+  const risk = { ...input.risk };
+  for (const [key, value] of Object.entries(params)) {
+    const dot = key.indexOf(".");
+    if (dot <= 0) continue;
+    const scope = key.slice(0, dot);
+    const name = key.slice(dot + 1);
+    if (scope === "ensemble") {
+      if (typeof (ensemble as unknown as Record<string, unknown>)[name] === "number") {
+        ensemble = { ...ensemble, [name]: value };
+      }
+    } else if (scope === "risk") {
+      if (typeof (risk as unknown as Record<string, unknown>)[name] === "number") {
+        (risk as unknown as Record<string, number>)[name] = value;
+      }
+    } else if (isStrategyId(scope)) {
+      ensemble.params[scope] = { ...(ensemble.params[scope] ?? {}), [name]: value };
+      ensemble = forceEnableStrategy(ensemble, scope);
+    }
+  }
+  return { ...input, ensemble, risk };
+}
+
+/** Current values of the grid keys in the input config (keys without a known value are skipped). */
+export function currentParamValues(input: BacktestInput, keys: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const key of keys) {
+    const dot = key.indexOf(".");
+    const scope = key.slice(0, dot);
+    const name = key.slice(dot + 1);
+    let v: unknown;
+    if (scope === "ensemble") v = (input.ensemble as unknown as Record<string, unknown>)[name];
+    else if (scope === "risk") v = (input.risk as unknown as Record<string, unknown>)[name];
+    else if (isStrategyId(scope)) v = input.ensemble.params[scope]?.[name];
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = v;
+  }
+  return out;
+}
+
+export function objectiveValue(m: BacktestMetrics, objective: OptimizeObjective): number {
+  switch (objective) {
+    case "sharpe":
+      return m.sharpe;
+    case "return":
+      return m.totalReturnPct;
+    case "profitFactor":
+      return m.profitFactor;
+    case "calmar":
+      return m.calmar;
+    default:
+      return m.sharpe;
+  }
+}
+
+/** Objective score; fewer than MIN_TRADES_FOR_SCORE trades → PENALTY_SCORE. */
+export function objectiveScore(m: BacktestMetrics, objective: OptimizeObjective): number {
+  if (m.trades < MIN_TRADES_FOR_SCORE) return PENALTY_SCORE;
+  const v = objectiveValue(m, objective);
+  return Number.isFinite(v) ? v : PENALTY_SCORE;
+}
+
+/** Deterministic sample of `count` distinct indices from [0, total), ascending. */
+export function sampleComboIndices(total: number, count: number, seed: number): number[] {
+  if (count >= total) return Array.from({ length: total }, (_, i) => i);
+  const rng = mulberry32(seed);
+  let picked: number[];
+  if (total <= 2_000_000) {
+    const idx = new Uint32Array(total);
+    for (let i = 0; i < total; i++) idx[i] = i;
+    for (let i = 0; i < count; i++) {
+      const j = i + Math.floor(rng() * (total - i));
+      const t = idx[i];
+      idx[i] = idx[j];
+      idx[j] = t;
+    }
+    picked = Array.from(idx.subarray(0, count));
+  } else {
+    const set = new Set<number>();
+    while (set.size < count) set.add(Math.floor(rng() * total));
+    picked = [...set];
+  }
+  return picked.sort((a, b) => a - b);
+}
+
+function decodeCombo(index: number, keys: string[], grid: Record<string, number[]>): Record<string, number> {
+  const params: Record<string, number> = {};
+  let rest = index;
+  for (let k = keys.length - 1; k >= 0; k--) {
+    const values = grid[keys[k]];
+    params[keys[k]] = values[rest % values.length];
+    rest = Math.floor(rest / values.length);
+  }
+  // Keep key order stable (grid order) for display.
+  const ordered: Record<string, number> = {};
+  for (const key of keys) ordered[key] = params[key];
+  return ordered;
+}
+
+/** Neutral score of an objective: profit factor 1, everything else 0. */
+export function objectivePivot(objective: OptimizeObjective | undefined): number {
+  return objective === "profitFactor" ? 1 : 0;
+}
+
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/**
+ * Heatmap over the two params with the most distinct values, with ALL the
+ * per-cell details of the `Heatmap` contract filled in (JSON-safe):
+ * - `values` = MEDIAN of the scored (non-penalised) combinations in the cell
+ *   (over the other, hidden params), so one lucky combination cannot paint a
+ *   region green;
+ * - `best` = best score per cell (null = no combination with enough trades);
+ * - `tested` = sampled combinations that fell into the cell;
+ * - `scored` = of those, the ones with at least MIN_TRADES_FOR_SCORE trades;
+ * - `positive` = of the scored ones, the ones above the neutral point
+ *   (profitFactor: 1, otherwise 0).
+ */
+export function buildHeatmap(
+  grid: Record<string, number[]>,
+  tested: { params: Record<string, number>; score: number }[],
+  objective?: OptimizeObjective,
+): Required<Heatmap> | null {
+  const keys = Object.keys(grid);
+  if (keys.length < 2) return null;
+  const byCount = keys
+    .map((k, order) => ({ k, order, count: grid[k].length }))
+    .sort((a, b) => b.count - a.count || a.order - b.order);
+  const xParam = byCount[0].k;
+  const yParam = byCount[1].k;
+  const xValues = [...grid[xParam]].sort((a, b) => a - b);
+  const yValues = [...grid[yParam]].sort((a, b) => a - b);
+  const pivot = objectivePivot(objective);
+  const scores: number[][][] = yValues.map(() => xValues.map(() => []));
+  const testedCount: number[][] = yValues.map(() => xValues.map(() => 0));
+  for (const t of tested) {
+    const xi = xValues.indexOf(t.params[xParam]);
+    const yi = yValues.indexOf(t.params[yParam]);
+    if (xi < 0 || yi < 0) continue;
+    testedCount[yi][xi]++;
+    if (t.score > PENALTY_SCORE) scores[yi][xi].push(t.score); // too few trades → does not count
+  }
+  const values = scores.map((row) => row.map((cell) => median(cell)));
+  const best = scores.map((row) => row.map((cell) => (cell.length > 0 ? Math.max(...cell) : null)));
+  const scored = scores.map((row) => row.map((cell) => cell.length));
+  const positive = scores.map((row) => row.map((cell) => cell.filter((v) => v > pivot).length));
+  return { xParam, yParam, xValues, yValues, values, best, tested: testedCount, scored, positive };
+}
+
+/** Grid-search optimisation with resolved dependencies. */
+export function optimizeWith(input: BacktestInput, opts: OptimizeOptions, deps: ResolvedOptimizerDeps): OptimizationOutput {
+  const startedAt = Date.now();
+  // Spread-aware costs once, so the risk manager of every combo sees them too.
+  const costed = withSpreadCosts(input);
+  const base: BacktestInput = opts.strategy
+    ? { ...costed, ensemble: forceEnableStrategy(costed.ensemble, opts.strategy) }
+    : costed;
+  const grid = buildParamGrid(opts.strategy, deps.paramSpace);
+  const keys = Object.keys(grid);
+  const total = keys.reduce((acc, k) => acc * grid[k].length, 1);
+  const maxCombos = Math.max(1, Math.floor(opts.maxCombos ?? DEFAULT_MAX_COMBOS));
+  const seed = hashString(`${keys.join("|")}#${total}#${maxCombos}`);
+  const indices = sampleComboIndices(total, maxCombos, seed);
+
+  // ── Decision cache ──
+  // Scores only depend on the non-threshold part of the ensemble config. When a
+  // classify() is available, compute decisions once per score-key and
+  // re-threshold them; otherwise call decide() once per distinct config.
+  const { market, candles } = base;
+  const fullCache = new Map<string, EnsembleDecision[]>();
+  const scoreCache = new Map<string, { decisions: EnsembleDecision[]; overridden: Uint8Array }>();
+  const classify = deps.classify;
+  const getDecisions = (ens: EnsembleConfig): EnsembleDecision[] => {
+    const fullKey = JSON.stringify(ens);
+    const hit = fullCache.get(fullKey);
+    if (hit) return hit;
+    let decisions: EnsembleDecision[];
+    if (classify) {
+      const scoreKey = JSON.stringify({ ...ens, buyThreshold: null, sellThreshold: null });
+      let entry = scoreCache.get(scoreKey);
+      if (!entry) {
+        const computed = deps.decide(market, candles, ens);
+        // Decisions whose action is not what classify() says (e.g. forced "hold"
+        // during warmup) keep their action when re-thresholding.
+        const overridden = new Uint8Array(computed.length);
+        for (let i = 0; i < computed.length; i++) {
+          const d = computed[i];
+          if (classify(d.score, d.regime, ens, d.exitScore) !== d.action) overridden[i] = 1;
+        }
+        entry = { decisions: computed, overridden };
+        scoreCache.set(scoreKey, entry);
+        decisions = computed;
+      } else {
+        const src = entry.decisions;
+        decisions = new Array(src.length);
+        for (let i = 0; i < src.length; i++) {
+          const d = src[i];
+          if (entry.overridden[i]) {
+            decisions[i] = d;
+            continue;
+          }
+          const action = classify(d.score, d.regime, ens, d.exitScore);
+          decisions[i] = action === d.action ? d : { ...d, action };
+        }
+      }
+    } else {
+      decisions = deps.decide(market, candles, ens);
+    }
+    fullCache.set(fullKey, decisions);
+    return decisions;
+  };
+
+  // Every combination goes through simulate() with the same trendCandles / spreadPct, so the
+  // entry gates (trend filter, spread limit) apply to each of them exactly like in a backtest.
+  const tested: (OptimizationRowWithGates & { order: number })[] = [];
+  indices.forEach((comboIndex, order) => {
+    const params = decodeCombo(comboIndex, keys, grid);
+    const comboInput = applyParams(base, params);
+    const decisions = getDecisions(comboInput.ensemble);
+    const risk = deps.createRisk(comboInput.risk, comboInput.interval);
+    const { result } = simulate(comboInput, decisions, risk, { lite: true });
+    tested.push({
+      params,
+      metrics: result.metrics,
+      score: objectiveScore(result.metrics, opts.objective),
+      order,
+      ...(result.blockedEntries ? { blockedEntries: result.blockedEntries } : {}),
+    });
+  });
+
+  tested.sort((a, b) => b.score - a.score || a.order - b.order);
+  const rows: OptimizationRowWithGates[] = tested
+    .slice(0, MAX_ROWS)
+    .map(({ params, metrics, score, blockedEntries }) => ({ params, metrics, score, ...(blockedEntries ? { blockedEntries } : {}) }));
+  const best = rows.length > 0 && rows[0].score > PENALTY_SCORE ? rows[0] : null;
+  const shown = best ?? rows[0];
+  const { note } = entryGates(base);
+
+  return {
+    objective: opts.objective,
+    rows,
+    best,
+    combosTested: tested.length,
+    heatmap: buildHeatmap(grid, tested, opts.objective),
+    durationMs: Date.now() - startedAt,
+    ...(shown?.blockedEntries ? { blockedEntries: { ...shown.blockedEntries } } : {}),
+    ...(note ? { note } : {}),
+  };
+}

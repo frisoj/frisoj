@@ -1,0 +1,310 @@
+// Gedeelde API-client voor het dashboard. Alle panelen gebruiken deze module;
+// praat nooit rechtstreeks met fetch vanuit een paneel.
+//
+// Meerdere bots (v3): staat de pagina onder /bot/<id>/, dan gaat elk verzoek voor
+// "deze bot" (en de SSE-stream) naar /bot/<id>/api/…; de wedstrijdroutes
+// (/api/bots…) gaan altijd naar de root.
+
+const TOKEN_KEY = "bvt-dashboard-token";
+
+function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setToken(token) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* localStorage niet beschikbaar */
+  }
+}
+
+/**
+ * BASE voor een URL-pad: `/bot/<id>` als het pad met /bot/<id> begint, anders "".
+ * Alleen veilige ids (letters, cijfers, - en _), zoals de profielen in src/bots/profiles.ts.
+ */
+export function basePath(pathname) {
+  const m = /^\/bot\/([A-Za-z0-9_-]+)(?:\/|$)/.exec(String(pathname || ""));
+  return m ? `/bot/${m[1]}` : "";
+}
+
+/** Bot-id uit de BASE ("" = de root, dus de standaardbot) */
+export function baseBotId(pathname) {
+  const b = basePath(pathname);
+  return b ? b.slice("/bot/".length) : "";
+}
+
+/** BASE van deze pagina (verandert niet zonder herladen; een #hash telt niet mee) */
+export function apiBase() {
+  try {
+    return basePath(globalThis.location ? globalThis.location.pathname : "");
+  } catch {
+    return "";
+  }
+}
+
+/** BASE bij het laden van de pagina: `/bot/<id>` of "" */
+export const BASE = apiBase();
+
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** Opties voor routes die niet bij één bot horen (altijd de root) */
+const ROOT = { root: true };
+
+// Nooit eindeloos wachten: een browser opent maar 6 verbindingen tegelijk per server. Zijn
+// die allemaal bezet (bijv. veel dashboard-tabbladen met een live-verbinding), dan blijft een
+// verzoek — ook de noodstop — anders stil in de wachtrij staan en gaat het minuten later
+// alsnog de deur uit. Na de tijdslimiet wordt het afgebroken (een verzoek dat nog in de
+// wachtrij stond, gaat dan ook later niet meer weg) en krijgt de gebruiker een duidelijke fout.
+/** Opvragen (GET) */
+export const READ_TIMEOUT_MS = 20_000;
+/**
+ * Opdrachten (start, stop, noodstop, sluiten, opslaan…): de server kan even bezig zijn met
+ * verkopen (live tot ~65 s wachten op de rate limit van Bitvavo, zie bitvavoClient.ts).
+ */
+export const ACTION_TIMEOUT_MS = 90_000;
+/** Backtest, optimaliseren en walk-forward mogen lang rekenen */
+export const HEAVY_TIMEOUT_MS = 15 * 60_000;
+const HEAVY = { timeoutMs: HEAVY_TIMEOUT_MS };
+
+/** Nederlandse melding als de server niet op tijd antwoordt */
+export function timeoutMessage(method, ms) {
+  const s = Math.round(ms / 1000);
+  const when = s >= 120 ? `${Math.round(s / 60)} minuten` : `${s} seconden`;
+  const tabs = "Staan er veel dashboard-tabbladen open? Sluit er een paar en probeer het opnieuw.";
+  return String(method).toUpperCase() === "GET"
+    ? `De server reageert niet (geen antwoord binnen ${when}). Draait het programma nog? ${tabs}`
+    : `Geen antwoord van de server binnen ${when}. Misschien is de opdracht toch uitgevoerd: controleer de status en de posities. ${tabs}`;
+}
+
+async function request(method, path, body, opts) {
+  const headers = { Accept: "application/json" };
+  const token = getToken();
+  if (token) headers["x-dashboard-token"] = token;
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const url = opts && opts.root ? path : apiBase() + path;
+  const timeoutMs =
+    opts && typeof opts.timeoutMs === "number" && opts.timeoutMs > 0
+      ? opts.timeoutMs
+      : method === "GET"
+        ? READ_TIMEOUT_MS
+        : ACTION_TIMEOUT_MS;
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  let timedOut = false;
+  const timer = ctl
+    ? setTimeout(() => {
+        timedOut = true;
+        ctl.abort();
+      }, timeoutMs)
+    : null;
+  let res;
+  let text;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(ctl ? { signal: ctl.signal } : {}),
+    });
+    text = await res.text();
+  } catch (err) {
+    if (timedOut) {
+      const e = new ApiError(timeoutMessage(method, timeoutMs), 0);
+      e.timeout = true;
+      throw e;
+    }
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { error: text };
+  }
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+    throw new ApiError(msg, res.status);
+  }
+  return data;
+}
+
+const qs = (params) =>
+  Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+export const api = {
+  /** AppInfo */
+  info: () => request("GET", "/api/info"),
+  /** EngineSnapshot */
+  getState: () => request("GET", "/api/state"),
+  /** EngineConfig */
+  getConfig: () => request("GET", "/api/config"),
+  /** Partial<EngineConfig> → EngineConfig */
+  putConfig: (partial) => request("PUT", "/api/config", partial),
+  start: () => request("POST", "/api/engine/start"),
+  stop: () => request("POST", "/api/engine/stop"),
+  /** Noodstop: sluit alle posities en stopt de bot */
+  kill: () => request("POST", "/api/engine/kill"),
+  closePosition: (id) => request("POST", `/api/positions/${encodeURIComponent(id)}/close`),
+  /** Onverkoopbare positie afschrijven (bot beheert hem niet meer, inleg = verlies) → Trade */
+  writeOffPosition: (id) => request("POST", `/api/positions/${encodeURIComponent(id)}/writeoff`),
+  /** Live mode: bevestigingstekst moet exact "IK BEGRIJP HET RISICO" zijn */
+  arm: (confirm) => request("POST", "/api/live/arm", { confirm }),
+  disarm: () => request("POST", "/api/live/disarm"),
+  /** Live: gebruiker heeft Bitvavo gecontroleerd na kooporder(s) met onbekende uitkomst → EngineSnapshot */
+  ackUnknownOrders: () => request("POST", "/api/live/unknown-orders/ack"),
+  /** Onbruikbare opgeslagen staat bevestigd (deblokkeert live armen) → EngineSnapshot */
+  ackStateRecovery: () => request("POST", "/api/state/recovery/ack"),
+  /** Paper mode: reset account naar startkapitaal */
+  resetPaper: () => request("POST", "/api/paper/reset"),
+  /** MarketInfo[] (alleen EUR-markten die traden) */
+  getMarkets: () => request("GET", "/api/markets"),
+  /** CandlesResponse */
+  getCandles: (market, interval, limit = 300) =>
+    request("GET", `/api/candles?${qs({ market, interval, limit })}`),
+  /** Laatste beslissing van de engine voor één markt → { decision: EnsembleDecision | null } (null = nog niet beoordeeld) */
+  getDecision: (market) => request("GET", `/api/decision?${qs({ market })}`),
+  /** ScannerRow[] */
+  // De scan kan bij veel munten wachten op de rate limit van Bitvavo: langer dan een gewone GET
+  getScanner: (limit = 30) => request("GET", `/api/scanner?${qs({ limit })}`, undefined, { timeoutMs: ACTION_TIMEOUT_MS }),
+  /** StrategyMeta[] */
+  getStrategies: () => request("GET", "/api/strategies"),
+  /** BacktestRequest → BacktestResult */
+  backtest: (req) => request("POST", "/api/backtest", req, HEAVY),
+  /** OptimizeRequest → OptimizationResult */
+  optimize: (req) => request("POST", "/api/optimize", req, HEAVY),
+  /** WalkForwardRequest → WalkForwardResult */
+  walkForward: (req) => request("POST", "/api/walkforward", req, HEAVY),
+
+  // ── Bot-wedstrijd (altijd de root, ook vanaf /bot/<id>/) ──
+  /** BotSummary[] (volgorde van BOTS); 404 = server zonder meerdere bots */
+  getBots: () => request("GET", "/api/bots", undefined, ROOT),
+  /** → { results: { id, ok, error? }[] } */
+  startAll: () => request("POST", "/api/bots/start-all", undefined, ROOT),
+  /** → { results: { id, ok, error? }[] } (open posities blijven staan) */
+  stopAll: () => request("POST", "/api/bots/stop-all", undefined, ROOT),
+  /** Noodstop van elke bot (ook als er één mislukt) → { results: { id, ok, error?, killResult? }[] } */
+  killAll: () => request("POST", "/api/bots/kill-all", undefined, ROOT),
+};
+
+/** Alle event-types die de server via SSE stuurt (zie ServerEvent in src/core/types.ts) */
+export const EVENT_TYPES = [
+  "snapshot",
+  "price",
+  "candle",
+  "decision",
+  "order",
+  "position-opened",
+  "position-closed",
+  "log",
+];
+
+/**
+ * Zo lang houdt een tabblad dat naar de achtergrond gaat zijn live-verbinding nog open
+ * (kort wisselen van tabblad kost dan geen nieuwe verbinding).
+ */
+export const HIDDEN_PAUSE_MS = 5_000;
+
+/**
+ * Verbindt met de SSE-stream. `onEvent(type, data)` voor elk server-event,
+ * `onStatus("open" | "closed" | "connecting" | "paused")` bij verbindingswijzigingen.
+ * EventSource herverbindt automatisch. Geeft een functie terug om te sluiten.
+ *
+ * Een tabblad op de achtergrond (`document.hidden`) sluit zijn stream na
+ * {@link HIDDEN_PAUSE_MS} ("paused") en opent hem weer zodra het zichtbaar wordt; de server
+ * stuurt dan meteen een verse snapshot. Elke open stream houdt één van de maar 6
+ * verbindingen die een browser per server gebruikt: met het overzicht en de dashboards van
+ * vier bots in aparte tabbladen kwam anders geen enkel verzoek meer aan, ook de noodstop niet.
+ * `opts` (voor tests): { document, EventSource, pauseMs }.
+ */
+export function connectEvents(onEvent, onStatus, opts = {}) {
+  const doc = "document" in opts ? opts.document : typeof document !== "undefined" ? document : null;
+  const ES = opts.EventSource || globalThis.EventSource;
+  const pauseMs = typeof opts.pauseMs === "number" && opts.pauseMs >= 0 ? opts.pauseMs : HIDDEN_PAUSE_MS;
+  const status = (s) => {
+    try {
+      onStatus && onStatus(s);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  const hidden = () => !!(doc && doc.hidden);
+  let es = null;
+  let timer = null;
+  let ended = false;
+
+  function open() {
+    if (es || ended) return;
+    const token = getToken();
+    const path = `${apiBase()}/api/events`;
+    const url = token ? `${path}?${qs({ token })}` : path;
+    const src = new ES(url);
+    es = src;
+    // Alleen de huidige stream telt (een gesloten stream kan nog een laatste event geven)
+    src.onopen = () => es === src && status("open");
+    src.onerror = () => es === src && status("closed");
+    for (const type of EVENT_TYPES) {
+      src.addEventListener(type, (ev) => {
+        if (es !== src) return;
+        try {
+          onEvent(type, JSON.parse(ev.data));
+        } catch (err) {
+          console.error("Kon event niet lezen", type, err);
+        }
+      });
+    }
+  }
+  function shut() {
+    if (!es) return;
+    const src = es;
+    es = null;
+    try {
+      src.close();
+    } catch {
+      /* al dicht */
+    }
+  }
+  function pause() {
+    timer = null;
+    if (ended || !es || !hidden()) return;
+    shut();
+    status("paused");
+  }
+  function onVisibility() {
+    if (ended) return;
+    clearTimeout(timer);
+    timer = null;
+    if (hidden()) {
+      if (es) timer = setTimeout(pause, pauseMs);
+    } else if (!es) {
+      status("connecting");
+      open();
+    }
+  }
+
+  if (doc && typeof doc.addEventListener === "function") doc.addEventListener("visibilitychange", onVisibility);
+  // Geopend op de achtergrond (bijv. Ctrl+klik op "Open dashboard"): pas verbinden als je kijkt
+  if (hidden()) status("paused");
+  else open();
+  return () => {
+    ended = true;
+    clearTimeout(timer);
+    timer = null;
+    if (doc && typeof doc.removeEventListener === "function") doc.removeEventListener("visibilitychange", onVisibility);
+    shut();
+  };
+}

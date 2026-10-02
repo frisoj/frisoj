@@ -1,0 +1,429 @@
+// Pure hulpfuncties van het Backtest-lab (geen DOM), zodat ze los te testen zijn
+// (tests/frontend/backtestLogic.test.ts). Gebruikt door panels/backtest.js.
+
+/** Zelfde waarden als src/backtest/optimizerCore.ts (PENALTY_SCORE / MIN_TRADES_FOR_SCORE). */
+export const PENALTY_SCORE = -1e9;
+export const MIN_TRADES_FOR_SCORE = 5;
+
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+
+export const INTERVAL_MS = {
+  "1m": 6e4, "5m": 3e5, "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5,
+  "4h": 144e5, "6h": 216e5, "8h": 288e5, "12h": 432e5, "1d": 864e5,
+};
+const DAY_MS = 86_400_000;
+
+/** Zelfde als MIN_PERIOD_CANDLES in src/server/routes.ts: minimaal aantal candles in de testperiode. */
+export const MIN_PERIOD_CANDLES = 30;
+
+/** Aantal candles in `days` dagen van `interval` (NaN bij onbekend interval). */
+export function periodCandles(days, interval) {
+  const ms = INTERVAL_MS[interval];
+  return ms ? (Number(days) * DAY_MS) / ms : NaN;
+}
+
+/** Kleinste aantal (hele) dagen dat minstens MIN_PERIOD_CANDLES candles van `interval` geeft. */
+export function minPeriodDays(interval) {
+  const ms = INTERVAL_MS[interval];
+  return ms ? Math.max(1, Math.ceil((MIN_PERIOD_CANDLES * ms) / DAY_MS - 1e-9)) : 1;
+}
+
+/** Nederlandse melding als de periode te kort is voor een backtest, anders null. */
+export function periodError(days, interval) {
+  const n = periodCandles(days, interval);
+  if (!Number.isFinite(n) || n + 1e-9 >= MIN_PERIOD_CANDLES) return null;
+  return (
+    `Periode te kort: ${days} ${Number(days) === 1 ? "dag" : "dagen"} van ${interval} is maar ${Math.floor(n + 1e-9)} candles ` +
+    `(minimaal ${MIN_PERIOD_CANDLES}). Kies minstens ${minPeriodDays(interval)} dagen of een korter interval.`
+  );
+}
+
+/** Lengte van de ECHTE testperiode van een backtestresultaat in dagen (from/to = openingstijd eerste/laatste candle). */
+export function resultDays(res) {
+  if (!res || !isNum(res.from) || !isNum(res.to) || res.to < res.from) return NaN;
+  return (res.to - res.from + (INTERVAL_MS[res.interval] || 0)) / DAY_MS;
+}
+
+// ── Heatmap (optimizer) ──
+
+const idxOf = (list, v) => (Array.isArray(list) && isNum(v) ? list.findIndex((x) => Math.abs(x - v) <= 1e-9 * Math.max(1, Math.abs(v))) : -1);
+
+/**
+ * Eén heatmapcel. `values` zijn de MEDIAAN-scores over de overige parameters.
+ * status: "ok" (score), "untested" (niets getest in deze cel), "few" (wel
+ * getest, maar geen combinatie met genoeg trades) of "none" (oudere server
+ * zonder `tested`: null = niet getest óf te weinig trades).
+ */
+export function heatmapCell(hm, xi, yi) {
+  const v = hm?.values?.[yi]?.[xi];
+  const value = isNum(v) ? v : null;
+  const arr = (k) => (Array.isArray(hm?.[k]) ? hm[k][yi]?.[xi] : undefined);
+  const count = (k) => {
+    const c = arr(k);
+    return isNum(c) ? c : Array.isArray(hm?.[k]) ? 0 : null;
+  };
+  const b = arr("best");
+  const tested = count("tested");
+  const scored = count("scored");
+  const positive = count("positive");
+  let status = "ok";
+  if (value === null) status = tested === null ? "none" : tested > 0 ? "few" : "untested";
+  return { value, best: isNum(b) ? b : null, tested, scored, positive, status };
+}
+
+/** Cel van de beste combinatie (res.best) in de heatmap, of null (niet max(values): die is een mediaan). */
+export function bestHeatmapCell(hm, bestRow) {
+  if (!hm || !bestRow || !isScoredRow(bestRow) || !bestRow.params) return null;
+  const xi = idxOf(hm.xValues, bestRow.params[hm.xParam]);
+  const yi = idxOf(hm.yValues, bestRow.params[hm.yParam]);
+  return xi >= 0 && yi >= 0 ? { xi, yi } : null;
+}
+
+/**
+ * Tooltiptekst (zonder HTML) van een heatmapcel, bijv.
+ * "mediaan 0,42 · beste 1,10 · 3 van 4 winstgevend (6 getest)".
+ * `fmtScore(v)` formatteert een score.
+ */
+export function heatmapCellTip(cell, fmtScore) {
+  if (!cell) return "";
+  if (cell.status === "untested") return "niet getest";
+  if (cell.status === "few") return `te weinig trades (${cell.tested} getest, geen enkele met minstens ${MIN_TRADES_FOR_SCORE} trades)`;
+  if (cell.status === "none") return "niet getest of te weinig trades";
+  let s = `mediaan ${fmtScore(cell.value)}`;
+  if (cell.best !== null) s += ` · beste ${fmtScore(cell.best)}`;
+  if (cell.positive !== null && cell.scored !== null) {
+    s += ` · ${cell.positive} van ${cell.scored} winstgevend`;
+    if (cell.tested !== null) s += ` (${cell.tested} getest)`;
+  }
+  return s;
+}
+
+/**
+ * Kwaliteit van een KPI-kaart: "good" | "warn" | "bad" | "neutral".
+ * `maxDrawdownPct` is volgens het contract ≤ 0 (metrics.ts); we vergelijken de
+ * grootte (|dd|), zodat beide tekenconventies goed gaan.
+ */
+export function quality(kind, m, initial) {
+  switch (kind) {
+    case "ret":
+      return m.totalReturnPct <= 0 ? "bad" : m.totalReturnPct >= m.buyHoldReturnPct ? "good" : "warn";
+    case "dd": {
+      if (!isNum(m?.maxDrawdownPct)) return "neutral";
+      const dd = Math.abs(m.maxDrawdownPct);
+      return dd <= 10 ? "good" : dd <= 20 ? "warn" : "bad";
+    }
+    case "sharpe":
+      return m.sharpe >= 1 ? "good" : m.sharpe >= 0.3 ? "warn" : "bad";
+    case "win":
+      return m.winRatePct >= 50 ? "good" : m.winRatePct >= 35 ? "warn" : "bad";
+    case "pf":
+      return m.profitFactor >= 1.5 ? "good" : m.profitFactor >= 1 ? "warn" : "bad";
+    case "trades":
+      return m.trades >= 30 ? "good" : m.trades >= 10 ? "warn" : "bad";
+    case "fees":
+      return initial > 0 && m.feesPaid / initial > 0.05 ? "warn" : "neutral";
+    case "final":
+      return m.finalEquity > initial ? "good" : m.finalEquity < initial ? "bad" : "neutral";
+    default:
+      return "neutral";
+  }
+}
+
+/** Telt een optimizer-rij mee? Rijen met te weinig trades krijgen PENALTY_SCORE van de server. */
+export function isScoredRow(r) {
+  return !!r && isNum(r.score) && r.score > PENALTY_SCORE;
+}
+
+/** De beste combinatie, of null als de server er geen vond (nooit een afgestrafte rij). */
+export function bestScoredRow(res) {
+  return res && isScoredRow(res.best) ? res.best : null;
+}
+
+/** Schaal van de scorebalkjes: alleen over rijen die echt meetellen. */
+export function scoreBarMax(rows) {
+  return Math.max(...(rows || []).filter(isScoredRow).map((r) => Math.abs(Math.min(r.score, 999))), 1e-9);
+}
+
+/** Zet optimizer-parameters ("ensemble.x", "risk.x", "<strategie>.x") om naar een Partial<EngineConfig>. */
+export function paramsToPartial(params, cfg, strategyIds) {
+  const ids = strategyIds instanceof Set ? strategyIds : new Set(strategyIds || []);
+  const partial = {};
+  for (const [key, value] of Object.entries(params || {})) {
+    const i = key.indexOf(".");
+    if (i < 0) continue;
+    const head = key.slice(0, i);
+    const rest = key.slice(i + 1);
+    if (head === "ensemble") {
+      partial.ensemble ??= {};
+      if (rest.startsWith("weights.")) {
+        partial.ensemble.weights ??= { ...(cfg?.ensemble?.weights || {}) };
+        partial.ensemble.weights[rest.slice(8)] = value;
+      } else partial.ensemble[rest] = value;
+    } else if (head === "risk") {
+      partial.risk ??= {};
+      partial.risk[rest] = value;
+    } else if (ids.has(head)) {
+      partial.ensemble ??= {};
+      partial.ensemble.params ??= JSON.parse(JSON.stringify(cfg?.ensemble?.params || {}));
+      partial.ensemble.params[head] = { ...(partial.ensemble.params[head] || {}), [rest]: value };
+    }
+  }
+  return partial;
+}
+
+/**
+ * De configuratie die de optimizer ECHT heeft getest, als PUT-body voor de bot:
+ * de ensemble-/risico-velden uit het lab-formulier (`req`), plus de strategie die
+ * de optimizer geforceerd aanzet (optimizerCore.forceEnableStrategy / applyParams:
+ * aan, met gewicht ≥ 1), plus de parameters van de rij. Rij-waarden gaan voor.
+ */
+export function testedPartial(row, req, cfg, strategyIds) {
+  const ids = strategyIds instanceof Set ? strategyIds : new Set(strategyIds || []);
+  const p = paramsToPartial(row?.params, cfg, ids);
+  p.ensemble ??= {};
+  p.risk ??= {};
+  const reqEns = req?.ensemble || {};
+  const reqRisk = req?.risk || {};
+
+  const forced = [];
+  if (req?.strategy) forced.push(req.strategy);
+  for (const key of Object.keys(row?.params || {})) {
+    const head = key.slice(0, Math.max(0, key.indexOf(".")));
+    if (ids.has(head) && !forced.includes(head)) forced.push(head);
+  }
+  const baseEnabled = Array.isArray(reqEns.enabled) ? reqEns.enabled : cfg?.ensemble?.enabled || [];
+  const enabled = [...new Set([...baseEnabled, ...forced])];
+  if (enabled.length) p.ensemble.enabled = enabled;
+  for (const id of forced) {
+    const w = p.ensemble.weights?.[id] ?? cfg?.ensemble?.weights?.[id] ?? 0;
+    if (!(w > 0)) p.ensemble.weights = { ...(p.ensemble.weights || {}), [id]: 1 };
+  }
+  for (const [k, v] of Object.entries(reqEns)) {
+    if (k === "enabled" || k === "weights" || k === "params" || v === undefined || k in p.ensemble) continue;
+    // Trendfilter alleen meesturen als de test een ander filter had dan de bot nu heeft
+    if (k === "trendFilter" && sameTrendFilter(v, cfg?.ensemble?.trendFilter)) continue;
+    p.ensemble[k] = k === "trendFilter" ? { ...v } : v;
+  }
+  for (const [k, v] of Object.entries(reqRisk)) {
+    if (v === undefined || k in p.risk) continue;
+    p.risk[k] = v;
+  }
+  if (!Object.keys(p.ensemble).length) delete p.ensemble;
+  if (!Object.keys(p.risk).length) delete p.risk;
+  return p;
+}
+
+function currentValue(key, cfg, strategies) {
+  const i = key.indexOf(".");
+  const head = key.slice(0, i);
+  const rest = key.slice(i + 1);
+  if (head === "ensemble") {
+    if (rest.startsWith("weights.")) return cfg?.ensemble?.weights?.[rest.slice(8)];
+    return cfg?.ensemble?.[rest];
+  }
+  if (head === "risk") return cfg?.risk?.[rest];
+  const p = cfg?.ensemble?.params?.[head]?.[rest];
+  if (p !== undefined) return p;
+  return (strategies || []).find((s) => s.id === head)?.defaultParams?.[rest];
+}
+
+function nextValue(key, partial, row) {
+  const i = key.indexOf(".");
+  const head = key.slice(0, i);
+  const rest = key.slice(i + 1);
+  const e = partial?.ensemble || {};
+  if (head === "ensemble") {
+    if (rest.startsWith("weights.")) return e.weights?.[rest.slice(8)];
+    return e[rest];
+  }
+  if (head === "risk") return partial?.risk?.[rest];
+  return e.params?.[head]?.[rest] ?? row?.params?.[key];
+}
+
+/**
+ * Overzicht "Nu → Nieuw" voor de bevestiging: alle instellingen die de PUT
+ * aanraakt (niet alleen de grid-parameters).
+ * @returns {{ enabled: null | { cur: string[], next: string[], added: string[], removed: string[] },
+ *             rows: { key: string, cur: any, next: any, same: boolean }[] }}
+ */
+export function describeApply(partial, row, cfg, strategies) {
+  const e = partial?.ensemble || {};
+  const keys = [];
+  const add = (k) => {
+    if (!keys.includes(k)) keys.push(k);
+  };
+  for (const k of Object.keys(row?.params || {})) add(k);
+  for (const k of Object.keys(e)) {
+    if (k === "enabled" || k === "params" || k === "weights") continue;
+    add(`ensemble.${k}`);
+  }
+  for (const [id, w] of Object.entries(e.weights || {})) {
+    const key = `ensemble.weights.${id}`;
+    if (keys.includes(key) || w !== cfg?.ensemble?.weights?.[id]) add(key);
+  }
+  for (const k of Object.keys(partial?.risk || {})) add(`risk.${k}`);
+  const rows = keys.map((key) => {
+    const cur = currentValue(key, cfg, strategies);
+    const next = nextValue(key, partial, row);
+    const same = key === "ensemble.trendFilter" ? sameTrendFilter(cur, next) : cur === next;
+    return { key, cur, next, same };
+  });
+  let enabled = null;
+  if (Array.isArray(e.enabled)) {
+    const before = cfg?.ensemble?.enabled || [];
+    enabled = {
+      cur: [...before],
+      next: [...e.enabled],
+      added: e.enabled.filter((id) => !before.includes(id)),
+      removed: before.filter((id) => !e.enabled.includes(id)),
+    };
+  }
+  return { enabled, rows };
+}
+
+// ── Grafiek "Koers & trades" ──
+
+/**
+ * Korte tekst bij een trade-marker (minder overlap): een koop krijgt alleen de pijl
+ * (geen "KOOP"), een verkoop alleen het resultaat ("TRAIL -0,8%" → "-0,8%"). Zonder
+ * percentage in het label: het label zelf (bijv. "VERKOOP").
+ */
+export function shortMarkerText(m) {
+  if (!m || m.action === "buy") return "";
+  const lbl = String(m.label || "").trim();
+  const pct = /[+\-−]?\d+(?:[.,]\d+)?\s*%/.exec(lbl);
+  return pct ? pct[0].replace(/\s+/g, "") : lbl;
+}
+
+/**
+ * Zichtbaar bereik (logische indexen) zodat alle `n` candles passen met `padPx` pixels
+ * ruimte links en rechts, zodat markers (pijl + tekst) op de eerste en laatste candle
+ * niet afgesneden worden. `widthPx` = breedte van de tijdas. Null als dat niet kan.
+ */
+export function paddedRange(n, widthPx, padPx = 32) {
+  if (!(n > 0) || !(widthPx > 2 * padPx)) return null;
+  // pad (in candles) × candlebreedte = padPx, met candlebreedte = breedte / (n − 1 + 2·pad)
+  const pad = (padPx * Math.max(1, n - 1)) / (widthPx - 2 * padPx);
+  return { from: -pad, to: n - 1 + pad };
+}
+
+// ── Zijbalk ──
+
+/**
+ * Mag de zijbalk "sticky" (meeschuiven)? Alleen als hij helemaal in beeld past onder de
+ * vaste kopbalk; anders scrolt hij gewoon mee met de pagina (geen aparte scrollbalk
+ * waarin knoppen als Walk-forward verstopt zitten).
+ */
+export function sideFitsViewport(sideHeight, viewportHeight, topOffset, bottomGap = 12) {
+  return sideHeight > 0 && viewportHeight > 0 && sideHeight + topOffset + bottomGap <= viewportHeight;
+}
+
+// ── Trendfilter & filters in het resultaat (v2) ──
+
+/** Standaard trendfilter (DEFAULT_TREND_FILTER in src/core/defaults.ts) */
+export const DEFAULT_TREND_FILTER = { market: true, coin: false, interval: "1d", period: 50 };
+
+/** Staat er een trendfilter aan (markt of munt)? */
+export const trendFilterActive = (tf) => !!tf && (tf.market === true || tf.coin === true);
+
+/** Hetzelfde filter? Twee filters die allebei uit staan zijn gelijk, ongeacht tijdschaal/periode. */
+export function sameTrendFilter(a, b) {
+  const aa = trendFilterActive(a);
+  const bb = trendFilterActive(b);
+  if (!aa || !bb) return aa === bb;
+  return !!a.market === !!b.market && !!a.coin === !!b.coin && a.interval === b.interval && Number(a.period) === Number(b.period);
+}
+
+/**
+ * Het trendfilter voor een test in het lab. Aan: het filter van de bot (staat dat
+ * uit, dan het standaard marktfilter). Uit: beide vlaggen uit, met dezelfde
+ * tijdschaal en periode (zodat je eerlijk met/zonder vergelijkt).
+ */
+export function labTrendFilter(on, botTf) {
+  const interval = botTf?.interval === "4h" || botTf?.interval === "1d" ? botTf.interval : DEFAULT_TREND_FILTER.interval;
+  const p = Math.round(Number(botTf?.period));
+  const period = p >= 5 && p <= 200 ? p : DEFAULT_TREND_FILTER.period;
+  if (!on) return { market: false, coin: false, interval, period };
+  if (trendFilterActive(botTf)) return { market: !!botTf.market, coin: !!botTf.coin, interval, period };
+  return { market: true, coin: false, interval, period };
+}
+
+/** Korte samenvatting, bijv. "Bitcoin boven het gemiddelde van 50 dagen" (of "uit"). */
+export function describeTrendFilter(tf) {
+  if (!trendFilterActive(tf)) return "uit";
+  const who = tf.market && tf.coin ? "Bitcoin én de munt zelf" : tf.market ? "Bitcoin" : "de munt zelf";
+  const n = Math.round(Number(tf.period));
+  const span = tf.interval === "4h" ? `${n} blokken van 4 uur` : `${n} dagen`;
+  return `${who} boven het gemiddelde van ${span}`;
+}
+
+/**
+ * Koopsignalen die door een filter geen aankoop werden (BacktestResult.blockedEntries).
+ * Null als de server ze niet meestuurt (geen filter actief, of een oudere server).
+ * @returns {null | { trend: number, spread: number, total: number }}
+ */
+export function blockedEntriesView(res) {
+  const b = res?.blockedEntries;
+  if (!b || typeof b !== "object") return null;
+  const trend = isNum(b.trend) && b.trend > 0 ? Math.round(b.trend) : 0;
+  const spread = isNum(b.spread) && b.spread > 0 ? Math.round(b.spread) : 0;
+  return { trend, spread, total: trend + spread };
+}
+
+/**
+ * Soort serveruitleg (`note`): "period" (periode aangepast/ingekort), "filter"
+ * (trendfilter/spread) of "mixed" (beide). Bepaalt de kop van de melding.
+ */
+export function noteKind(note) {
+  const s = String(note || "");
+  const filter = /trendfilter|marktfilter|muntfilter|spread/i.test(s);
+  const period = /periode|ingekort|historie/i.test(s);
+  if (filter && period) return "mixed";
+  return filter ? "filter" : "period";
+}
+
+// ── Formulier per bot (v3: meerdere bots) ──
+
+/**
+ * localStorage-sleutel van het backtest-formulier. Alle /bot/<id>/-dashboards delen één
+ * origin en dus één localStorage: met één sleutel kreeg de Trendvolger (1 uur) na een
+ * backtest bij de scalper stilletjes diens interval (5 min). Daarom per bot (BASE uit api.js).
+ */
+export function formKey(base) {
+  return base ? `bvt-backtest-form:${base}` : "bvt-backtest-form";
+}
+
+/**
+ * Budget van deze bot als startkapitaal voor een backtest: oefengeld = `paperStartingCapital`,
+ * live = `capitalLimitQuote` (AppInfo); anders `account.startingEquity` uit de snapshot.
+ * null = onbekend.
+ * @returns {{ amount: number, live: boolean } | null}
+ */
+export function botBudget(info, snap) {
+  const live = (info && info.mode ? info.mode : snap && snap.mode) === "live";
+  const fromInfo = info ? (live ? info.capitalLimitQuote : info.paperStartingCapital) : undefined;
+  if (isNum(fromInfo) && fromInfo > 0) return { amount: fromInfo, live };
+  const eq = snap && snap.account ? snap.account.startingEquity : undefined;
+  if (isNum(eq) && eq > 0) return { amount: eq, live };
+  return null;
+}
+
+/**
+ * Interval en startkapitaal bij het openen van het backtest-formulier. Opgeslagen waarden
+ * gelden alleen als ze bewaard zijn bij DEZELFDE bot-instelling (`botInterval` / `botBudget`
+ * in het opgeslagen formulier); anders het interval en het budget van de bot zelf. Zo test
+ * een oud of ander opgeslagen formulier nooit stilletjes een andere handelsstijl.
+ * `capital` = null: niets invullen (budget onbekend en niets opgeslagen).
+ * @param {object | null} saved   opgeslagen formulier
+ * @param {{ interval?: string, budget?: number | null }} bot
+ * @returns {{ interval: string, capital: string | number | null }}
+ */
+export function restoreForm(saved, bot = {}) {
+  const s = saved && typeof saved === "object" ? saved : {};
+  const botIv = typeof bot.interval === "string" && bot.interval ? bot.interval : "";
+  const budget = isNum(bot.budget) && bot.budget > 0 ? bot.budget : null;
+  const interval = botIv ? (s.interval && s.botInterval === botIv ? s.interval : botIv) : s.interval || "15m";
+  const savedCap = s.capital !== undefined && s.capital !== null && String(s.capital) !== "" ? s.capital : null;
+  const capital = budget !== null ? (savedCap !== null && Number(s.botBudget) === budget ? savedCap : budget) : savedCap;
+  return { interval, capital };
+}

@@ -1,0 +1,39 @@
+name: Bitvavo Trader
+
+# Standalone trading bot in bitvavo-trader/ (own package.json, own tooling).
+# Runs only when that folder changes. No secrets or network access to
+# Bitvavo needed: tests use mocked HTTP and the built-in market simulator.
+on:
+  pull_request:
+    paths:
+      - "bitvavo-trader/**"
+      - ".github/workflows/bitvavo-trader.yml"
+  push:
+    branches: [main]
+    paths:
+      - "bitvavo-trader/**"
+      - ".github/workflows/bitvavo-trader.yml"
+
+concurrency:
+  group: trader-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-test:
+    name: Typecheck and unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bitvavo-trader
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: bitvavo-trader/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Backtest smoke run (simulated data)
+        run: npm run backtest -- --market BTC-EUR --interval 15m --days 14 --source simulated

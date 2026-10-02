@@ -1,0 +1,2 @@
+# Windows-startbestand: altijd met CRLF-regeleinden bewaren (cmd.exe struikelt over LF)
+*.bat -text
