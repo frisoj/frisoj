@@ -8,11 +8,12 @@ Wat het doet, in deze volgorde:
   3. Het placebestand bouwen (build.sh: Rojo + Lune).
   4. Het placebestand publiceren naar je bestaande game.
 
-Nodig (als omgevingsvariabelen, nooit in de code of chat):
-  ROBLOX_API_KEY      API-sleutel met universe-places (write),
+Nodig:
+  ROBLOX_API_KEY      (omgevingsvariabele / GitHub secret, nooit in de code of chat)
+                      API-sleutel met universe-places (write),
                       developer-product (read+write) en game-pass (read+write)
-  ROBLOX_UNIVERSE_ID  Creator Hub > ... bij je game > Copy Universe ID
-  ROBLOX_PLACE_ID     het getal in de link van je place
+  universeId, placeId in tools/roblox-ids.json (niet geheim), of als
+                      omgevingsvariabelen ROBLOX_UNIVERSE_ID en ROBLOX_PLACE_ID
 
 Gebruik:
   python3 tools/deploy.py              alles
@@ -152,13 +153,14 @@ def main():
     parser.add_argument("--skip-publish", action="store_true", help="niet publiceren")
     args = parser.parse_args()
 
+    ids_file = json.loads((ROOT / "tools" / "roblox-ids.json").read_text())
     key = os.environ.get("ROBLOX_API_KEY", "").strip()
-    universe = os.environ.get("ROBLOX_UNIVERSE_ID", "").strip()
-    place = os.environ.get("ROBLOX_PLACE_ID", "").strip()
+    universe = os.environ.get("ROBLOX_UNIVERSE_ID", "").strip() or str(ids_file.get("universeId") or "")
+    place = os.environ.get("ROBLOX_PLACE_ID", "").strip() or str(ids_file.get("placeId") or "")
     if not args.dry_run:
         missing = [n for n, v in (("ROBLOX_API_KEY", key), ("ROBLOX_UNIVERSE_ID", universe), ("ROBLOX_PLACE_ID", place)) if not v]
         if missing:
-            sys.exit("Ontbreekt: " + ", ".join(missing) + " (zie de uitleg bovenaan dit bestand)")
+            sys.exit("Ontbreekt: " + ", ".join(missing) + " (zie de uitleg bovenaan dit bestand en tools/roblox-ids.json)")
 
     store = json.loads((ROOT / "tools" / "store.json").read_text())
     if not args.skip_store:
