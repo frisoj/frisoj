@@ -136,6 +136,27 @@ def write_ids(ids):
     print(f"  {len(ids)} ID's ingevuld in src/shared/Config.luau")
 
 
+def discover_ids(key):
+    """Zoekt via de sleutel zelf uit voor welke game hij geldt (universe + startplace)."""
+    info = request("POST", f"{API}/api-keys/v1/introspect", key,
+                   json.dumps({"apiKey": key}).encode(), "application/json")
+    universes = set()
+    for scope in info.get("scopes") or []:
+        for universe_id in scope.get("universeIds") or []:
+            if str(universe_id) != "*":
+                universes.add(str(universe_id))
+    if len(universes) != 1:
+        sys.exit("Fout: kon niet bepalen voor welke game de sleutel is "
+                 f"(gevonden: {sorted(universes) or 'geen'}). Vul tools/roblox-ids.json handmatig in.")
+    universe = universes.pop()
+    details = request("GET", f"{API}/cloud/v2/universes/{universe}", key)
+    match = re.search(r"places/(\d+)", details.get("rootPlace") or "")
+    if not match:
+        sys.exit(f"Fout: geen startplace gevonden voor universe {universe}. Vul tools/roblox-ids.json handmatig in.")
+    print(f"  Game gevonden: {details.get('displayName', '?')} (universe {universe}, place {match.group(1)})")
+    return universe, match.group(1)
+
+
 def build():
     subprocess.run(["sh", "build.sh"], cwd=ROOT, check=True)
 
@@ -157,6 +178,9 @@ def main():
     key = os.environ.get("ROBLOX_API_KEY", "").strip()
     universe = os.environ.get("ROBLOX_UNIVERSE_ID", "").strip() or str(ids_file.get("universeId") or "")
     place = os.environ.get("ROBLOX_PLACE_ID", "").strip() or str(ids_file.get("placeId") or "")
+    if key and not (universe and place) and not args.dry_run:
+        print("0. Game opzoeken via de API-sleutel")
+        universe, place = discover_ids(key)
     if not args.dry_run:
         missing = [n for n, v in (("ROBLOX_API_KEY", key), ("ROBLOX_UNIVERSE_ID", universe), ("ROBLOX_PLACE_ID", place)) if not v]
         if missing:
