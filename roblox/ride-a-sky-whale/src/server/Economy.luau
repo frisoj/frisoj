@@ -186,7 +186,8 @@ function Economy.addDriftling(player: Player, speciesId: string, mutation: strin
 
 	local label = (if mutation then mutation .. " " else "") .. species.name
 	local rate = entryRate(newEntry)
-	local cap = Economy.nestCapacity(player, data)
+	-- Nooit kleiner maken dan het nest al was (bijv. als de VIP-check even mislukte).
+	local cap = math.max(Economy.nestCapacity(player, data), #data.nest - 1)
 	local soldText = ""
 	while #data.nest > cap do
 		local sold = table.remove(data.nest) :: PlayerData.NestEntry
@@ -344,7 +345,10 @@ local function areFriends(a: Player, b: Player): boolean
 	local ok, result = pcall(function()
 		return a:IsFriendsWithAsync(b.UserId)
 	end)
-	local value = ok and result == true
+	if not ok then
+		return false -- niet onthouden, zodat het de volgende keer opnieuw geprobeerd wordt
+	end
+	local value = result == true
 	friendCache[key] = value
 	return value
 end
@@ -354,12 +358,15 @@ function Economy.recomputeFriends()
 	for _, player in list do
 		local count = 0
 		for _, other in list do
-			if other ~= player and areFriends(player, other) then
+			if other ~= player and other.Parent and areFriends(player, other) then
 				count += 1
 			end
 		end
-		friendBonus[player] = math.min(Config.FRIEND_BONUS_MAX, count * Config.FRIEND_BONUS)
-		Economy.refresh(player)
+		-- areFriends kan wachten: check of de speler er nog is voordat we iets bewaren.
+		if player.Parent and PlayerData.get(player) then
+			friendBonus[player] = math.min(Config.FRIEND_BONUS_MAX, count * Config.FRIEND_BONUS)
+			Economy.refresh(player)
+		end
 	end
 end
 
@@ -380,7 +387,7 @@ function Economy.onJoin(player: Player)
 	stats.Parent = player
 
 	-- Offline verdiensten
-	local away = math.clamp(os.time() - data.lastSeen, 0, Config.OFFLINE_CAP_SECONDS)
+	local away = math.min(PlayerData.awaySeconds(player), Config.OFFLINE_CAP_SECONDS)
 	local offline = Economy.baseRate(data) * Economy.permanentMultiplier(player, data) * Config.OFFLINE_RATE * away / 60
 	if offline >= 1 and away > 60 then
 		data.pearls += offline
@@ -401,6 +408,13 @@ function Economy.onLeave(player: Player)
 	friendBonus[player] = nil
 	lastFeed[player] = nil
 	lastAction[player] = nil
+	local id = tostring(player.UserId)
+	for key in friendCache do
+		local a, b = string.match(key, "^(%d+):(%d+)$")
+		if a == id or b == id then
+			friendCache[key] = nil
+		end
+	end
 end
 
 function Economy.handleAction(player: Player, action: unknown, arg: unknown)

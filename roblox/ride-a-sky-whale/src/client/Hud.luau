@@ -57,6 +57,7 @@ local state: SyncState? = nil
 local gui: ScreenGui
 local toastList: Frame
 local openPanel: Frame? = nil
+local migrateArmedUntil = 0
 local renderers: { [Frame]: () -> () } = {}
 
 -- Kleine helper om UI te bouwen.
@@ -406,7 +407,13 @@ local function buildShop(): Frame
 		row(list, nextOrder(), "Migrate (rebirth)",
 			string.format("Reset for +%d%% Pearls forever. Done: %d", math.floor(Config.MIGRATION_BONUS * 100), migrations),
 			Format.number(cost), if pearls >= cost then GOLD else Color3.fromRGB(90, 100, 115), function()
-				ActionRemote:FireServer("migrate")
+				if os.clock() < migrateArmedUntil then
+					migrateArmedUntil = 0
+					ActionRemote:FireServer("migrate")
+				else
+					migrateArmedUntil = os.clock() + 5
+					toast("Tap again to confirm. Migration resets your nest and upgrades!", "bad")
+				end
 			end)
 
 		sectionTitle(list, "SERVER BOOSTS", nextOrder())

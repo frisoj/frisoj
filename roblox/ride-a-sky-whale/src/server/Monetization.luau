@@ -95,13 +95,26 @@ local function owns(player: Player, passId: number): boolean
 	if passId == 0 then
 		return false
 	end
-	local ok, result = pcall(function()
-		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
-	end)
-	return ok and result == true
+	for attempt = 1, 3 do
+		local ok, result = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
+		end)
+		if ok then
+			return result == true
+		end
+		if player.Parent == nil then
+			return false
+		end
+		task.wait(attempt * 2)
+	end
+	warn("[Monetization] Kon pass", passId, "niet controleren voor", player.Name)
+	return false
 end
 
 local function applyPass(player: Player, name: string)
+	if player.Parent == nil or PlayerData.get(player) == nil then
+		return -- speler is al weg
+	end
 	local passes = Economy.getPasses(player)
 	if name == "DoublePearls" then
 		passes.DoublePearls = true

@@ -22,8 +22,10 @@ local DriftlingService = {}
 
 type Entry = { model: Model, species: string, expiresAt: number, zone: string }
 
+type Guard = { tokens: number, t: number, pos: Vector3?, posT: number }
+
 local active: { [string]: Entry } = {}
-local lastCatch: { [Player]: number } = {}
+local guards: { [Player]: Guard } = {}
 local nextId = 0
 local rng = Random.new()
 local currentBiome = ""
@@ -173,19 +175,46 @@ local function onCatch(player: Player, id: unknown)
 		return
 	end
 	local t = os.clock()
-	if t - (lastCatch[player] or 0) < 0.1 then
+	local guard = guards[player]
+	if guard == nil then
+		guard = { tokens = 8, t = t, pos = nil, posT = t }
+		guards[player] = guard
+	end
+	local g = guard :: Guard
+	-- Emmertje met 8 vangsten, vult 10 per seconde bij: een zwerm vangen mag, spammen niet.
+	g.tokens = math.min(8, g.tokens + (t - g.t) * 10)
+	g.t = t
+	if g.tokens < 1 then
 		return
 	end
+	g.tokens -= 1
+
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root == nil then
 		return
 	end
-	local range = ((tonumber(player:GetAttribute("NetRange")) or 12)) + Config.CATCH_TOLERANCE
-	if (root.Position - entry.model:GetPivot().Position).Magnitude > range then
+	local position = root.Position
+
+	-- Wie sneller beweegt dan het spuitgat kan lanceren, teleporteert (exploit).
+	local lastPos = g.pos
+	if lastPos then
+		local dt = math.max(t - g.posT, 0.05)
+		if (position - lastPos).Magnitude / dt > 400 then
+			g.pos = position
+			g.posT = t
+			return
+		end
+	end
+	g.pos = position
+	g.posT = t
+
+	-- Meer speling bij hoge snelheid, omdat de positie op de server iets achterloopt.
+	local speed = root.AssemblyLinearVelocity.Magnitude
+	local range = ((tonumber(player:GetAttribute("NetRange")) or 12)) + Config.CATCH_TOLERANCE + math.min(speed * 0.25, 50)
+	if (position - entry.model:GetPivot().Position).Magnitude > range then
 		return
 	end
-	lastCatch[player] = t
 	remove(id)
 	local biomeId = SkyForecast.current(serverNow())
 	Economy.addDriftling(player, entry.species, rollMutation(biomeId))
@@ -224,7 +253,7 @@ end
 function DriftlingService.start()
 	Remotes.Catch.OnServerEvent:Connect(onCatch)
 	Players.PlayerRemoving:Connect(function(player)
-		lastCatch[player] = nil
+		guards[player] = nil
 	end)
 	task.spawn(function()
 		while true do

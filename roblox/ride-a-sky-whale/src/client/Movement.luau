@@ -28,6 +28,8 @@ local gliderClosed = false
 local launched = false
 local airborneSince: number? = nil
 local lastLaunch = 0
+local boostUntil = 0
+local boostVelocity = 0
 local launchers: { BasePart } = {}
 
 local function addLauncher(inst: Instance)
@@ -64,9 +66,13 @@ function Movement.isClosed(): boolean
 	return gliderClosed
 end
 
+-- GLIDE ON/OFF is een instelling: hij blijft staan tot je hem weer omzet.
 function Movement.toggle()
 	gliderClosed = not gliderClosed
-	glideEvent:Fire(gliding and not gliderClosed, gliderClosed)
+	if gliderClosed then
+		setGliding(false)
+	end
+	glideEvent:Fire(gliding, gliderClosed)
 end
 
 local function playWhoosh(root: BasePart)
@@ -95,10 +101,13 @@ local function tryLaunch(humanoid: Humanoid, root: BasePart)
 				lastLaunch = os.clock()
 				launched = true
 				airborneSince = os.clock()
-				gliderClosed = false
 				local v = root.AssemblyLinearVelocity
+				boostVelocity = (tonumber(pad:GetAttribute("LaunchVelocity")) or Config.LAUNCH_VELOCITY)
+				-- Een paar frames lang opnieuw zetten, zodat de sprong van de Humanoid
+				-- de lancering niet kan overschrijven.
+				boostUntil = os.clock() + 0.2
 				humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-				root.AssemblyLinearVelocity = Vector3.new(v.X * 0.2, (tonumber(pad:GetAttribute("LaunchVelocity")) or Config.LAUNCH_VELOCITY), v.Z * 0.2)
+				root.AssemblyLinearVelocity = Vector3.new(v.X * 0.2, boostVelocity, v.Z * 0.2)
 				playWhoosh(root)
 				launchedEvent:Fire()
 				return
@@ -121,12 +130,19 @@ local function step()
 
 	tryLaunch(humanoid, root)
 
+	if os.clock() < boostUntil then
+		local v = root.AssemblyLinearVelocity
+		if v.Y < boostVelocity * 0.9 then
+			root.AssemblyLinearVelocity = Vector3.new(v.X, boostVelocity, v.Z)
+		end
+		return
+	end
+
 	local state = humanoid:GetState()
 	local inAir = state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping
 	if not inAir then
 		airborneSince = nil
 		launched = false
-		gliderClosed = false
 		setGliding(false)
 		return
 	end

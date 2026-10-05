@@ -26,7 +26,7 @@ Het volledige concept (kaart, verdienmodel, rekenvoorbeeld, bouwplan) staat op d
 | Game Passes: 2x Parels, VIP Kapitein, Weerman | Klaar, ID's nog invullen |
 | Codes (`WHALEHELLO`, `SKYHIGH`) | Klaar |
 | Vriendenbonus: +10% Parels per vriend in je server (max +40%) | Klaar |
-| Opslaan met DataStores, veilige afhandeling van aankopen | Klaar |
+| Opslaan met DataStores en sessie-slot, veilige afhandeling van aankopen | Klaar |
 | Piratennacht, ruilen, De Buik, wolkenvissen, eieren met Veren | Volgende updates |
 
 De game is in het Engels, omdat de meeste Roblox-spelers Engels spreken. Roblox vertaalt de teksten automatisch naar andere talen, waaronder Nederlands.
@@ -102,5 +102,5 @@ tools/        MapBuilder (bouwt de walvis), build-place (zet de map in het place
 
 ## Bekende beperkingen
 - De game is gecontroleerd met de Roblox-typechecker en de logica is getest, maar nog niet in een echte Roblox-server gespeeld. Test daarom eerst in Studio en met een paar vrienden voordat je advertenties koopt.
-- Opslaan gebruikt gewone DataStores met opslaan bij vertrekken, elke 90 seconden en bij afsluiten. Voor een grote game is [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore) (met sessie-locking) een goede volgende stap.
+- Opslaan gebeurt bij vertrekken, elke 90 seconden en bij afsluiten, met een sessie-slot zodat een speler die snel van server wisselt geen oude voortgang terugkrijgt. Wie later nog meer zekerheid wil, kan overstappen op [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore).
 - Geluiden gebruiken ingebouwde Roblox-geluiden. Eigen muziek en effecten maken het spel veel beter.

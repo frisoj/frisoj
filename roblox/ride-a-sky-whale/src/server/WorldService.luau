@@ -19,8 +19,6 @@ local whale = Workspace:WaitForChild("SkyWhale")
 local spawnLocation = whale:WaitForChild("Spawn") :: BasePart
 local trough = whale:WaitForChild("FeedingTrough") :: BasePart
 
-local lastGlideToggle: { [Player]: number } = {}
-
 local function setupClouds()
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
 	if terrain and terrain:FindFirstChildOfClass("Clouds") == nil then
@@ -79,11 +77,6 @@ local function onSetGliding(player: Player, gliding: unknown)
 	if type(gliding) ~= "boolean" then
 		return
 	end
-	local t = os.clock()
-	if t - (lastGlideToggle[player] or 0) < 0.15 then
-		return
-	end
-	lastGlideToggle[player] = t
 	local folder = player.Character and player.Character:FindFirstChild("Glider")
 	if folder == nil then
 		return
@@ -146,9 +139,6 @@ function WorldService.start()
 			task.spawn(addGlider, player.Character)
 		end
 	end
-	Players.PlayerRemoving:Connect(function(player)
-		lastGlideToggle[player] = nil
-	end)
 	task.spawn(rescueLoop)
 end
 
