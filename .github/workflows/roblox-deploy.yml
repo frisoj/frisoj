@@ -1,0 +1,54 @@
+name: Roblox deploy (Ride a Sky Whale)
+
+# Bij elke wijziging in de game: controleren, bouwen en (als de sleutel er is)
+# automatisch online zetten. Handmatig starten kan via Actions > Run workflow.
+on:
+  push:
+    branches: [main, claude/sharp-cannon-qtmfg4]
+    paths:
+      - "roblox/ride-a-sky-whale/**"
+      - ".github/workflows/roblox-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: roblox-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Check, build en publiceer
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: roblox/ride-a-sky-whale
+    env:
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+      ROBLOX_UNIVERSE_ID: ${{ vars.ROBLOX_UNIVERSE_ID }}
+      ROBLOX_PLACE_ID: ${{ vars.ROBLOX_PLACE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools installeren (Rojo, Lune, luau-lsp)
+        run: ./tools/install-tools.sh
+
+      - name: Code controleren (typecheck + tests)
+        run: ./tools/check.sh
+
+      - name: Alleen bouwen (nog geen Roblox-sleutel ingesteld)
+        if: env.ROBLOX_API_KEY == ''
+        run: |
+          ./build.sh
+          echo "::notice::Geen ROBLOX_API_KEY secret gevonden: gebouwd maar niet gepubliceerd."
+
+      - name: Producten, passes en game online zetten
+        if: env.ROBLOX_API_KEY != ''
+        run: python3 tools/deploy.py
+
+      - name: Placebestand bewaren
+        uses: actions/upload-artifact@v4
+        with:
+          name: RideASkyWhale
+          path: roblox/ride-a-sky-whale/RideASkyWhale.rbxl

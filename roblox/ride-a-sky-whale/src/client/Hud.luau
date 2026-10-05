@@ -16,6 +16,7 @@ local Biomes = require(Shared:WaitForChild("Biomes"))
 local Driftlings = require(Shared:WaitForChild("Driftlings"))
 local Upgrades = require(Shared:WaitForChild("Upgrades"))
 local Format = require(Shared:WaitForChild("Format"))
+local LiveEvents = require(Shared:WaitForChild("LiveEvents"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local ActionRemote = Remotes:WaitForChild("Action") :: RemoteEvent
@@ -775,7 +776,11 @@ function Hud.start()
 
 			local feastEnds = (tonumber(Workspace:GetAttribute("FeastEndsAt")) or 0)
 			local songEnds = (tonumber(Workspace:GetAttribute("SongEndsAt")) or 0)
-			if feastEnds > now then
+			local eventActive, eventLeft = LiveEvents.captainsCall(now)
+			if eventActive then
+				boostLabel.Visible = true
+				boostLabel.Text = "CAPTAIN'S CALL LIVE · 2x PEARLS · 2x DRIFTLINGS · " .. LiveEvents.formatCountdown(eventLeft)
+			elseif feastEnds > now then
 				boostLabel.Visible = true
 				boostLabel.Text = string.format("%s's FEAST · %dx PEARLS · %s",
 					tostring(Workspace:GetAttribute("FeastBy") or "?"), (tonumber(Workspace:GetAttribute("FeastMult")) or 2), Format.clock(feastEnds - now))
@@ -783,7 +788,8 @@ function Hud.start()
 				boostLabel.Visible = true
 				boostLabel.Text = "WHALE SONG · 2x DRIFTLINGS · " .. Format.clock(songEnds - now)
 			else
-				boostLabel.Visible = false
+				boostLabel.Visible = true
+				boostLabel.Text = "Next CAPTAIN'S CALL in " .. LiveEvents.formatCountdown(eventLeft)
 			end
 
 			local done = state ~= nil and (state :: SyncState).tutorialDone

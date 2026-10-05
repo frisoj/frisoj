@@ -1,0 +1,18 @@
+{
+  "developerProducts": [
+    { "key": "GoldenFeast", "name": "Golden Feast", "price": 99, "image": "marketing/golden-feast.png",
+      "description": "2x Pearls for the whole server for 10 minutes. Everyone sees your name!" },
+    { "key": "MegaFeast", "name": "MEGA Feast", "price": 449, "image": "marketing/mega-feast.png",
+      "description": "3x Pearls for the whole server for 30 minutes, plus a treasure island." },
+    { "key": "PearlPack", "name": "Pearl Pack", "price": 49, "image": "marketing/pearl-pack.png",
+      "description": "Get 30 minutes of your Pearl income instantly." }
+  ],
+  "gamePasses": [
+    { "key": "DoublePearls", "name": "2x Pearls", "price": 399, "image": "marketing/double-pearls.png",
+      "description": "Your nest makes double Pearls, forever." },
+    { "key": "VIPCaptain", "name": "VIP Captain", "price": 249, "image": "marketing/vip-captain.png",
+      "description": "+2 nest slots and a gold [VIP] chat tag." },
+    { "key": "Weatherman", "name": "Weatherman", "price": 99, "image": "marketing/weatherman.png",
+      "description": "See 3 skies ahead and get alerts before rare skies." }
+  ]
+}

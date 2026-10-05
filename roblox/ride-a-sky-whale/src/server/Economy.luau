@@ -11,6 +11,7 @@ local Driftlings = require(Shared:WaitForChild("Driftlings"))
 local Biomes = require(Shared:WaitForChild("Biomes"))
 local Upgrades = require(Shared:WaitForChild("Upgrades"))
 local Format = require(Shared:WaitForChild("Format"))
+local LiveEvents = require(Shared:WaitForChild("LiveEvents"))
 
 local Server = script.Parent
 local PlayerData = require(Server:WaitForChild("PlayerData"))
@@ -94,7 +95,10 @@ function Economy.permanentMultiplier(player: Player, data: PlayerData.Data): num
 end
 
 function Economy.totalMultiplier(player: Player, data: PlayerData.Data): number
-	return Economy.permanentMultiplier(player, data) * Economy.feastMultiplier() * (1 + (friendBonus[player] or 0))
+	return Economy.permanentMultiplier(player, data)
+		* Economy.feastMultiplier()
+		* LiveEvents.pearlMultiplier(now())
+		* (1 + (friendBonus[player] or 0))
 end
 
 function Economy.migrationCost(data: PlayerData.Data): number
@@ -395,6 +399,26 @@ function Economy.onJoin(player: Player)
 		task.delay(4, function()
 			if player.Parent then
 				Economy.notify(player, string.format("Your nest earned %s Pearls while you were away!", Format.number(offline)), "good")
+			end
+		end)
+	end
+
+	-- Dagelijkse beloning (per UTC-dag), groter bij een reeks dagen achter elkaar.
+	local today = os.date("!%Y-%m-%d") :: string
+	if data.dailyDay ~= today then
+		local yesterday = os.date("!%Y-%m-%d", os.time() - 86400) :: string
+		data.dailyStreak = if data.dailyDay == yesterday then data.dailyStreak + 1 else 1
+		data.dailyDay = today
+		local streak = math.min(data.dailyStreak, Config.DAILY_MAX_STREAK)
+		local perMinute = Economy.baseRate(data) * Economy.permanentMultiplier(player, data)
+		local reward = math.max(Config.DAILY_MIN_PEARLS, perMinute * Config.DAILY_MINUTES) * streak
+		data.pearls += reward
+		data.totalPearls += reward
+		local streakDays = data.dailyStreak
+		task.delay(7, function()
+			if player.Parent then
+				Economy.notify(player, string.format("Daily reward (day %d): +%s Pearls! Come back tomorrow for more.",
+					streakDays, Format.number(reward)), "good")
 			end
 		end)
 	end

@@ -12,6 +12,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Driftlings = require(Shared:WaitForChild("Driftlings"))
 local Biomes = require(Shared:WaitForChild("Biomes"))
 local SkyForecast = require(Shared:WaitForChild("SkyForecast"))
+local LiveEvents = require(Shared:WaitForChild("LiveEvents"))
 
 local Server = script.Parent
 local DriftlingModel = require(Server:WaitForChild("DriftlingModel"))
@@ -29,6 +30,7 @@ local guards: { [Player]: Guard } = {}
 local nextId = 0
 local rng = Random.new()
 local currentBiome = ""
+local eventWasActive: boolean? = nil
 local island: Model? = nil
 
 local skyFolder = Instance.new("Folder")
@@ -100,7 +102,7 @@ local function spawnMultiplier(): number
 	if ((tonumber(Workspace:GetAttribute("SongEndsAt")) or 0)) > serverNow() then
 		mult *= Config.SONG_SPAWN_MULT
 	end
-	return mult
+	return mult * LiveEvents.spawnMultiplier(serverNow())
 end
 
 local function newPart(name: string, shape: Enum.PartType, size: Vector3, color: Color3, cf: CFrame, material: Enum.Material, parent: Instance): Part
@@ -227,6 +229,17 @@ local function tick()
 			remove(id)
 		end
 	end
+
+	-- Captain's Call start of eindigt vanzelf: iedereen krijgt een melding.
+	local eventActive = LiveEvents.captainsCall(serverNow())
+	if eventWasActive ~= nil and eventActive ~= eventWasActive then
+		if eventActive then
+			Economy.announce("CAPTAIN'S CALL is LIVE! 2x Pearls and 2x Driftlings for 20 minutes!", "feast")
+		else
+			Economy.announce("Captain's Call is over. See you next Saturday!", "info")
+		end
+	end
+	eventWasActive = eventActive
 
 	local biomeId = SkyForecast.current(serverNow())
 	if biomeId ~= currentBiome then

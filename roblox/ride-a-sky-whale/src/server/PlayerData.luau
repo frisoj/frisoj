@@ -31,6 +31,8 @@ export type Data = {
 	purchases: { string },
 	lastSeen: number,
 	tutorialDone: boolean,
+	dailyDay: string,
+	dailyStreak: number,
 	lock: Lock?,
 }
 
@@ -71,6 +73,8 @@ local function defaults(): Data
 		purchases = {},
 		lastSeen = os.time(),
 		tutorialDone = false,
+		dailyDay = "",
+		dailyStreak = 0,
 	}
 end
 

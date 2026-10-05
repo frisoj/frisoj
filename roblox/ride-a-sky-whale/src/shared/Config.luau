@@ -42,6 +42,11 @@ Config.FRIEND_BONUS_MAX = 0.40
 Config.PEARL_PACK_MINUTES = 30 -- Parelzak = 30 minuten van je huidige inkomen
 Config.PEARL_PACK_MIN = 1000
 
+-- Dagelijkse beloning: eerste keer per dag spelen = gratis Pearls, meer bij een reeks dagen
+Config.DAILY_MIN_PEARLS = 100
+Config.DAILY_MINUTES = 10 -- beloning = 10 minuten van je inkomen x de reeks (min. 100)
+Config.DAILY_MAX_STREAK = 7
+
 -- Feestmalen (server-boosts)
 Config.FEASTS = {
 	GoldenFeast = { minutes = 10, mult = 2, label = "Golden Feast" },
