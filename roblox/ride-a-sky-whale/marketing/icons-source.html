@@ -1,0 +1,186 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Fredoka; src: url(Fredoka.ttf) /* download Fredoka from fonts.google.com and place it next to this file */; font-weight: 300 700; }
+body { margin: 0; background: #ffffff; }
+svg { display: block; }
+.t { font-family: Fredoka, sans-serif; font-weight: 700; paint-order: stroke; stroke-linejoin: round; }
+</style></head><body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <path id="spark" d="M0,-1 C.14,-.14 .14,-.14 1,0 C.14,.14 .14,.14 0,1 C-.14,.14 -.14,.14 -1,0 C-.14,-.14 -.14,-.14 0,-1Z"/>
+    <radialGradient id="pearl" cx="35%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".45" stop-color="#F4EEFF"/><stop offset="1" stop-color="#B9ACDF"/>
+    </radialGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3D8FE0"/><stop offset=".65" stop-color="#8CCBFA"/><stop offset="1" stop-color="#D8F0FF"/>
+    </linearGradient>
+    <linearGradient id="whale" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5287BA"/><stop offset="1" stop-color="#2F5F8E"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE27A"/><stop offset="1" stop-color="#E39B12"/>
+    </linearGradient>
+    <g id="whaleShape">
+      <path d="M70 270 C80 190 160 150 300 140 C480 125 640 140 780 200 C830 222 860 238 890 244 C905 220 925 180 958 158 C950 200 935 235 920 255 C940 285 955 320 962 345 C925 320 905 290 888 272 C820 300 720 330 600 345 C430 365 260 365 160 335 C110 320 75 300 70 270 Z" fill="url(#whale)" stroke="#1C3D5C" stroke-width="7"/>
+      <path d="M95 305 C160 330 260 352 400 352 C500 352 560 345 640 332 C560 352 430 366 300 362 C220 358 140 340 95 305 Z" fill="#B7D0E6"/>
+      <path d="M285 352 C330 395 390 430 455 442 C425 415 385 385 350 360 Z" fill="#3F6E9C" stroke="#1C3D5C" stroke-width="6"/>
+      <path d="M78 282 C125 300 185 305 250 292" fill="none" stroke="#1C3D5C" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="185" cy="236" r="17" fill="#13243A"/>
+      <circle cx="191" cy="229" r="6" fill="#FFFFFF"/>
+      <ellipse cx="150" cy="268" rx="20" ry="11" fill="#F5A3B5" opacity=".7"/>
+      <g fill="#C99A55" stroke="#7A5530" stroke-width="4">
+        <path d="M380 140 Q400 160 420 140 Z"/><path d="M450 136 Q470 156 490 136 Z"/><path d="M520 139 Q540 159 560 139 Z"/><path d="M590 148 Q610 168 630 148 Z"/>
+      </g>
+    </g>
+    <g id="spray" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity=".95">
+      <path d="M0 0 C-6 -40 -26 -70 -52 -82"/><path d="M0 0 C0 -50 3 -80 6 -104"/><path d="M0 0 C8 -40 30 -66 56 -76"/>
+    </g>
+    <g id="cloud" fill="#FFFFFF">
+      <circle cx="-60" cy="10" r="38"/><circle cx="0" cy="-12" r="52"/><circle cx="62" cy="8" r="40"/><rect x="-98" y="10" width="200" height="40" rx="20"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- 1. Game icon -->
+<svg id="game-icon" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="420" cy="92" r="46" fill="#FFE27A" opacity=".9"/>
+  <use href="#cloud" transform="translate(90 440) scale(1.2)"/>
+  <use href="#cloud" transform="translate(400 470) scale(1.4)"/>
+  <use href="#spray" transform="translate(110 190) scale(1.1)"/>
+  <use href="#whaleShape" transform="translate(-22 116) scale(0.54)"/>
+  <circle cx="300" cy="96" r="15" fill="#FFD84A" stroke="#C98A00" stroke-width="4"/>
+  <circle cx="368" cy="160" r="12" fill="#FF9AD0" stroke="#C75A96" stroke-width="4"/>
+  <circle cx="232" cy="64" r="10" fill="#9FE8FF" stroke="#4BA8C8" stroke-width="3"/>
+  <use href="#spark" transform="translate(330 70) scale(16)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(470 230) scale(12)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(52 120) scale(10)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 2. Golden Feast -->
+<svg id="golden-feast" width="512" height="512" viewBox="0 0 512 512">
+  <defs><radialGradient id="bgGold" cx="50%" cy="45%" r="65%"><stop offset="0" stop-color="#FFF1B8"/><stop offset="1" stop-color="#E0900C"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#bgGold)"/>
+  <ellipse cx="256" cy="330" rx="170" ry="54" fill="#B8720A"/>
+  <path d="M86 320 C96 420 416 420 426 320 Z" fill="url(#gold)" stroke="#9A5E05" stroke-width="8"/>
+  <g stroke="#B5404F" stroke-width="5">
+    <ellipse cx="190" cy="300" rx="44" ry="22" fill="#FF7A8C" transform="rotate(-15 190 300)"/>
+    <ellipse cx="262" cy="282" rx="50" ry="24" fill="#FF8E9E" transform="rotate(10 262 282)"/>
+    <ellipse cx="330" cy="302" rx="44" ry="22" fill="#FF7A8C" transform="rotate(18 330 302)"/>
+    <ellipse cx="228" cy="252" rx="40" ry="20" fill="#FFA3B0" transform="rotate(-8 228 252)"/>
+    <ellipse cx="300" cy="248" rx="38" ry="19" fill="#FF97A6" transform="rotate(12 300 248)"/>
+  </g>
+  <circle cx="262" cy="214" r="22" fill="url(#pearl)" stroke="#8E80B8" stroke-width="4"/>
+  <text class="t" x="256" y="168" font-size="120" text-anchor="middle" fill="#FFFFFF" stroke="#9A5E05" stroke-width="18">2x</text>
+  <use href="#spark" transform="translate(118 160) scale(22)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(400 190) scale(18)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(380 96) scale(12)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 3. MEGA Feast -->
+<svg id="mega-feast" width="512" height="512" viewBox="0 0 512 512">
+  <defs><radialGradient id="bgMega" cx="50%" cy="45%" r="65%"><stop offset="0" stop-color="#C69BFF"/><stop offset="1" stop-color="#4B1E8C"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#bgMega)"/>
+  <ellipse cx="256" cy="345" rx="180" ry="56" fill="#9A5E05"/>
+  <path d="M76 335 C86 445 426 445 436 335 Z" fill="url(#gold)" stroke="#8A5004" stroke-width="8"/>
+  <g stroke="#B5404F" stroke-width="5">
+    <ellipse cx="170" cy="318" rx="46" ry="22" fill="#FF7A8C" transform="rotate(-18 170 318)"/>
+    <ellipse cx="256" cy="300" rx="54" ry="26" fill="#FF8E9E"/>
+    <ellipse cx="344" cy="318" rx="46" ry="22" fill="#FF7A8C" transform="rotate(18 344 318)"/>
+    <ellipse cx="212" cy="262" rx="44" ry="21" fill="#FFA3B0" transform="rotate(-10 212 262)"/>
+    <ellipse cx="302" cy="262" rx="44" ry="21" fill="#FF97A6" transform="rotate(10 302 262)"/>
+    <ellipse cx="256" cy="228" rx="40" ry="19" fill="#FFB3BE"/>
+  </g>
+  <circle cx="200" cy="222" r="18" fill="url(#pearl)" stroke="#8E80B8" stroke-width="4"/>
+  <circle cx="318" cy="216" r="20" fill="url(#pearl)" stroke="#8E80B8" stroke-width="4"/>
+  <path d="M196 196 L216 150 L256 182 L296 150 L316 196 Z" fill="url(#gold)" stroke="#8A5004" stroke-width="7" stroke-linejoin="round"/>
+  <text class="t" x="256" y="128" font-size="104" text-anchor="middle" fill="#FFE27A" stroke="#3A136E" stroke-width="18">3x</text>
+  <text class="t" x="256" y="482" font-size="58" text-anchor="middle" fill="#FFFFFF" stroke="#3A136E" stroke-width="12">MEGA</text>
+  <use href="#spark" transform="translate(100 150) scale(22)" fill="#FFE27A"/>
+  <use href="#spark" transform="translate(420 170) scale(18)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 4. Pearl Pack -->
+<svg id="pearl-pack" width="512" height="512" viewBox="0 0 512 512">
+  <defs><radialGradient id="bgTeal" cx="50%" cy="45%" r="65%"><stop offset="0" stop-color="#9CF0E6"/><stop offset="1" stop-color="#127C8C"/></radialGradient>
+  <linearGradient id="sack" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6A9DE0"/><stop offset="1" stop-color="#2D5C9E"/></linearGradient></defs>
+  <rect width="512" height="512" fill="url(#bgTeal)"/>
+  <path d="M168 190 C110 250 110 410 256 410 C402 410 402 250 344 190 Z" fill="url(#sack)" stroke="#1C3D6C" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M176 192 C210 176 302 176 336 192" fill="none" stroke="#FFD84A" stroke-width="14" stroke-linecap="round"/>
+  <g stroke="#8E80B8" stroke-width="4">
+    <circle cx="214" cy="168" r="28" fill="url(#pearl)"/>
+    <circle cx="268" cy="150" r="32" fill="url(#pearl)"/>
+    <circle cx="316" cy="172" r="26" fill="url(#pearl)"/>
+    <circle cx="242" cy="116" r="24" fill="url(#pearl)"/>
+    <circle cx="300" cy="112" r="20" fill="url(#pearl)"/>
+    <circle cx="384" cy="398" r="24" fill="url(#pearl)"/>
+    <circle cx="128" cy="400" r="20" fill="url(#pearl)"/>
+  </g>
+  <path d="M256 268 C232 300 232 330 256 346 C280 330 280 300 256 268 Z" fill="#FFFFFF" opacity=".25"/>
+  <use href="#spark" transform="translate(130 120) scale(20)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(396 140) scale(16)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 5. 2x Pearls -->
+<svg id="double-pearls" width="512" height="512" viewBox="0 0 512 512">
+  <defs><radialGradient id="bgBlue" cx="50%" cy="45%" r="65%"><stop offset="0" stop-color="#7FC4FF"/><stop offset="1" stop-color="#1B3F8C"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#bgBlue)"/>
+  <circle cx="226" cy="236" r="122" fill="url(#pearl)" stroke="#7E70AA" stroke-width="8"/>
+  <ellipse cx="188" cy="186" rx="40" ry="26" fill="#FFFFFF" opacity=".9" transform="rotate(-30 188 186)"/>
+  <circle cx="352" cy="330" r="74" fill="#FFD84A" stroke="#B87A00" stroke-width="9"/>
+  <text class="t" x="352" y="360" font-size="88" text-anchor="middle" fill="#FFFFFF" stroke="#B87A00" stroke-width="14">2x</text>
+  <use href="#spark" transform="translate(110 380) scale(20)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(390 120) scale(24)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 6. VIP Captain -->
+<svg id="vip-captain" width="512" height="512" viewBox="0 0 512 512">
+  <defs><radialGradient id="bgVip" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#3C5FA8"/><stop offset="1" stop-color="#0E1D3D"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#bgVip)"/>
+  <path d="M120 236 C110 150 402 150 392 236 Z" fill="#FFFFFF" stroke="#0A1430" stroke-width="9" stroke-linejoin="round"/>
+  <rect x="124" y="226" width="264" height="58" rx="10" fill="#1C2E5E" stroke="#0A1430" stroke-width="9"/>
+  <path d="M110 288 C170 340 342 340 402 288 L402 300 C342 362 170 362 110 300 Z" fill="#111111" stroke="#0A1430" stroke-width="6"/>
+  <rect x="124" y="270" width="264" height="10" fill="#FFD84A"/>
+  <circle cx="256" cy="226" r="34" fill="url(#gold)" stroke="#9A5E05" stroke-width="6"/>
+  <path d="M232 228 C240 214 266 210 280 222 L288 214 L288 236 L280 230 C266 240 244 240 232 228 Z" fill="#1C3D5C"/>
+  <text class="t" x="256" y="438" font-size="104" text-anchor="middle" fill="#FFD84A" stroke="#0A1430" stroke-width="16">VIP</text>
+  <use href="#spark" transform="translate(110 130) scale(20)" fill="#FFD84A"/>
+  <use href="#spark" transform="translate(404 112) scale(16)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 7. Weatherman -->
+<svg id="weatherman" width="512" height="512" viewBox="0 0 512 512">
+  <defs><radialGradient id="bgStorm" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#8FD0FF"/><stop offset="1" stop-color="#2A4E86"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#bgStorm)"/>
+  <circle cx="330" cy="170" r="74" fill="#FFD84A" stroke="#D99A00" stroke-width="8"/>
+  <g stroke="#FFD84A" stroke-width="12" stroke-linecap="round">
+    <path d="M330 64 L330 82"/><path d="M420 104 L408 116"/><path d="M440 170 L422 170"/><path d="M240 104 L252 116"/>
+  </g>
+  <use href="#cloud" transform="translate(236 262) scale(1.55)"/>
+  <path d="M250 300 L206 384 L246 384 L222 456 L300 352 L258 352 L284 300 Z" fill="#FFE04A" stroke="#C98A00" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#FFFFFF"><circle cx="112" cy="410" r="9"/><circle cx="392" cy="420" r="9"/><circle cx="420" cy="370" r="7"/></g>
+  <use href="#spark" transform="translate(110 120) scale(18)" fill="#FFFFFF"/>
+</svg>
+
+<!-- 8. Thumbnail 1920x1080 -->
+<svg id="thumbnail" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <circle cx="1660" cy="180" r="110" fill="#FFE27A" opacity=".9"/>
+  <use href="#cloud" transform="translate(240 980) scale(2.6)"/>
+  <use href="#cloud" transform="translate(860 1040) scale(3.2)"/>
+  <use href="#cloud" transform="translate(1600 1000) scale(2.8)"/>
+  <use href="#cloud" transform="translate(1500 470) scale(1.1)" opacity=".85"/>
+  <use href="#spray" transform="translate(520 470) scale(2.3)"/>
+  <use href="#whaleShape" transform="translate(260 300) scale(1.45)"/>
+  <circle cx="1080" cy="300" r="30" fill="#FFD84A" stroke="#C98A00" stroke-width="7"/>
+  <circle cx="1240" cy="420" r="24" fill="#FF9AD0" stroke="#C75A96" stroke-width="6"/>
+  <circle cx="900" cy="420" r="20" fill="#9FE8FF" stroke="#4BA8C8" stroke-width="5"/>
+  <circle cx="1400" cy="280" r="34" fill="#B58CFF" stroke="#6A3FC0" stroke-width="7"/>
+  <use href="#spark" transform="translate(1120 240) scale(30)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(1450 220) scale(26)" fill="#FFFFFF"/>
+  <use href="#spark" transform="translate(860 330) scale(20)" fill="#FFFFFF"/>
+  <text class="t" x="80" y="190" font-size="150" fill="#FFFFFF" stroke="#1C3D6C" stroke-width="26">RIDE A SKY WHALE</text>
+  <text class="t" x="86" y="1010" font-size="68" fill="#FFE27A" stroke="#1C3D6C" stroke-width="9" letter-spacing="1">Catch Driftlings in 8 changing skies!</text>
+</svg>
+</body></html>
