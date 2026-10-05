@@ -1,0 +1,44 @@
+{
+  "name": "RideASkyWhale",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CharacterWalkSpeed": 20,
+        "CameraMaxZoomDistance": 120
+      },
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "Gravity": 120,
+        "StreamingEnabled": false
+      }
+    },
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "ClockTime": 13,
+        "Brightness": 2.2
+      }
+    }
+  }
+}
