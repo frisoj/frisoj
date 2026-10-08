@@ -20,9 +20,9 @@ function caption(text, t, t0, t1, o = {}) {
   const sc = Math.max(0.01, pin * (1 - pout * 0.3));
   return label(text, 960, o.y ?? 150, o.size ?? 92, { scale: sc, op: 1 - pout, fill: o.fill ?? '#FFFFFF', stroke: o.stroke ?? '#15204A', sw: o.sw ?? 22, depth: 10, rot: o.rot ?? -2, outer: o.outer, ow: o.ow ?? 8 });
 }
-function flash(t, tc, dur = 0.18) {
+function flash(t, tc, dur = 0.18, peak = 0.85) {
   const p = seg(t, tc, tc + dur);
-  return t >= tc && p < 1 ? `<rect width="1920" height="1080" fill="#FFFFFF" opacity="${(1 - p).toFixed(3)}"/>` : '';
+  return t >= tc && p < 1 ? `<rect width="1920" height="1080" fill="#FFFFFF" opacity="${((1 - p) * peak).toFixed(3)}"/>` : '';
 }
 function whalePoint(lx, ly, x, y, sc, rot) {
   const dx = (lx - 520) * sc, dy = (ly - 250) * sc, a = rot * Math.PI / 180;
@@ -182,7 +182,7 @@ function sceneSkies(t) {
   s += pill(mut ? `${mut} ×${k.mult}` : 'CALM SKIES', 1460, 700, 46, { bg: mut ? MUT_COLORS[mut] : '#FFFFFF', scale: ease.outBack(seg(ct, 0.1, 0.35)), rot: -4 });
   s += pill('8 WILD SKIES', 960, 1000, 40, { bg: '#FFC93C', rot: 0 });
   // een kleine flits bij elke wissel
-  return s + flash(t, T.skies + i * 0.75, i === 0 ? 0.2 : 0.12);
+  return s + flash(t, T.skies + i * 0.75, i === 0 ? 0.2 : 0.14, i === 0 ? 0.8 : 0.45);
 }
 
 /* 5. Het nest */
