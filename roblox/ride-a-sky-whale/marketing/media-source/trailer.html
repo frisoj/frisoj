@@ -1,0 +1,296 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Fredoka; src: url(Fredoka.ttf); font-weight: 300 700; }
+html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+svg { display: block; }
+</style></head><body>
+<svg id="stage" width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"><defs id="static"></defs><g id="scene"></g></svg>
+<script src="art.js"></script>
+<script>
+// 30 seconden trailer. window.render(t) tekent het beeld op tijdstip t (seconden).
+document.getElementById('static').innerHTML = STATIC_DEFS;
+
+// Scènegrenzen (in de maat van de muziek: 120 BPM, een tel = 0,5 s)
+const T = { ride: 3.0, catch: 7.5, skies: 12.5, nest: 18.5, eclipse: 22.5, end: 26.5, total: 30 };
+
+function caption(text, t, t0, t1, o = {}) {
+  if (t < t0 || t > t1) return '';
+  const pin = ease.outBack(seg(t, t0, t0 + 0.35)), pout = seg(t, t1 - 0.2, t1);
+  const sc = Math.max(0.01, pin * (1 - pout * 0.3));
+  return label(text, 960, o.y ?? 150, o.size ?? 92, { scale: sc, op: 1 - pout, fill: o.fill ?? '#FFFFFF', stroke: o.stroke ?? '#15204A', sw: o.sw ?? 22, depth: 10, rot: o.rot ?? -2, outer: o.outer, ow: o.ow ?? 8 });
+}
+function flash(t, tc, dur = 0.18) {
+  const p = seg(t, tc, tc + dur);
+  return t >= tc && p < 1 ? `<rect width="1920" height="1080" fill="#FFFFFF" opacity="${(1 - p).toFixed(3)}"/>` : '';
+}
+function whalePoint(lx, ly, x, y, sc, rot) {
+  const dx = (lx - 520) * sc, dy = (ly - 250) * sc, a = rot * Math.PI / 180;
+  return [x + dx * Math.cos(a) - dy * Math.sin(a), y + dx * Math.sin(a) + dy * Math.cos(a)];
+}
+// Waar het net van het poppetje zit (zelfde transform als avatar()).
+function netPos(x, y, sc, rot, armR) {
+  const a = armR * Math.PI / 180, px = 34, py = -46, lx = 0, ly = 176; // hoepel 176 onder de schouder
+  const hx = px - ly * Math.sin(a), hy = py + ly * Math.cos(a);
+  const b = rot * Math.PI / 180;
+  return [x + (hx * Math.cos(b) - hy * Math.sin(b)) * sc, y + (hx * Math.sin(b) + hy * Math.cos(b)) * sc];
+}
+function burst(x, y, p, col, n = 10, rad = 140) {
+  if (p <= 0 || p >= 1) return '';
+  let s = `<circle cx="${x}" cy="${y}" r="${(20 + p * rad).toFixed(1)}" fill="none" stroke="${col}" stroke-width="${(14 * (1 - p)).toFixed(1)}" opacity="${(1 - p).toFixed(2)}"/>`;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + 0.3, d = 30 + ease.out(p) * rad * 1.1;
+    s += sparkle(x + Math.cos(a) * d, y + Math.sin(a) * d, 16 * (1 - p) + 4, 1 - p, i % 2 ? col : '#FFFFFF', p * 90);
+  }
+  return s;
+}
+function popup(text, x, y, p, col) {
+  if (p <= 0 || p >= 1) return '';
+  return label(text, x, y - ease.out(p) * 80, 54, { fill: col, stroke: '#15204A', sw: 14, depth: 5, op: 1 - seg(p, 0.7, 1), scale: ease.outBack(seg(p, 0, 0.25)) });
+}
+function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+
+/* 1. Boven de wolken... */
+function sceneIntro(t) {
+  let s = sky('CloudSea', t, { sunX: 1520, sunY: 230, sunR: 105 });
+  s += island(260, 600, 0.5, { op: 0.65 }) + island(1690, 470, 0.34, { op: 0.55, chest: true });
+  s += cloudBank(880, 'CloudSea', t, { count: 8, w: 540, seed: 2, drift: 40 });
+  const p = ease.out(seg(t, 0.1, 2.7));
+  const wx = lerp(2600, 1080, p), wy = 640 + Math.sin(t * 1.3) * 12;
+  s += whale(wx, wy, 1.05, { t, rot: -4 + Math.sin(t * 1.1) * 1.5, blink: t > 2.35 && t < 2.47, nest: [null, null, null], warm: '#FFF2C8', warmOp: 0.35 });
+  s += driftling('Breezle', lerp(1900, 1500, p), 320 + Math.sin(t * 2) * 15, 30, { t });
+  s += driftling('NimbusPup', lerp(2100, 1680, p), 430 + Math.sin(t * 2 + 1) * 15, 26, { t, phase: 2 });
+  const part = ease.inOut(seg(t, 0, 1.5));
+  const fg = { fill: '#FFFFFF', shade: '#BCD6F0', blur: 'b6' };
+  s += cloud(lerp(620, -460, part), 760, 1200, fg) + cloud(lerp(1380, 2420, part), 800, 1300, fg) + cloud(960, lerp(620, 1500, part), 1500, fg);
+  s += grade(0.22);
+  s += caption('HIGH ABOVE THE CLOUDS...', t, 0.25, 1.55) + caption('...SWIMS A GIANT SKY WHALE!', t, 1.6, 3.0);
+  return s;
+}
+
+/* 2. Rijd op de walvis en lanceer uit het spuitgat */
+function sceneRide(t) {
+  const lt = t - T.ride;
+  const cam = ease.out(seg(lt, 2.05, 3.4)) * 700;
+  let s = sky('CloudSea', t, { sunX: 1560, sunY: 220 + cam * 0.2, sunR: 105 });
+  s += `<g transform="translate(0,${(cam * 0.35).toFixed(1)})">${cloudBank(820, 'CloudSea', t, { count: 7, w: 500, seed: 9, op: 0.9, drift: 25 })}</g>`;
+  s += `<g transform="translate(0,${cam.toFixed(1)})">`;
+  const wx = 960, wy = 760, sc = 1.55, rot = -3;
+  const [bx, by] = whalePoint(250, 112, wx, wy, sc, rot);
+  const launch = seg(lt, 2.0, 3.3);
+  const jet = ease.out(seg(lt, 1.95, 2.2));
+  if (jet > 0) s += spout(bx, by + 8, 120 + jet * 640, t, { w: 74, op: 1 - seg(lt, 3.6, 4.4) * 0.6 });
+  s += whale(wx, wy, sc, { t, rot, nest: ['NimbusPup', 'Jellyfloat', 'Breezle'], warm: '#FFF2C8', warmOp: 0.3 });
+  // poppetje rent over de rug naar het spuitgat
+  if (lt < 2.0) {
+    const lx = lerp(720, 262, ease.inOut(seg(lt, 0.15, 1.75)));
+    const ly = lx > 300 ? backAt(lx)[0] : 112;
+    const [ax, ay] = whalePoint(lx, ly, wx, wy, sc, rot);
+    const run = lt < 1.75 ? Math.sin(lt * 16) : 0;
+    s += avatar(ax, ay - 48, 1.0, { rot: rot - (lt < 1.75 ? 6 : 0), legL: run * 32, legR: -run * 32, armL: -run * 40, armR: -160 + run * 10, net: true });
+  } else {
+    const h = ease.out(launch) * 820;
+    const spin = ease.inOut(seg(lt, 2.15, 3.2)) * 360;
+    s += speedLines(bx, by - h + 40, 220, 0, 10, { spread: 120, op: 0.8 * (1 - seg(lt, 3.3, 3.9)) });
+    s += avatar(bx, by - 48 - h, 0.95 + launch * 0.2, { rot: spin, armL: 160, armR: -150, legL: 14, legR: -14, shout: true, glow: '#FFFFFF' });
+  }
+  s += `</g>`;
+  // Driftlings boven in beeld als de camera meegaat
+  const up = seg(lt, 2.6, 4.5);
+  if (up > 0) {
+    s += driftling('Jellyfloat', lerp(2100, 1600, ease.out(up)), 470, 46, { t });
+    s += driftling('KiteRay', lerp(2200, 1180, ease.out(seg(lt, 2.8, 4.5))), 330, 50, { t, phase: 1 });
+  }
+  s += grade(0.22);
+  s += caption('RIDE THE WHALE!', t, T.ride + 0.15, T.ride + 1.9);
+  s += caption('LAUNCH FROM THE BLOWHOLE!', t, T.ride + 2.0, T.catch, { fill: '#9FF3FF' });
+  return s + flash(t, T.ride);
+}
+
+/* 3. Vang Driftlings */
+const CATCHES = [
+  { id: 'Breezle', at: 1.0, rate: '+5/min' },
+  { id: 'Jellyfloat', at: 2.0, rate: '+15/min' },
+  { id: 'KiteRay', at: 3.0, rate: '+50/min' },
+  { id: 'AuroraMoth', at: 4.0, rate: '+1,000/min' },
+];
+function catchPose(lt) {
+  const x = lerp(160, 1700, lt / 5), y = 650 + Math.sin(lt * 2.2) * 60;
+  let armR = -110;
+  for (const c of CATCHES) { const d = lt - c.at; if (d > -0.3 && d < 0.3) armR = -110 - Math.cos(d / 0.3 * Math.PI / 2) * 60; }
+  return { x, y, armR, rot: 12 };
+}
+function sceneCatch(t) {
+  const lt = t - T.catch;
+  let s = sky('CloudSea', t, { sunX: 1600, sunY: 200, sunR: 100 });
+  s += `<g transform="translate(${(-lt * 60).toFixed(1)},0)">${island(500, 760, 0.55, { op: 0.6 })}${island(1500, 640, 0.4, { op: 0.5, chest: true })}${island(2200, 720, 0.5, { op: 0.6 })}</g>`;
+  s += `<g transform="translate(${(-lt * 140).toFixed(1)},0)">${cloudBank(930, 'CloudSea', 0, { count: 10, w: 520, seed: 4, drift: 0 })}</g>`;
+  s += driftling('Thunderkoi', 1500, 230 + Math.sin(t * 2) * 20, 34, { t, op: 0.85 });
+  s += driftling('NimbusPup', 760, 260 + Math.sin(t * 2 + 2) * 20, 30, { t, op: 0.85, phase: 3 });
+  let count = 0;
+  for (const c of CATCHES) {
+    const pose = catchPose(c.at);
+    const [cx, cy] = netPos(pose.x, pose.y, 1.15, pose.rot, -110 - 60);
+    const d = lt - c.at;
+    const big = SPECIES[c.id].rarity === 'Legendary';
+    const size = big ? 54 : c.id === 'KiteRay' ? 42 : 46;
+    if (d < 0) s += driftling(c.id, cx, cy + Math.sin(t * 3 + c.at) * 10, size, { t, phase: c.at });
+    else if (d < 0.2) s += driftling(c.id, cx, cy, size * (1 - d / 0.2), { t });
+    s += burst(cx, cy, d / 0.6, RARITY[SPECIES[c.id].rarity], big ? 14 : 10, big ? 220 : 140);
+    s += popup(c.rate, cx, cy - 60, d / 1.0, RARITY[SPECIES[c.id].rarity]);
+    if (d >= 0) count++;
+  }
+  const pose = catchPose(lt);
+  s += speedLines(pose.x - 70, pose.y - 40, 160, -100, 8, { spread: 120, op: 0.55 });
+  s += avatar(pose.x, pose.y, 1.15, { rot: pose.rot, armL: 120, armR: pose.armR, legL: 30, legR: 18, shout: lt % 1 < 0.4 });
+  // kaartje met de laatste vangst
+  for (const c of CATCHES) {
+    const d = lt - c.at;
+    if (d >= 0.05 && d < 0.95) {
+      const sp = SPECIES[c.id];
+      const p = ease.outBack(seg(d, 0.05, 0.3)) * (1 - seg(d, 0.8, 0.95));
+      s += pill(`${sp.rarity.toUpperCase()}!  ${sp.name.toUpperCase()}`, 960, 960, 50, { bg: RARITY[sp.rarity], scale: p, rot: -2 });
+    }
+  }
+  // teller rechtsboven
+  s += `<g transform="translate(1590,62)"><rect x="-10" y="-40" width="300" height="80" rx="40" fill="#15204A" opacity=".75"/>${driftling('NimbusPup', 34, 0, 26, { t, glow: false, rot: 0 })}<text x="80" y="18" font-family="Fredoka" font-weight="700" font-size="50" fill="#FFFFFF">${count} / 4</text></g>`;
+  s += grade(0.22);
+  s += caption('CATCH CUTE DRIFTLINGS!', t, T.catch + 0.1, T.catch + 2.45);
+  s += caption('THE RARER, THE RICHER!', t, T.catch + 2.5, T.skies, { fill: '#FFE27A' });
+  return s + flash(t, T.catch);
+}
+
+/* 4. Acht luchten */
+const SKY_STAR = {
+  CloudSea: ['NimbusPup', null], Thunderfront: ['Thunderkoi', 'CHARGED'], Blizzard: ['NimbusPup', 'FROZEN'], Ashfall: ['PuffinPilot', 'MOLTEN'],
+  GoldenHour: ['Owlbatross', 'GILDED'], Aurora: ['AuroraMoth', 'PRISMATIC'], Starfall: ['CometNarwhal', 'STARDUST'], Eclipse: ['KiteRay', 'VOID'],
+};
+function sceneSkies(t) {
+  const lt = t - T.skies, i = Math.min(7, Math.floor(lt / 0.75)), key = SKY_ORDER[i], k = SKIES[key];
+  const ct = lt - i * 0.75;
+  const zoom = 1 + ct * 0.06;
+  let s = `<g transform="translate(960,540) scale(${zoom.toFixed(4)}) translate(-960,-540)">`;
+  s += sky(key, t, { sunX: 1450, sunY: 260, sunR: 110 });
+  s += cloudBank(900, key, t, { count: 8, w: 520, seed: 6 + i, drift: 60 });
+  s += whale(760, 700, 0.95, { t, rot: -5, nest: [null, null, null], warm: k.ui, warmOp: 0.35 });
+  const [sid, mut] = SKY_STAR[key];
+  s += driftling(sid, 1460, 520 + Math.sin(t * 3) * 14, 92, { t, mut: mut || undefined, glowR: 110, glowOp: 0.75 });
+  s += `</g>` + weather(key, t);
+  s += grade(0.18);
+  const pin = ease.outBack(seg(ct, 0, 0.25));
+  s += label(k.name, 960, 175, 120, { fill: k.ui, stroke: '#0E1433', sw: 26, depth: 12, scale: pin, rot: -2, outer: '#FFFFFF', ow: 8 });
+  s += pill(mut ? `${mut} ×${k.mult}` : 'CALM SKIES', 1460, 700, 46, { bg: mut ? MUT_COLORS[mut] : '#FFFFFF', scale: ease.outBack(seg(ct, 0.1, 0.35)), rot: -4 });
+  s += pill('8 WILD SKIES', 960, 1000, 40, { bg: '#FFC93C', rot: 0 });
+  // een kleine flits bij elke wissel
+  return s + flash(t, T.skies + i * 0.75, i === 0 ? 0.2 : 0.12);
+}
+
+/* 5. Het nest */
+const NEST = [['NimbusPup'], ['Breezle'], ['Jellyfloat'], ['PuffinPilot'], ['KiteRay'], ['Thunderkoi', 'GILDED'], ['Owlbatross'], ['CometNarwhal', 'FROZEN']];
+function sceneNest(t) {
+  const lt = t - T.nest;
+  let s = sky('GoldenHour', t, { sunX: 1550, sunY: 300, sunR: 120 });
+  s += cloudBank(860, 'GoldenHour', t, { count: 8, w: 520, seed: 12, drift: 30 });
+  s += whale(lerp(1300, 1100, lt / 4), 820, 1.2, { t, rot: -3, warm: '#FFD6A0', warmOp: 0.5 });
+  s += `<rect width="1920" height="1080" fill="#1A1036" opacity=".35"/>`;
+  const pin = ease.outBack(seg(lt, 0, 0.4));
+  s += `<g transform="translate(960,640) scale(${pin.toFixed(3)}) translate(-960,-640)" filter="url(#shadow)">`;
+  s += `<rect x="330" y="400" width="1260" height="500" rx="46" fill="#6E4320"/>`;
+  s += `<rect x="330" y="390" width="1260" height="500" rx="46" fill="url(#woodG)" stroke="#4E3014" stroke-width="10"/>`;
+  for (let r = 0; r < 4; r++) s += `<line x1="360" y1="${470 + r * 110}" x2="1560" y2="${470 + r * 110}" stroke="#7A4A20" stroke-width="5" opacity=".35"/>`;
+  s += `</g>`;
+  NEST.forEach(([id, mut], i) => {
+    const col = i % 4, row = Math.floor(i / 4);
+    const x = 510 + col * 300, y = 560 + row * 210;
+    const p = seg(lt, 0.35 + i * 0.22, 0.75 + i * 0.22);
+    if (pin > 0.6) {
+      s += `<g transform="translate(${x},${y + 40})"><path d="M-80 -10 Q0 66 80 -10 Z" fill="url(#woodG)" stroke="#5A3612" stroke-width="7" stroke-linejoin="round"/><path d="M-60 12 Q0 38 60 12 M-40 -6 L-28 36 M0 -6 L0 44 M40 -6 L28 36" stroke="#5A3612" stroke-width="4" fill="none" opacity=".6"/><ellipse cx="0" cy="-10" rx="84" ry="18" fill="#B97C3A" stroke="#5A3612" stroke-width="6"/></g>`;
+      if (p > 0) s += driftling(id, x, y - 10, 58 * ease.outBack(p), { t, mut, phase: i, glowOp: 0.45 });
+      if (p > 0) s += sparkle(x + 60, y - 60, 14 * (1 - seg(lt, 0.75 + i * 0.22, 1.2 + i * 0.22)), 1);
+    }
+  });
+  // teller
+  const value = 1250 + Math.pow(seg(lt, 0.3, 3.8), 2.2) * 1283250;
+  s += `<g transform="translate(960,${lerp(260, 300, 1 - pin)})">`;
+  s += `<rect x="-330" y="-62" width="660" height="124" rx="62" fill="#15204A" opacity=".8"/>`;
+  s += pearl(-250, 0, 40);
+  s += `<text x="40" y="26" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="78" fill="#FFFFFF">${fmt(value)}</text></g>`;
+  s += grade(0.2);
+  s += caption('BUILD YOUR NEST', t, T.nest + 0.05, T.eclipse, { y: 130, fill: '#FFE27A' });
+  s += label("IT EARNS PEARLS — EVEN WHILE YOU'RE OFFLINE!", 960, 1010, 50, { fill: '#FFFFFF', stroke: '#15204A', sw: 14, depth: 5, op: seg(lt, 1.2, 1.6) });
+  return s + flash(t, T.nest);
+}
+
+/* 6. Eclips */
+function sceneEclipse(t) {
+  const lt = t - T.eclipse;
+  const dark = ease.inOut(seg(lt, 0, 1.3));
+  let s = sky('GoldenHour', t, { sunX: 1380, sunY: 300, sunR: 125 });
+  s += `<g opacity="${dark.toFixed(3)}">${sky('Eclipse', t, { sunX: 1380, sunY: 300, sunR: 125 })}</g>`;
+  if (dark < 1) s += `<circle cx="${lerp(1700, 1380, dark)}" cy="${lerp(220, 300, dark)}" r="125" fill="#120618" opacity="${(0.9 * (1 - dark * 0.2)).toFixed(2)}"/>`;
+  s += cloudBank(900, 'Eclipse', t, { count: 8, w: 520, seed: 14, drift: 20, op: 0.6 + dark * 0.4, fill: mix('#FFE4CB', SKIES.Eclipse.cloud, dark), shade: mix('#DF9A8A', SKIES.Eclipse.cshade, dark) });
+  s += whale(620, 760, 1.05, { t, rot: -5, nest: [null, null, null], warm: '#B45AFF', warmOp: 0.6 * dark });
+  s += weather('Eclipse', t);
+  const vp = seg(lt, 1.3, 2.0);
+  if (vp > 0) {
+    for (const [id, x, y, sz, ph] of [['NimbusPup', 300, 300, 40, 0], ['Breezle', 1700, 650, 42, 1], ['Jellyfloat', 1060, 230, 38, 2], ['PuffinPilot', 1780, 260, 36, 3]]) {
+      s += driftling(id, x, y + Math.sin(t * 2 + ph) * 16, sz * ease.outBack(seg(lt, 1.3 + ph * 0.12, 1.8 + ph * 0.12)), { t, mut: 'VOID', phase: ph });
+    }
+  }
+  const mp = seg(lt, 2.0, 2.5);
+  if (mp > 0) {
+    s += `<circle cx="1260" cy="560" r="${(260 * ease.out(mp)).toFixed(1)}" fill="#FF8FD8" opacity="${(0.35 * (1 - seg(lt, 2.6, 3.4) * 0.5)).toFixed(2)}" filter="url(#b50)"/>`;
+    s += driftling('Whalelet', 1260, 560 + Math.sin(t * 2) * 12, 110 * ease.outBack(mp), { t });
+    s += burst(1260, 560, seg(lt, 2.0, 2.8), '#FF78C8', 16, 260);
+    s += pill('MYTHIC!', 1260, 780, 56, { bg: '#FF78C8', scale: ease.outBack(seg(lt, 2.2, 2.5)), rot: -4 });
+    s += pill('VOID ×25', 1640, 420, 42, { bg: '#B45AFF', color: '#FFFFFF', scale: ease.outBack(seg(lt, 2.45, 2.75)), rot: 6 });
+  }
+  s += grade(0.2);
+  s += caption('THE ECLIPSE', t, T.eclipse + 0.9, T.eclipse + 2.0, { fill: '#D9A6FF' });
+  s += caption('EVERY 3 HOURS!', t, T.eclipse + 2.0, T.end, { fill: '#D9A6FF' });
+  const cp = seg(lt, 2.8, 3.1);
+  if (cp > 0) s += pill("CAPTAIN'S CALL: 2× PEARLS EVERY SATURDAY", 960, 1000, 36, { bg: '#FFC93C', scale: ease.outBack(cp) });
+  return s;
+}
+
+/* 7. Eindbeeld */
+function sceneEnd(t) {
+  const lt = t - T.end;
+  let s = sky('Cover', t, { sunX: 400, sunY: 860, sunR: 140 });
+  s += island(1760, 600, 0.36, { op: 0.55, grass: '#9BCB8A', rock: '#9C7E92' }) + island(150, 680, 0.4, { op: 0.6, grass: '#9BCB8A', rock: '#9C7E92', chest: true });
+  s += cloudBank(900, 'Cover', t, { count: 8, w: 520, seed: 3, drift: 25 });
+  const wx = lerp(1180, 1080, lt / 3.5), wy = 935;
+  s += whale(wx, wy, 0.85, { t, rot: -4, nest: ['NimbusPup', 'Jellyfloat', 'Breezle'] });
+  const [ax, ay] = whalePoint(470, backAt(470)[0], wx, wy, 0.85, -4);
+  s += avatar(ax, ay - 40, 0.72, { rot: -5, armL: 150 + Math.sin(t * 8) * 20, armR: -30, legL: 6, legR: -6 });
+  s += driftling('Whalelet', 1720, 300 + Math.sin(t * 2) * 14, 64, { t });
+  s += driftling('AuroraMoth', 250, 470 + Math.sin(t * 2 + 1) * 14, 50, { t, phase: 1 });
+  s += driftling('Thunderkoi', 1620, 560 + Math.sin(t * 2 + 2) * 14, 36, { t, phase: 2 });
+  s += driftling('KiteRay', 470, 760 + Math.sin(t * 2 + 3) * 14, 38, { t, phase: 3 });
+  s += bokeh(12, 10, { y0: 760, h: 320, rMin: 18, rMax: 46, op: 0.45 });
+  s += grade(0.38);
+  const tp = ease.outBack(seg(lt, 0.05, 0.6));
+  s += `<g transform="translate(960,300) scale(${Math.max(0.01, tp).toFixed(3)}) translate(-960,-300)">${title(960, 300, 0.82, { rot: -4 })}</g>`;
+  const pp = ease.outBack(seg(lt, 0.7, 1.05)) * (1 + Math.sin(Math.max(0, lt - 1.1) * 6) * 0.035);
+  s += pill('PLAY FREE ON ROBLOX!', 960, 520, 56, { bg: '#5BE37D', scale: pp });
+  s += label('Search: Ride a Sky Whale', 960, 615, 40, { fill: '#FFFFFF', stroke: '#15204A', sw: 10, depth: 3, op: seg(lt, 1.3, 1.7) });
+  const fade = seg(t, 29.35, 30);
+  if (fade > 0) s += `<rect width="1920" height="1080" fill="#000" opacity="${fade.toFixed(3)}"/>`;
+  return s + flash(t, T.end);
+}
+
+window.render = function (t) {
+  resetUid();
+  let s;
+  if (t < T.ride) s = sceneIntro(t);
+  else if (t < T.catch) s = sceneRide(t);
+  else if (t < T.skies) s = sceneCatch(t);
+  else if (t < T.nest) s = sceneSkies(t);
+  else if (t < T.eclipse) s = sceneNest(t);
+  else if (t < T.end) s = sceneEclipse(t);
+  else s = sceneEnd(t);
+  document.getElementById('scene').innerHTML = s;
+};
+render(+(location.hash.slice(1) || 0));
+</script>
+</body></html>

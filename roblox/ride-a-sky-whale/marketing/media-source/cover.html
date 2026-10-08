@@ -1,0 +1,85 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Fredoka; src: url(Fredoka.ttf); font-weight: 300 700; }
+html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+svg { display: block; }
+</style></head><body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg"><defs id="static"></defs><g id="scene"></g></svg>
+<script src="art.js"></script>
+<script>
+// #cover = thumbnail 1920x1080, #icon = vierkant icoon (ontwerp op 1080x1080).
+const mode = location.hash.slice(1) || 'cover';
+const stage = document.getElementById('stage');
+document.getElementById('static').innerHTML = STATIC_DEFS;
+
+function drawCover() {
+  const t = 0.35;
+  let s = sky('Cover', t, { sunX: 420, sunY: 840, sunR: 140 });
+  s += island(1780, 560, 0.38, { op: 0.55, grass: '#9BCB8A', rock: '#9C7E92' });
+  s += island(150, 560, 0.42, { op: 0.6, grass: '#9BCB8A', rock: '#9C7E92', chest: true });
+  s += cloudBank(870, 'Cover', t, { count: 8, w: 520, op: 0.95, seed: 3, jitter: 60 });
+
+  const wx = 1320, wy = 700, wsc = 1.1, wr = -8;
+  const [bx, by] = blowholePos(wx, wy, wsc, wr);
+  s += `<ellipse cx="${wx - 40}" cy="${wy + 300}" rx="560" ry="46" fill="#6B2E6E" opacity=".28" filter="url(#b24)"/>`;
+  s += spout(bx, by + 6, 290, t, { w: 66 });
+  s += whale(wx, wy, wsc, { t: 0.5, rot: wr, nest: ['NimbusPup', 'Jellyfloat', 'Breezle'] });
+
+  // poppetje boven op de waterstraal, net naar de Driftlings
+  s += speedLines(bx + 4, by - 250, 150, 8, 9, { spread: 150, op: 0.7 });
+  s += avatar(bx + 6, by - 286, 1.3, { rot: 8, armL: 150, armR: -135, legL: 18, legR: -14, shout: true, glow: '#FFE7B0' });
+  s += pearl(bx - 120, by - 480, 16) + pearl(bx + 40, by - 560, 12) + pearl(bx - 170, by - 360, 11);
+  s += sparkle(bx - 60, by - 520, 20) + sparkle(bx + 230, by - 560, 16, 0.9, '#FFF4B0');
+
+  s += driftling('Whalelet', 1720, 200, 70, { t: 0.2 });
+  s += driftling('AuroraMoth', 1440, 330, 58, { t: 0.9, rot: -8 });
+  s += driftling('KiteRay', 1230, 150, 44, { t: 1.6, rot: 10 });
+  s += driftling('Thunderkoi', 1830, 420, 40, { t: 0.4, rot: 6 });
+  s += driftling('Breezle', 560, 600, 36, { t: 2.2 });
+  s += driftling('PuffinPilot', 330, 700, 30, { t: 1.1, rot: -6 });
+  s += sparkle(1560, 110, 20) + sparkle(1860, 300, 14) + sparkle(1330, 250, 12, 0.8, '#FFF4B0');
+
+  s += cloud(200, 1050, 640, { fill: '#FFEAE0', shade: '#DC93AE', hi: '#FFF6EA', hiOp: 0.45, blur: 'b6' });
+  s += cloud(1450, 1080, 760, { fill: '#FFEAE0', shade: '#DC93AE', hi: '#FFF6EA', hiOp: 0.45, blur: 'b6' });
+  s += cloud(1930, 990, 380, { fill: '#FFEAE0', shade: '#DC93AE', hi: '#FFF6EA', hiOp: 0.45, blur: 'b3' });
+  s += bokeh(12, 10, { y0: 700, h: 380, rMin: 18, rMax: 46, op: 0.5 });
+  s += grade(0.4);
+
+  s += title(500, 215, 0.66, { rot: -5 });
+  s += pill('CATCH RARE DRIFTLINGS!', 470, 372, 40, { rot: -5, bg: '#FFC93C' });
+  return s;
+}
+
+function drawIcon() {
+  const t = 0.35;
+  let s = sky('Cover', t, { sunX: 860, sunY: 720, sunR: 140 });
+  s += cloudBank(900, 'Cover', t, { count: 5, w: 520, op: 0.95, seed: 8, jitter: 40 });
+  const wx = 760, wy = 720, wsc = 1.55, wr = -10;
+  const [bx, by] = blowholePos(wx, wy, wsc, wr);
+  s += spout(bx, by + 8, 280, t, { w: 60 });
+  s += whale(wx, wy, wsc, { t: 0.5, rot: wr, nest: ['NimbusPup', 'Jellyfloat', 'Breezle'] });
+  s += speedLines(bx + 4, by - 250, 150, 8, 8, { spread: 160, op: 0.7 });
+  s += avatar(bx + 6, by - 285, 1.6, { rot: 8, armL: 150, armR: -135, legL: 18, legR: -14, shout: true, glow: '#FFE7B0' });
+  s += driftling('Whalelet', 850, 210, 92, { t: 0.2 });
+  s += driftling('AuroraMoth', 860, 520, 60, { t: 0.9, rot: -10 });
+  s += pearl(bx - 150, by - 470, 22) + pearl(bx + 170, by - 430, 16);
+  s += sparkle(980, 120, 26) + sparkle(640, 140, 18, 0.9, '#FFF4B0') + sparkle(1010, 380, 16);
+  s += cloud(180, 1100, 620, { fill: '#FFEAE0', shade: '#DC93AE', hi: '#FFF6EA', hiOp: 0.45, blur: 'b6' });
+  s += cloud(900, 1120, 640, { fill: '#FFEAE0', shade: '#DC93AE', hi: '#FFF6EA', hiOp: 0.45, blur: 'b6' });
+  s += bokeh(5, 6, { w: 1080, y0: 760, h: 320, rMin: 18, rMax: 40, op: 0.5 });
+  s += grade(0.4, 1080, 1080);
+  return s;
+}
+
+if (mode === 'icon') {
+  stage.setAttribute('viewBox', '0 0 1080 1080');
+  stage.setAttribute('width', '512'); stage.setAttribute('height', '512');
+  document.getElementById('scene').innerHTML = drawIcon();
+} else {
+  stage.setAttribute('viewBox', '0 0 1920 1080');
+  stage.setAttribute('width', '1920'); stage.setAttribute('height', '1080');
+  document.getElementById('scene').innerHTML = drawCover();
+}
+</script>
+</body></html>

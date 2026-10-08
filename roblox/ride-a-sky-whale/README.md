@@ -51,7 +51,7 @@ Ga naar [create.roblox.com/dashboard/creations](https://create.roblox.com/dashbo
 1. **Avatar**: zet het avatartype op **R15**. Dat is nodig voor het hogere DevEx-tarief op uitgaven van 18+ spelers uit de VS.
 2. **Places > jouw place > Server size**: zet hem op **8** (er zijn 8 nesten).
 3. **Questionnaire**: vul de Maturity & Compliance-vragenlijst in. Zonder die vragenlijst kun je de game niet openbaar maken.
-4. **Icon en thumbnails**: maak een icoon (close-up van het walvisoog met een avatar op haar kop) en 2 à 3 thumbnails.
+4. **Icon, thumbnail en trailer**: upload `marketing/game-icon.png` als icoon, `marketing/thumbnail.png` als thumbnail en `marketing/trailer.mp4` als video. Opnieuw maken: zie `marketing/media-source/README.md`.
 
 ### 4. Geld verdienen aanzetten
 1. Maak in de Creator Hub onder **Monetization** deze producten aan:
