@@ -1,0 +1,109 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Fredoka; src: url(Fredoka.ttf); font-weight: 300 700; }
+html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+svg { display: block; }
+</style></head><body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg"><defs id="d"></defs><g id="scene"></g></svg>
+<script src="art.js"></script>
+<script>
+// #cover = thumbnail 1920x1080, #icon = icoon (ontwerp op 1080x1080)
+document.getElementById('d').innerHTML = DEFS;
+const mode = location.hash.slice(1) || 'cover';
+const stage = document.getElementById('stage');
+
+function skyBg(w, h) {
+  const g = uid('sky');
+  let s = `<defs>${linear(g, [[0, '#3C7BF2'], [0.5, '#9A8CF5'], [1, '#FFB8DC']])}</defs><rect width="${w}" height="${h}" fill="url(#${g})"/>`;
+  s += `<circle cx="${w * 0.82}" cy="${h * 0.22}" r="${h * 0.3}" fill="#FFF3C8" opacity=".35" filter="url(#b50)"/>`;
+  for (let i = 0; i < 16; i++) s += `<path d="M${w * 0.82} ${h * 0.22} L${w * 0.82 + Math.cos(i / 16 * 6.283) * w} ${h * 0.22 + Math.sin(i / 16 * 6.283) * w} L${w * 0.82 + Math.cos((i + 0.4) / 16 * 6.283) * w} ${h * 0.22 + Math.sin((i + 0.4) / 16 * 6.283) * w} Z" fill="#FFFFFF" opacity=".06"/>`;
+  return s;
+}
+function puffs(y, w, n, seed, col, op) {
+  const r = rand(seed); let s = '';
+  for (let i = 0; i < n; i++) { const x = (i + r() * 0.6) * (w / n); const rr = 60 + r() * 90; s += `<circle cx="${x}" cy="${y + r() * 40}" r="${rr}" fill="${col}" opacity="${op}"/>`; }
+  return s;
+}
+function ground(w, y) {
+  return `<path d="M0 ${y} C${w * 0.3} ${y - 40} ${w * 0.7} ${y - 40} ${w} ${y} L${w} ${y + 600} L0 ${y + 600} Z" fill="#5CCB6C"/><path d="M0 ${y} C${w * 0.3} ${y - 40} ${w * 0.7} ${y - 40} ${w} ${y} L${w} ${y + 22} C${w * 0.7} ${y - 18} ${w * 0.3} ${y - 18} 0 ${y + 22} Z" fill="#8BE89A"/>`;
+}
+function river(y, w) {
+  let s = `<path d="M-50 ${y} C${w * 0.3} ${y - 30} ${w * 0.6} ${y + 30} ${w + 50} ${y - 10} L${w + 50} ${y + 120} C${w * 0.6} ${y + 150} ${w * 0.3} ${y + 90} -50 ${y + 120} Z" fill="url(#gooFill)" stroke="#0E6B3E" stroke-width="6"/>`;
+  s += `<path d="M-50 ${y + 55} C${w * 0.3} ${y + 25} ${w * 0.6} ${y + 85} ${w + 50} ${y + 45}" stroke="#FFFFFF" stroke-width="10" opacity=".35" fill="none"/>`;
+  for (let i = 0; i < 26; i++) { const x = i * (w / 25) - 20; s += `<rect x="${x}" y="${y - 22 + Math.sin(i * 0.7) * 14}" width="${w / 25 - 6}" height="16" rx="8" fill="${i % 2 ? '#FFFFFF' : '#FF6FB0'}" stroke="#2A1748" stroke-width="3"/>`; }
+  return s;
+}
+function labWall(x, y, w, h, col) {
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="#F4F2FF" stroke="#2A1748" stroke-width="6"/>`;
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h * 0.42}" rx="12" fill="#CDEBFF" opacity=".7" stroke="#2A1748" stroke-width="6"/>`;
+  s += `<rect x="${x - 6}" y="${y - 10}" width="${w + 12}" height="18" rx="9" fill="${col}" stroke="#2A1748" stroke-width="5"/>`;
+  return s;
+}
+function laser(x1, y1, x2, y2) {
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#FF3A62" stroke-width="16" opacity=".55" filter="url(#b4)"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#FF6E8C" stroke-width="7"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#FFFFFF" stroke-width="2.5"/>`;
+}
+function speed(x, y, len, n, seed) {
+  const r = rand(seed); let s = '';
+  for (let i = 0; i < n; i++) { const yy = y + (r() - 0.5) * 160, l = len * (0.5 + r() * 0.5); s += `<line x1="${x}" y1="${yy}" x2="${x - l}" y2="${yy}" stroke="#FFFFFF" stroke-width="${4 + r() * 5}" stroke-linecap="round" opacity="${0.5 + r() * 0.4}"/>`; }
+  return s;
+}
+function pill(str, x, y, size, bg, rot = 0) {
+  const w = str.length * size * 0.62 + size * 1.4, h = size * 1.6;
+  return `<g transform="translate(${x},${y}) rotate(${rot})" filter="url(#shadow)"><rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="${h / 2}" fill="${bg}" stroke="#1A0E36" stroke-width="${size * 0.14}"/><rect x="${-w / 2 + h * 0.3}" y="${-h / 2 + h * 0.12}" width="${w - h * 0.6}" height="${h * 0.26}" rx="${h * 0.13}" fill="#FFFFFF" opacity=".35"/><text font-family="Fredoka" font-weight="700" font-size="${size}" text-anchor="middle" y="${size * 0.35}" fill="#1A0E36">${str}</text></g>`;
+}
+
+function drawCover() {
+  const W = 1920, H = 1080;
+  let s = skyBg(W, H);
+  s += puffs(860, W, 9, 4, '#FFE6F3', 0.9);
+  s += ground(W, 760);
+  // lab links met laserpoort
+  s += labWall(-40, 330, 520, 420, '#FF6FB0');
+  s += `<rect x="300" y="470" width="150" height="280" fill="#2A1748" opacity=".15"/>`;
+  for (let i = 0; i < 6; i++) s += laser(300, 480 + i * 45, 450, 470 + i * 45);
+  s += `<rect x="290" y="450" width="18" height="310" rx="8" fill="#FF6FB0" stroke="#2A1748" stroke-width="5"/><rect x="442" y="450" width="18" height="310" rx="8" fill="#FF6FB0" stroke="#2A1748" stroke-width="5"/>`;
+  s += slime('KingGloop', 120, 760, 150, { glowOp: 0.4 }) + slime('Frosty', 230, 760, 110, { glowOp: 0.3 });
+  // boze eigenaar met de Bonker
+  s += avatar(560, 720, 1.45, { shirt: '#4B8BFF', pants: '#26335E', armL: 150, armR: -20, holdL: 'bonker', legL: 20, legR: -16, shout: true, rot: -6 });
+  // rivier vooraan met slijmpjes en prijzen
+  s += river(905, W);
+  const front = [['Gloop', 140, null], ['Jellybean', 420, null], ['Bouncer', 700, 'Gold'], ['Sprout', 1500, null], ['Pirate', 1780, null]];
+  for (const [id, x, m] of front) s += slime(id, x, 965, 120, { mut: m, glowOp: 0.35 });
+  // de dief rent met een Mythic boven zijn hoofd
+  s += speed(1020, 600, 260, 9, 3);
+  s += `<circle cx="1190" cy="400" r="230" fill="#FF6FC0" opacity=".35" filter="url(#b50)"/>`;
+  s += avatar(1180, 760, 1.9, { armL: 172, armR: -172, legL: 30, legR: -26, shout: true, rot: 4 });
+  s += slime('RainbowRoyale', 1195, 512, 270, { squash: 0.06, glowOp: 0.8 });
+  s += pill('SECRET!', 1195, 205, 46, '#C68CFF', -6);
+  s += text('+800K/s', 1520, 330, 64, { fill: 'url(#mintText)', rot: 8 });
+  s += sparkle(1420, 210, 26) + sparkle(900, 260, 18, 0.9, '#FFF4B0') + sparkle(1500, 520, 20);
+  s += `<rect width="${W}" height="${H}" fill="url(#vignette)"/>`;
+  // titel
+  s += `<ellipse cx="460" cy="190" rx="520" ry="190" fill="#FFFFFF" opacity=".16" filter="url(#b50)"/>`;
+  s += text('STEAL A', 450, 150, 120, { fill: 'url(#pinkText)', rot: -5 });
+  s += text('SLIME!', 470, 330, 210, { fill: 'url(#mintText)', rot: -5 });
+  return s;
+}
+
+function drawIcon() {
+  const S = 1080;
+  let s = skyBg(S, S);
+  s += `<circle cx="540" cy="560" r="420" fill="#FF8AD2" opacity=".35" filter="url(#b50)"/>`;
+  for (let i = 0; i < 14; i++) s += `<path d="M540 560 L${540 + Math.cos(i / 14 * 6.283) * 1200} ${560 + Math.sin(i / 14 * 6.283) * 1200} L${540 + Math.cos((i + 0.45) / 14 * 6.283) * 1200} ${560 + Math.sin((i + 0.45) / 14 * 6.283) * 1200} Z" fill="#FFFFFF" opacity=".08"/>`;
+  s += slime('RainbowRoyale', 500, 930, 720, { glowOp: 0.85 });
+  s += `<g transform="translate(870,330) rotate(-128) scale(2.2)">${glove(0, 0, 100)}</g>`;
+  s += sparkle(200, 230, 46) + sparkle(880, 860, 34, 0.9, '#FFF4B0') + sparkle(160, 760, 28);
+  s += `<rect width="${S}" height="${S}" fill="url(#vignette)"/>`;
+  return s;
+}
+
+if (mode === 'icon') {
+  stage.setAttribute('viewBox', '0 0 1080 1080'); stage.setAttribute('width', '512'); stage.setAttribute('height', '512');
+  document.getElementById('scene').innerHTML = drawIcon();
+} else {
+  stage.setAttribute('viewBox', '0 0 1920 1080'); stage.setAttribute('width', '1920'); stage.setAttribute('height', '1080');
+  document.getElementById('scene').innerHTML = drawCover();
+}
+</script>
+</body></html>

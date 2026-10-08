@@ -1,0 +1,146 @@
+{
+  "developerProducts": [
+    {
+      "key": "GooPackS",
+      "name": "Goo Snack",
+      "description": "15 minutes of your current Goo income (at least 500 Goo).",
+      "price": 29,
+      "image": "marketing/items/goo-snack.png"
+    },
+    {
+      "key": "GooPackM",
+      "name": "Goo Bucket",
+      "description": "1 hour of your current Goo income (at least 5K Goo).",
+      "price": 99,
+      "image": "marketing/items/goo-bucket.png"
+    },
+    {
+      "key": "GooPackL",
+      "name": "Goo Barrel",
+      "description": "4 hours of your current Goo income (at least 50K Goo).",
+      "price": 299,
+      "image": "marketing/items/goo-barrel.png"
+    },
+    {
+      "key": "GooPackXL",
+      "name": "Goo Tanker",
+      "description": "12 hours of your current Goo income (at least 500K Goo).",
+      "price": 799,
+      "image": "marketing/items/goo-tanker.png"
+    },
+    {
+      "key": "LuckyEgg",
+      "name": "Lucky Egg",
+      "description": "A random Rare or better slime. Odds are shown in the game before you buy.",
+      "price": 79,
+      "image": "marketing/items/lucky-egg.png"
+    },
+    {
+      "key": "MegaEgg",
+      "name": "Mega Egg",
+      "description": "A random Legendary or better slime. Odds are shown in the game before you buy.",
+      "price": 249,
+      "image": "marketing/items/mega-egg.png"
+    },
+    {
+      "key": "ServerLuck2",
+      "name": "Server Luck x2",
+      "description": "For 15 minutes Rare and better slimes are x2 more likely on the river for everyone in the server.",
+      "price": 99,
+      "image": "marketing/items/server-luck-2.png"
+    },
+    {
+      "key": "ServerLuck5",
+      "name": "Server Luck x5",
+      "description": "For 15 minutes Rare and better slimes are x5 more likely on the river for everyone in the server.",
+      "price": 349,
+      "image": "marketing/items/server-luck-5.png"
+    },
+    {
+      "key": "GoldRush",
+      "name": "Gold Rush",
+      "description": "Start a Gold storm now: slimes can turn Gold (x2 Goo).",
+      "price": 99,
+      "image": "marketing/items/gold-rush.png"
+    },
+    {
+      "key": "RainbowSurge",
+      "name": "Rainbow Surge",
+      "description": "Start a Rainbow storm now: slimes can turn Rainbow (x15 Goo).",
+      "price": 349,
+      "image": "marketing/items/rainbow-surge.png"
+    },
+    {
+      "key": "LabShield",
+      "name": "Lab Shield",
+      "description": "Nobody can steal from your lab for 5 minutes.",
+      "price": 59,
+      "image": "marketing/items/lab-shield.png"
+    },
+    {
+      "key": "SkipFusion",
+      "name": "Skip Fusion",
+      "description": "Finish your current fusion instantly.",
+      "price": 19,
+      "image": "marketing/items/skip-fusion.png"
+    }
+  ],
+  "gamePasses": [
+    {
+      "key": "VIP",
+      "name": "VIP",
+      "description": "+50% Goo forever, +1 golden pad, +15 seconds lock and a VIP chat tag.",
+      "price": 299,
+      "image": "marketing/items/vip.png"
+    },
+    {
+      "key": "DoubleGoo",
+      "name": "2x Goo",
+      "description": "Double all the Goo you earn, forever.",
+      "price": 449,
+      "image": "marketing/items/double-goo.png"
+    },
+    {
+      "key": "AutoCollect",
+      "name": "Auto Collect",
+      "description": "Goo goes straight into your wallet, no need to walk to the Collect Pad.",
+      "price": 199,
+      "image": "marketing/items/auto-collect.png"
+    },
+    {
+      "key": "MegaLab",
+      "name": "Mega Lab",
+      "description": "+6 pads in your lab for more slimes.",
+      "price": 349,
+      "image": "marketing/items/mega-lab.png"
+    },
+    {
+      "key": "SpeedBoots",
+      "name": "Speed Boots",
+      "description": "+35% walk speed and +20% jump. Steal faster, escape faster.",
+      "price": 179,
+      "image": "marketing/items/speed-boots.png"
+    },
+    {
+      "key": "ThiefGloves",
+      "name": "Thief Gloves",
+      "description": "Steal in 0.6 seconds and carry slimes faster.",
+      "price": 249,
+      "image": "marketing/items/thief-gloves.png"
+    },
+    {
+      "key": "LaserLockPlus",
+      "name": "Laser Lock+",
+      "description": "Your lab lock lasts twice as long.",
+      "price": 199,
+      "image": "marketing/items/laser-lock.png"
+    },
+    {
+      "key": "LuckyCharm",
+      "name": "Lucky Charm",
+      "description": "2x luck in eggs, and storms strike your lab twice as often (3% to 6% per 10 s).",
+      "price": 399,
+      "image": "marketing/items/lucky-charm.png"
+    }
+  ]
+}

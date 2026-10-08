@@ -1,0 +1,7 @@
+build/
+sourcemap.json
+.tools/
+marketing/media-source/Fredoka.ttf
+marketing/media-source/frames/
+marketing/media-source/preview/
+marketing/media-source/music.wav

@@ -1,0 +1,50 @@
+{
+  "name": "StealASlime",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CharacterWalkSpeed": 24,
+        "CameraMaxZoomDistance": 110
+      },
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "Gravity": 160,
+        "StreamingEnabled": false
+      }
+    },
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future",
+        "ClockTime": 14.6,
+        "Brightness": 2.6,
+        "GlobalShadows": true,
+        "EnvironmentDiffuseScale": 1,
+        "EnvironmentSpecularScale": 1,
+        "Ambient": [0.36, 0.3, 0.42],
+        "OutdoorAmbient": [0.55, 0.5, 0.62]
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Fredoka; src: url(Fredoka.ttf); font-weight: 300 700; }
+html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+svg { display: block; }
+</style></head><body>
+<svg id="stage" width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs id="d"></defs><g id="scene"></g></svg>
+<script src="art.js"></script>
+<script>
+// Eén winkelplaatje per item: items.html#vip, #double-goo, ... (512x512, onderwerp in de cirkel)
+document.getElementById('d').innerHTML = DEFS;
+const PURPLE = ['#8C5CFF', '#2A1260'], GREEN = ['#5CF0A0', '#0E5C46'], GOLD = ['#FFD45A', '#8A3E10'], PINK = ['#FF8AD2', '#5C1450'], BLUE = ['#6EC8FF', '#122C6C'], RAINBOW = ['#FFB0E0', '#3A1A7A'];
+
+const ITEMS = {
+  'vip': () => bg(512, 512, ...GOLD) + slime('KingGloop', 256, 360, 230, { mut: 'Gold', glowOp: 0.7 }) + text('VIP', 256, 462, 96, { fill: 'url(#goldText)' }),
+  'double-goo': () => bg(512, 512, ...GREEN) + gooDrop(150, 250, 60) + gooDrop(362, 250, 60) + slime('Gloop', 256, 330, 170) + text('2X GOO', 256, 450, 92, { fill: 'url(#mintText)' }),
+  'auto-collect': () => bg(512, 512, ...PINK) + magnet(330, 200, 130) + gooDrop(160, 300, 40) + gooDrop(110, 220, 30) + gooDrop(210, 380, 34) + text('AUTO', 256, 460, 88, { fill: 'url(#pinkText)' }),
+  'mega-lab': () => bg(512, 512, ...BLUE) + lab(256, 260, 150) + text('+6', 400, 150, 100, { fill: 'url(#mintText)', rot: 10 }) + text('MEGA LAB', 256, 455, 74),
+  'speed-boots': () => bg(512, 512, ...PINK) + `<g opacity=".8">${[0, 1, 2].map(i => `<path d="M60 ${190 + i * 45} L170 ${190 + i * 45}" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>`).join('')}</g>` + boot(286, 270, 165) + text('SPEED', 256, 455, 92, { fill: 'url(#pinkText)' }),
+  'thief-gloves': () => bg(512, 512, ...PURPLE) + slime('Bubbles', 330, 210, 120, { rot: 12 }) + glove(220, 300, 170) + text('THIEF', 256, 460, 92, { fill: 'url(#pinkText)' }),
+  'laser-lock': () => bg(512, 512, ...BLUE) + `<g opacity=".9">${[-1, 1].map(s => `<path d="M${256 + s * 60} 40 L${256 + s * 200} 470" stroke="#FF4A6E" stroke-width="10"/><path d="M${256 + s * 60} 40 L${256 + s * 200} 470" stroke="#FFFFFF" stroke-width="3"/>`).join('')}</g>` + lock(256, 250, 150) + text('2X LOCK', 256, 455, 80, { fill: 'url(#goldText)' }),
+  'lucky-charm': () => bg(512, 512, ...GREEN) + clover(256, 220, 170) + text('LUCKY', 256, 455, 92, { fill: 'url(#mintText)' }),
+
+  'goo-snack': () => bg(512, 512, ...GREEN) + container('cup', 256, 280, 140) + text('GOO SNACK', 256, 455, 64, { fill: 'url(#mintText)' }),
+  'goo-bucket': () => bg(512, 512, ...GREEN) + container('bucket', 256, 290, 140) + text('GOO BUCKET', 256, 455, 62, { fill: 'url(#mintText)' }),
+  'goo-barrel': () => bg(512, 512, ...GREEN) + container('barrel', 256, 270, 135) + gooDrop(120, 360, 34) + gooDrop(395, 340, 30) + text('GOO BARREL', 256, 462, 60, { fill: 'url(#mintText)' }),
+  'goo-tanker': () => bg(512, 512, ...GOLD) + container('tanker', 270, 280, 135) + gooDrop(130, 140, 34) + gooDrop(390, 120, 40) + text('GOO TANKER', 256, 460, 60, { fill: 'url(#mintText)' }),
+  'lucky-egg': () => bg(512, 512, ...PINK) + egg(256, 330, 120, '#FFE27A', '#FF8AC8', '#FFE27A') + text('LUCKY EGG', 256, 462, 66, { fill: 'url(#goldText)' }),
+  'mega-egg': () => bg(512, 512, ...RAINBOW) + egg(256, 330, 125, '#B07BFF', '#6EE6FF', '#FF6FC0') + sparkle(150, 140, 24) + sparkle(380, 170, 18, 0.9, '#FFF4B0') + text('MEGA EGG', 256, 462, 70, { fill: 'url(#pinkText)' }),
+  'server-luck-2': () => bg(512, 512, ...GREEN) + clover(256, 210, 150) + text('x2 LUCK', 256, 455, 84, { fill: 'url(#mintText)' }),
+  'server-luck-5': () => bg(512, 512, ...RAINBOW) + rainbowArc(256, 300, 200, 18) + clover(256, 230, 150, '#3FE07F') + text('x5 LUCK', 256, 455, 84, { fill: 'url(#goldText)' }),
+  'gold-rush': () => bg(512, 512, ...GOLD) + cloud(256, 170, 330, '#FFF3C4', '#8A5A10') + bolt(200, 310, 100) + bolt(330, 300, 80) + slime('Gloop', 256, 430, 110, { mut: 'Gold', glow: false }) + text('GOLD RUSH', 256, 90, 70, { fill: 'url(#goldText)' }),
+  'rainbow-surge': () => bg(512, 512, ...RAINBOW) + rainbowArc(256, 330, 210, 22) + cloud(256, 180, 300, '#FFFFFF', '#5A3A9A') + slime('Gloop', 256, 440, 120, { mut: 'Rainbow', glow: false }) + text('RAINBOW', 256, 92, 76, { fill: 'url(#rainbow)' }),
+  'lab-shield': () => bg(512, 512, ...BLUE) + shieldBubble(256, 250, 175) + slime('Jellybean', 256, 330, 170, { glow: false }) + text('SHIELD', 256, 462, 88, { fill: 'url(#goldText)' }),
+  'skip-fusion': () => bg(512, 512, ...PURPLE) + slime('Sprout', 175, 330, 120, { glow: false }) + slime('Sprout', 345, 330, 120, { glow: false }) + fastForward(256, 170, 110) + text('SKIP', 256, 462, 92, { fill: 'url(#goldText)' }),
+};
+
+const key = location.hash.slice(1) || 'vip';
+document.getElementById('scene').innerHTML = (ITEMS[key] || ITEMS.vip)() + `<rect width="512" height="512" fill="url(#vignette)"/>`;
+window.ITEM_KEYS = Object.keys(ITEMS);
+</script>
+</body></html>
