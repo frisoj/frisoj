@@ -59,6 +59,16 @@ local function profileAt(x: number): (number, number)
 	return last[2], last[3]
 end
 
+-- Eigen lookAt: CFrame.lookAt in Lune 0.10 draait de kijkrichting om (in Roblox klopt hij wel),
+-- waardoor het weerbord eerst met de tekstkant van de spelers af stond.
+local function lookAt(pos: any, target: any, upHint: any?): any
+	local f = (target - pos).Unit
+	local up = upHint or (if math.abs(f.Y) > 0.99 then Vector3.new(1, 0, 0) else Vector3.new(0, 1, 0))
+	local r = f:Cross(up).Unit
+	local u = r:Cross(f)
+	return CFrame.new(pos.X, pos.Y, pos.Z, r.X, u.X, -f.X, r.Y, u.Y, -f.Y, r.Z, u.Z, -f.Z)
+end
+
 type Sphere = { x: number, y: number, r: number }
 local spheres: { Sphere } = {}
 
@@ -112,7 +122,7 @@ local function rod(name: string, a: any, b: any, diameter: number, color: any, p
 		Name = name,
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(length, diameter, diameter),
-		CFrame = CFrame.lookAt(mid, b, up) * CFrame.Angles(0, math.rad(90), 0),
+		CFrame = lookAt(mid, b, up) * CFrame.Angles(0, math.rad(90), 0),
 		Color = color,
 		Parent = parent,
 	})
@@ -183,7 +193,7 @@ local function buildBody(whale: any)
 		part({
 			Name = "Fin",
 			Size = Vector3.new(64, 3, 22),
-			CFrame = CFrame.lookAt(center, center + dir) * CFrame.Angles(0, math.rad(90), 0),
+			CFrame = lookAt(center, center + dir) * CFrame.Angles(0, math.rad(90), 0),
 			Color = BODY,
 			Parent = body,
 		})
@@ -266,7 +276,7 @@ local function buildSpawnAndBoard(whale: any)
 		ClassName = "SpawnLocation",
 		Name = "Spawn",
 		Size = Vector3.new(10, 1, 10),
-		CFrame = CFrame.lookAt(spawnPos, spawnPos + Vector3.new(-1, 0, 0)),
+		CFrame = lookAt(spawnPos, spawnPos + Vector3.new(-1, 0, 0)),
 		Transparency = 1,
 		CanCollide = false,
 		Parent = whale,
@@ -282,11 +292,11 @@ local function buildSpawnAndBoard(whale: any)
 	part({
 		Name = "ForecastBoard",
 		Size = Vector3.new(22, 13, 1),
-		CFrame = CFrame.lookAt(boardPos, lookTarget),
+		CFrame = lookAt(boardPos, lookTarget),
 		Color = rgb(30, 50, 80),
 		Parent = whale,
 	})
-	local boardCf = CFrame.lookAt(boardPos, lookTarget)
+	local boardCf = lookAt(boardPos, lookTarget)
 	for _, side in { -1, 1 } do
 		local postTop = (boardCf * CFrame.new(side * 9, -6, 0.8)).Position
 		rod("BoardPost", postTop, Vector3.new(postTop.X, groundY - 3, postTop.Z), 1.4, WOOD, whale)

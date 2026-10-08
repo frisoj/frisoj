@@ -36,6 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 API = os.environ.get("ROBLOX_API_BASE", "https://apis.roblox.com")  # alleen aanpassen om te testen
 CONFIG = ROOT / "src" / "shared" / "Config.luau"
 PLACE_FILE = ROOT / "RideASkyWhale.rbxl"
+GAME_HINT = "whale"  # als de sleutel voor meerdere games geldt: kies de game met dit woord in de naam
 
 
 def request(method, url, key, body=None, content_type=None):
@@ -145,11 +146,18 @@ def discover_ids(key):
         for universe_id in scope.get("universeIds") or []:
             if str(universe_id) != "*":
                 universes.add(str(universe_id))
-    if len(universes) != 1:
+    if not universes:
+        sys.exit("Fout: de sleutel geldt voor geen enkele game. Vul tools/roblox-ids.json handmatig in.")
+    candidates = []
+    for universe_id in sorted(universes):
+        info_u = request("GET", f"{API}/cloud/v2/universes/{universe_id}", key)
+        candidates.append((universe_id, info_u))
+    if len(candidates) > 1:
+        candidates = [c for c in candidates if GAME_HINT in (c[1].get("displayName") or "").lower()]
+    if len(candidates) != 1:
         sys.exit("Fout: kon niet bepalen voor welke game de sleutel is "
-                 f"(gevonden: {sorted(universes) or 'geen'}). Vul tools/roblox-ids.json handmatig in.")
-    universe = universes.pop()
-    details = request("GET", f"{API}/cloud/v2/universes/{universe}", key)
+                 f"(gevonden: {sorted(universes)}). Vul tools/roblox-ids.json handmatig in.")
+    universe, details = candidates[0]
     match = re.search(r"places/(\d+)", details.get("rootPlace") or "")
     if not match:
         sys.exit(f"Fout: geen startplace gevonden voor universe {universe}. Vul tools/roblox-ids.json handmatig in.")
