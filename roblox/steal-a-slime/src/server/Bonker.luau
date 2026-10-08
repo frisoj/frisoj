@@ -86,8 +86,9 @@ local function swing(player: Player, tool: Tool)
 		return
 	end
 	local look = root.CFrame.LookVector
+	-- Een dief binnen bereik gaat voor: een maatje dat ervoor staat vangt de klap niet op.
 	local best: Player? = nil
-	local bestDist = Config.BONK_RANGE
+	local bestScore = math.huge
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
 			local oc = other.Character
@@ -96,9 +97,12 @@ local function swing(player: Player, tool: Tool)
 			if oroot and hum and hum.Health > 0 then
 				local offset = oroot.Position - root.Position
 				local dist = offset.Magnitude
-				if dist < bestDist and (dist < 3 or offset.Unit:Dot(look) > 0.2) then
-					best = other
-					bestDist = dist
+				if dist < Config.BONK_RANGE and (dist < 3 or offset.Unit:Dot(look) > 0.2) then
+					local score = dist - (if Steal.isCarrying(other) then 100 else 0)
+					if score < bestScore then
+						best = other
+						bestScore = score
+					end
 				end
 			end
 		end

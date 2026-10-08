@@ -49,7 +49,8 @@ local LOCK_STALE_SECONDS = 300
 local LOCK_WAIT_ATTEMPTS = 6
 
 local profiles: { [Player]: Data } = {}
-local saveDisabled: { [Player]: boolean } = {}
+-- "studio" = bewust niet opslaan (geen DataStore), "stolen" = een andere server heeft de save.
+local saveDisabled: { [Player]: string } = {}
 local awaySeconds: { [Player]: number } = {}
 
 local store: DataStore? = nil
@@ -121,7 +122,7 @@ local function lockedByOther(current: any): boolean
 end
 
 local function useDefaults(player: Player): Data
-	saveDisabled[player] = true
+	saveDisabled[player] = "studio"
 	local data = PlayerData.defaults()
 	profiles[player] = data
 	awaySeconds[player] = 0
@@ -193,6 +194,9 @@ end
 -- Slaat op. Met `release` = true wordt ook het sessie-slot vrijgegeven.
 function PlayerData.save(player: Player, release: boolean?): boolean
 	local data = profiles[player]
+	if saveDisabled[player] == "stolen" then
+		return false
+	end
 	if data == nil or store == nil or saveDisabled[player] then
 		return data ~= nil
 	end
@@ -216,7 +220,7 @@ function PlayerData.save(player: Player, release: boolean?): boolean
 	end
 	if stolen then
 		warn("[PlayerData] Save van", player.Name, "is door een andere server overgenomen; deze server schrijft niet meer.")
-		saveDisabled[player] = true
+		saveDisabled[player] = "stolen"
 		return false
 	end
 	return true

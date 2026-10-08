@@ -19,11 +19,13 @@ local Movement = require(Server:WaitForChild("Movement"))
 local Remotes = require(Server:WaitForChild("Remotes"))
 
 type Slime = PlayerData.Slime
-type Carry = { owner: Player, lab: Labs.LabInfo, pad: number, slime: Slime, started: number }
+type Carry = { owner: Player, lab: Labs.LabInfo, pad: number, slime: Slime, started: number, lastPos: Vector3, lastT: number }
 
 local Steal = {}
 
 local carries: { [Player]: Carry } = {}
+-- Snelste eerlijke tempo met een slijmpje (Speed Boots + Thief Gloves), met ruime marge voor lag.
+local MAX_CARRY_SPEED = Config.WALK_SPEED * Config.SPEED_BOOTS * Config.CARRY_SPEED_GLOVES * 1.8
 local holdBegan: { [Player]: { prompt: ProximityPrompt, t: number } } = {}
 local promptInfo: { [ProximityPrompt]: { lab: Labs.LabInfo, pad: number } } = {}
 
@@ -73,13 +75,20 @@ local function deliver(thief: Player)
 	finish(thief)
 	local owner = carry.owner
 	Economy.setInTransit(owner, carry.pad, false)
+	-- Staat er nog precies hetzelfde slijmpje? (De eigenaar kan intussen gerebirthd hebben.)
+	local ownerData = PlayerData.get(owner)
+	local current = ownerData and ownerData.lab[tostring(carry.pad)]
+	if not current or current.s ~= carry.slime.s or current.m ~= carry.slime.m or current.f ~= carry.slime.f then
+		Labs.refresh(owner)
+		return
+	end
 	local slime = Economy.removeSlime(owner, carry.pad)
 	if not slime then
 		return
 	end
+	Economy.placeStorage(owner)
 	Economy.addSlime(thief, slime)
 	local thiefData = PlayerData.get(thief)
-	local ownerData = PlayerData.get(owner)
 	if thiefData then
 		thiefData.steals += 1
 	end
@@ -146,7 +155,7 @@ local function tryStart(thief: Player, prompt: ProximityPrompt)
 	end
 
 	local copy: Slime = { s = slime.s, m = slime.m, f = slime.f }
-	carries[thief] = { owner = owner, lab = lab, pad = info.pad, slime = copy, started = now() }
+	carries[thief] = { owner = owner, lab = lab, pad = info.pad, slime = copy, started = now(), lastPos = root.Position, lastT = os.clock() }
 	Economy.setInTransit(owner, info.pad, true)
 	Labs.refresh(owner)
 	setCarryAttributes(thief, copy)
@@ -194,7 +203,18 @@ local function updatePrompts(lab: Labs.LabInfo, pad: number, steal: ProximityPro
 	end
 end
 
+-- Een rebirth leegt het lab: lopende diefstallen bij die speler vervallen.
+local function onRebirth(owner: Player)
+	for thief, carry in carries do
+		if carry.owner == owner then
+			finish(thief)
+			Economy.notify(thief, "The owner rebirthed. The slime is gone!", "bad")
+		end
+	end
+end
+
 function Steal.start()
+	Economy.rebirthed:Connect(onRebirth)
 	for _, lab in Labs.all() do
 		for pad, part in lab.pads do
 			local steal = Instance.new("ProximityPrompt")
@@ -245,7 +265,7 @@ function Steal.start()
 		while true do
 			task.wait(0.2)
 			for thief, carry in carries do
-				local ok, err = pcall(function()
+				local ok, err = pcall(function(): any
 					local character = thief.Character
 					local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -256,11 +276,22 @@ function Steal.start()
 					elseif now() - carry.started > Config.CARRY_TIMEOUT then
 						sendHome(thief, "Too slow! The slime ran home.")
 					else
+						-- Teleporteren of supersnel lopen met een slijmpje kan niet: dan gaat het naar huis.
+						local t = os.clock()
+						local d = root.Position - carry.lastPos
+						local dt = math.max(t - carry.lastT, 0.05)
+						if Vector2.new(d.X, d.Z).Magnitude > MAX_CARRY_SPEED * dt + 6 then
+							sendHome(thief, "The slime slipped out of your hands!")
+							return nil
+						end
+						carry.lastPos = root.Position
+						carry.lastT = t
 						local mine = Labs.get(thief)
 						if mine and Labs.at(root.Position) == mine then
 							deliver(thief)
 						end
 					end
+					return nil
 				end)
 				if not ok then
 					warn("[Steal]", err)

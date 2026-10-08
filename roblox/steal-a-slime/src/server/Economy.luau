@@ -241,15 +241,18 @@ end
 
 function Economy.collect(player: Player): number
 	local data = PlayerData.get(player)
-	if not data or data.tank < 1 then
+	if not data then
+		return 0
+	end
+	if data.tutorial == 1 then
+		data.tutorial = 2
+	end
+	if data.tank < 1 then
 		return 0
 	end
 	local amount = math.floor(data.tank)
 	data.goo += amount
 	data.tank -= amount
-	if data.tutorial == 1 then
-		data.tutorial = 2
-	end
 	return amount
 end
 
@@ -474,6 +477,8 @@ function Economy.state(player: Player): { [string]: any }
 		skipTokens = data.skipTokens,
 		dailyReady = data.dailyDay < Events.day(now()),
 		dailyStreak = data.dailyStreak,
+		-- Welke dag je nu kunt claimen: een gemiste dag zet de reeks terug op 1.
+		dailyNext = if data.dailyDay == Events.day(now()) - 1 then data.dailyStreak % #Config.DAILY + 1 else 1,
 		giftSeconds = data.giftSeconds,
 		giftsClaimed = data.giftsClaimed,
 		tutorial = data.tutorial,

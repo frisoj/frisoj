@@ -58,6 +58,10 @@ local function onJoin(player: Player)
 
 	local data = PlayerData.load(player)
 	if player.Parent == nil then
+		-- Weg terwijl de save laadde: geef het slot meteen vrij, anders blijft het profiel hangen.
+		if data then
+			PlayerData.release(player)
+		end
 		return
 	end
 	if not data then

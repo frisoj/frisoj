@@ -28,7 +28,11 @@ function SlimeIcon.new(species: string, mut: string?, fuse: number, spin: boolea
 	camera.FieldOfView = 32
 	local S = visual.size
 	local target = Vector3.new(0, visual.height * 0.55, 0)
-	camera.CFrame = CFrame.lookAt(target + Vector3.new(S * 0.55, S * 0.55, -S * 2.6), target)
+	local function aim(angle: number)
+		local offset = CFrame.Angles(0, angle, 0) * Vector3.new(S * 0.55, S * 0.55, -S * 2.6)
+		camera.CFrame = CFrame.lookAt(target + offset, target)
+	end
+	aim(0)
 	camera.Parent = frame
 	frame.CurrentCamera = camera
 	if spin then
@@ -42,8 +46,8 @@ function SlimeIcon.new(species: string, mut: string?, fuse: number, spin: boolea
 				return
 			end
 			shown = true
-			local t = os.clock()
-			SlimeModel.place(visual, CFrame.Angles(0, math.sin(t * 0.9) * 0.6, 0), t, 0.5)
+			-- Het model staat stil (welds werken hier niet); de camera zwaait er rustig omheen.
+			aim(math.sin(os.clock() * 0.9) * 0.6)
 		end)
 	end
 	return frame

@@ -66,6 +66,7 @@ check(dC ~= nil and storeData.u_42.lock.id == "C", "C neemt het slot over na wac
 dB.goo = 1
 check(B.save(player) == false, "B mag de save van C niet overschrijven")
 check(storeData.u_42.goo == 900, "save is niet teruggezet door B")
+check(B.save(player) == false, "B blijft weigeren, zodat een aankoop daar niet als opgeslagen telt")
 
 -- 4. Verlopen slot (gecrashte server) wordt direct overgenomen.
 C.save(player)

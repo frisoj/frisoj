@@ -22,6 +22,8 @@ local Weather = {}
 local rng = Random.new()
 local nextStorm = 0
 local nextStrike = 0
+-- Gekochte stormen die wachten tot een sterkere storm voorbij is.
+local queue: { { mutation: string, buyer: Player? } } = {}
 
 local function now(): number
 	return Workspace:GetServerTimeNow()
@@ -50,6 +52,19 @@ function Weather.begin(mutation: string, buyer: Player?)
 		then string.format("%s started a %s! (%s x%d)", buyer.DisplayName, string.upper(info.storm), info.name, info.mult)
 		else string.format("A %s is coming! %s slimes x%d", string.upper(info.storm), info.name, info.mult)
 	Economy.announce(text, string.format("#%02X%02X%02X", info.color[1], info.color[2], info.color[3]))
+end
+
+-- Een gekochte storm: start meteen, behalve als er nu een sterkere storm loopt.
+-- Dan komt hij direct daarna, zodat niemand een betere storm voor de hele server afbreekt.
+function Weather.request(mutation: string, buyer: Player)
+	local active = Weather.current()
+	if active and Slimes.mutationMult(active) > Slimes.mutationMult(mutation) then
+		table.insert(queue, { mutation = mutation, buyer = buyer })
+		local info = Slimes.MUTATIONS[mutation]
+		Economy.announce(string.format("%s bought a %s! It starts right after this storm.", buyer.DisplayName, string.upper(info.storm)), "#FFFFFF")
+		return
+	end
+	Weather.begin(mutation, buyer)
 end
 
 local function strike(mutation: string)
@@ -96,7 +111,10 @@ function Weather.start()
 					if Workspace:GetAttribute("Weather") ~= "" then
 						Workspace:SetAttribute("Weather", "")
 					end
-					if t >= nextStorm then
+					local queued = table.remove(queue, 1)
+					if queued then
+						Weather.begin(queued.mutation, if queued.buyer and queued.buyer.Parent then queued.buyer else nil)
+					elseif t >= nextStorm then
 						Weather.begin(Slimes.rollStorm(function()
 							return rng:NextNumber()
 						end))

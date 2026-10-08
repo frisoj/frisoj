@@ -33,6 +33,8 @@ export type LabInfo = {
 }
 
 local labs: { LabInfo } = {}
+-- De Lock-knop werkt pas weer als de eigenaar er eerst vanaf is gestapt (geen eindeloos AFK-slot).
+local lockArmed: { [LabInfo]: boolean } = {}
 local byPlayer: { [Player]: LabInfo } = {}
 
 local function now(): number
@@ -189,6 +191,7 @@ function Labs.release(player: Player)
 	end
 	byPlayer[player] = nil
 	lab.owner = nil
+	lockArmed[lab] = nil
 	clearLab(lab)
 end
 
@@ -294,7 +297,12 @@ function Labs.start()
 							end
 						end
 						if near(lab.lockButton, 5) then
-							Labs.lock(owner)
+							if lockArmed[lab] ~= false and not Labs.isLocked(lab) then
+								Labs.lock(owner)
+								lockArmed[lab] = false
+							end
+						else
+							lockArmed[lab] = true
 						end
 					end
 					local data = PlayerData.get(owner)

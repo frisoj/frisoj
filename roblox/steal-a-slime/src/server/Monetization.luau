@@ -47,10 +47,10 @@ handlers.ServerLuck5 = function(player: Player)
 	Stream.addLuck(5, Config.SERVER_LUCK_SECONDS, player)
 end
 handlers.GoldRush = function(player: Player)
-	Weather.begin("Gold", player)
+	Weather.request("Gold", player)
 end
 handlers.RainbowSurge = function(player: Player)
-	Weather.begin("Rainbow", player)
+	Weather.request("Rainbow", player)
 end
 handlers.LabShield = function(player: Player)
 	Labs.shield(player, Config.SHIELD_SECONDS)

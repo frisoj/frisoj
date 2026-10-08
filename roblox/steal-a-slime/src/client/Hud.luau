@@ -365,8 +365,9 @@ local function buildShop(panel: Frame)
 			end else nil)
 		end
 	else
-		if player:GetAttribute("RandomItemsRestricted") == true then
-			Ui.label("Eggs are not available for your account.", { Size = UDim2.new(1, 0, 0, 50), Parent = area })
+		local restricted = player:GetAttribute("RandomItemsRestricted")
+		if restricted ~= false then
+			Ui.label(if restricted == nil then "Checking your account..." else "Eggs are not available for your account.", { Size = UDim2.new(1, 0, 0, 50), Parent = area })
 			list:Destroy()
 			return
 		end
@@ -462,10 +463,15 @@ end
 
 ------------------------------------------------------------------ Fuse
 
+local fuseTimer: TextLabel? = nil
+local fuseShownBusy = false
+
 local function buildFuse(panel: Frame)
 	local body = panel:FindFirstChild("Body") :: Frame
 	clear(body)
 	local fusing = state.fusing
+	fuseShownBusy = fusing ~= nil
+	fuseTimer = nil
 	if fusing then
 		local left = math.max(0, (fusing.readyAt or 0) - Workspace:GetServerTimeNow())
 		local box = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 120), BackgroundColor3 = Color3.fromRGB(70, 44, 124), Parent = body }, { Ui.corner(16), Ui.stroke(3) })
@@ -474,7 +480,7 @@ local function buildFuse(panel: Frame)
 		icon.Position = UDim2.fromOffset(6, 5)
 		icon.Parent = box
 		Ui.label("Fusing: " .. Slimes.displayName(fusing), { Size = UDim2.new(1, -140, 0, 36), Position = UDim2.fromOffset(124, 12), TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
-		Ui.label("Ready in " .. Format.time(left), { Size = UDim2.new(0.5, -60, 0, 30), Position = UDim2.fromOffset(124, 60), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Ui.GOLD, Parent = box })
+		fuseTimer = Ui.label("Ready in " .. Format.time(left), { Size = UDim2.new(0.5, -60, 0, 30), Position = UDim2.fromOffset(124, 60), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Ui.GOLD, Parent = box })
 		Ui.button("Skip  R$ " .. Config.PRICES.SkipFusion, Ui.PINK, { Size = UDim2.fromOffset(200, 48), Position = UDim2.new(1, -212, 0, 60), Parent = box }, function()
 			buyProduct("SkipFusion")
 		end)
@@ -581,7 +587,7 @@ local function buildDaily(panel: Frame)
 	Ui.label("Come back every day for bigger rewards!", { Size = UDim2.new(1, 0, 0, 34), Parent = body })
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 160), Position = UDim2.fromOffset(0, 50), BackgroundTransparency = 1, Parent = body })
 	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center, Parent = row })
-	local nextDay = if ready then (streak % #Config.DAILY) + 1 else streak
+	local nextDay = if ready then (state.dailyNext or 1) else streak
 	for i, reward in Config.DAILY do
 		local current = i == nextDay
 		local tile = Ui.make("Frame", { Size = UDim2.fromOffset(92, 150), BackgroundColor3 = if i < nextDay or (not ready and i == nextDay) then Color3.fromRGB(50, 90, 70) else Color3.fromRGB(70, 44, 124), Parent = row }, { Ui.corner(14), Ui.stroke(3, if current and ready then Ui.GOLD else Ui.STROKE) })
@@ -595,7 +601,7 @@ local function buildDaily(panel: Frame)
 			closePanels()
 		end)
 	else
-		Ui.label("Come back tomorrow for day " .. ((streak % #Config.DAILY) + 1) .. "!", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 250), TextColor3 = Ui.GOLD, Parent = body })
+		Ui.label("Come back tomorrow to keep your streak going!", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 250), TextColor3 = Ui.GOLD, Parent = body })
 	end
 end
 
@@ -700,8 +706,10 @@ local function onState(data: { [string]: any })
 	giftBadge.Text = tostring(claimable)
 	if openName == "Fuse" and panels.Fuse.Visible then
 		local fusing = data.fusing
-		if fusing then
+		if (fusing ~= nil) ~= fuseShownBusy then
 			buildFuse(panels.Fuse)
+		elseif fusing and fuseTimer then
+			(fuseTimer :: TextLabel).Text = "Ready in " .. Format.time(math.max(0, (fusing.readyAt or 0) - Workspace:GetServerTimeNow()))
 		end
 	end
 	updateTutorial()
@@ -820,10 +828,18 @@ function Hud.start(screen: ScreenGui)
 		announce(string.format("%s is stealing your %s! BONK THEM!", thief, slime), Ui.RED)
 	end)
 	player.AttributeChanged:Connect(function(name: string)
-		if string.sub(name, 1, 5) == "Pass_" and player:GetAttribute(name) == true then
-			toast("Thank you! " .. string.sub(name, 6) .. " is now active.", "rare")
-			if openName == "Shop" then
-				buildShop(panels.Shop)
+		if (string.sub(name, 1, 5) == "Pass_" or name == "RandomItemsRestricted") and openName == "Shop" then
+			buildShop(panels.Shop)
+		end
+	end)
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(who: Player, id: number, purchased: boolean)
+		if who ~= player or not purchased then
+			return
+		end
+		for _, item in PASS_ITEMS do
+			if Config.PASSES[item.key] == id then
+				toast("Thank you! " .. item.name .. " is now active.", "rare")
+				Sound.play("rare")
 			end
 		end
 	end)

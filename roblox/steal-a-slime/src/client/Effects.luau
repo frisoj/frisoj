@@ -210,7 +210,7 @@ local function screenFlash(color: Color3, strength: number)
 	tween(flash, 0.5, { BackgroundTransparency = 1 })
 end
 
-local function eggReveal(species: string, egg: string?)
+local function eggReveal(species: string, egg: string?, mut: string?, fuse: number?)
 	local info = Slimes.BY_ID[species]
 	if not info then
 		return
@@ -223,14 +223,14 @@ local function eggReveal(species: string, egg: string?)
 		BackgroundColor3 = Ui.PANEL,
 		Parent = screen,
 	}, { Ui.corner(24), Ui.stroke(4, Ui.rgb(rarity.color)), Ui.gradient(Color3.fromRGB(80, 50, 140), Color3.fromRGB(30, 18, 60)) })
-	Ui.label(if egg then (Slimes.EGGS[egg] and Slimes.EGGS[egg].name or "Egg") .. " opened!" else "New slime!", {
+	Ui.label(if egg then (Slimes.EGGS[egg] and Slimes.EGGS[egg].name or "Egg") .. " opened!" elseif (fuse or 0) > 0 then "Fusion complete!" else "New slime!", {
 		Size = UDim2.new(1, -20, 0, 40), Position = UDim2.fromOffset(10, 10), Parent = frame,
 	})
-	local icon = SlimeIcon.new(species, nil, 0, true)
+	local icon = SlimeIcon.new(species, mut, fuse or 0, true)
 	icon.Size = UDim2.new(1, -40, 0, 220)
 	icon.Position = UDim2.fromOffset(20, 55)
 	icon.Parent = frame
-	Ui.label(info.name, { Size = UDim2.new(1, -20, 0, 44), Position = UDim2.fromOffset(10, 280), Parent = frame })
+	Ui.label(Slimes.displayName({ s = species, m = mut, f = fuse or 0 }), { Size = UDim2.new(1, -20, 0, 44), Position = UDim2.fromOffset(10, 280), Parent = frame })
 	Ui.label(string.upper(info.rarity), { Size = UDim2.new(1, -20, 0, 34), Position = UDim2.fromOffset(10, 326), TextColor3 = Ui.rgb(rarity.color), Parent = frame })
 	Ui.pop(frame)
 	Sound.play(if rarity.order >= 5 then "rare" else "buy")
@@ -345,7 +345,7 @@ function Effects.start(gui: ScreenGui)
 		elseif kind == "egg" then
 			eggReveal(extra.species, extra.egg)
 		elseif kind == "fused" then
-			eggReveal(extra.species, nil)
+			eggReveal(extra.species, nil, extra.mut, extra.fuse)
 		elseif kind == "rebirth" then
 			Sound.play("rare")
 			screenFlash(Color3.fromRGB(150, 255, 190), 0.6)
