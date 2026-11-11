@@ -1,0 +1,320 @@
+{
+  "_meta": {
+    "description": "Reference (literature) values for pure SU(2) lattice gauge theory with the Wilson plaquette action, used only for COMPARISON with this project's Monte Carlo results. None of these numbers is used as an input to any simulation.",
+    "compiled_on": "2026-11-11",
+    "conventions": {
+      "beta": "beta = 4/(g^2 a^(4-D)); D=4: beta = 4/g^2, D=3: beta = 4/(g^2 a).",
+      "plaquette": "P = <(1/2) Tr U_p>, cold start = 1.",
+      "a_sqrt_sigma": "square root of the string tension in lattice units, a*sqrt(sigma). In the cited papers sigma is extracted from the mass of a flux loop (torelon) winding a spatial circle of length L (Polyakov-loop correlators) including the leading universal string correction, a*m_P(L) = a^2 sigma L - pi (D-2)/(6 L) [form of the correction quoted from memory; check the cited equation].",
+      "a_m_0pp": "mass of the lightest scalar (0++) glueball in lattice units.",
+      "beta_c": "critical coupling of the finite-temperature deconfinement transition on N_t x N_s^3 lattices, extrapolated to N_s -> infinity."
+    },
+    "schema": "Every leaf entry has: value, uncertainty (one standard deviation, same units as value; null if the source gives none), source, web_verified (boolean), verification_level, note. Optional 'alternatives' is a list of entries with the same fields.",
+    "verification_levels": {
+      "search_excerpt": "The number was read during this session (2026-11-11) in a web-search result that quoted the cited source (typically the arXiv HTML/PDF text of the paper). The full text itself could NOT be opened: direct access to arxiv.org, inspirehep.net and other hosts is blocked by the network policy of the session. Treat as 'seen in a quoted excerpt', which is weaker than 'checked against the published table'.",
+      "none": "Not found during this session. Quoted from memory (the orchestrator's and/or the document author's). Must be re-checked against the cited paper before it is used for any quantitative claim."
+    },
+    "warning": "web_verified=true means verification_level=search_excerpt, NOT a line-by-line check of the published table. Numbers flagged 'from memory' may be wrong in the last digits and their uncertainties are rough estimates."
+  },
+
+  "D4_SU2_wilson": {
+    "plaquette": {
+      "2.2": {
+        "value": 0.569,
+        "uncertainty": 0.001,
+        "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory. Several web searches for a published table with this value returned nothing usable."
+      },
+      "2.3": {
+        "value": 0.6023,
+        "uncertainty": 0.001,
+        "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory."
+      },
+      "2.4": {
+        "value": 0.6300,
+        "uncertainty": 0.001,
+        "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory."
+      },
+      "2.5": {
+        "value": 0.6520,
+        "uncertainty": 0.001,
+        "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory. Only weak web support: a search excerpt of arXiv:hep-lat/9806024 associates an average plaquette of about 0.640 with an effective Wilson beta of about 2.45, which lies between the beta=2.4 and beta=2.5 values quoted here."
+      }
+    },
+
+    "a_sqrt_sigma": {
+      "2.2": {
+        "value": 0.467,
+        "uncertainty": 0.010,
+        "source": "M. Teper, 'Glueball masses and other physical properties of SU(N) gauge theories in D=3+1: a review of lattice results for theorists', arXiv:hep-th/9812187, Appendix A (SU(2)), Table 10.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Extra entry (not requested). The search excerpt wrote 'a sigma = 0.467(10) at beta = 2.2'; interpreted as a*sqrt(sigma) because a^2*sigma would be about 0.22 at this coupling."
+      },
+      "2.3": {
+        "value": 0.3687,
+        "uncertainty": 0.0022,
+        "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10 ('Various SU(2) lattice calculations of the string tension and lightest J=0 and J=2 masses'), row beta=2.3, 10^4 lattice; original data from C. Michael and M. Teper, Phys. Lett. B199 (1987) 95.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "The excerpt showed the row 'beta=2.3, 10^4: 0.3687(22), 1.216(23), 1.94(8)' without column headers; the assignment (a*sqrt(sigma), a*m(0++), a*m(2++)) follows the order in the table caption and is physically unambiguous. Agrees with the orchestrator's from-memory 0.369. Small lattice (L*sqrt(sigma) = 3.7), effective mass from t=a to t=2a."
+      },
+      "2.4": {
+        "value": 0.2673,
+        "uncertainty": 0.0015,
+        "source": "M. Teper, arXiv:hep-th/9812187, Appendix A: 'When I need a single value of the string tension at beta=2.4 or at beta=2.5, I use a sqrt(sigma)=0.2673(15) and a sqrt(sigma)=0.186(3) respectively.'",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Agrees with the orchestrator's from-memory 0.267."
+      },
+      "2.5": {
+        "value": 0.186,
+        "uncertainty": 0.003,
+        "source": "M. Teper, arXiv:hep-th/9812187, Appendix A (same sentence as for beta=2.4).",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "The orchestrator's from-memory value was 0.187; consistent within the quoted error.",
+        "alternatives": [
+          {
+            "value": 0.1871,
+            "uncertainty": 0.0010,
+            "source": "G. S. Bali, K. Schilling, C. Schlichter, 'Observing long colour flux tubes in SU(2) lattice gauge theory', Phys. Rev. D51 (1995) 5165, arXiv:hep-lat/9409005 (string tension from the static potential).",
+            "web_verified": false,
+            "verification_level": "none",
+            "note": "from memory. The paper and its beta values (2.5, 2.635, 2.74) were confirmed by web search, the number itself was not."
+          },
+          {
+            "value": 0.1905,
+            "uncertainty": 0.0008,
+            "source": "Compilation in J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493, arXiv:hep-lat/9208012.",
+            "web_verified": false,
+            "verification_level": "none",
+            "note": "from memory; not found in any search excerpt."
+          }
+        ]
+      }
+    },
+
+    "a_m_0pp": {
+      "2.3": {
+        "value": 1.216,
+        "uncertainty": 0.023,
+        "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10, row beta=2.3, 10^4 lattice; original data from C. Michael and M. Teper, Phys. Lett. B199 (1987) 95.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Second number of the row '0.3687(22), 1.216(23), 1.94(8)'; column assignment inferred from the caption order (string tension, J=0, J=2). Effective mass from t=a to t=2a, i.e. a variational upper estimate, on a small 10^4 lattice. Agrees with the orchestrator's 'about 1.2'."
+      },
+      "2.4": {
+        "value": 0.94,
+        "uncertainty": 0.03,
+        "source": "Remembered from the Michael-Teper SU(2) data as compiled in arXiv:hep-th/9812187, Table 10 (row not seen in any search excerpt).",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory. Consistency check only: with a*sqrt(sigma)=0.2673 this gives m/sqrt(sigma)=3.52, as expected from the continuum value 3.78 with an O(a^2 sigma) correction of the size seen at beta=2.3."
+      },
+      "2.5": {
+        "value": 0.69,
+        "uncertainty": 0.04,
+        "source": "Remembered range 0.66-0.72 (different lattice sizes / groups) for the 4D SU(2) Wilson action at beta=2.5; rows not seen in any search excerpt of arXiv:hep-th/9812187 Table 10.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory. Value is the midpoint of the remembered range, uncertainty covers the range. With a*sqrt(sigma)=0.186 this gives m/sqrt(sigma)=3.5-3.9."
+      }
+    },
+
+    "continuum_m0pp_over_sqrt_sigma": {
+      "value": 3.78,
+      "uncertainty": 0.07,
+      "source": "B. Lucini, M. Teper, U. Wenger, 'Glueballs and k-strings in SU(N) gauge theories: calculations with improved operators', JHEP 06 (2004) 012, arXiv:hep-lat/0404008, table of continuum limits (SU(2): 3.78(7); SU(3): 3.55(7); SU(4): 3.36(6)).",
+      "web_verified": true,
+      "verification_level": "search_excerpt",
+      "note": "Continuum limit a -> 0 of m(0++)/sqrt(sigma) for SU(2). Consistent with the orchestrator's range 3.5-3.8 (the lower end of that range corresponds to finite lattice spacing, not to the continuum).",
+      "alternatives": [
+        {
+          "value": 3.74,
+          "uncertainty": 0.12,
+          "source": "M. Teper, arXiv:hep-th/9812187 (1998 review), SU(2) continuum value.",
+          "web_verified": true,
+          "verification_level": "search_excerpt",
+          "note": "Seen in two independent search excerpts (one quoting the review directly, one quoting arXiv:hep-th/0604006 which cites it)."
+        },
+        {
+          "value": 3.781,
+          "uncertainty": 0.023,
+          "source": "A. Athenodorou, M. Teper, 'SU(N) gauge theories in 3+1 dimensions: glueball spectrum, string tensions and topology', JHEP 12 (2021) 082, arXiv:2106.00364.",
+          "web_verified": false,
+          "verification_level": "none",
+          "note": "from memory. The paper (title, journal, Wilson action, N=2..12) was confirmed by web search, the SU(2) number was not found in any excerpt."
+        }
+      ]
+    },
+
+    "beta_c": {
+      "4": {
+        "value": 2.2986,
+        "uncertainty": 0.0006,
+        "source": "Value used in J. Fingberg, U. Heller, F. Karsch, 'Scaling and asymptotic scaling in the SU(2) gauge theory', Nucl. Phys. B392 (1993) 493-517, arXiv:hep-lat/9208012 (for N_t <= 6 that paper takes the critical couplings from earlier finite-size-scaling studies).",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory. The paper itself and the statement that the N_t<=6 couplings come from earlier work were confirmed by web search; the number was not found.",
+        "alternatives": [
+          {
+            "value": 2.2991,
+            "uncertainty": null,
+            "source": "A. Velytsky, 'Finite temperature SU(2) gauge theory: critical coupling and universality class', Int. J. Mod. Phys. C19 (2008) 1079, arXiv:0711.0748.",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": "The search excerpt says the paper adopts beta_c = 2.2991 for N_t=4 (to be derived there by finite-size scaling); no uncertainty was visible in the excerpt."
+          }
+        ]
+      },
+      "6": {
+        "value": 2.4265,
+        "uncertainty": 0.0030,
+        "source": "Value used in J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493-517, arXiv:hep-lat/9208012 (taken there from earlier work).",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory; not found in any search excerpt."
+      },
+      "8": {
+        "value": 2.510363,
+        "uncertainty": 0.000071,
+        "source": "B. A. Berg, D. A. Clarke, 'Deconfinement, gradient and cooling scales for pure SU(2) lattice gauge theory', Phys. Rev. D95 (2017) 094508, arXiv:1612.07347, infinite-volume extrapolation for N_t=8.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Rounds to the orchestrator's from-memory 2.5104.",
+        "alternatives": [
+          {
+            "value": 2.5090,
+            "uncertainty": 0.0006,
+            "source": "B. Lucini, M. Teper, U. Wenger, 'The high temperature phase transition in SU(N) gauge theories', JHEP 01 (2004) 061, arXiv:hep-lat/0307017, as quoted in arXiv:1612.07347 ('their estimate beta_c(8)=2.5090(6) is somewhat lower than ours').",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": "Seen only as quoted by Berg and Clarke."
+          },
+          {
+            "value": 2.5104,
+            "uncertainty": 0.0002,
+            "source": "A. Velytsky, Int. J. Mod. Phys. C19 (2008) 1079, arXiv:0711.0748.",
+            "web_verified": false,
+            "verification_level": "none",
+            "note": "from memory; the exact string '2.5104(2)' was not found by web search."
+          },
+          {
+            "value": 2.5115,
+            "uncertainty": 0.0040,
+            "source": "J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493-517, arXiv:hep-lat/9208012 (their own determination for N_t=8).",
+            "web_verified": false,
+            "verification_level": "none",
+            "note": "from memory. Web search confirmed only that the paper determines beta_c for N_t=8 and 16 and finds T_c/sqrt(sigma)=0.69(2)."
+          }
+        ]
+      }
+    }
+  },
+
+  "D3_SU2_wilson": {
+    "a_sqrt_sigma": {
+      "6": {
+        "value": 0.2538,
+        "uncertainty": 0.0010,
+        "source": "M. Teper, 'SU(N) gauge theories in 2+1 dimensions', Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, table 'SU(2) string tensions as extracted from flux loop masses of length L' (labelled Table 12 in the excerpt), beta=6.0, L=16.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Agrees with the orchestrator's from-memory value. Same table: 0.2562(26) at L=24 and 0.2529(33) at L=32.",
+        "alternatives": [
+          {"value": 0.2562, "uncertainty": 0.0026, "source": "same table, beta=6.0, L=24", "web_verified": true, "verification_level": "search_excerpt", "note": ""},
+          {"value": 0.2529, "uncertainty": 0.0033, "source": "same table, beta=6.0, L=32", "web_verified": true, "verification_level": "search_excerpt", "note": ""}
+        ]
+      },
+      "9": {
+        "value": 0.1616,
+        "uncertainty": 0.0006,
+        "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, same table (labelled Table 12 in the excerpt), beta=9.0, L=24.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Agrees with the orchestrator's from-memory value. Same table: 0.1622(4) at L=32; the two differ by about one standard deviation, so a comparison should allow for both.",
+        "alternatives": [
+          {"value": 0.1622, "uncertainty": 0.0004, "source": "same table, beta=9.0, L=32", "web_verified": true, "verification_level": "search_excerpt", "note": ""}
+        ]
+      },
+      "12": {
+        "value": 0.1179,
+        "uncertainty": 0.0005,
+        "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, same table (labelled Table 12 in the excerpt), beta=12.0, L=32.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Agrees with the orchestrator's from-memory value. Same table: 0.1179(8) at L=48.",
+        "alternatives": [
+          {"value": 0.1179, "uncertainty": 0.0008, "source": "same table, beta=12.0, L=48", "web_verified": true, "verification_level": "search_excerpt", "note": ""}
+        ]
+      }
+    },
+
+    "a_m_0pp": {
+      "6": {
+        "value": 1.19,
+        "uncertainty": 0.02,
+        "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, SU(2) glueball mass tables (the excerpts name Tables 23/24 'lightest SU(2) masses at lower/higher values of beta').",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory. Partial support only: a search excerpt of the paper's finite-volume table for the lightest SU(2) masses shows a 0++ row '0.99(2) | 1.12(2) | 1.21(2) | 1.19(2) | 1.20(2) | 1.18(2)' for increasing spatial size, without showing beta (the paper's volume study is at beta=6). Consistency: 4.718 * 0.2538 = 1.197."
+      },
+      "9": {
+        "value": 0.765,
+        "uncertainty": 0.010,
+        "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, SU(2) glueball mass tables.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory; uncertainty is a rough guess, not taken from the paper. Consistency: 4.718 * 0.1616 = 0.762."
+      },
+      "12": {
+        "value": 0.559,
+        "uncertainty": 0.008,
+        "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, SU(2) glueball mass tables.",
+        "web_verified": false,
+        "verification_level": "none",
+        "note": "from memory; uncertainty is a rough guess, not taken from the paper. Consistency: 4.718 * 0.1179 = 0.556."
+      }
+    },
+
+    "continuum_m0pp_over_sqrt_sigma": {
+      "value": 4.718,
+      "uncertainty": 0.043,
+      "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, table of continuum glueball masses in units of the string tension, SU(2).",
+      "web_verified": false,
+      "verification_level": "none",
+      "note": "from memory; the exact string '4.718(43)' was not found by web search. Indirect support seen in search excerpts: (i) the same paper's large-N fit m(0++)/sqrt(sigma) = 4.046(70) + 2.67(28)/N^2 gives 4.714 at N=2; (ii) the later high-statistics value in 'alternatives'.",
+      "alternatives": [
+        {
+          "value": 4.737,
+          "uncertainty": 0.006,
+          "source": "A. Athenodorou, M. Teper, 'SU(N) gauge theories in 2+1 dimensions: glueball spectra and k-string tensions', JHEP 02 (2017) 015, arXiv:1609.03873, as quoted for SU(2) in R. Lau, M. Teper, arXiv:1701.06941.",
+          "web_verified": true,
+          "verification_level": "search_excerpt",
+          "note": "Seen only as quoted in arXiv:1701.06941 ('M_0+/sqrt(sigma_f) = 4.737(6)' for SU(2) in D=2+1)."
+        }
+      ]
+    },
+
+    "continuum_sqrt_sigma_over_g2": {
+      "value": 0.3353,
+      "uncertainty": 0.0018,
+      "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, eq. (38) (continuum limit for SU(2)).",
+      "web_verified": true,
+      "verification_level": "search_excerpt",
+      "note": "g^2 has dimension of mass in D=3 and is defined through beta = 4/(a g^2), so sqrt(sigma)/g^2 = lim_{beta->inf} beta*a*sqrt(sigma)/4. The excerpt quotes 0.3375(130) as 'consistent with the value of 0.3353(18) in eqn(38)'. Cross-check from another excerpt: Teper's fit sqrt(sigma)/g^2 = 0.1974(12) N - 0.120(8)/N (arXiv:hep-lat/9711011) gives 0.3348 at N=2. Warning: at beta = 6, 9, 12 the naive ratio beta*a*sqrt(sigma)/4 is 0.381, 0.364, 0.354, i.e. still 5-14 percent above the continuum value; Teper extrapolates with a mean-field improved coupling (statement about the improved coupling is from memory)."
+    }
+  }
+}
