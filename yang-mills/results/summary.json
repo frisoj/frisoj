@@ -1,7 +1,7 @@
 {
  "format": "ym-summary-1",
  "disclaimer": "Numerical Monte Carlo evidence (finite lattice spacing, finite volume, statistical errors, variational upper estimates of masses). NOT a proof of the Yang-Mills mass gap; the Millennium problem is open and nothing here solves it.",
- "generated_utc": "2026-11-11T22:35:38Z",
+ "generated_utc": "2026-11-11T23:39:34Z",
  "inputs": {
   "results_dir": "results",
   "pipeline_files": [
@@ -16,7 +16,8 @@
    "d4_b2.4_L16.json",
    "d4_b2.5_L16.json",
    "d4_b2.5_L16x.json",
-   "d4_b2.5_L16_combined.json"
+   "d4_b2.5_L16_combined.json",
+   "d4_b2.5_L20.json"
   ],
   "literature": "literature.json",
   "literature_compiled_on": "2026-11-11"
@@ -49,7 +50,8 @@
    "d4_b2.3_L10",
    "d4_b2.4_L12",
    "d4_b2.4_L16",
-   "d4_b2.5_L16_combined"
+   "d4_b2.5_L16_combined",
+   "d4_b2.5_L20"
   ],
   "scaling": {
    "D3": {
@@ -90,7 +92,8 @@
   "d4_b2.4_L16",
   "d4_b2.5_L16",
   "d4_b2.5_L16x",
-  "d4_b2.5_L16_combined"
+  "d4_b2.5_L16_combined",
+  "d4_b2.5_L20"
  ],
  "ensembles": {
   "d3_b6.0_L16": {
@@ -3714,6 +3717,308 @@
     "am_err_ratio": 1.0341679773879469,
     "same_t_star": true
    }
+  },
+  "d4_b2.5_L20": {
+   "name": "d4_b2.5_L20",
+   "round": "3",
+   "role": "finite-volume check of d4_b2.5_L16 (20^4)",
+   "D": 4,
+   "beta": 2.5,
+   "shape": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "lattice": "20^4",
+   "T": 20,
+   "L": 20,
+   "pipeline_file": "d4_b2.5_L20.json",
+   "pipeline_generated_utc": "2026-11-11T23:38:19Z",
+   "n_meas": 9600,
+   "n_used": 9516,
+   "n_bins": 156,
+   "binsize": 61,
+   "tau_int_max": 6.090127334403837,
+   "seeds": [
+    901,
+    902,
+    903,
+    904
+   ],
+   "plaquette": {
+    "value": 0.651987124318533,
+    "err": 7.529996038741199e-06
+   },
+   "stream_consistency": {
+    "plaquette_chi2": 5.2854030394256775,
+    "plaquette_dof": 3,
+    "hot_minus_cold_pull": -0.8677570657252685
+   },
+   "warnings_other": [],
+   "n_incomplete_streams": 0,
+   "am": {
+    "R5": {
+     "value": 0.7262913496537391,
+     "err": 0.01250123677901857,
+     "t_star": 1,
+     "t_value": 1,
+     "flag": "plateau",
+     "is_measurement": true
+    },
+    "t1": {
+     "value": 0.7262913496537391,
+     "err": 0.01250123677901857,
+     "is_measurement": true
+    },
+    "t2": {
+     "value": 0.718567060495126,
+     "err": 0.02632022266360948,
+     "is_measurement": true
+    },
+    "t1_minus_t2": {
+     "value": 0.007724289158613118,
+     "err": 0.02158035065430289,
+     "sigma": 0.35793158704179706,
+     "note": "correlated jackknife error of the difference (pipeline file)"
+    }
+   },
+   "aE_torelon": {
+    "R5": {
+     "value": 0.64051529375678,
+     "err": 0.012616657031685002,
+     "t_star": 2,
+     "t_value": 2,
+     "flag": "plateau",
+     "is_measurement": true
+    },
+    "t1": {
+     "value": 0.6521646229315707,
+     "err": 0.0076047908418879215,
+     "is_measurement": true
+    },
+    "t2": {
+     "value": 0.64051529375678,
+     "err": 0.012616657031685002,
+     "is_measurement": true
+    },
+    "t1_minus_t2": {
+     "value": 0.011649329174790779,
+     "err": 0.009178409544192943,
+     "sigma": 1.2692099996955524,
+     "note": "correlated jackknife error of the difference (pipeline file)"
+    }
+   },
+   "am_over_err": {
+    "R5": 58.09755966487323,
+    "t1": 58.09755966487323,
+    "t2": 27.300949147691735
+   },
+   "a_sqrt_sigma": {
+    "R5": {
+     "value": 0.1864150913966516,
+     "err": 0.0016860354597748278,
+     "is_measurement": true,
+     "t_star": 2,
+     "t_value": 2
+    },
+    "t1": {
+     "value": 0.18796582327175265,
+     "err": 0.0010081863303260039,
+     "is_measurement": true
+    },
+    "t2": {
+     "value": 0.1864150913966516,
+     "err": 0.0016860354597748278,
+     "is_measurement": true
+    }
+   },
+   "a_sqrt_sigma_luscher": {
+    "R5": {
+     "value": 0.18612833896489403,
+     "err": 0.0016942583355297027,
+     "is_measurement": true,
+     "t_star": 2,
+     "t_value": 2
+    },
+    "t1": {
+     "value": 0.18768650730558664,
+     "err": 0.0010129350768791387,
+     "is_measurement": true
+    },
+    "t2": {
+     "value": 0.18612833896489403,
+     "err": 0.0016942583355297027,
+     "is_measurement": true
+    }
+   },
+   "ng_minus_luscher": {
+    "R5": 0.00028675243175757537,
+    "t1": 0.0002793159661660105,
+    "t2": 0.00028675243175757537
+   },
+   "a2_sigma": {
+    "R5": {
+     "value": 0.03475058630042197,
+     "err": 0.000628737498206443,
+     "is_measurement": true
+    },
+    "t1": {
+     "value": 0.035331150718227754,
+     "err": 0.000379009147182109,
+     "is_measurement": true
+    },
+    "t2": {
+     "value": 0.03475058630042197,
+     "err": 0.0006286049086638401,
+     "is_measurement": true
+    }
+   },
+   "m_over_sqrt_sigma": {
+    "R5": {
+     "value": 3.896097382525462,
+     "err": 0.07833524369503139,
+     "is_measurement": true,
+     "err_kind": "correlated jackknife (pipeline file)",
+     "t_glueball": 1,
+     "t_torelon": 2
+    },
+    "t1": {
+     "value": 3.863954292391225,
+     "err": 0.06966234650334933,
+     "is_measurement": true,
+     "err_kind": "uncorrelated propagation"
+    },
+    "t2": {
+     "value": 3.8546614177613354,
+     "err": 0.14543212386924448,
+     "is_measurement": true,
+     "err_kind": "uncorrelated propagation"
+    }
+   },
+   "ratio_error_check": {
+    "pipeline_correlated_err": 0.07833524369503139,
+    "uncorrelated_err": 0.07575590675673247,
+    "correlated_over_uncorrelated": 1.0340479976905523,
+    "value_matches_pipeline": true
+   },
+   "finite_volume_indicators": {
+    "R5": {
+     "L_sqrt_sigma": {
+      "value": 3.728301827933032,
+      "err": 0.03372070919549656
+     },
+     "mL": {
+      "value": 14.525826993074782,
+      "err": 0.2500247355803714
+     },
+     "mT": {
+      "value": 14.525826993074782,
+      "err": 0.2500247355803714
+     },
+     "two_torelon_over_m": {
+      "value": 1.7637971154747938,
+      "err": 0.0461382399023642,
+      "err_kind": "uncorrelated propagation"
+     },
+     "is_measurement": true
+    },
+    "t1": {
+     "L_sqrt_sigma": {
+      "value": 3.7593164654350533,
+      "err": 0.020163726606520077
+     },
+     "mL": {
+      "value": 14.525826993074782,
+      "err": 0.2500247355803714
+     },
+     "mT": {
+      "value": 14.525826993074782,
+      "err": 0.2500247355803714
+     },
+     "two_torelon_over_m": {
+      "value": 1.7958760578450825,
+      "err": 0.03733707763583009,
+      "err_kind": "uncorrelated propagation"
+     },
+     "is_measurement": true
+    },
+    "t2": {
+     "L_sqrt_sigma": {
+      "value": 3.728301827933032,
+      "err": 0.03372070919549656
+     },
+     "mL": {
+      "value": 14.37134120990252,
+      "err": 0.5264044532721897
+     },
+     "mT": {
+      "value": 14.37134120990252,
+      "err": 0.5264044532721897
+     },
+     "two_torelon_over_m": {
+      "value": 1.7827571815369194,
+      "err": 0.07414350546543741,
+      "err_kind": "uncorrelated propagation"
+     },
+     "is_measurement": true
+    }
+   },
+   "D4": {
+    "a_lambda_two_loop": 0.0035757856719900666,
+    "m_over_lambda": {
+     "R5": {
+      "value": 203.1137814950551,
+      "err": 3.4960811205614393,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 203.1137814950551,
+      "err": 3.4960811205614393,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 200.95361590707836,
+      "err": 7.360682400453054,
+      "is_measurement": true
+     }
+    },
+    "sqrt_sigma_over_lambda": {
+     "R5": {
+      "value": 52.13262440668157,
+      "err": 0.47151468640358474,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 52.56630025231412,
+      "err": 0.2819481990275184,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 52.13262440668157,
+      "err": 0.47151468640358474,
+      "is_measurement": true
+     }
+    },
+    "matches_pipeline": true
+   },
+   "binning_check": {
+    "binsize": 122,
+    "am": {
+     "value": 0.727593413373858,
+     "err": 0.013728654899037268,
+     "t_star": 1
+    },
+    "aE_torelon": {
+     "value": 0.6444226295410727,
+     "err": 0.012773613024398582,
+     "t_star": 2,
+     "flag": "plateau"
+    },
+    "am_shift_in_sigma": 0.10415479229256659,
+    "am_err_ratio": 1.0981837350748154,
+    "same_t_star": true
+   }
   }
  },
  "ratio_error_check": {
@@ -3790,10 +4095,16 @@
     "uncorrelated_err": 0.09410710324337768,
     "correlated_over_uncorrelated": 0.9270108997798048,
     "value_matches_pipeline": true
+   },
+   "d4_b2.5_L20": {
+    "pipeline_correlated_err": 0.07833524369503139,
+    "uncorrelated_err": 0.07575590675673247,
+    "correlated_over_uncorrelated": 1.0340479976905523,
+    "value_matches_pipeline": true
    }
   },
   "min": 0.8197094998557745,
-  "max": 1.0273511704839935
+  "max": 1.0340479976905523
  },
  "scaling_d3": {
   "note": "Three lattice spacings and a variational systematic (the masses are upper estimates at small t; that bias is not part of the statistical errors) do not make a controlled continuum limit. The intercepts describe these three points; they are indicative only.",
@@ -8123,6 +8434,253 @@
     }
    ],
    "note": "A - B; the two ensembles are statistically independent (different seeds), errors added in quadrature"
+  },
+  {
+   "kind": "finite volume",
+   "A": "d4_b2.5_L16_combined",
+   "B": "d4_b2.5_L20",
+   "lattice_A": "16^4",
+   "lattice_B": "20^4",
+   "beta": 2.5,
+   "D": 4,
+   "rows": [
+    {
+     "quantity": "a*m(0++)",
+     "key": "am",
+     "variant": "R5",
+     "A": {
+      "value": 0.7530538176672879,
+      "err": 0.01701031232737365
+     },
+     "B": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857
+     },
+     "diff": 0.026762468013548757,
+     "err": 0.02110998925816606,
+     "sigma": 1.2677632227214954,
+     "both_measurements": true,
+     "t_A": 1,
+     "t_B": 1
+    },
+    {
+     "quantity": "a*m(0++)",
+     "key": "am",
+     "variant": "t1",
+     "A": {
+      "value": 0.7530538176672879,
+      "err": 0.01701031232737365
+     },
+     "B": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857
+     },
+     "diff": 0.026762468013548757,
+     "err": 0.02110998925816606,
+     "sigma": 1.2677632227214954,
+     "both_measurements": true
+    },
+    {
+     "quantity": "a*m(0++)",
+     "key": "am",
+     "variant": "t2",
+     "A": {
+      "value": 0.7462705411668233,
+      "err": 0.037121858426193186
+     },
+     "B": {
+      "value": 0.718567060495126,
+      "err": 0.02632022266360948
+     },
+     "diff": 0.027703480671697367,
+     "err": 0.04550589515740035,
+     "sigma": 0.6087888300158428,
+     "both_measurements": true
+    },
+    {
+     "quantity": "a*sqrt(sigma) [Nambu-Goto]",
+     "key": "a_sqrt_sigma",
+     "variant": "R5",
+     "A": {
+      "value": 0.1866072466322564,
+      "err": 0.0010812848284577888
+     },
+     "B": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278
+     },
+     "diff": 0.0001921552356047851,
+     "err": 0.0020029709063965717,
+     "sigma": 0.09593511068539702,
+     "both_measurements": true,
+     "t_A": 1,
+     "t_B": 2
+    },
+    {
+     "quantity": "a*sqrt(sigma) [Nambu-Goto]",
+     "key": "a_sqrt_sigma",
+     "variant": "t1",
+     "A": {
+      "value": 0.1866072466322564,
+      "err": 0.0010812848284577888
+     },
+     "B": {
+      "value": 0.18796582327175265,
+      "err": 0.0010081863303260039
+     },
+     "diff": -0.0013585766394962617,
+     "err": 0.0014783830886847982,
+     "sigma": -0.9189611609429874,
+     "both_measurements": true
+    },
+    {
+     "quantity": "a*sqrt(sigma) [Nambu-Goto]",
+     "key": "a_sqrt_sigma",
+     "variant": "t2",
+     "A": {
+      "value": 0.18575344741967265,
+      "err": 0.001767002547387188
+     },
+     "B": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278
+     },
+     "diff": -0.0006616439769789595,
+     "err": 0.0024423377272791177,
+     "sigma": -0.27090601336124914,
+     "both_measurements": true
+    },
+    {
+     "quantity": "a*sqrt(sigma) [Luscher]",
+     "key": "a_sqrt_sigma_luscher",
+     "variant": "R5",
+     "A": {
+      "value": 0.18587307993498026,
+      "err": 0.0010952937657723674
+     },
+     "B": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027
+     },
+     "diff": -0.0002552590299137736,
+     "err": 0.0020174686468076007,
+     "sigma": -0.1265244098428444,
+     "both_measurements": true,
+     "t_A": 1,
+     "t_B": 2
+    },
+    {
+     "quantity": "a*sqrt(sigma) [Luscher]",
+     "key": "a_sqrt_sigma_luscher",
+     "variant": "t1",
+     "A": {
+      "value": 0.18587307993498026,
+      "err": 0.0010952937657723674
+     },
+     "B": {
+      "value": 0.18768650730558664,
+      "err": 0.0010129350768791387
+     },
+     "diff": -0.0018134273706063853,
+     "err": 0.001491879989580918,
+     "sigma": -1.2155316669377627,
+     "both_measurements": true
+    },
+    {
+     "quantity": "a*sqrt(sigma) [Luscher]",
+     "key": "a_sqrt_sigma_luscher",
+     "variant": "t2",
+     "A": {
+      "value": 0.18500809695569712,
+      "err": 0.0017903698865013602
+     },
+     "B": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027
+     },
+     "diff": -0.0011202420091969145,
+     "err": 0.002464941305184116,
+     "sigma": -0.45447005445561284,
+     "both_measurements": true
+    },
+    {
+     "quantity": "m/sqrt(sigma)",
+     "key": "m_over_sqrt_sigma",
+     "variant": "R5",
+     "A": {
+      "value": 4.0355014676965775,
+      "err": 0.08723831045331452
+     },
+     "B": {
+      "value": 3.896097382525462,
+      "err": 0.07833524369503139
+     },
+     "diff": 0.13940408517111536,
+     "err": 0.11724731645333654,
+     "sigma": 1.1889746340300849,
+     "both_measurements": true,
+     "t_A": [
+      1,
+      1
+     ],
+     "t_B": [
+      1,
+      2
+     ]
+    },
+    {
+     "quantity": "m/sqrt(sigma)",
+     "key": "m_over_sqrt_sigma",
+     "variant": "t1",
+     "A": {
+      "value": 4.0355014676965775,
+      "err": 0.08723831045331452
+     },
+     "B": {
+      "value": 3.863954292391225,
+      "err": 0.06966234650334933
+     },
+     "diff": 0.17154717530535235,
+     "err": 0.11163944343779932,
+     "sigma": 1.5366179732070326,
+     "both_measurements": true
+    },
+    {
+     "quantity": "m/sqrt(sigma)",
+     "key": "m_over_sqrt_sigma",
+     "variant": "t2",
+     "A": {
+      "value": 4.017532657042832,
+      "err": 0.2034662123526881
+     },
+     "B": {
+      "value": 3.8546614177613354,
+      "err": 0.14543212386924448
+     },
+     "diff": 0.16287123928149638,
+     "err": 0.25009798524232146,
+     "sigma": 0.6512297135208405,
+     "both_measurements": true
+    },
+    {
+     "quantity": "plaquette",
+     "key": "plaquette",
+     "variant": "-",
+     "A": {
+      "value": 0.6519854376663352,
+      "err": 1.1452004589641967e-05
+     },
+     "B": {
+      "value": 0.651987124318533,
+      "err": 7.529996038741199e-06
+     },
+     "diff": -1.686652197796512e-06,
+     "err": 1.370581079194656e-05,
+     "sigma": -0.12306110330864754,
+     "both_measurements": true
+    }
+   ],
+   "note": "A - B; the two ensembles are statistically independent (different seeds), errors added in quadrature"
   }
  ],
  "replication": [
@@ -8727,6 +9285,259 @@
    "note": "A - B; the two ensembles are statistically independent (different seeds), errors added in quadrature"
   }
  ],
+ "round3": {
+  "reference": "d4_b2.5_L16_combined",
+  "ensemble": "d4_b2.5_L20",
+  "L_reference": 16,
+  "L": 20,
+  "criterion_sigma": 3.0,
+  "primary_quantity": "am t1 (m_eff(1))",
+  "R5": {
+   "measured": {
+    "value": 0.7262913496537391,
+    "err": 0.01250123677901857
+   },
+   "reference": {
+    "value": 0.7530538176672879,
+    "err": 0.01701031232737365
+   },
+   "both_measurements": true,
+   "reading_A_prediction": {
+    "value": 0.6024430541338304,
+    "err": 0.01360824986189892
+   },
+   "measured_minus_A": {
+    "diff": 0.12384829551990872,
+    "err": 0.018478782029910917,
+    "sigma": 6.7021893174257965
+   },
+   "measured_minus_reference": {
+    "diff": -0.026762468013548757,
+    "err": 0.02110998925816606,
+    "sigma": -1.2677632227214954
+   },
+   "amL_reference": {
+    "value": 12.048861082676606,
+    "err": 0.2721649972379784
+   },
+   "amL_measured": {
+    "value": 14.525826993074782,
+    "err": 0.2500247355803714
+   },
+   "exponent_q": {
+    "value": 0.16216222092589458,
+    "err": 0.12726801893975193,
+    "note": "m ~ L^-q from the two volumes; q = 1 pure finite-size gap, q = 0 volume-independent gap"
+   }
+  },
+  "t1": {
+   "measured": {
+    "value": 0.7262913496537391,
+    "err": 0.01250123677901857
+   },
+   "reference": {
+    "value": 0.7530538176672879,
+    "err": 0.01701031232737365
+   },
+   "both_measurements": true,
+   "reading_A_prediction": {
+    "value": 0.6024430541338304,
+    "err": 0.01360824986189892
+   },
+   "measured_minus_A": {
+    "diff": 0.12384829551990872,
+    "err": 0.018478782029910917,
+    "sigma": 6.7021893174257965
+   },
+   "measured_minus_reference": {
+    "diff": -0.026762468013548757,
+    "err": 0.02110998925816606,
+    "sigma": -1.2677632227214954
+   },
+   "amL_reference": {
+    "value": 12.048861082676606,
+    "err": 0.2721649972379784
+   },
+   "amL_measured": {
+    "value": 14.525826993074782,
+    "err": 0.2500247355803714
+   },
+   "exponent_q": {
+    "value": 0.16216222092589458,
+    "err": 0.12726801893975193,
+    "note": "m ~ L^-q from the two volumes; q = 1 pure finite-size gap, q = 0 volume-independent gap"
+   }
+  },
+  "t2": {
+   "measured": {
+    "value": 0.718567060495126,
+    "err": 0.02632022266360948
+   },
+   "reference": {
+    "value": 0.7462705411668233,
+    "err": 0.037121858426193186
+   },
+   "both_measurements": true,
+   "reading_A_prediction": {
+    "value": 0.5970164329334587,
+    "err": 0.02969748674095455
+   },
+   "measured_minus_A": {
+    "diff": 0.12155062756166723,
+    "err": 0.03968242482247215,
+    "sigma": 3.063084680572069
+   },
+   "measured_minus_reference": {
+    "diff": -0.027703480671697367,
+    "err": 0.04550589515740035,
+    "sigma": -0.6087888300158428
+   },
+   "amL_reference": {
+    "value": 11.940328658669173,
+    "err": 0.593949734819091
+   },
+   "amL_measured": {
+    "value": 14.37134120990252,
+    "err": 0.5264044532721897
+   },
+   "exponent_q": {
+    "value": 0.1695283362243794,
+    "err": 0.27683603151582425,
+    "note": "m ~ L^-q from the two volumes; q = 1 pure finite-size gap, q = 0 volume-independent gap"
+   }
+  },
+  "verdict": {
+   "reading_A_excluded": true,
+   "reference_volume_contaminated": false
+  },
+  "note": "Criterion and predictions were committed in run_round3_production.sh before the run, the list of what is computed in round3_plan.md before its data were looked at. Statistical errors only; the masses are variational upper estimates. Numerical evidence, not a proof.",
+  "largest_volume_set": {
+   "ensembles": [
+    "d4_b2.3_L10",
+    "d4_b2.4_L16",
+    "d4_b2.5_L20"
+   ],
+   "note": "largest volume at each beta; shown next to the pre-registered primary set, not instead of it. No continuum value is quoted from either set. Fixed-t ratio errors: uncorrelated propagation (see ratio_error_check).",
+   "t1": {
+    "points": [
+     {
+      "ensemble": "d4_b2.3_L10",
+      "beta": 2.3,
+      "lattice": "12x10^3",
+      "x": 0.1359040627465603,
+      "x_err": 0.0013740061524578399,
+      "y": 3.241717567000974,
+      "y_err": 0.06257897751806957,
+      "err_kind": "uncorrelated propagation",
+      "is_measurement": true,
+      "a_sqrt_sigma": 0.36865168214258875,
+      "a_sqrt_sigma_err": 0.0018635560598451245,
+      "L_sqrt_sigma": 3.6865168214258874,
+      "L_sqrt_sigma_err": 0.018635560598451246
+     },
+     {
+      "ensemble": "d4_b2.4_L16",
+      "beta": 2.4,
+      "lattice": "16^4",
+      "x": 0.07037278468417041,
+      "x_err": 0.001363346922743764,
+      "y": 3.7178854015626213,
+      "y_err": 0.12538481952472524,
+      "err_kind": "correlated jackknife (pipeline file; R5 chose this t in both channels)",
+      "is_measurement": true,
+      "a_sqrt_sigma": 0.26527869248051267,
+      "a_sqrt_sigma_err": 0.0025696502610060086,
+      "L_sqrt_sigma": 4.244459079688203,
+      "L_sqrt_sigma_err": 0.04111440417609614
+     },
+     {
+      "ensemble": "d4_b2.5_L20",
+      "beta": 2.5,
+      "lattice": "20^4",
+      "x": 0.035331150718227754,
+      "x_err": 0.000379009147182109,
+      "y": 3.863954292391225,
+      "y_err": 0.06966234650334933,
+      "err_kind": "uncorrelated propagation",
+      "is_measurement": true,
+      "a_sqrt_sigma": 0.18796582327175265,
+      "a_sqrt_sigma_err": 0.0010081863303260039,
+      "L_sqrt_sigma": 3.7593164654350533,
+      "L_sqrt_sigma_err": 0.020163726606520077
+     }
+    ],
+    "fit_constant": {
+     "value": 3.543624162091324,
+     "err": 0.04364246444414598,
+     "chi2": 46.35109517690646,
+     "dof": 2,
+     "chi2_dof": 23.17554758845323,
+     "p_value": 8.609691044661768e-11,
+     "scale_factor": 4.8140988345123565,
+     "n_points": 3
+    }
+   },
+   "R5": {
+    "points": [
+     {
+      "ensemble": "d4_b2.3_L10",
+      "beta": 2.3,
+      "lattice": "12x10^3",
+      "x": 0.12917070932178787,
+      "x_err": 0.004529202773280572,
+      "y": 3.325135688094427,
+      "y_err": 0.08234857538301091,
+      "err_kind": "correlated jackknife (pipeline file)",
+      "is_measurement": true,
+      "a_sqrt_sigma": 0.3594032683793901,
+      "a_sqrt_sigma_err": 0.006301111594486934,
+      "L_sqrt_sigma": 3.594032683793901,
+      "L_sqrt_sigma_err": 0.06301111594486934
+     },
+     {
+      "ensemble": "d4_b2.4_L16",
+      "beta": 2.4,
+      "lattice": "16^4",
+      "x": 0.0703727846841704,
+      "x_err": 0.0013634809474652035,
+      "y": 3.7178854015626213,
+      "y_err": 0.12538481952472524,
+      "err_kind": "correlated jackknife (pipeline file)",
+      "is_measurement": true,
+      "a_sqrt_sigma": 0.26527869248051267,
+      "a_sqrt_sigma_err": 0.0025696502610060086,
+      "L_sqrt_sigma": 4.244459079688203,
+      "L_sqrt_sigma_err": 0.04111440417609614
+     },
+     {
+      "ensemble": "d4_b2.5_L20",
+      "beta": 2.5,
+      "lattice": "20^4",
+      "x": 0.03475058630042197,
+      "x_err": 0.000628737498206443,
+      "y": 3.896097382525462,
+      "y_err": 0.07833524369503139,
+      "err_kind": "correlated jackknife (pipeline file)",
+      "is_measurement": true,
+      "a_sqrt_sigma": 0.1864150913966516,
+      "a_sqrt_sigma_err": 0.0016860354597748278,
+      "L_sqrt_sigma": 3.728301827933032,
+      "L_sqrt_sigma_err": 0.03372070919549656
+     }
+    ],
+    "fit_constant": {
+     "value": 3.6406866795652846,
+     "err": 0.051706412380239423,
+     "chi2": 25.693236339507234,
+     "dof": 2,
+     "chi2_dof": 12.846618169753617,
+     "p_value": 2.6350242584943313e-06,
+     "scale_factor": 3.5842179300028083,
+     "n_points": 3
+    }
+   }
+  }
+ },
  "literature_comparison": {
   "note": "pull = (ours - literature)/sqrt(err_ours^2 + unc_lit^2). 'matched' = the literature entry with the same spatial lattice size if literature.json names one, otherwise the primary entry; one matched entry per ensemble and quantity. Counts over 'all entries' include alternatives of the same quantity and are therefore not independent. The Gaussian expectation assumes independent pulls with correct errors. Literature numbers are at best 'seen in a web-search excerpt' (search_excerpt) or quoted from memory (none); none was checked against a published table.",
   "rows": [
@@ -11679,6 +12490,446 @@
      "t1": 0.9584438084455618,
      "t2": 0.5504134951481656
     }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "plaquette",
+    "lit_role": "primary",
+    "lit_index": 0,
+    "lit_value": 0.652,
+    "lit_unc": 0.001,
+    "verification_level": "none",
+    "web_verified": false,
+    "lit_lattice_L": null,
+    "same_L": false,
+    "matched": true,
+    "source_short": "no source identified",
+    "note": "no plateau choice involved: the variant columns are identical",
+    "ours": {
+     "R5": {
+      "value": 0.651987124318533,
+      "err": 7.529996038741199e-06,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.651987124318533,
+      "err": 7.529996038741199e-06,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.651987124318533,
+      "err": 7.529996038741199e-06,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": -0.012875316451560082,
+     "t1": -0.012875316451560082,
+     "t2": -0.012875316451560082
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*sqrt(sigma)",
+    "lit_role": "primary",
+    "lit_index": 0,
+    "lit_value": 0.186,
+    "lit_unc": 0.003,
+    "verification_level": "search_excerpt",
+    "web_verified": true,
+    "lit_lattice_L": null,
+    "same_L": false,
+    "matched": true,
+    "source_short": "arXiv:hep-th/9812187",
+    "ours_luscher": {
+     "R5": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18768650730558664,
+      "err": 0.0010129350768791387,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     }
+    },
+    "pull_luscher": {
+     "R5": 0.037249789183090784,
+     "t1": 0.5326274748043837,
+     "t2": 0.037249789183090784
+    },
+    "ours": {
+     "R5": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18796582327175265,
+      "err": 0.0010081863303260039,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": 0.12061965519871398,
+     "t1": 0.6211375462550695,
+     "t2": 0.12061965519871398
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*sqrt(sigma)",
+    "lit_role": "alternative 1",
+    "lit_index": 1,
+    "lit_value": 0.1834,
+    "lit_unc": 0.0026,
+    "verification_level": "search_excerpt",
+    "web_verified": true,
+    "lit_lattice_L": 16,
+    "same_L": false,
+    "matched": false,
+    "source_short": "arXiv:hep-th/9812187",
+    "ours_luscher": {
+     "R5": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18768650730558664,
+      "err": 0.0010129350768791387,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     }
+    },
+    "pull_luscher": {
+     "R5": 0.8791716043295035,
+     "t1": 1.5361913789445611,
+     "t2": 0.8791716043295035
+    },
+    "ours": {
+     "R5": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18796582327175265,
+      "err": 0.0010081863303260039,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": 0.9729789593342257,
+     "t1": 1.6373016279008308,
+     "t2": 0.9729789593342257
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*sqrt(sigma)",
+    "lit_role": "alternative 2",
+    "lit_index": 2,
+    "lit_value": 0.1871,
+    "lit_unc": 0.001,
+    "verification_level": "search_excerpt",
+    "web_verified": true,
+    "lit_lattice_L": 16,
+    "same_L": false,
+    "matched": false,
+    "source_short": "arXiv:hep-th/9812187",
+    "ours_luscher": {
+     "R5": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18768650730558664,
+      "err": 0.0010129350768791387,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     }
+    },
+    "pull_luscher": {
+     "R5": -0.4938904368152915,
+     "t1": 0.41204978282648214,
+     "t2": -0.4938904368152915
+    },
+    "ours": {
+     "R5": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18796582327175265,
+      "err": 0.0010081863303260039,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": -0.3493924381938064,
+     "t1": 0.6097286996381102,
+     "t2": -0.3493924381938064
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*sqrt(sigma)",
+    "lit_role": "alternative 3",
+    "lit_index": 3,
+    "lit_value": 0.1905,
+    "lit_unc": 0.0008,
+    "verification_level": "none",
+    "web_verified": false,
+    "lit_lattice_L": null,
+    "same_L": false,
+    "matched": false,
+    "source_short": "arXiv:hep-lat/9208012",
+    "ours_luscher": {
+     "R5": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18768650730558664,
+      "err": 0.0010129350768791387,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.18612833896489403,
+      "err": 0.0016942583355297027,
+      "is_measurement": true
+     }
+    },
+    "pull_luscher": {
+     "R5": -2.333250097363202,
+     "t1": -2.179733553211065,
+     "t2": -2.333250097363202
+    },
+    "ours": {
+     "R5": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.18796582327175265,
+      "err": 0.0010081863303260039,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.1864150913966516,
+      "err": 0.0016860354597748278,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": -2.1888869908071436,
+     "t1": -1.9690152787746036,
+     "t2": -2.1888869908071436
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*m(0++)",
+    "lit_role": "primary",
+    "lit_index": 0,
+    "lit_value": 0.66,
+    "lit_unc": 0.022,
+    "verification_level": "search_excerpt",
+    "web_verified": true,
+    "lit_lattice_L": 16,
+    "same_L": false,
+    "matched": true,
+    "source_short": "arXiv:hep-th/9812187",
+    "ours": {
+     "R5": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.718567060495126,
+      "err": 0.02632022266360948,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": 2.6198207681394687,
+     "t1": 2.6198207681394687,
+     "t2": 1.7073028417715925
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*m(0++)",
+    "lit_role": "alternative 1",
+    "lit_index": 1,
+    "lit_value": 0.69,
+    "lit_unc": 0.04,
+    "verification_level": "none",
+    "web_verified": false,
+    "lit_lattice_L": null,
+    "same_L": false,
+    "matched": false,
+    "source_short": "no source identified",
+    "ours": {
+     "R5": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.718567060495126,
+      "err": 0.02632022266360948,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": 0.8659765422358365,
+     "t1": 0.8659765422358365,
+     "t2": 0.5966048960783712
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*m(0++)",
+    "lit_role": "alternative 2",
+    "lit_index": 2,
+    "lit_value": 0.6857,
+    "lit_unc": 0.0028,
+    "verification_level": "search_excerpt",
+    "web_verified": true,
+    "lit_lattice_L": null,
+    "same_L": false,
+    "matched": false,
+    "source_short": "arXiv:1911.03048",
+    "ours": {
+     "R5": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.718567060495126,
+      "err": 0.02632022266360948,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": 3.16848400463178,
+     "t1": 3.16848400463178,
+     "t2": 1.2417312754884182
+    }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "a*m(0++)",
+    "lit_role": "alternative 3",
+    "lit_index": 3,
+    "lit_value": 0.72,
+    "lit_unc": 0.03,
+    "verification_level": "search_excerpt",
+    "web_verified": true,
+    "lit_lattice_L": null,
+    "same_L": false,
+    "matched": false,
+    "source_short": "arXiv:hep-lat/9809019",
+    "ours": {
+     "R5": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t1": {
+      "value": 0.7262913496537391,
+      "err": 0.01250123677901857,
+      "is_measurement": true
+     },
+     "t2": {
+      "value": 0.718567060495126,
+      "err": 0.02632022266360948,
+      "is_measurement": true
+     }
+    },
+    "pull": {
+     "R5": 0.19357715594633118,
+     "t1": 0.19357715594633118,
+     "t2": -0.03590488063276085
+    }
    }
   ],
   "counts": {
@@ -12285,16 +13536,17 @@
      "d4_b2.3_L10",
      "d4_b2.4_L12",
      "d4_b2.4_L16",
-     "d4_b2.5_L16_combined"
+     "d4_b2.5_L16_combined",
+     "d4_b2.5_L20"
     ],
     "matched_entry_only": {
      "R5": {
-      "n": 19,
-      "n_gt_2": 3,
+      "n": 22,
+      "n_gt_2": 4,
       "n_gt_3": 2,
       "max_abs": 3.3461541705720315,
-      "expected_gt_2_if_gaussian": 0.8644999999999999,
-      "expected_gt_3_if_gaussian": 0.051300000000000005,
+      "expected_gt_2_if_gaussian": 1.001,
+      "expected_gt_3_if_gaussian": 0.0594,
       "rows_gt_2": [
        {
         "ensemble": "d4_b2.4_L12",
@@ -12319,16 +13571,24 @@
         "lit": "0.660(22)",
         "verification_level": "search_excerpt",
         "pull": 3.3461541705720315
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*m(0++)",
+        "lit_role": "primary",
+        "lit": "0.660(22)",
+        "verification_level": "search_excerpt",
+        "pull": 2.6198207681394687
        }
       ]
      },
      "t1": {
-      "n": 20,
-      "n_gt_2": 3,
+      "n": 23,
+      "n_gt_2": 4,
       "n_gt_3": 2,
       "max_abs": 3.3461541705720315,
-      "expected_gt_2_if_gaussian": 0.9099999999999999,
-      "expected_gt_3_if_gaussian": 0.054000000000000006,
+      "expected_gt_2_if_gaussian": 1.0465,
+      "expected_gt_3_if_gaussian": 0.0621,
       "rows_gt_2": [
        {
         "ensemble": "d4_b2.4_L12",
@@ -12353,16 +13613,24 @@
         "lit": "0.660(22)",
         "verification_level": "search_excerpt",
         "pull": 3.3461541705720315
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*m(0++)",
+        "lit_role": "primary",
+        "lit": "0.660(22)",
+        "verification_level": "search_excerpt",
+        "pull": 2.6198207681394687
        }
       ]
      },
      "t2": {
-      "n": 20,
+      "n": 23,
       "n_gt_2": 1,
       "n_gt_3": 0,
       "max_abs": 2.1488249951532254,
-      "expected_gt_2_if_gaussian": 0.9099999999999999,
-      "expected_gt_3_if_gaussian": 0.054000000000000006,
+      "expected_gt_2_if_gaussian": 1.0465,
+      "expected_gt_3_if_gaussian": 0.0621,
       "rows_gt_2": [
        {
         "ensemble": "d4_b2.4_L12",
@@ -12377,12 +13645,12 @@
     },
     "all_entries_including_alternatives": {
      "R5": {
-      "n": 31,
-      "n_gt_2": 6,
-      "n_gt_3": 3,
+      "n": 40,
+      "n_gt_2": 9,
+      "n_gt_3": 4,
       "max_abs": 3.907010612084981,
-      "expected_gt_2_if_gaussian": 1.4104999999999999,
-      "expected_gt_3_if_gaussian": 0.08370000000000001,
+      "expected_gt_2_if_gaussian": 1.8199999999999998,
+      "expected_gt_3_if_gaussian": 0.10800000000000001,
       "rows_gt_2": [
        {
         "ensemble": "d3_b9.0_L24_combined",
@@ -12431,16 +13699,40 @@
         "lit": "0.6857(28)",
         "verification_level": "search_excerpt",
         "pull": 3.907010612084981
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*sqrt(sigma)",
+        "lit_role": "alternative 3",
+        "lit": "0.1905(8)",
+        "verification_level": "none",
+        "pull": -2.1888869908071436
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*m(0++)",
+        "lit_role": "primary",
+        "lit": "0.660(22)",
+        "verification_level": "search_excerpt",
+        "pull": 2.6198207681394687
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*m(0++)",
+        "lit_role": "alternative 2",
+        "lit": "0.6857(28)",
+        "verification_level": "search_excerpt",
+        "pull": 3.16848400463178
        }
       ]
      },
      "t1": {
-      "n": 34,
-      "n_gt_2": 6,
-      "n_gt_3": 3,
+      "n": 43,
+      "n_gt_2": 8,
+      "n_gt_3": 4,
       "max_abs": 3.907010612084981,
-      "expected_gt_2_if_gaussian": 1.547,
-      "expected_gt_3_if_gaussian": 0.0918,
+      "expected_gt_2_if_gaussian": 1.9565,
+      "expected_gt_3_if_gaussian": 0.11610000000000001,
       "rows_gt_2": [
        {
         "ensemble": "d3_b9.0_L24_combined",
@@ -12489,16 +13781,32 @@
         "lit": "0.6857(28)",
         "verification_level": "search_excerpt",
         "pull": 3.907010612084981
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*m(0++)",
+        "lit_role": "primary",
+        "lit": "0.660(22)",
+        "verification_level": "search_excerpt",
+        "pull": 2.6198207681394687
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*m(0++)",
+        "lit_role": "alternative 2",
+        "lit": "0.6857(28)",
+        "verification_level": "search_excerpt",
+        "pull": 3.16848400463178
        }
       ]
      },
      "t2": {
-      "n": 34,
-      "n_gt_2": 3,
+      "n": 43,
+      "n_gt_2": 4,
       "n_gt_3": 0,
       "max_abs": 2.857556448729108,
-      "expected_gt_2_if_gaussian": 1.547,
-      "expected_gt_3_if_gaussian": 0.0918,
+      "expected_gt_2_if_gaussian": 1.9565,
+      "expected_gt_3_if_gaussian": 0.11610000000000001,
       "rows_gt_2": [
        {
         "ensemble": "d3_b9.0_L24_combined",
@@ -12523,18 +13831,26 @@
         "lit": "0.1905(8)",
         "verification_level": "none",
         "pull": -2.447099905050769
+       },
+       {
+        "ensemble": "d4_b2.5_L20",
+        "quantity": "a*sqrt(sigma)",
+        "lit_role": "alternative 3",
+        "lit": "0.1905(8)",
+        "verification_level": "none",
+        "pull": -2.1888869908071436
        }
       ]
      }
     },
     "matched_entry_only_luscher_string_tension": {
      "R5": {
-      "n": 7,
+      "n": 8,
       "n_gt_2": 1,
       "n_gt_3": 1,
       "max_abs": 3.5331981864539013,
-      "expected_gt_2_if_gaussian": 0.3185,
-      "expected_gt_3_if_gaussian": 0.0189,
+      "expected_gt_2_if_gaussian": 0.364,
+      "expected_gt_3_if_gaussian": 0.0216,
       "rows_gt_2": [
        {
         "ensemble": "d4_b2.4_L12",
@@ -12547,12 +13863,12 @@
       ]
      },
      "t1": {
-      "n": 8,
+      "n": 9,
       "n_gt_2": 1,
       "n_gt_3": 1,
       "max_abs": 3.5331981864539013,
-      "expected_gt_2_if_gaussian": 0.364,
-      "expected_gt_3_if_gaussian": 0.0216,
+      "expected_gt_2_if_gaussian": 0.4095,
+      "expected_gt_3_if_gaussian": 0.024300000000000002,
       "rows_gt_2": [
        {
         "ensemble": "d4_b2.4_L12",
@@ -12565,12 +13881,12 @@
       ]
      },
      "t2": {
-      "n": 8,
+      "n": 9,
       "n_gt_2": 1,
       "n_gt_3": 0,
       "max_abs": 2.482425947924645,
-      "expected_gt_2_if_gaussian": 0.364,
-      "expected_gt_3_if_gaussian": 0.0216,
+      "expected_gt_2_if_gaussian": 0.4095,
+      "expected_gt_3_if_gaussian": 0.024300000000000002,
       "rows_gt_2": [
        {
         "ensemble": "d4_b2.4_L12",
@@ -12586,41 +13902,41 @@
     "by_quantity_matched": {
      "plaquette": {
       "R5": {
-       "n": 4,
+       "n": 5,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 0.08210343252500167,
-       "expected_gt_2_if_gaussian": 0.182,
-       "expected_gt_3_if_gaussian": 0.0108,
+       "expected_gt_2_if_gaussian": 0.22749999999999998,
+       "expected_gt_3_if_gaussian": 0.013500000000000002,
        "rows_gt_2": []
       },
       "t1": {
-       "n": 4,
+       "n": 5,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 0.08210343252500167,
-       "expected_gt_2_if_gaussian": 0.182,
-       "expected_gt_3_if_gaussian": 0.0108,
+       "expected_gt_2_if_gaussian": 0.22749999999999998,
+       "expected_gt_3_if_gaussian": 0.013500000000000002,
        "rows_gt_2": []
       },
       "t2": {
-       "n": 4,
+       "n": 5,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 0.08210343252500167,
-       "expected_gt_2_if_gaussian": 0.182,
-       "expected_gt_3_if_gaussian": 0.0108,
+       "expected_gt_2_if_gaussian": 0.22749999999999998,
+       "expected_gt_3_if_gaussian": 0.013500000000000002,
        "rows_gt_2": []
       }
      },
      "a*sqrt(sigma)": {
       "R5": {
-       "n": 7,
+       "n": 8,
        "n_gt_2": 1,
        "n_gt_3": 1,
        "max_abs": 3.0732982124460335,
-       "expected_gt_2_if_gaussian": 0.3185,
-       "expected_gt_3_if_gaussian": 0.0189,
+       "expected_gt_2_if_gaussian": 0.364,
+       "expected_gt_3_if_gaussian": 0.0216,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12633,12 +13949,12 @@
        ]
       },
       "t1": {
-       "n": 8,
+       "n": 9,
        "n_gt_2": 1,
        "n_gt_3": 1,
        "max_abs": 3.0732982124460335,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12651,12 +13967,12 @@
        ]
       },
       "t2": {
-       "n": 8,
+       "n": 9,
        "n_gt_2": 1,
        "n_gt_3": 0,
        "max_abs": 2.1488249951532254,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12671,12 +13987,12 @@
      },
      "a*m(0++)": {
       "R5": {
-       "n": 8,
-       "n_gt_2": 2,
+       "n": 9,
+       "n_gt_2": 3,
        "n_gt_3": 1,
        "max_abs": 3.3461541705720315,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12693,16 +14009,24 @@
          "lit": "0.660(22)",
          "verification_level": "search_excerpt",
          "pull": 3.3461541705720315
+        },
+        {
+         "ensemble": "d4_b2.5_L20",
+         "quantity": "a*m(0++)",
+         "lit_role": "primary",
+         "lit": "0.660(22)",
+         "verification_level": "search_excerpt",
+         "pull": 2.6198207681394687
         }
        ]
       },
       "t1": {
-       "n": 8,
-       "n_gt_2": 2,
+       "n": 9,
+       "n_gt_2": 3,
        "n_gt_3": 1,
        "max_abs": 3.3461541705720315,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12719,16 +14043,24 @@
          "lit": "0.660(22)",
          "verification_level": "search_excerpt",
          "pull": 3.3461541705720315
+        },
+        {
+         "ensemble": "d4_b2.5_L20",
+         "quantity": "a*m(0++)",
+         "lit_role": "primary",
+         "lit": "0.660(22)",
+         "verification_level": "search_excerpt",
+         "pull": 2.6198207681394687
         }
        ]
       },
       "t2": {
-       "n": 8,
+       "n": 9,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 1.9992583046289605,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": []
       }
      }
@@ -12736,12 +14068,12 @@
     "by_verification_level_matched": {
      "search_excerpt": {
       "R5": {
-       "n": 11,
-       "n_gt_2": 3,
+       "n": 13,
+       "n_gt_2": 4,
        "n_gt_3": 2,
        "max_abs": 3.3461541705720315,
-       "expected_gt_2_if_gaussian": 0.5005,
-       "expected_gt_3_if_gaussian": 0.0297,
+       "expected_gt_2_if_gaussian": 0.5915,
+       "expected_gt_3_if_gaussian": 0.0351,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12766,16 +14098,24 @@
          "lit": "0.660(22)",
          "verification_level": "search_excerpt",
          "pull": 3.3461541705720315
+        },
+        {
+         "ensemble": "d4_b2.5_L20",
+         "quantity": "a*m(0++)",
+         "lit_role": "primary",
+         "lit": "0.660(22)",
+         "verification_level": "search_excerpt",
+         "pull": 2.6198207681394687
         }
        ]
       },
       "t1": {
-       "n": 12,
-       "n_gt_2": 3,
+       "n": 14,
+       "n_gt_2": 4,
        "n_gt_3": 2,
        "max_abs": 3.3461541705720315,
-       "expected_gt_2_if_gaussian": 0.546,
-       "expected_gt_3_if_gaussian": 0.0324,
+       "expected_gt_2_if_gaussian": 0.637,
+       "expected_gt_3_if_gaussian": 0.0378,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12800,16 +14140,24 @@
          "lit": "0.660(22)",
          "verification_level": "search_excerpt",
          "pull": 3.3461541705720315
+        },
+        {
+         "ensemble": "d4_b2.5_L20",
+         "quantity": "a*m(0++)",
+         "lit_role": "primary",
+         "lit": "0.660(22)",
+         "verification_level": "search_excerpt",
+         "pull": 2.6198207681394687
         }
        ]
       },
       "t2": {
-       "n": 12,
+       "n": 14,
        "n_gt_2": 1,
        "n_gt_3": 0,
        "max_abs": 2.1488249951532254,
-       "expected_gt_2_if_gaussian": 0.546,
-       "expected_gt_3_if_gaussian": 0.0324,
+       "expected_gt_2_if_gaussian": 0.637,
+       "expected_gt_3_if_gaussian": 0.0378,
        "rows_gt_2": [
         {
          "ensemble": "d4_b2.4_L12",
@@ -12824,30 +14172,30 @@
      },
      "none": {
       "R5": {
-       "n": 8,
+       "n": 9,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 1.1033543596375606,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": []
       },
       "t1": {
-       "n": 8,
+       "n": 9,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 1.1033543596375606,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": []
       },
       "t2": {
-       "n": 8,
+       "n": 9,
        "n_gt_2": 0,
        "n_gt_3": 0,
        "max_abs": 0.9735054224776221,
-       "expected_gt_2_if_gaussian": 0.364,
-       "expected_gt_3_if_gaussian": 0.0216,
+       "expected_gt_2_if_gaussian": 0.4095,
+       "expected_gt_3_if_gaussian": 0.024300000000000002,
        "rows_gt_2": []
       }
      }
@@ -13310,6 +14658,44 @@
      "t1": 2.7848389341425923,
      "t2": 1.7333138826104355
     }
+   },
+   {
+    "ensemble": "d4_b2.5_L20",
+    "D": 4,
+    "beta": 2.5,
+    "lattice": "20^4",
+    "quantity": "m/sqrt(sigma)",
+    "lit_value": 3.5986913849509268,
+    "lit_unc": 0.13035456136439397,
+    "lit_a2_sigma": 0.03363556,
+    "how": "0.66(0.022) / 0.1834(0.0026), errors in quadrature; DERIVED, not a literature entry",
+    "verification_level": "search_excerpt",
+    "lit_lattice_L": 16,
+    "ours": {
+     "R5": {
+      "value": 3.896097382525462,
+      "err": 0.07833524369503139,
+      "is_measurement": true,
+      "err_kind": "correlated jackknife (pipeline file)"
+     },
+     "t1": {
+      "value": 3.863954292391225,
+      "err": 0.06966234650334933,
+      "is_measurement": true,
+      "err_kind": "uncorrelated propagation"
+     },
+     "t2": {
+      "value": 3.8546614177613354,
+      "err": 0.14543212386924448,
+      "is_measurement": true,
+      "err_kind": "uncorrelated propagation"
+     }
+    },
+    "pull": {
+     "R5": 1.9555724200143279,
+     "t1": 1.7947293630306713,
+     "t2": 1.3106380051120128
+    }
    }
   ],
   "derived_ratio_counts": {
@@ -13341,14 +14727,6 @@
    },
    "independent_all_data": {
     "R5": {
-     "n": 7,
-     "n_gt_2": 2,
-     "n_gt_3": 0,
-     "max_abs": 2.7848389341425923,
-     "expected_gt_2_if_gaussian": 0.3185,
-     "expected_gt_3_if_gaussian": 0.0189
-    },
-    "t1": {
      "n": 8,
      "n_gt_2": 2,
      "n_gt_3": 0,
@@ -13356,13 +14734,21 @@
      "expected_gt_2_if_gaussian": 0.364,
      "expected_gt_3_if_gaussian": 0.0216
     },
+    "t1": {
+     "n": 9,
+     "n_gt_2": 2,
+     "n_gt_3": 0,
+     "max_abs": 2.7848389341425923,
+     "expected_gt_2_if_gaussian": 0.4095,
+     "expected_gt_3_if_gaussian": 0.024300000000000002
+    },
     "t2": {
-     "n": 8,
+     "n": 9,
      "n_gt_2": 0,
      "n_gt_3": 0,
      "max_abs": 1.7333138826104355,
-     "expected_gt_2_if_gaussian": 0.364,
-     "expected_gt_3_if_gaussian": 0.0216
+     "expected_gt_2_if_gaussian": 0.4095,
+     "expected_gt_3_if_gaussian": 0.024300000000000002
     }
    }
   },
@@ -15525,6 +16911,38 @@
    }
   },
   {
+   "id": "ensemble.d4_b2.5_L20",
+   "description": "d4_b2.5_L20: D=4, beta=2.5, lattice 20^4, round 3 (finite-volume check of d4_b2.5_L16 (20^4)), 9600 measurements. Every quantity as R5 / fixed t=1 / fixed t=2; statistical errors only; masses are variational upper estimates.",
+   "source": "summary.json: ensembles.d4_b2.5_L20.{am,a_sqrt_sigma,m_over_sqrt_sigma}  <-  results/d4_b2.5_L20.json: glueball.{mass,err,fixed_t}, string_tension, ratios",
+   "am": {
+    "R5": "0.7263(125)",
+    "t1": "0.7263(125)",
+    "t2": "0.7186(263)"
+   },
+   "am_t_star": 1,
+   "a_sqrt_sigma": {
+    "R5": "0.1864(17)",
+    "t1": "0.1880(10)",
+    "t2": "0.1864(17)"
+   },
+   "torelon_t_star": 2,
+   "m_over_sqrt_sigma": {
+    "R5": "3.896(78)",
+    "t1": "3.864(70)",
+    "t2": "3.855(145)"
+   },
+   "m_over_sqrt_sigma_err_kind": {
+    "R5": "correlated jackknife (pipeline file)",
+    "t1": "uncorrelated propagation",
+    "t2": "uncorrelated propagation"
+   },
+   "am_over_err": {
+    "R5": 58.09755966487323,
+    "t1": 58.09755966487323,
+    "t2": 27.300949147691735
+   }
+  },
+  {
    "id": "d3.m_over_sqrt_sigma.primary.R5",
    "description": "D=3 m/sqrt(sigma) at beta = 6, 9, 12 with a constant fit and a straight line in a^2 sigma. Three points and a variational systematic: indicative only, not a controlled continuum limit.",
    "source": "summary.json: scaling_d3.sets.primary.R5",
@@ -16423,6 +17841,59 @@
    }
   },
   {
+   "id": "finite_volume.d4_b2.5_L16_combined_vs_d4_b2.5_L20",
+   "description": "finite volume: d4_b2.5_L16_combined (16^4) minus d4_b2.5_L20 (20^4); sigma = difference over the quadrature sum of the statistical errors (null where one side is not a measurement).",
+   "source": "summary.json: finite_volume[2].rows",
+   "am": {
+    "R5": {
+     "A_minus_B": "0.0268(211)",
+     "sigma": 1.2677632227214954
+    },
+    "t1": {
+     "A_minus_B": "0.0268(211)",
+     "sigma": 1.2677632227214954
+    },
+    "t2": {
+     "A_minus_B": "0.0277(455)",
+     "sigma": 0.6087888300158428
+    }
+   },
+   "a_sqrt_sigma": {
+    "R5": {
+     "A_minus_B": "0.0002(20)",
+     "sigma": 0.09593511068539702
+    },
+    "t1": {
+     "A_minus_B": "-0.0014(15)",
+     "sigma": -0.9189611609429874
+    },
+    "t2": {
+     "A_minus_B": "-0.0007(24)",
+     "sigma": -0.27090601336124914
+    }
+   },
+   "m_over_sqrt_sigma": {
+    "R5": {
+     "A_minus_B": "0.139(117)",
+     "sigma": 1.1889746340300849
+    },
+    "t1": {
+     "A_minus_B": "0.172(112)",
+     "sigma": 1.5366179732070326
+    },
+    "t2": {
+     "A_minus_B": "0.163(250)",
+     "sigma": 0.6512297135208405
+    }
+   },
+   "plaquette": {
+    "-": {
+     "A_minus_B": "-0.000002(14)",
+     "sigma": -0.12306110330864754
+    }
+   }
+  },
+  {
    "id": "replication.d3_b9.0_L24_vs_d3_b9.0_L24r",
    "description": "replication: d3_b9.0_L24 (24^3) minus d3_b9.0_L24r (24^3); sigma = difference over the quadrature sum of the statistical errors (null where one side is not a measurement).",
    "source": "summary.json: replication[0].rows",
@@ -16645,28 +18116,28 @@
    "source": "summary.json: literature_comparison.counts.independent_all_data.matched_entry_only",
    "counts": {
     "R5": {
-     "n": 19,
-     "n_gt_2": 3,
+     "n": 22,
+     "n_gt_2": 4,
      "n_gt_3": 2,
      "max_abs": 3.3461541705720315,
-     "expected_gt_2_if_gaussian": 0.8644999999999999,
-     "expected_gt_3_if_gaussian": 0.051300000000000005
+     "expected_gt_2_if_gaussian": 1.001,
+     "expected_gt_3_if_gaussian": 0.0594
     },
     "t1": {
-     "n": 20,
-     "n_gt_2": 3,
+     "n": 23,
+     "n_gt_2": 4,
      "n_gt_3": 2,
      "max_abs": 3.3461541705720315,
-     "expected_gt_2_if_gaussian": 0.9099999999999999,
-     "expected_gt_3_if_gaussian": 0.054000000000000006
+     "expected_gt_2_if_gaussian": 1.0465,
+     "expected_gt_3_if_gaussian": 0.0621
     },
     "t2": {
-     "n": 20,
+     "n": 23,
      "n_gt_2": 1,
      "n_gt_3": 0,
      "max_abs": 2.1488249951532254,
-     "expected_gt_2_if_gaussian": 0.9099999999999999,
-     "expected_gt_3_if_gaussian": 0.054000000000000006
+     "expected_gt_2_if_gaussian": 1.0465,
+     "expected_gt_3_if_gaussian": 0.0621
     }
    },
    "rows_gt_2": {
@@ -16694,6 +18165,14 @@
       "lit": "0.660(22)",
       "verification_level": "search_excerpt",
       "pull": 3.3461541705720315
+     },
+     {
+      "ensemble": "d4_b2.5_L20",
+      "quantity": "a*m(0++)",
+      "lit_role": "primary",
+      "lit": "0.660(22)",
+      "verification_level": "search_excerpt",
+      "pull": 2.6198207681394687
      }
     ],
     "t1": [
@@ -16720,6 +18199,14 @@
       "lit": "0.660(22)",
       "verification_level": "search_excerpt",
       "pull": 3.3461541705720315
+     },
+     {
+      "ensemble": "d4_b2.5_L20",
+      "quantity": "a*m(0++)",
+      "lit_role": "primary",
+      "lit": "0.660(22)",
+      "verification_level": "search_excerpt",
+      "pull": 2.6198207681394687
      }
     ],
     "t2": [
@@ -16760,19 +18247,20 @@
  ],
  "limits": [
   "This is numerical evidence for a mass gap in a lattice model, not a proof. The Millennium problem is open; nothing here proves or solves it.",
-  "On a finite lattice the transfer matrix has a discrete spectrum, so a nonzero gap at one (beta, L) is automatic and a*m/error only measures precision. The physically meaningful evidence is that m/sqrt(sigma) stays finite and stable when L grows and a shrinks; this is tested with three lattice spacings per dimension and one larger volume at one beta per dimension, no more.",
+  "On a finite lattice the transfer matrix has a discrete spectrum, so a nonzero gap at one (beta, L) is automatic and a*m/error only measures precision. The physically meaningful evidence is that m/sqrt(sigma) stays finite and stable when L grows and a shrinks; this is tested with three lattice spacings per dimension and one larger volume at one beta in D=3 and at two betas in D=4 (beta = 2.4 in round 2, beta = 2.5 in round 3), no more.",
   "All masses are variational upper estimates at small t (t = 1 or 2) with statistical errors only. Rule R5 picks t* on the same data: its error under-covers (52-65 % within 1 sigma in the synthetic tests quoted in the pipeline files), so every R5 number must be read with m_eff(1) and m_eff(2) beside it.",
   "Replication failure at the 2-3 sigma level in D=3, beta=9: d3_b9.0_L24 minus d3_b9.0_L24r is +2.9 sigma for a*m by rule R5 (both t*=2), +1.9 sigma at fixed t=1, +2.7 sigma for m/sqrt(sigma) (R5) and -2.1 sigma for the plaquette. In round 1 the effective mass rises from t=1 to t=2 by 2.0 sigma (m_eff(1)-m_eff(2) = -0.0207(105)), which a variational correlator cannot do in expectation; in the replication it falls (0.0111(87)). Reading the pre-registered round-1 number at beta=9 as an upward fluctuation that rule R5 then selected is consistent with these numbers, but it is a post-hoc reading; the pre-registered value stays what it is and all three (round 1, replication, combined) are reported.",
-  "D=4 glueball masses against the literature values of literature.json (search-excerpt level, column assignment inferred; rule R5 chose t*=1 in every D=4 glueball channel, so R5 = m_eff(1)): d4_b2.3_L10: m_eff(1) = 1.1951(223) (-0.7 sigma), m_eff(2) = 1.1492(704) (-0.9 sigma) vs 1.216(23); d4_b2.4_L12: m_eff(1) = 0.9926(148) (+2.1 sigma), m_eff(2) = 0.9809(404) (+1.0 sigma) vs 0.936(23); d4_b2.4_L16: m_eff(1) = 0.9863(309) (+1.3 sigma), m_eff(2) = 1.0215(850) (+1.0 sigma) vs 0.936(23); d4_b2.5_L16: m_eff(1) = 0.7420(216) (+2.7 sigma), m_eff(2) = 0.7667(494) (+2.0 sigma) vs 0.660(22); d4_b2.5_L16_combined: m_eff(1) = 0.7531(170) (+3.3 sigma), m_eff(2) = 0.7463(371) (+2.0 sigma) vs 0.660(22). At beta = 2.4 and 2.5 our values lie above the reference. Ours are variational upper estimates from a small operator basis; m_eff(2) has errors 2.2-3.2 times larger and neither confirms nor removes the excess. The tension is unresolved.",
+  "D=4 glueball masses against the literature values of literature.json (search-excerpt level, column assignment inferred; rule R5 chose t*=1 in every D=4 glueball channel, so R5 = m_eff(1)): d4_b2.3_L10: m_eff(1) = 1.1951(223) (-0.7 sigma), m_eff(2) = 1.1492(704) (-0.9 sigma) vs 1.216(23); d4_b2.4_L12: m_eff(1) = 0.9926(148) (+2.1 sigma), m_eff(2) = 0.9809(404) (+1.0 sigma) vs 0.936(23); d4_b2.4_L16: m_eff(1) = 0.9863(309) (+1.3 sigma), m_eff(2) = 1.0215(850) (+1.0 sigma) vs 0.936(23); d4_b2.5_L16: m_eff(1) = 0.7420(216) (+2.7 sigma), m_eff(2) = 0.7667(494) (+2.0 sigma) vs 0.660(22); d4_b2.5_L16_combined: m_eff(1) = 0.7531(170) (+3.3 sigma), m_eff(2) = 0.7463(371) (+2.0 sigma) vs 0.660(22); d4_b2.5_L20: m_eff(1) = 0.7263(125) (+2.6 sigma), m_eff(2) = 0.7186(263) (+1.7 sigma) vs 0.660(22). At beta = 2.4 and 2.5 our values lie above the reference. Ours are variational upper estimates from a small operator basis; m_eff(2) has errors 2.1-3.2 times larger and neither confirms nor removes the excess. The tension is unresolved.",
   "String tension, d4_b2.4_L12: a*sqrt(sigma) = 0.2619(9) (Nambu-Goto, t=1) against 0.2673(15) [search_excerpt; lattice size not named]: -3.1 sigma (-3.5 sigma with the Luscher formula). The torelon of this ensemble has L*sqrt(sigma) = 3.14(1) (our other volume at this beta, d4_b2.4_L16 with L = 16, gives 0.2653(26)); a short flux loop is where corrections beyond the string formulas are largest, and m/sqrt(sigma) of this ensemble inherits the shift.",
   "D=4 (primary, R5): m/sqrt(sigma) rises by 0.637(139) (+4.6 sigma) from beta=2.3 to 2.5; a straight line in a^2 sigma is formally acceptable (chi2/dof = 0.32/1) with intercept 4.259(116), +3.5 sigma from the literature continuum value 3.78(7); this intercept is not a continuum limit (see scaling_d4.note).",
   "D=4 (all_data, R5): m/sqrt(sigma) rises by 0.710(120) (+5.9 sigma) from beta=2.3 to 2.5; a straight line in a^2 sigma is formally acceptable (chi2/dof = 0.01/1) with intercept 4.305(103), +4.2 sigma from the literature continuum value 3.78(7); this intercept is not a continuum limit (see scaling_d4.note).",
   "D=3 (primary) m/sqrt(sigma) over beta = 6, 9, 12 - R5: constant 4.773(26) (chi2/dof 11.7/2, p=0.003), linear intercept 4.863(51) (chi2/dof 7.6/1, p=0.006), pulls of the intercept against the excerpt-level continuum values 4.716(21): +2.6, 4.737(6): +2.4, 4.718(43): +2.2; t1: constant 4.788(21) (chi2/dof 6.5/2, p=0.039), linear intercept 4.860(43) (chi2/dof 2.8/1, p=0.093), pulls of the intercept against the excerpt-level continuum values 4.716(21): +3.0, 4.737(6): +2.8, 4.718(43): +2.3. Three lattice spacings and a variational systematic (the masses are upper estimates at small t; that bias is not part of the statistical errors) do not make a controlled continuum limit. The intercepts describe these three points; they are indicative only.",
   "D=3 (all_data) m/sqrt(sigma) over beta = 6, 9, 12 - R5: constant 4.790(19) (chi2/dof 7.1/2, p=0.029), linear intercept 4.866(38) (chi2/dof 2.0/1, p=0.156), pulls of the intercept against the excerpt-level continuum values 4.716(21): +3.4, 4.737(6): +3.3, 4.718(43): +2.6; t1: constant 4.783(17) (chi2/dof 3.6/2, p=0.167), linear intercept 4.837(36) (chi2/dof 0.7/1, p=0.403), pulls of the intercept against the excerpt-level continuum values 4.716(21): +2.9, 4.737(6): +2.7, 4.718(43): +2.1. Three lattice spacings and a variational systematic (the masses are upper estimates at small t; that bias is not part of the statistical errors) do not make a controlled continuum limit. The intercepts describe these three points; they are indicative only.",
-  "Finite volume, d3_b6.0_L16 (16^3) minus d3_b6.0_L24 (24^3): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: +0.4 sigma; a*sqrt(sigma) R5: no measurement on one side; a*sqrt(sigma) t1: -1.3 sigma; a*sqrt(sigma) t2: -1.6 sigma. One larger volume per dimension, with errors 1.8 (a*m) and 3.6 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.",
-  "Finite volume, d4_b2.4_L12 (16x12^3) minus d4_b2.4_L16 (16^4): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: -0.4 sigma; a*sqrt(sigma) R5: -1.2 sigma; a*sqrt(sigma) t1: -1.2 sigma; a*sqrt(sigma) t2: +0.1 sigma. One larger volume per dimension, with errors 2.1 (a*m) and 2.8 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.",
+  "Finite volume, d3_b6.0_L16 (16^3) minus d3_b6.0_L24 (24^3): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: +0.4 sigma; a*sqrt(sigma) R5: no measurement on one side; a*sqrt(sigma) t1: -1.3 sigma; a*sqrt(sigma) t2: -1.6 sigma. The larger volume has errors 1.8 (a*m) and 3.6 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.",
+  "Finite volume, d4_b2.4_L12 (16x12^3) minus d4_b2.4_L16 (16^4): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: -0.4 sigma; a*sqrt(sigma) R5: -1.2 sigma; a*sqrt(sigma) t1: -1.2 sigma; a*sqrt(sigma) t2: +0.1 sigma. The larger volume has errors 2.1 (a*m) and 2.8 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.",
+  "Finite volume, d4_b2.5_L16_combined (16^4) minus d4_b2.5_L20 (20^4): a*m R5: +1.3 sigma; a*m t1: +1.3 sigma; a*m t2: +0.6 sigma; a*sqrt(sigma) R5: +0.1 sigma; a*sqrt(sigma) t1: -0.9 sigma; a*sqrt(sigma) t2: -0.3 sigma. The larger volume has errors 0.7 (a*m) and 0.9 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.",
   "No plateau (rule R5 gives an upper bound only, not a measurement): d3_b6.0_L24 (torelon / string tension); only the fixed-t values can be compared there.",
-  "Few jackknife bins (errors of errors are large, about 1/sqrt(2 n_bins)): d4_b2.4_L16: 178 bins, tau_int,max = 2.9, d4_b2.5_L16: 52 bins, tau_int,max = 10.6, d4_b2.5_L16x: 37 bins, tau_int,max = 12.1, d4_b2.5_L16_combined: 100 bins, tau_int,max = 10.3.",
+  "Few jackknife bins (errors of errors are large, about 1/sqrt(2 n_bins)): d4_b2.4_L16: 178 bins, tau_int,max = 2.9, d4_b2.5_L16: 52 bins, tau_int,max = 10.6, d4_b2.5_L16x: 37 bins, tau_int,max = 12.1, d4_b2.5_L16_combined: 100 bins, tau_int,max = 10.3, d4_b2.5_L20: 156 bins, tau_int,max = 6.1.",
   "Hot-start minus cold-start plaquette beyond 2 sigma: d4_b2.4_L16: -2.2 sigma (possible residual thermalisation effect or a fluctuation; not resolved).",
   "Literature values are 'seen in a web-search excerpt' at best, several are quoted from memory; no published table was opened. Agreement or disagreement with them is correspondingly weak evidence.",
   "D=4 is far from two-loop asymptotic scaling in this beta range (see scaling_d4.asymptotic_scaling): the lattice spacing in physical units is fixed by sqrt(sigma), not by perturbation theory."

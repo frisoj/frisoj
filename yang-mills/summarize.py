@@ -75,7 +75,9 @@ VARIANTS = ("R5", "t1", "t2")
 ACCEPT_P = 0.05
 
 #: ensemble -> (round, role).  Round 1 = the six pre-registered primary ensembles; round 2 was
-#: decided after a first look at round 1 (purposes fixed in run_extra_production.sh beforehand).
+#: decided after a first look at round 1 (purposes fixed in run_extra_production.sh beforehand);
+#: round 3 was decided after the adversarial physics review (purpose and criterion fixed in
+#: run_round3_production.sh, analysis plan in round3_plan.md, both before its data were looked at).
 ENSEMBLES = {
     "d3_b6.0_L16": ("1", "primary"),
     "d3_b6.0_L24": ("2", "finite-volume check of d3_b6.0_L16"),
@@ -89,6 +91,7 @@ ENSEMBLES = {
     "d4_b2.5_L16": ("1", "primary"),
     "d4_b2.5_L16x": ("2", "more statistics for d4_b2.5_L16 (new seeds)"),
     "d4_b2.5_L16_combined": ("1+2", "d4_b2.5_L16 and d4_b2.5_L16x analysed together"),
+    "d4_b2.5_L20": ("3", "finite-volume check of d4_b2.5_L16 (20^4)"),
 }
 TABLE_ORDER = list(ENSEMBLES)
 #: the six pre-registered ensembles
@@ -96,14 +99,20 @@ PRIMARY = ["d3_b6.0_L16", "d3_b9.0_L24", "d3_b12.0_L32", "d4_b2.3_L10", "d4_b2.4
            "d4_b2.5_L16"]
 #: all data, as statistically independent ensembles (combined files replace their parts)
 INDEPENDENT_ALL = ["d3_b6.0_L16", "d3_b6.0_L24", "d3_b9.0_L24_combined", "d3_b12.0_L32",
-                   "d4_b2.3_L10", "d4_b2.4_L12", "d4_b2.4_L16", "d4_b2.5_L16_combined"]
+                   "d4_b2.3_L10", "d4_b2.4_L12", "d4_b2.4_L16", "d4_b2.5_L16_combined",
+                   "d4_b2.5_L20"]
 SCALING_SETS = {
     3: {"primary": ["d3_b6.0_L16", "d3_b9.0_L24", "d3_b12.0_L32"],
         "all_data": ["d3_b6.0_L16", "d3_b9.0_L24_combined", "d3_b12.0_L32"]},
     4: {"primary": ["d4_b2.3_L10", "d4_b2.4_L12", "d4_b2.5_L16"],
         "all_data": ["d4_b2.3_L10", "d4_b2.4_L12", "d4_b2.5_L16_combined"]},
 }
-VOLUME_PAIRS = [("d3_b6.0_L16", "d3_b6.0_L24"), ("d4_b2.4_L12", "d4_b2.4_L16")]
+VOLUME_PAIRS = [("d3_b6.0_L16", "d3_b6.0_L24"), ("d4_b2.4_L12", "d4_b2.4_L16"),
+                ("d4_b2.5_L16_combined", "d4_b2.5_L20")]
+#: round 3 (run_round3_production.sh): reference ensemble, new ensemble, criterion in sigma
+ROUND3_REF, ROUND3_NEW, ROUND3_NSIGMA = "d4_b2.5_L16_combined", "d4_b2.5_L20", 3.0
+#: round3_plan.md item 4: the largest volume at each D=4 beta (shown NEXT TO the primary set)
+LARGEST_VOLUME_D4 = ["d4_b2.3_L10", "d4_b2.4_L16", "d4_b2.5_L20"]
 REPLICATION_PAIRS = [("d3_b9.0_L24", "d3_b9.0_L24r"), ("d4_b2.5_L16", "d4_b2.5_L16x")]
 LIT_SECTION = {3: "D3_SU2_wilson", 4: "D4_SU2_wilson"}
 
@@ -907,6 +916,73 @@ def compare_pair(ra, rb, kind):
 
 
 # ==============================================================================================
+# round 3: finite volume at beta = 2.5 (criterion of run_round3_production.sh, round3_plan.md)
+# ==============================================================================================
+def round3_verdict(ref, new, nsigma=ROUND3_NSIGMA):
+    """Volume test of the glueball mass between two independent ensembles at the same beta.
+
+    Reading A (pure finite-size gap, m ~ 1/L) predicts a*m(new) = a*m(ref) * L_ref / L_new;
+    reading B (volume-independent gap) predicts a*m(new) = a*m(ref).  The verdict uses the
+    fixed-t value m_eff(1) only, as fixed before the run: reading A is excluded if the measured
+    value lies more than ``nsigma`` (errors in quadrature) above its prediction; the reference
+    value is called volume-contaminated if the measured value lies more than ``nsigma`` below it.
+    """
+    out = {"reference": ref["name"], "ensemble": new["name"], "L_reference": ref["L"],
+           "L": new["L"], "criterion_sigma": nsigma, "primary_quantity": "am t1 (m_eff(1))"}
+    scale = ref["L"] / new["L"]
+    for v in VARIANTS:
+        a, b = ref["am"][v], new["am"][v]
+        if not (ok(a["value"], a["err"], b["value"], b["err"]) and a["value"] > 0
+                and b["value"] > 0):
+            out[v] = None
+            continue
+        pred = ve(a["value"] * scale, a["err"] * scale)
+        lnr = math.log(new["L"] / ref["L"])
+        out[v] = {
+            "measured": ve(b["value"], b["err"]), "reference": ve(a["value"], a["err"]),
+            "both_measurements": bool(a.get("is_measurement")) and bool(b.get("is_measurement")),
+            "reading_A_prediction": pred,
+            "measured_minus_A": diff_sigma(b["value"], b["err"], pred["value"], pred["err"]),
+            "measured_minus_reference": diff_sigma(b["value"], b["err"], a["value"], a["err"]),
+            "amL_reference": ve(a["value"] * ref["L"], a["err"] * ref["L"]),
+            "amL_measured": ve(b["value"] * new["L"], b["err"] * new["L"]),
+            "exponent_q": ve(-math.log(b["value"] / a["value"]) / lnr,
+                             math.hypot(a["err"] / a["value"], b["err"] / b["value"]) / lnr,
+                             note="m ~ L^-q from the two volumes; q = 1 pure finite-size gap, "
+                                  "q = 0 volume-independent gap"),
+        }
+    t1 = out.get("t1")
+    if t1:
+        sa, sb = t1["measured_minus_A"]["sigma"], t1["measured_minus_reference"]["sigma"]
+        out["verdict"] = {"reading_A_excluded": bool(sa is not None and sa > nsigma),
+                          "reference_volume_contaminated": bool(sb is not None and sb < -nsigma)}
+    else:
+        out["verdict"] = {"reading_A_excluded": None, "reference_volume_contaminated": None}
+    return out
+
+
+def round3_block(recs):
+    """Round 3 as fixed beforehand: volume test at beta = 2.5 and the largest-volume D=4 set."""
+    out = round3_verdict(recs[ROUND3_REF], recs[ROUND3_NEW])
+    out["note"] = ("Criterion and predictions were committed in run_round3_production.sh before "
+                   "the run, the list of what is computed in round3_plan.md before its data were "
+                   "looked at. Statistical errors only; the masses are variational upper "
+                   "estimates. Numerical evidence, not a proof.")
+    lv = {"ensembles": LARGEST_VOLUME_D4,
+          "note": "largest volume at each beta; shown next to the pre-registered primary set, "
+                  "not instead of it. No continuum value is quoted from either set. Fixed-t "
+                  "ratio errors: uncorrelated propagation (see ratio_error_check)."}
+    for v in ("t1", "R5"):
+        pts = _ratio_points(recs, LARGEST_VOLUME_D4, v)
+        fit = None
+        if all(p["is_measurement"] and ok(p["y"], p["y_err"]) for p in pts):
+            fit = fit_constant([p["y"] for p in pts], [p["y_err"] for p in pts])
+        lv[v] = {"points": pts, "fit_constant": fit}
+    out["largest_volume_set"] = lv
+    return out
+
+
+# ==============================================================================================
 # section 6: literature
 # ==============================================================================================
 LIT_QUANTITIES = (("plaquette", "plaquette"), ("a_sqrt_sigma", "a*sqrt(sigma)"),
@@ -1335,7 +1411,8 @@ def build_limits(summary):
         "one (beta, L) is automatic and a*m/error only measures precision. The physically "
         "meaningful evidence is that m/sqrt(sigma) stays finite and stable when L grows and a "
         "shrinks; this is tested with three lattice spacings per dimension and one larger "
-        "volume at one beta per dimension, no more.",
+        "volume at one beta in D=3 and at two betas in D=4 (beta = 2.4 in round 2, beta = 2.5 "
+        "in round 3), no more.",
         "All masses are variational upper estimates at small t (t = 1 or 2) with statistical "
         "errors only. Rule R5 picks t* on the same data: its error under-covers (52-65 % within "
         "1 sigma in the synthetic tests quoted in the pipeline files), so every R5 number must "
@@ -1444,8 +1521,8 @@ def build_limits(summary):
         er = [rr[(key, "t1")]["B"]["err"] / rr[(key, "t1")]["A"]["err"]
               for key in ("am", "a_sqrt_sigma")]
         out.append(f"Finite volume, {cmp_['A']} ({cmp_['lattice_A']}) minus {cmp_['B']} "
-                   f"({cmp_['lattice_B']}): " + "; ".join(bits) + ". One larger volume per "
-                   f"dimension, with errors {er[0]:.1f} (a*m) and {er[1]:.1f} (a*sqrt(sigma)) "
+                   f"({cmp_['lattice_B']}): " + "; ".join(bits) + ". The larger volume has "
+                   f"errors {er[0]:.1f} (a*m) and {er[1]:.1f} (a*sqrt(sigma)) "
                    "times those of the smaller volume at t=1: finite-volume effects are bounded "
                    "only at the level of these errors.")
     npl = [n for n in TABLE_ORDER if not recs[n]["a_sqrt_sigma"]["R5"]["is_measurement"]
@@ -1517,6 +1594,7 @@ def build_summary(results_dir, literature_path):
                           for a, b in VOLUME_PAIRS],
         "replication": [compare_pair(recs[a], recs[b], "replication")
                         for a, b in REPLICATION_PAIRS],
+        "round3": round3_block(recs),
         "literature_comparison": literature_comparison(recs, lit),
     }
     vals = [v["correlated_over_uncorrelated"]
@@ -1641,7 +1719,9 @@ def render_markdown(S):
     A("- \"σ\" bij een verschil = verschil gedeeld door de kwadratisch opgetelde statistische "
       "fouten (onafhankelijke ensembles).")
     A("- Ronde 1 = de zes vooraf vastgelegde ensembles. Ronde 2 is na een eerste blik op ronde 1 "
-      "besloten; het doel van elke run is vóór het draaien vastgelegd in `run_extra_production.sh`.")
+      "besloten; het doel van elke run is vóór het draaien vastgelegd in `run_extra_production.sh`. "
+      "Ronde 3 (d4_b2.5_L20) is na de natuurkundige controle besloten; doel, voorspellingen en "
+      "criterium staan vooraf in `run_round3_production.sh`, het analyseplan in `round3_plan.md`.")
     A("")
 
     # ------------------------------------------------------------------ 1
@@ -1921,9 +2001,10 @@ def render_markdown(S):
     # ------------------------------------------------------------------ 4, 5
     for key, title, intro in (
             ("finite_volume", "## 4. Eindig volume",
-             "Verschil klein rooster − groot rooster bij dezelfde β. Eén groter volume per dimensie, "
-             "met grotere fouten dan op het kleine rooster: volume-effecten zijn alleen op het "
-             "niveau van deze fouten begrensd."),
+             "Verschil klein rooster − groot rooster bij dezelfde β: één vergelijking in D = 3 en "
+             "twee in D = 4 (β = 2.4 uit ronde 2, β = 2.5 uit ronde 3). Het grotere rooster "
+             "heeft meestal grotere fouten: volume-effecten zijn alleen op het niveau van deze "
+             "fouten begrensd."),
             ("replication", "## 5. Replicatie",
              "Verschil ronde 1 − nieuwe seeds, zelfde β en rooster.")):
         A(title)
@@ -1948,6 +2029,66 @@ def render_markdown(S):
                              else "‡ geen meting aan één kant"])
             A(md_table(["grootheid", "variant", "A", "B", "A − B", "significantie"], rows))
             A("")
+
+    # ------------------------------------------------------------------ 5b (round 3)
+    r3 = S["round3"]
+    A("## 5b. Ronde 3: volumecontrole bij β = 2.5 (vooraf vastgelegd criterium)")
+    A("")
+    A(f"Vergelijking van {r3['ensemble']} (L = {r3['L']}) met {r3['reference']} "
+      f"(L = {r3['L_reference']}). Lezing A (zuivere eindige-doos-kloof, m ∝ 1/L) voorspelt "
+      f"a·m(L = {r3['L']}) = a·m(L = {r3['L_reference']}) × {r3['L_reference']}/{r3['L']}; lezing B "
+      "(volume-onafhankelijke kloof) voorspelt dezelfde waarde als op het kleine rooster. "
+      f"Criterium (`run_round3_production.sh`, vóór de run vastgelegd): lezing A is uitgesloten "
+      f"als m_eff(1) meer dan {r3['criterion_sigma']:g}σ boven haar voorspelling ligt; de waarde "
+      f"op L = {r3['L_reference']} heet door het volume vertekend als m_eff(1) meer dan "
+      f"{r3['criterion_sigma']:g}σ eronder ligt. Alleen t = 1 telt voor het oordeel; t = 2 en R5 "
+      "staan ernaast.")
+    A("")
+    rows = []
+    vlab = {"t1": "t = 1 (primair)", "t2": "t = 2", "R5": "R5"}
+    for v in ("t1", "t2", "R5"):
+        b = r3.get(v)
+        if not b:
+            rows.append([vlab[v]] + ["n/a"] * 7)
+            continue
+        rows.append([
+            vlab[v],
+            fmt_ve(b["reference"]["value"], b["reference"]["err"], 4),
+            fmt_ve(b["reading_A_prediction"]["value"], b["reading_A_prediction"]["err"], 4),
+            fmt_ve(b["measured"]["value"], b["measured"]["err"], 4),
+            _sg(b["measured_minus_A"]["sigma"], 1) + "σ",
+            _sg(b["measured_minus_reference"]["sigma"], 1) + "σ",
+            fmt_ve(b["amL_reference"]["value"], b["amL_reference"]["err"], 2) + " / "
+            + fmt_ve(b["amL_measured"]["value"], b["amL_measured"]["err"], 2),
+            fmt_ve(b["exponent_q"]["value"], b["exponent_q"]["err"], 2)])
+    A(md_table(["variant", f"a·m, L = {r3['L_reference']}", "voorspelling lezing A",
+                f"a·m gemeten, L = {r3['L']}", "gemeten − A", "gemeten − klein rooster",
+                f"a·m·L (L = {r3['L_reference']} / L = {r3['L']})", "exponent q in m ∝ L^−q"], rows))
+    A("")
+    vd = r3["verdict"]
+    A(f"**Oordeel volgens het criterium (t = 1):** lezing A (m ∝ 1/L) is bij β = 2.5 "
+      f"**{'uitgesloten' if vd['reading_A_excluded'] else 'niet uitgesloten'}**; de waarde op "
+      f"L = {r3['L_reference']} is **{'wel' if vd['reference_volume_contaminated'] else 'niet'}** "
+      "als door het volume vertekend aangemerkt. q = 1 is een zuivere eindige-doos-kloof, q = 0 "
+      "een volume-onafhankelijke kloof. Dit zegt iets over twee doosgroottes bij één "
+      "roosterafstand, niet over de continuümlimiet.")
+    A("")
+    lv = r3["largest_volume_set"]
+    A("**Grootste volume per β in D = 4** (" + ", ".join(lv["ensembles"]) + "; analyseplan "
+      "`round3_plan.md`, punt 4). Deze set staat naast de vooraf vastgelegde primaire set van "
+      "sectie 3, niet in plaats daarvan; uit geen van beide volgt een continuümwaarde.")
+    A("")
+    rows = []
+    for v, lab in (("t1", "t = 1"), ("R5", "R5")):
+        pts, fit = lv[v]["points"], lv[v]["fit_constant"]
+        rows.append([lab] + [fmt_ve(q["y"], q["y_err"], 3) + ("" if q["is_measurement"] else " ‡")
+                             for q in pts]
+                    + [" / ".join(fmt_ve(q["L_sqrt_sigma"], q["L_sqrt_sigma_err"], 2) for q in pts),
+                       (fmt_ve(fit["value"], fit["err"], 3) + f", χ² = {fit['chi2']:.1f} bij "
+                        f"{fit['dof']} (p = {fit['p_value']:.3f})") if fit else "n/a"])
+    A(md_table(["variant"] + [f"m/√σ, β = {q['beta']:g} ({q['lattice']})" for q in lv["t1"]["points"]]
+               + ["L√σ per rooster", "constante door de drie punten"], rows))
+    A("")
 
     # ------------------------------------------------------------------ 6
     lc = S["literature_comparison"]
@@ -1986,7 +2127,7 @@ def render_markdown(S):
     A("")
     rows = []
     names_nl = {"primary_ensembles": "primair (6 ensembles van ronde 1)",
-                "independent_all_data": "alle data (8 onafhankelijke ensembles)"}
+                "independent_all_data": f"alle data ({len(INDEPENDENT_ALL)} onafhankelijke ensembles)"}
     which_nl = {"matched_entry_only": "gekozen waarde",
                 "all_entries_including_alternatives": "alle waarden incl. alternatieven",
                 "matched_entry_only_luscher_string_tension": "alleen a√σ, Lüscher-formule, gekozen waarde"}
@@ -2420,7 +2561,9 @@ def make_figures(S, outdir):
     files.append(os.path.basename(path))
 
     # ------------------------------------------------------------------ volume
-    fig, axes = plt.subplots(2, 2, figsize=(13.5, 10.0), facecolor=COL["surface"])
+    n_fv = len(S["finite_volume"])
+    fig, axes = plt.subplots(n_fv, 2, figsize=(13.5, 5.0 * n_fv), facecolor=COL["surface"],
+                             squeeze=False)
     for row, cmp_ in enumerate(S["finite_volume"]):
         ra, rb = recs[cmp_["A"]], recs[cmp_["B"]]
         for col, (key, qlab, ylabel) in enumerate((("am", "a*m(0++)", "a·m (0++)"),
@@ -2467,7 +2610,7 @@ def make_figures(S, outdir):
                    f"D = {ra['D']}, β = {ra['beta']:g}: {ylabel} op {_sup(ra['lattice'])} en "
                    f"{_sup(rb['lattice'])}")
             _legend(ax, loc="upper left", ncol=2)
-    fig.suptitle(f"Eindig-volumecontrole (één groter rooster per dimensie) — {TAGLINE_NL}",
+    fig.suptitle(f"Eindig-volumecontrole (klein en groot rooster bij dezelfde β) — {TAGLINE_NL}",
                  color=COL["text"], fontsize=13, x=0.01, ha="left")
     fig.text(0.01, 0.008, "Fouten: alleen statistisch. Punten van t = 1 en t = 2 zijn horizontaal "
              "iets verschoven. Het grotere rooster heeft minder metingen en dus grotere fouten: "

@@ -64,7 +64,7 @@ the full sample at the pipeline bin size and kept fixed in all sub-analyses of t
 Usage
 -----
     python3 independent_analysis.py d3_b9.0_L24            # one ensemble -> results/independent/
-    python3 independent_analysis.py --all --jobs 4         # all twelve (about 1.5 minutes on 4 cores)
+    python3 independent_analysis.py --all --jobs 4         # all thirteen (about 2 minutes on 4 cores)
     python3 independent_analysis.py --table                # (re)write results/independent/COMPARISON.md
     python3 independent_analysis.py --selftest             # synthetic data with a known answer
 The raw files are only read.  Results are reproducible bit for bit (fixed bootstrap seed).
@@ -114,6 +114,8 @@ ENSEMBLES = {
     "d4_b2.5_L16x": [("d4_b2.5_L16x", (605, 606, 607, 608))],
     "d4_b2.5_L16_combined": [("d4_b2.5_L16", (601, 602, 603, 604)),
                              ("d4_b2.5_L16x", (605, 606, 607, 608))],
+    # round 3 (added after the first version of this script; see run_round3_production.sh)
+    "d4_b2.5_L20": [("d4_b2.5_L20", (901, 902, 903, 904))],
 }
 ORDER = list(ENSEMBLES)
 
@@ -1735,7 +1737,7 @@ def write_table(outdir, pipeline_dir):
       "than 3 times the scatter expected from dropping data; chi2 probability < 1 % for the streams and "
       "for the time-history chunks, < 0.1 % for the correlation between streams (14 tests per "
       "ensemble); chunk 0 differs from the rest by more than 3 sigma; hot-cold pull beyond 2.58.  A flag is a prompt to look, not a "
-      "verdict; with twelve ensembles and dozens of quantities a few flags are expected by chance.")
+      "verdict; with thirteen ensembles and dozens of quantities a few flags are expected by chance.")
     w("")
     any_flag = False
     for n, j in J.items():
@@ -1900,7 +1902,7 @@ def _worker(job):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("names", nargs="*", help="ensemble names (see ENSEMBLES)")
-    p.add_argument("--all", action="store_true", help="all twelve ensembles")
+    p.add_argument("--all", action="store_true", help="all thirteen ensembles")
     p.add_argument("--jobs", type=int, default=1)
     p.add_argument("--raw-dir", default=os.path.join(HERE, "results", "raw"))
     p.add_argument("--pipeline-dir", default=os.path.join(HERE, "results"))

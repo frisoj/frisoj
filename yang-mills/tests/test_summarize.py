@@ -276,7 +276,7 @@ SHAPES = {"d3_b6.0_L16": (16, 16, 16), "d3_b6.0_L24": (24, 24, 24), "d3_b9.0_L24
           "d3_b12.0_L32": (32, 32, 32), "d4_b2.3_L10": (12, 10, 10, 10),
           "d4_b2.4_L12": (16, 12, 12, 12), "d4_b2.4_L16": (16, 16, 16, 16),
           "d4_b2.5_L16": (16, 16, 16, 16), "d4_b2.5_L16x": (16, 16, 16, 16),
-          "d4_b2.5_L16_combined": (16, 16, 16, 16)}
+          "d4_b2.5_L16_combined": (16, 16, 16, 16), "d4_b2.5_L20": (20, 20, 20, 20)}
 
 
 def _beta_of(name):
@@ -497,6 +497,81 @@ def test_missing_or_misnamed_pipeline_file_is_an_error(tmp_path):
 REAL = ROOT / "results"
 HAVE_REAL = all((REAL / f"{n}.json").is_file() for n in S.TABLE_ORDER) \
     and (ROOT / "literature.json").is_file()
+
+
+# ----------------------------------------------------------------------------------------------
+# round 3: the criterion fixed in run_round3_production.sh
+# ----------------------------------------------------------------------------------------------
+def _vol_rec(name, L, m, e, measurement=True):
+    return {"name": name, "L": L,
+            "am": {v: {"value": m, "err": e, "is_measurement": measurement} for v in S.VARIANTS}}
+
+
+def test_round3_verdict_volume_independent_gap():
+    # same mass on both volumes: reading A (m ~ 1/L) predicts 0.75 * 16/20 = 0.60
+    r = S.round3_verdict(_vol_rec("ref", 16, 0.75, 0.017), _vol_rec("new", 20, 0.75, 0.018))
+    t1 = r["t1"]
+    assert t1["reading_A_prediction"]["value"] == pytest.approx(0.60, abs=1e-12)
+    assert t1["reading_A_prediction"]["err"] == pytest.approx(0.0136, abs=1e-12)
+    assert t1["measured_minus_A"]["diff"] == pytest.approx(0.15, abs=1e-12)
+    assert t1["measured_minus_A"]["sigma"] == pytest.approx(0.15 / math.hypot(0.018, 0.0136))
+    assert t1["measured_minus_reference"]["sigma"] == pytest.approx(0.0, abs=1e-12)
+    assert t1["exponent_q"]["value"] == pytest.approx(0.0, abs=1e-12)
+    assert t1["exponent_q"]["err"] == pytest.approx(
+        math.hypot(0.017 / 0.75, 0.018 / 0.75) / math.log(1.25))
+    assert t1["amL_reference"]["value"] == pytest.approx(12.0)
+    assert t1["amL_measured"]["value"] == pytest.approx(15.0)
+    assert r["verdict"] == {"reading_A_excluded": True, "reference_volume_contaminated": False}
+
+
+def test_round3_verdict_pure_finite_size_gap():
+    # mass falls exactly like 1/L: reading A is not excluded, q = 1, and the small-volume
+    # value counts as volume-contaminated (0.15 below it with errors 0.017 and 0.014: 6.8 sigma)
+    r = S.round3_verdict(_vol_rec("ref", 16, 0.75, 0.017), _vol_rec("new", 20, 0.60, 0.014))
+    t1 = r["t1"]
+    assert t1["measured_minus_A"]["sigma"] == pytest.approx(0.0, abs=1e-12)
+    assert t1["exponent_q"]["value"] == pytest.approx(1.0, abs=1e-12)
+    assert t1["amL_measured"]["value"] == pytest.approx(t1["amL_reference"]["value"])
+    assert r["verdict"] == {"reading_A_excluded": False, "reference_volume_contaminated": True}
+
+
+def test_round3_verdict_thresholds_are_strict_and_use_t1_only():
+    # 2.9 sigma above reading A: not excluded (criterion is "more than 3 sigma")
+    e = 0.02
+    m_new = 0.60 + 2.9 * math.hypot(e, 0.0136)
+    r = S.round3_verdict(_vol_rec("ref", 16, 0.75, 0.017), _vol_rec("new", 20, m_new, e))
+    assert r["verdict"]["reading_A_excluded"] is False
+    m_new = 0.60 + 3.1 * math.hypot(e, 0.0136)
+    r = S.round3_verdict(_vol_rec("ref", 16, 0.75, 0.017), _vol_rec("new", 20, m_new, e))
+    assert r["verdict"]["reading_A_excluded"] is True
+    # the verdict looks at t1 only: change t2 and R5 of the new ensemble, nothing changes
+    new = _vol_rec("new", 20, m_new, e)
+    new["am"]["t2"] = {"value": 0.10, "err": 0.5, "is_measurement": True}
+    new["am"]["R5"] = {"value": None, "err": None, "is_measurement": False}
+    r2 = S.round3_verdict(_vol_rec("ref", 16, 0.75, 0.017), new)
+    assert r2["verdict"] == r["verdict"] and r2["R5"] is None
+
+
+def test_round3_block_on_synthetic_files(tmp_path):
+    lit = write_synthetic_results(tmp_path)
+    summ = S.build_summary(str(tmp_path), str(lit))
+    r3 = summ["round3"]
+    assert (r3["reference"], r3["ensemble"]) == ("d4_b2.5_L16_combined", "d4_b2.5_L20")
+    # synthetic files: a*m = 3.5 * 0.19 = 0.665 +- 0.01 on both volumes
+    assert r3["t1"]["reading_A_prediction"]["value"] == pytest.approx(0.665 * 0.8)
+    assert r3["t1"]["measured_minus_A"]["sigma"] == pytest.approx(
+        0.665 * 0.2 / math.hypot(0.01, 0.008))
+    assert r3["verdict"] == {"reading_A_excluded": True, "reference_volume_contaminated": False}
+    lv = r3["largest_volume_set"]
+    assert lv["ensembles"] == ["d4_b2.3_L10", "d4_b2.4_L16", "d4_b2.5_L20"]
+    assert lv["t1"]["fit_constant"]["value"] == pytest.approx(3.5)
+    assert lv["t1"]["fit_constant"]["chi2"] == pytest.approx(0.0, abs=1e-9)
+    # the new pair is a finite-volume comparison like the other two
+    assert [(c["A"], c["B"]) for c in summ["finite_volume"]][-1] == \
+        ("d4_b2.5_L16_combined", "d4_b2.5_L20")
+    assert "d4_b2.5_L20" in S.INDEPENDENT_ALL and S.ENSEMBLES["d4_b2.5_L20"][0] == "3"
+    md = S.render_markdown(summ)
+    assert "## 5b. Ronde 3" in md and "**uitgesloten**" in md
 
 
 @pytest.mark.skipif(not HAVE_REAL, reason="pipeline output results/<ensemble>.json not present")

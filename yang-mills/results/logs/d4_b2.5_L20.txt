@@ -1,0 +1,31 @@
+ensemble d4_b2.5_L20: D=4 shape=20x20x20x20 beta=2.5 | 9516 measurements used (84 discarded), bins of 61 (auto: ceil(10 * tau_int_max), tau_int_max = 6.090), 156 bins
+plaquette   0.65199 +- 0.00001   tau_int = 1.38
+glueball a*m  0.72629 +- 0.01250   [plateau, t*=1]
+   GEVP operators: s28_2x2,s40_2x2,s10_2x2,s4_2x2   overlap 0.884
+   t=0  m_eff = 0.84980 +- 0.00759
+   t=1  m_eff = 0.72629 +- 0.01250
+   t=2  m_eff = 0.71857 +- 0.02632
+   t=3  m_eff = 0.68304 +- 0.04882
+   t=4  m_eff = 0.84228 +- 0.13692
+   t=5  m_eff = 0.87764 +- 0.33651
+   cosh fit t=1..6: 0.72360 +- 0.01809  chi2/dof = 0.77/4
+torelon  a*E  0.64052 +- 0.01262   [plateau, t*=2]
+   GEVP operators: s40,s28,s4   overlap 0.919
+   t=0  m_eff = 0.71282 +- 0.00493
+   t=1  m_eff = 0.65216 +- 0.00760
+   t=2  m_eff = 0.64052 +- 0.01262
+   t=3  m_eff = 0.63173 +- 0.02428
+   t=4  m_eff = 0.60855 +- 0.04301
+   t=5  m_eff = 0.66051 +- 0.08797
+   cosh fit t=2..7: 0.63588 +- 0.02008  chi2/dof = 0.31/4
+a*sqrt(sigma) [luscher, L=20]  0.18613 +- 0.00169
+a*sqrt(sigma) [nambu_goto, L=20]  0.18642 +- 0.00169
+   fixed t=1: a*E = 0.65216 +- 0.00760  ->  a*sqrt(sigma) [luscher] 0.18769 +- 0.00101
+   fixed t=2: a*E = 0.64052 +- 0.01262  ->  a*sqrt(sigma) [luscher] 0.18613 +- 0.00169
+m/sqrt(sigma) [luscher]  3.90210 +- 0.07857
+m/sqrt(sigma) [nambu_goto]  3.89610 +- 0.07834
+m/Lambda_L (two-loop)  203.11378 +- 3.49608   [a*Lambda_L = 0.00357579]
+plaquette, hot-start minus cold-start streams: -1.34e-05 +- 1.5e-05 (-0.87 sigma)
+CAVEAT: the error of a mass chosen by plateau rule R5 does not include the selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare with the fixed-t values above and see 'caveats' in the JSON file.
+(numerical evidence for one lattice ensemble; not a proof of the mass gap)
+wrote results/d4_b2.5_L20.json and d4_b2.5_L20_glueball_meff.png, d4_b2.5_L20_torelon_meff.png, d4_b2.5_L20_correlators.png

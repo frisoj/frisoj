@@ -1,6 +1,6 @@
 # Samenvatting over alle ensembles — numeriek bewijsmateriaal, geen bewijs
 
-Gegenereerd door `python3 summarize.py` uit `results/<ensemble>.json` (uitvoer van `analyze.py`, niet gewijzigd) en `literature.json`. Machineleesbaar: `results/summary.json`. Tijdstip: 2026-11-11T22:35:38Z.
+Gegenereerd door `python3 summarize.py` uit `results/<ensemble>.json` (uitvoer van `analyze.py`, niet gewijzigd) en `literature.json`. Machineleesbaar: `results/summary.json`. Tijdstip: 2026-11-11T23:39:34Z.
 
 **Wat dit is — en wat niet.** Monte-Carlo-resultaten voor zuivere SU(2)-roosterijktheorie (Wilson-actie) bij eindige roosterafstand en eindig volume, met alleen statistische fouten; de massa's zijn variationele bovengrens-schattingen. Dit is **numeriek bewijsmateriaal** voor een massakloof in het roostermodel, **geen bewijs**: het millenniumprobleem is open en wordt hier niet opgelost.
 
@@ -11,7 +11,7 @@ Gegenereerd door `python3 summarize.py` uit `results/<ensemble>.json` (uitvoer v
 - a√σ uit de torelon met de Nambu–Goto-formule; verschil met de Lüscher-formule apart vermeld.
 - ‡ = geen meting (R5: "no plateau", alleen een bovengrens). \* = fout van een verhouding berekend alsof glueball en torelon ongecorreleerd zijn (de pijplijnbestanden bevatten voor die combinatie geen gecorreleerde fout). Controle bij de R5-verhoudingen, waar beide bestaan: gecorreleerde fout / ongecorreleerde fout ligt tussen 0.82 en 1.03.
 - "σ" bij een verschil = verschil gedeeld door de kwadratisch opgetelde statistische fouten (onafhankelijke ensembles).
-- Ronde 1 = de zes vooraf vastgelegde ensembles. Ronde 2 is na een eerste blik op ronde 1 besloten; het doel van elke run is vóór het draaien vastgelegd in `run_extra_production.sh`.
+- Ronde 1 = de zes vooraf vastgelegde ensembles. Ronde 2 is na een eerste blik op ronde 1 besloten; het doel van elke run is vóór het draaien vastgelegd in `run_extra_production.sh`. Ronde 3 (d4_b2.5_L20) is na de natuurkundige controle besloten; doel, voorspellingen en criterium staan vooraf in `run_round3_production.sh`, het analyseplan in `round3_plan.md`.
 
 ## 1. Tabel per ensemble
 
@@ -31,6 +31,7 @@ Gegenereerd door `python3 summarize.py` uit `results/<ensemble>.json` (uitvoer v
 | d4_b2.5_L16 | 4 | 2.5 | 16^4 | 1 | 5831 | 0.7420(216) [1] | 0.7420(216) | 0.7667(494) | -0.0248(392) (-0.6σ) | 34 / 34 / 16 |
 | d4_b2.5_L16x | 4 | 2.5 | 16^4 | 2 | 4871 | 0.7713(260) [1] | 0.7713(260) | 0.7457(584) | 0.0256(412) (+0.6σ) | 30 / 30 / 13 |
 | d4_b2.5_L16_combined | 4 | 2.5 | 16^4 | 1+2 | 10702 | 0.7531(170) [1] | 0.7531(170) | 0.7463(371) | 0.0068(288) (+0.2σ) | 44 / 44 / 20 |
+| d4_b2.5_L20 | 4 | 2.5 | 20^4 | 3 | 9600 | 0.7263(125) [1] | 0.7263(125) | 0.7186(263) | 0.0077(216) (+0.4σ) | 58 / 58 / 27 |
 
 a·m/fout is de precisie waarmee de massa van nul verschilt. Op een eindig rooster is het spectrum discreet en is een kloof ≠ 0 bij één (β, L) vanzelfsprekend; bovendien is m_eff per definitie positief. Deze kolom is dus geen bewijsmateriaal voor een kloof in het continuüm.
 
@@ -50,6 +51,7 @@ a·m/fout is de precisie waarmee de massa van nul verschilt. Op een eindig roost
 | d4_b2.5_L16 | 16 | 0.4913(93) [1] | 0.4913(93) | 0.4908(132) | 0.1873(15) | 0.1873(15) | 0.1872(22) | +0.0007 |
 | d4_b2.5_L16x | 16 | 0.4553(204) [3] | 0.4858(93) | 0.4758(145) | 0.1812(35) | 0.1864(16) | 0.1847(24) | +0.0007 |
 | d4_b2.5_L16_combined | 16 | 0.4873(65) [1] | 0.4873(65) | 0.4822(106) | 0.1866(11) | 0.1866(11) | 0.1858(18) | +0.0007 |
+| d4_b2.5_L20 | 20 | 0.6405(126) [2] | 0.6522(76) | 0.6405(126) | 0.1864(17) | 0.1880(10) | 0.1864(17) | +0.0003 |
 
 ### 1c. Verhouding m/√σ en volume-indicatoren
 
@@ -67,6 +69,7 @@ a·m/fout is de precisie waarmee de massa van nul verschilt. Op een eindig roost
 | d4_b2.5_L16 | 3.962(112) | 3.962(112) | 4.096(268) * | 3.00(2) | 11.9(3) | 11.9(3) | 1.32(5) | 0.93 |
 | d4_b2.5_L16x | 4.256(135) | 4.139(144) * | 4.038(320) * | 2.90(6) | 12.3(4) | 12.3(4) | 1.18(7) | 0.82 |
 | d4_b2.5_L16_combined | 4.036(87) | 4.036(87) | 4.018(203) * | 2.99(2) | 12.0(3) | 12.0(3) | 1.29(3) | 0.93 |
+| d4_b2.5_L20 | 3.896(78) | 3.864(70) * | 3.855(145) * | 3.73(3) | 14.5(3) | 14.5(3) | 1.76(5) | 1.03 |
 
 L√σ en m·L: ruimtelijke afmeting in fysische eenheden; m·T: tijdsafmeting in eenheden 1/m; 2E_torelon/m: energie van een torelonpaar gedeeld door de glueballmassa (dicht bij 1 betekent dat het 0++-kanaal bij dit volume met torelonparen kan mengen). Berekend met de R5-waarden, of met t=1 waar R5 geen meting is. Laatste kolom: de gecorreleerde jackknife-fout van de R5-verhouding uit het pijplijnbestand gedeeld door de fout bij ongecorreleerde voortplanting; dit ijkt de met \* gemerkte fouten (kleiner dan 1 betekent dat een \*-fout iets te groot is).
 
@@ -86,6 +89,7 @@ L√σ en m·L: ruimtelijke afmeting in fysische eenheden; m·T: tijdsafmeting i
 | d4_b2.5_L16 | 52 | 106 | 10.6 | +1.4 | 5.0/3 | 0.651984(18) | +0.14σ, fout ×1.06 |
 | d4_b2.5_L16x | 37 | 122 | 12.1 | -0.3 | 0.1/3 | 0.651982(15) | -0.20σ, fout ×0.91 |
 | d4_b2.5_L16_combined | 100 | 103 | 10.3 | +0.9 | 5.3/7 | 0.651985(11) | -0.11σ, fout ×1.03 |
+| d4_b2.5_L20 | 156 | 61 | 6.1 | -0.9 | 5.3/3 | 0.651987(8) | +0.10σ, fout ×1.10 |
 
 ## 2. Schaalgedrag in D = 3 (β = 6, 9, 12)
 
@@ -229,7 +233,7 @@ a·Λ_L = (6π²β/11)^(51/121)·exp(−3π²β/11) (`ym/exact.py: a_lambda_two_
 
 ## 4. Eindig volume
 
-Verschil klein rooster − groot rooster bij dezelfde β. Eén groter volume per dimensie, met grotere fouten dan op het kleine rooster: volume-effecten zijn alleen op het niveau van deze fouten begrensd.
+Verschil klein rooster − groot rooster bij dezelfde β: één vergelijking in D = 3 en twee in D = 4 (β = 2.4 uit ronde 2, β = 2.5 uit ronde 3). Het grotere rooster heeft meestal grotere fouten: volume-effecten zijn alleen op het niveau van deze fouten begrensd.
 
 **d3_b6.0_L16 (16^3) − d3_b6.0_L24 (24^3), D = 3, β = 6**
 
@@ -266,6 +270,24 @@ Verschil klein rooster − groot rooster bij dezelfde β. Eén groter volume per
 | m/sqrt(sigma) | t1 | 3.790(58) | 3.718(125) | 0.072(138) | +0.52σ |
 | m/sqrt(sigma) | t2 | 3.741(156) | 3.910(340) | -0.169(374) | -0.45σ |
 | plaquette | - | 0.630022(16) | 0.630021(19) | 0.000001(25) | +0.03σ |
+
+**d4_b2.5_L16_combined (16^4) − d4_b2.5_L20 (20^4), D = 4, β = 2.5**
+
+| grootheid | variant | A | B | A − B | significantie |
+| --- | --- | --- | --- | --- | --- |
+| a*m(0++) | R5 [t: 1 / 1] | 0.7531(170) | 0.7263(125) | 0.0268(211) | +1.27σ |
+| a*m(0++) | t1 | 0.7531(170) | 0.7263(125) | 0.0268(211) | +1.27σ |
+| a*m(0++) | t2 | 0.7463(371) | 0.7186(263) | 0.0277(455) | +0.61σ |
+| a*sqrt(sigma) [Nambu-Goto] | R5 [t: 1 / 2] | 0.1866(11) | 0.1864(17) | 0.0002(20) | +0.10σ |
+| a*sqrt(sigma) [Nambu-Goto] | t1 | 0.1866(11) | 0.1880(10) | -0.0014(15) | -0.92σ |
+| a*sqrt(sigma) [Nambu-Goto] | t2 | 0.1858(18) | 0.1864(17) | -0.0007(24) | -0.27σ |
+| a*sqrt(sigma) [Luscher] | R5 [t: 1 / 2] | 0.1859(11) | 0.1861(17) | -0.0003(20) | -0.13σ |
+| a*sqrt(sigma) [Luscher] | t1 | 0.1859(11) | 0.1877(10) | -0.0018(15) | -1.22σ |
+| a*sqrt(sigma) [Luscher] | t2 | 0.1850(18) | 0.1861(17) | -0.0011(25) | -0.45σ |
+| m/sqrt(sigma) | R5 [t: [1, 1] / [1, 2]] | 4.036(87) | 3.896(78) | 0.139(117) | +1.19σ |
+| m/sqrt(sigma) | t1 | 4.036(87) | 3.864(70) | 0.172(112) | +1.54σ |
+| m/sqrt(sigma) | t2 | 4.018(203) | 3.855(145) | 0.163(250) | +0.65σ |
+| plaquette | - | 0.651985(11) | 0.651987(8) | -0.000002(14) | -0.12σ |
 
 ## 5. Replicatie
 
@@ -312,6 +334,25 @@ Verschil ronde 1 − nieuwe seeds, zelfde β en rooster.
 | m/sqrt(sigma) | t1 | 3.962(112) | 4.139(144) | -0.176(182) | -0.97σ |
 | m/sqrt(sigma) | t2 | 4.096(268) | 4.038(320) | 0.059(418) | +0.14σ |
 | plaquette | - | 0.651984(18) | 0.651982(15) | 0.000002(24) | +0.08σ |
+
+## 5b. Ronde 3: volumecontrole bij β = 2.5 (vooraf vastgelegd criterium)
+
+Vergelijking van d4_b2.5_L20 (L = 20) met d4_b2.5_L16_combined (L = 16). Lezing A (zuivere eindige-doos-kloof, m ∝ 1/L) voorspelt a·m(L = 20) = a·m(L = 16) × 16/20; lezing B (volume-onafhankelijke kloof) voorspelt dezelfde waarde als op het kleine rooster. Criterium (`run_round3_production.sh`, vóór de run vastgelegd): lezing A is uitgesloten als m_eff(1) meer dan 3σ boven haar voorspelling ligt; de waarde op L = 16 heet door het volume vertekend als m_eff(1) meer dan 3σ eronder ligt. Alleen t = 1 telt voor het oordeel; t = 2 en R5 staan ernaast.
+
+| variant | a·m, L = 16 | voorspelling lezing A | a·m gemeten, L = 20 | gemeten − A | gemeten − klein rooster | a·m·L (L = 16 / L = 20) | exponent q in m ∝ L^−q |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| t = 1 (primair) | 0.7531(170) | 0.6024(136) | 0.7263(125) | +6.7σ | -1.3σ | 12.05(27) / 14.53(25) | 0.16(13) |
+| t = 2 | 0.7463(371) | 0.5970(297) | 0.7186(263) | +3.1σ | -0.6σ | 11.94(59) / 14.37(53) | 0.17(28) |
+| R5 | 0.7531(170) | 0.6024(136) | 0.7263(125) | +6.7σ | -1.3σ | 12.05(27) / 14.53(25) | 0.16(13) |
+
+**Oordeel volgens het criterium (t = 1):** lezing A (m ∝ 1/L) is bij β = 2.5 **uitgesloten**; de waarde op L = 16 is **niet** als door het volume vertekend aangemerkt. q = 1 is een zuivere eindige-doos-kloof, q = 0 een volume-onafhankelijke kloof. Dit zegt iets over twee doosgroottes bij één roosterafstand, niet over de continuümlimiet.
+
+**Grootste volume per β in D = 4** (d4_b2.3_L10, d4_b2.4_L16, d4_b2.5_L20; analyseplan `round3_plan.md`, punt 4). Deze set staat naast de vooraf vastgelegde primaire set van sectie 3, niet in plaats daarvan; uit geen van beide volgt een continuümwaarde.
+
+| variant | m/√σ, β = 2.3 (12x10^3) | m/√σ, β = 2.4 (16^4) | m/√σ, β = 2.5 (20^4) | L√σ per rooster | constante door de drie punten |
+| --- | --- | --- | --- | --- | --- |
+| t = 1 | 3.242(63) | 3.718(125) | 3.864(70) | 3.69(2) / 4.24(4) / 3.76(2) | 3.544(44), χ² = 46.4 bij 2 (p = 0.000) |
+| R5 | 3.325(82) | 3.718(125) | 3.896(78) | 3.59(6) / 4.24(4) / 3.73(3) | 3.641(52), χ² = 25.7 bij 2 (p = 0.000) |
 
 ## 6. Vergelijking met literatuurwaarden
 
@@ -377,6 +418,15 @@ Betrouwbaarheid van de literatuurgetallen: "zoekfragment" = gezien in een fragme
 | d4_b2.5_L16_combined | a*m(0++) | 0.69(4) | geheugen (ongeverifieerd) | geen bron aangewezen |  | 0.7531(170) | +1.5 | 0.7531(170) | +1.5 | 0.7463(371) | +1.0 |  |
 | d4_b2.5_L16_combined | a*m(0++) | 0.6857(28) | zoekfragment | arXiv:1911.03048 |  | 0.7531(170) | +3.9 | 0.7531(170) | +3.9 | 0.7463(371) | +1.6 |  |
 | d4_b2.5_L16_combined | a*m(0++) | 0.72(3) | zoekfragment | arXiv:hep-lat/9809019 |  | 0.7531(170) | +1.0 | 0.7531(170) | +1.0 | 0.7463(371) | +0.6 |  |
+| d4_b2.5_L20 | plaquette | 0.652(1) | geheugen (ongeverifieerd) | geen bron aangewezen | ja | 0.651987(8) | -0.0 | 0.651987(8) | -0.0 | 0.651987(8) | -0.0 |  |
+| d4_b2.5_L20 | a*sqrt(sigma) | 0.186(3) | zoekfragment | arXiv:hep-th/9812187 | ja | 0.1864(17) | +0.1 | 0.1880(10) | +0.6 | 0.1864(17) | +0.1 | +0.0 / +0.5 / +0.0 |
+| d4_b2.5_L20 | a*sqrt(sigma) | 0.1834(26) | zoekfragment | arXiv:hep-th/9812187, L=16 |  | 0.1864(17) | +1.0 | 0.1880(10) | +1.6 | 0.1864(17) | +1.0 | +0.9 / +1.5 / +0.9 |
+| d4_b2.5_L20 | a*sqrt(sigma) | 0.1871(10) | zoekfragment | arXiv:hep-th/9812187, L=16 |  | 0.1864(17) | -0.3 | 0.1880(10) | +0.6 | 0.1864(17) | -0.3 | -0.5 / +0.4 / -0.5 |
+| d4_b2.5_L20 | a*sqrt(sigma) | 0.1905(8) | geheugen (ongeverifieerd) | arXiv:hep-lat/9208012 |  | 0.1864(17) | -2.2 | 0.1880(10) | -2.0 | 0.1864(17) | -2.2 | -2.3 / -2.2 / -2.3 |
+| d4_b2.5_L20 | a*m(0++) | 0.660(22) | zoekfragment | arXiv:hep-th/9812187, L=16 | ja | 0.7263(125) | +2.6 | 0.7263(125) | +2.6 | 0.7186(263) | +1.7 |  |
+| d4_b2.5_L20 | a*m(0++) | 0.69(4) | geheugen (ongeverifieerd) | geen bron aangewezen |  | 0.7263(125) | +0.9 | 0.7263(125) | +0.9 | 0.7186(263) | +0.6 |  |
+| d4_b2.5_L20 | a*m(0++) | 0.6857(28) | zoekfragment | arXiv:1911.03048 |  | 0.7263(125) | +3.2 | 0.7263(125) | +3.2 | 0.7186(263) | +1.2 |  |
+| d4_b2.5_L20 | a*m(0++) | 0.72(3) | zoekfragment | arXiv:hep-lat/9809019 |  | 0.7263(125) | +0.2 | 0.7263(125) | +0.2 | 0.7186(263) | -0.0 |  |
 
 De literatuurwaarden van a√σ zijn (volgens `literature.json`, uit het geheugen) met de Lüscher-correctie bepaald; de laatste kolom is daarom de meest gelijksoortige vergelijking voor de snaarspanning.
 
@@ -393,15 +443,15 @@ De literatuurwaarden van a√σ zijn (volgens `literature.json`, uit het geheuge
 | primair (6 ensembles van ronde 1) | alleen a√σ, Lüscher-formule, gekozen waarde | R5 | 6 | 1 | 1 | 3.53 | 0.3 / 0.02 |
 | primair (6 ensembles van ronde 1) | alleen a√σ, Lüscher-formule, gekozen waarde | t1 | 6 | 1 | 1 | 3.53 | 0.3 / 0.02 |
 | primair (6 ensembles van ronde 1) | alleen a√σ, Lüscher-formule, gekozen waarde | t2 | 6 | 1 | 0 | 2.48 | 0.3 / 0.02 |
-| alle data (8 onafhankelijke ensembles) | gekozen waarde | R5 | 19 | 3 | 2 | 3.35 | 0.9 / 0.05 |
-| alle data (8 onafhankelijke ensembles) | gekozen waarde | t1 | 20 | 3 | 2 | 3.35 | 0.9 / 0.05 |
-| alle data (8 onafhankelijke ensembles) | gekozen waarde | t2 | 20 | 1 | 0 | 2.15 | 0.9 / 0.05 |
-| alle data (8 onafhankelijke ensembles) | alle waarden incl. alternatieven | R5 | 31 | 6 | 3 | 3.91 | 1.4 / 0.08 |
-| alle data (8 onafhankelijke ensembles) | alle waarden incl. alternatieven | t1 | 34 | 6 | 3 | 3.91 | 1.5 / 0.09 |
-| alle data (8 onafhankelijke ensembles) | alle waarden incl. alternatieven | t2 | 34 | 3 | 0 | 2.86 | 1.5 / 0.09 |
-| alle data (8 onafhankelijke ensembles) | alleen a√σ, Lüscher-formule, gekozen waarde | R5 | 7 | 1 | 1 | 3.53 | 0.3 / 0.02 |
-| alle data (8 onafhankelijke ensembles) | alleen a√σ, Lüscher-formule, gekozen waarde | t1 | 8 | 1 | 1 | 3.53 | 0.4 / 0.02 |
-| alle data (8 onafhankelijke ensembles) | alleen a√σ, Lüscher-formule, gekozen waarde | t2 | 8 | 1 | 0 | 2.48 | 0.4 / 0.02 |
+| alle data (9 onafhankelijke ensembles) | gekozen waarde | R5 | 22 | 4 | 2 | 3.35 | 1.0 / 0.06 |
+| alle data (9 onafhankelijke ensembles) | gekozen waarde | t1 | 23 | 4 | 2 | 3.35 | 1.0 / 0.06 |
+| alle data (9 onafhankelijke ensembles) | gekozen waarde | t2 | 23 | 1 | 0 | 2.15 | 1.0 / 0.06 |
+| alle data (9 onafhankelijke ensembles) | alle waarden incl. alternatieven | R5 | 40 | 9 | 4 | 3.91 | 1.8 / 0.11 |
+| alle data (9 onafhankelijke ensembles) | alle waarden incl. alternatieven | t1 | 43 | 8 | 4 | 3.91 | 2.0 / 0.12 |
+| alle data (9 onafhankelijke ensembles) | alle waarden incl. alternatieven | t2 | 43 | 4 | 0 | 2.86 | 2.0 / 0.12 |
+| alle data (9 onafhankelijke ensembles) | alleen a√σ, Lüscher-formule, gekozen waarde | R5 | 8 | 1 | 1 | 3.53 | 0.4 / 0.02 |
+| alle data (9 onafhankelijke ensembles) | alleen a√σ, Lüscher-formule, gekozen waarde | t1 | 9 | 1 | 1 | 3.53 | 0.4 / 0.02 |
+| alle data (9 onafhankelijke ensembles) | alleen a√σ, Lüscher-formule, gekozen waarde | t2 | 9 | 1 | 0 | 2.48 | 0.4 / 0.02 |
 
 | ensembles | grootheid (gekozen waarde) | variant | aantal | > 2 | > 3 | grootste |pull| |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -414,15 +464,15 @@ De literatuurwaarden van a√σ zijn (volgens `literature.json`, uit het geheuge
 | primair (6 ensembles van ronde 1) | a*m(0++) | R5 | 6 | 3 | 0 | 2.66 |
 | primair (6 ensembles van ronde 1) | a*m(0++) | t1 | 6 | 2 | 0 | 2.66 |
 | primair (6 ensembles van ronde 1) | a*m(0++) | t2 | 6 | 1 | 0 | 2.47 |
-| alle data (8 onafhankelijke ensembles) | plaquette | R5 | 4 | 0 | 0 | 0.08 |
-| alle data (8 onafhankelijke ensembles) | plaquette | t1 | 4 | 0 | 0 | 0.08 |
-| alle data (8 onafhankelijke ensembles) | plaquette | t2 | 4 | 0 | 0 | 0.08 |
-| alle data (8 onafhankelijke ensembles) | a*sqrt(sigma) | R5 | 7 | 1 | 1 | 3.07 |
-| alle data (8 onafhankelijke ensembles) | a*sqrt(sigma) | t1 | 8 | 1 | 1 | 3.07 |
-| alle data (8 onafhankelijke ensembles) | a*sqrt(sigma) | t2 | 8 | 1 | 0 | 2.15 |
-| alle data (8 onafhankelijke ensembles) | a*m(0++) | R5 | 8 | 2 | 1 | 3.35 |
-| alle data (8 onafhankelijke ensembles) | a*m(0++) | t1 | 8 | 2 | 1 | 3.35 |
-| alle data (8 onafhankelijke ensembles) | a*m(0++) | t2 | 8 | 0 | 0 | 2.00 |
+| alle data (9 onafhankelijke ensembles) | plaquette | R5 | 5 | 0 | 0 | 0.08 |
+| alle data (9 onafhankelijke ensembles) | plaquette | t1 | 5 | 0 | 0 | 0.08 |
+| alle data (9 onafhankelijke ensembles) | plaquette | t2 | 5 | 0 | 0 | 0.08 |
+| alle data (9 onafhankelijke ensembles) | a*sqrt(sigma) | R5 | 8 | 1 | 1 | 3.07 |
+| alle data (9 onafhankelijke ensembles) | a*sqrt(sigma) | t1 | 9 | 1 | 1 | 3.07 |
+| alle data (9 onafhankelijke ensembles) | a*sqrt(sigma) | t2 | 9 | 1 | 0 | 2.15 |
+| alle data (9 onafhankelijke ensembles) | a*m(0++) | R5 | 9 | 3 | 1 | 3.35 |
+| alle data (9 onafhankelijke ensembles) | a*m(0++) | t1 | 9 | 3 | 1 | 3.35 |
+| alle data (9 onafhankelijke ensembles) | a*m(0++) | t2 | 9 | 0 | 0 | 2.00 |
 
 | ensembles | niveau van de literatuurwaarde (gekozen waarde) | variant | aantal | > 2 | > 3 | grootste |pull| |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -432,12 +482,12 @@ De literatuurwaarden van a√σ zijn (volgens `literature.json`, uit het geheuge
 | primair (6 ensembles van ronde 1) | geheugen (ongeverifieerd) | R5 | 6 | 1 | 0 | 2.47 |
 | primair (6 ensembles van ronde 1) | geheugen (ongeverifieerd) | t1 | 6 | 0 | 0 | 1.61 |
 | primair (6 ensembles van ronde 1) | geheugen (ongeverifieerd) | t2 | 6 | 1 | 0 | 2.47 |
-| alle data (8 onafhankelijke ensembles) | zoekfragment | R5 | 11 | 3 | 2 | 3.35 |
-| alle data (8 onafhankelijke ensembles) | zoekfragment | t1 | 12 | 3 | 2 | 3.35 |
-| alle data (8 onafhankelijke ensembles) | zoekfragment | t2 | 12 | 1 | 0 | 2.15 |
-| alle data (8 onafhankelijke ensembles) | geheugen (ongeverifieerd) | R5 | 8 | 0 | 0 | 1.10 |
-| alle data (8 onafhankelijke ensembles) | geheugen (ongeverifieerd) | t1 | 8 | 0 | 0 | 1.10 |
-| alle data (8 onafhankelijke ensembles) | geheugen (ongeverifieerd) | t2 | 8 | 0 | 0 | 0.97 |
+| alle data (9 onafhankelijke ensembles) | zoekfragment | R5 | 13 | 4 | 2 | 3.35 |
+| alle data (9 onafhankelijke ensembles) | zoekfragment | t1 | 14 | 4 | 2 | 3.35 |
+| alle data (9 onafhankelijke ensembles) | zoekfragment | t2 | 14 | 1 | 0 | 2.15 |
+| alle data (9 onafhankelijke ensembles) | geheugen (ongeverifieerd) | R5 | 9 | 0 | 0 | 1.10 |
+| alle data (9 onafhankelijke ensembles) | geheugen (ongeverifieerd) | t1 | 9 | 0 | 0 | 1.10 |
+| alle data (9 onafhankelijke ensembles) | geheugen (ongeverifieerd) | t2 | 9 | 0 | 0 | 0.97 |
 
 De verwachting bij Gauss-verdeelde, onafhankelijke pulls met juiste fouten staat in de eerste tabel. De pulls zijn niet onafhankelijk (a·m en a√σ van één ensemble; alternatieve literatuurwaarden van dezelfde grootheid) en de literatuurwaarden zijn niet geverifieerd.
 
@@ -453,7 +503,9 @@ Pulls boven 2σ (gekozen waarde):
 - d3_b9.0_L24, a*m(0++), t2: +2.47σ t.o.v. 0.765(10) [geheugen (ongeverifieerd)]
 - d4_b2.4_L12, a*sqrt(sigma), t2: -2.15σ t.o.v. 0.2673(15) [zoekfragment]
 - d4_b2.5_L16_combined, a*m(0++), R5: +3.35σ t.o.v. 0.660(22) [zoekfragment]
+- d4_b2.5_L20, a*m(0++), R5: +2.62σ t.o.v. 0.660(22) [zoekfragment]
 - d4_b2.5_L16_combined, a*m(0++), t1: +3.35σ t.o.v. 0.660(22) [zoekfragment]
+- d4_b2.5_L20, a*m(0++), t1: +2.62σ t.o.v. 0.660(22) [zoekfragment]
 
 ### 6b. Afgeleide verhouding m/√σ bij eindige β (geen literatuurwaarde op zich)
 
@@ -471,8 +523,9 @@ Pulls boven 2σ (gekozen waarde):
 | d4_b2.5_L16 | 3.599(130) | zoekfragment | 3.962(112) | +2.1 | 3.962(112) | +2.1 | 4.096(268) * | +1.7 |
 | d4_b2.5_L16x | 3.599(130) | zoekfragment | 4.256(135) | +3.5 | 4.139(144) * | +2.8 | 4.038(320) * | +1.3 |
 | d4_b2.5_L16_combined | 3.599(130) | zoekfragment | 4.036(87) | +2.8 | 4.036(87) | +2.8 | 4.018(203) * | +1.7 |
+| d4_b2.5_L20 | 3.599(130) | zoekfragment | 3.896(78) | +2.0 | 3.864(70) * | +1.8 | 3.855(145) * | +1.3 |
 
-Aantallen (afgeleid): primair (6 ensembles van ronde 1), R5: 3 van 6 boven 2σ, 0 boven 3σ; primair (6 ensembles van ronde 1), t1: 2 van 6 boven 2σ, 0 boven 3σ; primair (6 ensembles van ronde 1), t2: 1 van 6 boven 2σ, 0 boven 3σ; alle data (8 onafhankelijke ensembles), R5: 2 van 7 boven 2σ, 0 boven 3σ; alle data (8 onafhankelijke ensembles), t1: 2 van 8 boven 2σ, 0 boven 3σ; alle data (8 onafhankelijke ensembles), t2: 0 van 8 boven 2σ, 0 boven 3σ.
+Aantallen (afgeleid): primair (6 ensembles van ronde 1), R5: 3 van 6 boven 2σ, 0 boven 3σ; primair (6 ensembles van ronde 1), t1: 2 van 6 boven 2σ, 0 boven 3σ; primair (6 ensembles van ronde 1), t2: 1 van 6 boven 2σ, 0 boven 3σ; alle data (9 onafhankelijke ensembles), R5: 2 van 8 boven 2σ, 0 boven 3σ; alle data (9 onafhankelijke ensembles), t1: 2 van 9 boven 2σ, 0 boven 3σ; alle data (9 onafhankelijke ensembles), t2: 0 van 9 boven 2σ, 0 boven 3σ.
 
 ### 6c. Geëxtrapoleerde waarden tegen continuümwaarden uit de literatuur
 
@@ -541,6 +594,7 @@ Dezelfde lijst, met waarden en bronsleutels, staat in `summary.json` onder `head
 - `ensemble.d4_b2.5_L16`: a·m = 0.7420(216) / 0.7420(216) / 0.7667(494); a√σ = 0.1873(15) / 0.1873(15) / 0.1872(22); m/√σ = 3.962(112) / 3.962(112) / 4.096(268)  (R5 / t=1 / t=2)
 - `ensemble.d4_b2.5_L16x`: a·m = 0.7713(260) / 0.7713(260) / 0.7457(584); a√σ = 0.1812(35) / 0.1864(16) / 0.1847(24); m/√σ = 4.256(135) / 4.139(144) / 4.038(320)  (R5 / t=1 / t=2)
 - `ensemble.d4_b2.5_L16_combined`: a·m = 0.7531(170) / 0.7531(170) / 0.7463(371); a√σ = 0.1866(11) / 0.1866(11) / 0.1858(18); m/√σ = 4.036(87) / 4.036(87) / 4.018(203)  (R5 / t=1 / t=2)
+- `ensemble.d4_b2.5_L20`: a·m = 0.7263(125) / 0.7263(125) / 0.7186(263); a√σ = 0.1864(17) / 0.1880(10) / 0.1864(17); m/√σ = 3.896(78) / 3.864(70) / 3.855(145)  (R5 / t=1 / t=2)
 - `d3.m_over_sqrt_sigma.primary.R5`: constante 4.773(26) (χ²/dof 11.73/2, p = 0.003); rechte lijn → 4.863(51) (χ²/dof 7.56/1, p = 0.006); pulls van het snijpunt: 4.718(43) [geheugen (ongeverifieerd)]: +2.2, 4.716(21) [zoekfragment]: +2.6, 4.737(6) [zoekfragment]: +2.4, 4.718(43) [zoekfragment]: +2.2
 - `d3.sqrt_sigma_over_g2.primary.R5`: lineair in 1/β → 0.3322(27) (χ²/dof 3.60/1, pull -1.0); kwadratisch → 0.3610(154) (pull +1.7); lineair in 1/β_I → 0.3358(20) (pull +0.2); literatuur 0.3353(18) [zoekfragment]
 - `d3.m_over_sqrt_sigma.primary.t1`: constante 4.788(21) (χ²/dof 6.51/2, p = 0.039); rechte lijn → 4.860(43) (χ²/dof 2.82/1, p = 0.093); pulls van het snijpunt: 4.718(43) [geheugen (ongeverifieerd)]: +2.3, 4.716(21) [zoekfragment]: +3.0, 4.737(6) [zoekfragment]: +2.8, 4.718(43) [zoekfragment]: +2.3
@@ -557,10 +611,11 @@ Dezelfde lijst, met waarden en bronsleutels, staat in `summary.json` onder `head
 - `d4.asymptotic_scaling.all_data`: √σ/Λ_L = 60.8(1.1) → 56.9(2) → 52.2(3) (-14.1(1.6) %); a-verhoudingen uit √σ t.o.v. twee-lus: 1.372(25) vs 1.286 (+6.7 %), 1.403(10) vs 1.287 (+9.1 %), 1.926(36) vs 1.654 (+16.4 %)
 - `finite_volume.d3_b6.0_L16_vs_d3_b6.0_L24`: a·m: R5 +0.21σ / t1 +0.21σ / t2 +0.42σ; a√σ: R5 geen meting / t1 -1.29σ / t2 -1.64σ; m/√σ: R5 geen meting / t1 +0.76σ / t2 +1.33σ; plaquette: - +0.14σ
 - `finite_volume.d4_b2.4_L12_vs_d4_b2.4_L16`: a·m: R5 +0.19σ / t1 +0.19σ / t2 -0.43σ; a√σ: R5 -1.24σ / t1 -1.24σ / t2 +0.14σ; m/√σ: R5 +0.52σ / t1 +0.52σ / t2 -0.45σ; plaquette: - +0.03σ
+- `finite_volume.d4_b2.5_L16_combined_vs_d4_b2.5_L20`: a·m: R5 +1.27σ / t1 +1.27σ / t2 +0.61σ; a√σ: R5 +0.10σ / t1 -0.92σ / t2 -0.27σ; m/√σ: R5 +1.19σ / t1 +1.54σ / t2 +0.65σ; plaquette: - -0.12σ
 - `replication.d3_b9.0_L24_vs_d3_b9.0_L24r`: a·m: R5 +2.90σ / t1 +1.91σ / t2 +2.90σ; a√σ: R5 +0.35σ / t1 +0.22σ / t2 +0.35σ; m/√σ: R5 +2.74σ / t1 +1.76σ / t2 +2.74σ; plaquette: - -2.13σ
 - `replication.d4_b2.5_L16_vs_d4_b2.5_L16x`: a·m: R5 -0.87σ / t1 -0.87σ / t2 +0.28σ; a√σ: R5 +1.59σ / t1 +0.41σ / t2 +0.76σ; m/√σ: R5 -1.67σ / t1 -0.97σ / t2 +0.14σ; plaquette: - +0.08σ
 - `literature.primary_ensembles`: R5: 4 van 15 boven 2σ, 1 boven 3σ; t1: 3 van 15 boven 2σ, 1 boven 3σ; t2: 2 van 15 boven 2σ, 0 boven 3σ
-- `literature.independent_all_data`: R5: 3 van 19 boven 2σ, 2 boven 3σ; t1: 3 van 20 boven 2σ, 2 boven 3σ; t2: 1 van 20 boven 2σ, 0 boven 3σ
+- `literature.independent_all_data`: R5: 4 van 22 boven 2σ, 2 boven 3σ; t1: 4 van 23 boven 2σ, 2 boven 3σ; t2: 1 van 23 boven 2σ, 0 boven 3σ
 - `quality.min_am_over_err`: 12 (d4_b2.4_L16)
 - `quality.min_bins`: 37 (d4_b2.5_L16x)
 - `quality.max_hot_minus_cold`: -2.25 (d4_b2.4_L16)
@@ -572,19 +627,20 @@ Bronsleutel van elk getal: veld `source` van het betreffende item.
 (Engelstalig, letterlijk gelijk aan `limits` in summary.json; de getallen zijn door het script ingevuld.)
 
 - This is numerical evidence for a mass gap in a lattice model, not a proof. The Millennium problem is open; nothing here proves or solves it.
-- On a finite lattice the transfer matrix has a discrete spectrum, so a nonzero gap at one (beta, L) is automatic and a*m/error only measures precision. The physically meaningful evidence is that m/sqrt(sigma) stays finite and stable when L grows and a shrinks; this is tested with three lattice spacings per dimension and one larger volume at one beta per dimension, no more.
+- On a finite lattice the transfer matrix has a discrete spectrum, so a nonzero gap at one (beta, L) is automatic and a*m/error only measures precision. The physically meaningful evidence is that m/sqrt(sigma) stays finite and stable when L grows and a shrinks; this is tested with three lattice spacings per dimension and one larger volume at one beta in D=3 and at two betas in D=4 (beta = 2.4 in round 2, beta = 2.5 in round 3), no more.
 - All masses are variational upper estimates at small t (t = 1 or 2) with statistical errors only. Rule R5 picks t* on the same data: its error under-covers (52-65 % within 1 sigma in the synthetic tests quoted in the pipeline files), so every R5 number must be read with m_eff(1) and m_eff(2) beside it.
 - Replication failure at the 2-3 sigma level in D=3, beta=9: d3_b9.0_L24 minus d3_b9.0_L24r is +2.9 sigma for a*m by rule R5 (both t*=2), +1.9 sigma at fixed t=1, +2.7 sigma for m/sqrt(sigma) (R5) and -2.1 sigma for the plaquette. In round 1 the effective mass rises from t=1 to t=2 by 2.0 sigma (m_eff(1)-m_eff(2) = -0.0207(105)), which a variational correlator cannot do in expectation; in the replication it falls (0.0111(87)). Reading the pre-registered round-1 number at beta=9 as an upward fluctuation that rule R5 then selected is consistent with these numbers, but it is a post-hoc reading; the pre-registered value stays what it is and all three (round 1, replication, combined) are reported.
-- D=4 glueball masses against the literature values of literature.json (search-excerpt level, column assignment inferred; rule R5 chose t*=1 in every D=4 glueball channel, so R5 = m_eff(1)): d4_b2.3_L10: m_eff(1) = 1.1951(223) (-0.7 sigma), m_eff(2) = 1.1492(704) (-0.9 sigma) vs 1.216(23); d4_b2.4_L12: m_eff(1) = 0.9926(148) (+2.1 sigma), m_eff(2) = 0.9809(404) (+1.0 sigma) vs 0.936(23); d4_b2.4_L16: m_eff(1) = 0.9863(309) (+1.3 sigma), m_eff(2) = 1.0215(850) (+1.0 sigma) vs 0.936(23); d4_b2.5_L16: m_eff(1) = 0.7420(216) (+2.7 sigma), m_eff(2) = 0.7667(494) (+2.0 sigma) vs 0.660(22); d4_b2.5_L16_combined: m_eff(1) = 0.7531(170) (+3.3 sigma), m_eff(2) = 0.7463(371) (+2.0 sigma) vs 0.660(22). At beta = 2.4 and 2.5 our values lie above the reference. Ours are variational upper estimates from a small operator basis; m_eff(2) has errors 2.2-3.2 times larger and neither confirms nor removes the excess. The tension is unresolved.
+- D=4 glueball masses against the literature values of literature.json (search-excerpt level, column assignment inferred; rule R5 chose t*=1 in every D=4 glueball channel, so R5 = m_eff(1)): d4_b2.3_L10: m_eff(1) = 1.1951(223) (-0.7 sigma), m_eff(2) = 1.1492(704) (-0.9 sigma) vs 1.216(23); d4_b2.4_L12: m_eff(1) = 0.9926(148) (+2.1 sigma), m_eff(2) = 0.9809(404) (+1.0 sigma) vs 0.936(23); d4_b2.4_L16: m_eff(1) = 0.9863(309) (+1.3 sigma), m_eff(2) = 1.0215(850) (+1.0 sigma) vs 0.936(23); d4_b2.5_L16: m_eff(1) = 0.7420(216) (+2.7 sigma), m_eff(2) = 0.7667(494) (+2.0 sigma) vs 0.660(22); d4_b2.5_L16_combined: m_eff(1) = 0.7531(170) (+3.3 sigma), m_eff(2) = 0.7463(371) (+2.0 sigma) vs 0.660(22); d4_b2.5_L20: m_eff(1) = 0.7263(125) (+2.6 sigma), m_eff(2) = 0.7186(263) (+1.7 sigma) vs 0.660(22). At beta = 2.4 and 2.5 our values lie above the reference. Ours are variational upper estimates from a small operator basis; m_eff(2) has errors 2.1-3.2 times larger and neither confirms nor removes the excess. The tension is unresolved.
 - String tension, d4_b2.4_L12: a*sqrt(sigma) = 0.2619(9) (Nambu-Goto, t=1) against 0.2673(15) [search_excerpt; lattice size not named]: -3.1 sigma (-3.5 sigma with the Luscher formula). The torelon of this ensemble has L*sqrt(sigma) = 3.14(1) (our other volume at this beta, d4_b2.4_L16 with L = 16, gives 0.2653(26)); a short flux loop is where corrections beyond the string formulas are largest, and m/sqrt(sigma) of this ensemble inherits the shift.
 - D=4 (primary, R5): m/sqrt(sigma) rises by 0.637(139) (+4.6 sigma) from beta=2.3 to 2.5; a straight line in a^2 sigma is formally acceptable (chi2/dof = 0.32/1) with intercept 4.259(116), +3.5 sigma from the literature continuum value 3.78(7); this intercept is not a continuum limit (see scaling_d4.note).
 - D=4 (all_data, R5): m/sqrt(sigma) rises by 0.710(120) (+5.9 sigma) from beta=2.3 to 2.5; a straight line in a^2 sigma is formally acceptable (chi2/dof = 0.01/1) with intercept 4.305(103), +4.2 sigma from the literature continuum value 3.78(7); this intercept is not a continuum limit (see scaling_d4.note).
 - D=3 (primary) m/sqrt(sigma) over beta = 6, 9, 12 - R5: constant 4.773(26) (chi2/dof 11.7/2, p=0.003), linear intercept 4.863(51) (chi2/dof 7.6/1, p=0.006), pulls of the intercept against the excerpt-level continuum values 4.716(21): +2.6, 4.737(6): +2.4, 4.718(43): +2.2; t1: constant 4.788(21) (chi2/dof 6.5/2, p=0.039), linear intercept 4.860(43) (chi2/dof 2.8/1, p=0.093), pulls of the intercept against the excerpt-level continuum values 4.716(21): +3.0, 4.737(6): +2.8, 4.718(43): +2.3. Three lattice spacings and a variational systematic (the masses are upper estimates at small t; that bias is not part of the statistical errors) do not make a controlled continuum limit. The intercepts describe these three points; they are indicative only.
 - D=3 (all_data) m/sqrt(sigma) over beta = 6, 9, 12 - R5: constant 4.790(19) (chi2/dof 7.1/2, p=0.029), linear intercept 4.866(38) (chi2/dof 2.0/1, p=0.156), pulls of the intercept against the excerpt-level continuum values 4.716(21): +3.4, 4.737(6): +3.3, 4.718(43): +2.6; t1: constant 4.783(17) (chi2/dof 3.6/2, p=0.167), linear intercept 4.837(36) (chi2/dof 0.7/1, p=0.403), pulls of the intercept against the excerpt-level continuum values 4.716(21): +2.9, 4.737(6): +2.7, 4.718(43): +2.1. Three lattice spacings and a variational systematic (the masses are upper estimates at small t; that bias is not part of the statistical errors) do not make a controlled continuum limit. The intercepts describe these three points; they are indicative only.
-- Finite volume, d3_b6.0_L16 (16^3) minus d3_b6.0_L24 (24^3): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: +0.4 sigma; a*sqrt(sigma) R5: no measurement on one side; a*sqrt(sigma) t1: -1.3 sigma; a*sqrt(sigma) t2: -1.6 sigma. One larger volume per dimension, with errors 1.8 (a*m) and 3.6 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.
-- Finite volume, d4_b2.4_L12 (16x12^3) minus d4_b2.4_L16 (16^4): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: -0.4 sigma; a*sqrt(sigma) R5: -1.2 sigma; a*sqrt(sigma) t1: -1.2 sigma; a*sqrt(sigma) t2: +0.1 sigma. One larger volume per dimension, with errors 2.1 (a*m) and 2.8 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.
+- Finite volume, d3_b6.0_L16 (16^3) minus d3_b6.0_L24 (24^3): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: +0.4 sigma; a*sqrt(sigma) R5: no measurement on one side; a*sqrt(sigma) t1: -1.3 sigma; a*sqrt(sigma) t2: -1.6 sigma. The larger volume has errors 1.8 (a*m) and 3.6 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.
+- Finite volume, d4_b2.4_L12 (16x12^3) minus d4_b2.4_L16 (16^4): a*m R5: +0.2 sigma; a*m t1: +0.2 sigma; a*m t2: -0.4 sigma; a*sqrt(sigma) R5: -1.2 sigma; a*sqrt(sigma) t1: -1.2 sigma; a*sqrt(sigma) t2: +0.1 sigma. The larger volume has errors 2.1 (a*m) and 2.8 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.
+- Finite volume, d4_b2.5_L16_combined (16^4) minus d4_b2.5_L20 (20^4): a*m R5: +1.3 sigma; a*m t1: +1.3 sigma; a*m t2: +0.6 sigma; a*sqrt(sigma) R5: +0.1 sigma; a*sqrt(sigma) t1: -0.9 sigma; a*sqrt(sigma) t2: -0.3 sigma. The larger volume has errors 0.7 (a*m) and 0.9 (a*sqrt(sigma)) times those of the smaller volume at t=1: finite-volume effects are bounded only at the level of these errors.
 - No plateau (rule R5 gives an upper bound only, not a measurement): d3_b6.0_L24 (torelon / string tension); only the fixed-t values can be compared there.
-- Few jackknife bins (errors of errors are large, about 1/sqrt(2 n_bins)): d4_b2.4_L16: 178 bins, tau_int,max = 2.9, d4_b2.5_L16: 52 bins, tau_int,max = 10.6, d4_b2.5_L16x: 37 bins, tau_int,max = 12.1, d4_b2.5_L16_combined: 100 bins, tau_int,max = 10.3.
+- Few jackknife bins (errors of errors are large, about 1/sqrt(2 n_bins)): d4_b2.4_L16: 178 bins, tau_int,max = 2.9, d4_b2.5_L16: 52 bins, tau_int,max = 10.6, d4_b2.5_L16x: 37 bins, tau_int,max = 12.1, d4_b2.5_L16_combined: 100 bins, tau_int,max = 10.3, d4_b2.5_L20: 156 bins, tau_int,max = 6.1.
 - Hot-start minus cold-start plaquette beyond 2 sigma: d4_b2.4_L16: -2.2 sigma (possible residual thermalisation effect or a fluctuation; not resolved).
 - Literature values are 'seen in a web-search excerpt' at best, several are quoted from memory; no published table was opened. Agreement or disagreement with them is correspondingly weak evidence.
 - D=4 is far from two-loop asymptotic scaling in this beta range (see scaling_d4.asymptotic_scaling): the lattice spacing in physical units is fixed by sqrt(sigma), not by perturbation theory.
