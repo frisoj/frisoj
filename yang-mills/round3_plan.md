@@ -2,10 +2,10 @@
 
 Numerical evidence at finite lattice spacing and volume, not a proof.
 
-Written on 2026-11-11, about 20 minutes after the round-3 run `d4_b2.5_L20`
-started (see `run_round3_production.sh`, committed before the run), while the
-streams were still thermalising or had just begun measuring. No round-3 file
-had been opened or analysed. The criterion in the header of
+Written on 2026-11-11 at 22:35 UTC, about two minutes after the round-3 run
+`d4_b2.5_L20` started (see `run_round3_production.sh`, committed before the
+run), while all four streams were still thermalising (stream 901 was at
+update 383 of 1000) and no measurement existed. The criterion in the header of
 `run_round3_production.sh` stays as it is; this file adds what will be
 computed with the new ensemble, so that none of it is chosen after seeing it.
 
