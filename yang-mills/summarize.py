@@ -2613,8 +2613,9 @@ def make_figures(S, outdir):
     fig.suptitle(f"Eindig-volumecontrole (klein en groot rooster bij dezelfde β) — {TAGLINE_NL}",
                  color=COL["text"], fontsize=13, x=0.01, ha="left")
     fig.text(0.01, 0.008, "Fouten: alleen statistisch. Punten van t = 1 en t = 2 zijn horizontaal "
-             "iets verschoven. Het grotere rooster heeft minder metingen en dus grotere fouten: "
-             "volume-effecten zijn alleen op dat niveau begrensd. Literatuurwaarden: niet tegen "
+             "iets verschoven. In ronde 2 (β = 6 en β = 2.4) heeft het grotere rooster minder metingen "
+             "en dus grotere fouten.\nVolume-effecten zijn alleen op het niveau van de fouten "
+             "begrensd. Literatuurwaarden: niet tegen "
              "de gepubliceerde tabel gecontroleerd.", fontsize=8, color=COL["text2"], ha="left",
              va="bottom", wrap=True)
     fig.tight_layout(rect=(0, 0.035, 1, 0.955))

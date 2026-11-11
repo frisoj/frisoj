@@ -1,6 +1,6 @@
 # Samenvatting over alle ensembles — numeriek bewijsmateriaal, geen bewijs
 
-Gegenereerd door `python3 summarize.py` uit `results/<ensemble>.json` (uitvoer van `analyze.py`, niet gewijzigd) en `literature.json`. Machineleesbaar: `results/summary.json`. Tijdstip: 2026-11-11T23:39:34Z.
+Gegenereerd door `python3 summarize.py` uit `results/<ensemble>.json` (uitvoer van `analyze.py`, niet gewijzigd) en `literature.json`. Machineleesbaar: `results/summary.json`. Tijdstip: 2026-11-11T23:46:20Z.
 
 **Wat dit is — en wat niet.** Monte-Carlo-resultaten voor zuivere SU(2)-roosterijktheorie (Wilson-actie) bij eindige roosterafstand en eindig volume, met alleen statistische fouten; de massa's zijn variationele bovengrens-schattingen. Dit is **numeriek bewijsmateriaal** voor een massakloof in het roostermodel, **geen bewijs**: het millenniumprobleem is open en wordt hier niet opgelost.
 

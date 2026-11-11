@@ -1,7 +1,7 @@
 {
  "format": "ym-summary-1",
  "disclaimer": "Numerical Monte Carlo evidence (finite lattice spacing, finite volume, statistical errors, variational upper estimates of masses). NOT a proof of the Yang-Mills mass gap; the Millennium problem is open and nothing here solves it.",
- "generated_utc": "2026-11-11T23:39:34Z",
+ "generated_utc": "2026-11-11T23:46:20Z",
  "inputs": {
   "results_dir": "results",
   "pipeline_files": [

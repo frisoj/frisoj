@@ -23,6 +23,8 @@ betrouwbaarheid) in `literature.json`.
 | `run_production.py` | productierun: één Monte-Carlo-stroom → ruw `.npz`-bestand |
 | `analyze.py` | analyse van één ensemble (meerdere stromen) → JSON + figuren |
 | `run_all_production.sh`, `run_extra_production.sh`, `run_round3_production.sh` | de productie-ensembles zoals ze gedraaid zijn (ronde 1, 2 en 3; het doel van ronde 2 en 3 staat bovenaan het script, vastgelegd vóór de run) |
+| `round3_plan.md` | analyseplan voor ronde 3, vastgelegd voordat de data van die ronde werden bekeken |
+| `review/` | scripts en tekstuitvoer van de controleronde (statistiek, natuurkunde, rekensommen voor het rapport), ongewijzigd zoals ze zijn gedraaid; hoort niet bij de geteste code |
 | `independent_analysis.py` | onafhankelijke heranalyse van de ruwe data (deelt geen code met `ym/stats.py` en `analyze.py`; bootstrapfouten) → `results/independent/` |
 | `summarize.py` | synthese over alle ensembles: tabellen, schaalfits, volume- en replicatievergelijkingen, vergelijking met `literature.json` → `results/summary.json`, `results/summary.md` en drie figuren |
 | `results/` | uitkomsten: per ensemble `<naam>.json` en drie figuren (uitvoer van `analyze.py`), `logs/` (dezelfde samenvattingen als tekst), `summary.*` (uitvoer van `summarize.py`), `independent/` (uitvoer van `independent_analysis.py`, met `COMPARISON.md`); `raw/` bevat de ruwe data en staat niet in git |
