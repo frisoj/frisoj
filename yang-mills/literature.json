@@ -11,12 +11,34 @@
     },
     "schema": "Every leaf entry has: value, uncertainty (one standard deviation, same units as value; null if the source gives none), source, web_verified (boolean), verification_level, note. Optional 'alternatives' is a list of entries with the same fields.",
     "verification_levels": {
-      "search_excerpt": "The number was read during this session (2026-11-11) in a web-search result that quoted the cited source (typically the arXiv HTML/PDF text of the paper). The full text itself could NOT be opened: direct access to arxiv.org, inspirehep.net and other hosts is blocked by the network policy of the session. Treat as 'seen in a quoted excerpt', which is weaker than 'checked against the published table'.",
+      "search_excerpt": "The number was read during a session on 2026-11-11 in a web-search result that quoted the cited source (typically the arXiv HTML/PDF text of the paper, or a later paper that cites it; the note says which). The full text itself could NOT be opened: direct access to arxiv.org, inspirehep.net and other hosts is blocked by the network policy of the session. Treat as 'seen in a quoted excerpt', which is weaker than 'checked against the published table'.",
       "none": "Not found during this session. Quoted from memory (the orchestrator's and/or the document author's). Must be re-checked against the cited paper before it is used for any quantitative claim."
     },
-    "warning": "web_verified=true means verification_level=search_excerpt, NOT a line-by-line check of the published table. Numbers flagged 'from memory' may be wrong in the last digits and their uncertainties are rough estimates."
+    "warning": "web_verified=true means verification_level=search_excerpt, NOT a line-by-line check of the published table. Numbers flagged 'from memory' may be wrong in the last digits and their uncertainties are rough estimates.",
+    "fact_checked_on": "2026-11-11",
+    "fact_check": {
+      "who": "Second, independent pass over this file on 2026-11-11 (adversarial fact-check). Same limitation as the first pass: only web search worked, no full text could be opened.",
+      "changed_in_second_pass": [
+        "D4 a_m_0pp 2.4: from-memory 0.94(3) replaced by 0.936(23) seen in a search excerpt of hep-th/9812187 Table 10 (16^4 row); flag false -> true.",
+        "D4 a_m_0pp 2.5: from-memory 0.69(4) replaced by 0.660(22) seen in a search excerpt of hep-th/9812187 Table 10 (16^4 row); flag false -> true; the old from-memory value is kept as an unverified alternative.",
+        "D4 a_sqrt_sigma 2.4 and 2.5: added the 16^4 Table-10 values 0.2660(21) and 0.1834(26) as alternatives (search excerpt).",
+        "D4 a_sqrt_sigma 2.5 alternative 0.1871(10): number now seen in a search excerpt (flag false -> true), but the excerpt ties it to a 16^4 lattice and gives 0.1871(32) for 32^4; the attribution of 0.1871(10) to Bali-Schilling-Schlichter was therefore wrong/unsupported and has been corrected.",
+        "D4 beta_c N_t=4 (2.2986(6)) and N_t=6 (2.4265(30)), and the N_t=8 alternative 2.5115(40): seen in search excerpts of two later papers that tabulate them (flags false -> true, secondary citation).",
+        "D3 continuum m0pp/sqrt(sigma): added the alternative 4.716(21) (Lucini-Teper hep-lat/0206027, search excerpt). The primary 4.718(43) is still NOT verified."
+      ],
+      "re_seen_in_second_pass": [
+        "D4 a_sqrt_sigma 2.4 = 0.2673(15) and 2.5 = 0.186(3) (Teper review, Appendix A)."
+      ],
+      "not_reproduced_in_second_pass": "One targeted query each for 0.467(10), 0.3687(22), 1.216(23) (D4, Teper Table 10), 2.510363(71) (Berg-Clarke) and 2.2991 (Velytsky) did not return these numbers again. Their web_verified=true flags rest on the first compiler's report of the excerpts and were left unchanged; search results are not reproducible query by query, so this is neither a confirmation nor a refutation.",
+      "still_unverified": "All four D4 plaquette values (five differently worded searches in total found no table); D3 a_m_0pp at beta = 6, 9, 12; D3 continuum 4.718(43); D4 alternatives 0.1905(8), 3.781(23), 2.5104(2).",
+      "internal_consistency_checks": {
+        "D4_m0pp_over_sqrt_sigma": "beta=2.3: 1.216/0.3687 = 3.30; beta=2.4: 0.936/0.2660 = 3.52 (same 16^4 row), 0.936/0.2673 = 3.50; beta=2.5: 0.660/0.1834 = 3.60 (same 16^4 row), 0.660/0.186 = 3.55. All inside the expected 3.3-3.9 and rising towards the continuum value 3.78(7) as a -> 0.",
+        "D4_Tc_over_sqrt_sigma": "a*sqrt(sigma) interpolated log-linearly in beta to beta_c(N_t) gives T_c/sqrt(sigma) = 1/(N_t a sqrt(sigma)) = 0.676 (N_t=4, beta_c=2.2986), 0.686 (N_t=6, 2.4265), 0.698 (N_t=8, 2.510363) with the primary values, and 0.676, 0.691, 0.708 with the 16^4-row alternatives. Roughly constant, consistent with the literature 0.69-0.71 within the few-percent accuracy of this interpolation; the N_t=4 point is 2-4 percent low, which may be an O(a^2) effect or reflect that the beta=2.3 string tension comes from a small 10^4 lattice. Not a precision test.",
+        "D3_m0pp_over_sqrt_sigma": "1.19/0.2538 = 4.69, 0.765/0.1616 = 4.73, 0.559/0.1179 = 4.74: inside 4.6-4.8. Note that the three masses are from memory, so this checks only that the remembered numbers are mutually plausible.",
+        "D3_sqrt_sigma_over_g2": "beta*a*sqrt(sigma)/4 = 0.3807, 0.3636, 0.3537 at beta = 6, 9, 12: decreasing towards the continuum 0.3353(18). A naive extrapolation in the bare 1/beta gives 0.327 (linear) or 0.319 (quadratic through the three points), i.e. 2-5 percent below 0.3353; the published value uses a different (improved-coupling) extrapolation and more beta values, so only the direction and rough size of the drift are tested here."
+      }
+    }
   },
-
   "D4_SU2_wilson": {
     "plaquette": {
       "2.2": {
@@ -25,7 +47,7 @@
         "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
         "web_verified": false,
         "verification_level": "none",
-        "note": "from memory. Several web searches for a published table with this value returned nothing usable."
+        "note": "from memory. Several web searches for a published table with this value returned nothing usable. Second pass (fact-check): three further, differently worded searches also found no published table. The fact-checker's own recollection agrees with this value to within the quoted +-0.001, but two recollections are not a verification. A Monte Carlo mismatch at the 0.001 level must be reported as 'reference unverified', not tuned away."
       },
       "2.3": {
         "value": 0.6023,
@@ -33,34 +55,33 @@
         "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
         "web_verified": false,
         "verification_level": "none",
-        "note": "from memory."
+        "note": "from memory. Second pass (fact-check): three further, differently worded searches also found no published table. The fact-checker's own recollection agrees with this value to within the quoted +-0.001, but two recollections are not a verification. A Monte Carlo mismatch at the 0.001 level must be reported as 'reference unverified', not tuned away."
       },
       "2.4": {
-        "value": 0.6300,
+        "value": 0.63,
         "uncertainty": 0.001,
         "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
         "web_verified": false,
         "verification_level": "none",
-        "note": "from memory."
+        "note": "from memory. Second pass (fact-check): three further, differently worded searches also found no published table. The fact-checker's own recollection agrees with this value to within the quoted +-0.001, but two recollections are not a verification. A Monte Carlo mismatch at the 0.001 level must be reported as 'reference unverified', not tuned away."
       },
       "2.5": {
-        "value": 0.6520,
+        "value": 0.652,
         "uncertainty": 0.001,
         "source": "No specific table verified. Standard Monte Carlo value for the 4D SU(2) Wilson action as remembered by the orchestrator.",
         "web_verified": false,
         "verification_level": "none",
-        "note": "from memory. Only weak web support: a search excerpt of arXiv:hep-lat/9806024 associates an average plaquette of about 0.640 with an effective Wilson beta of about 2.45, which lies between the beta=2.4 and beta=2.5 values quoted here."
+        "note": "from memory. Only weak web support: a search excerpt of arXiv:hep-lat/9806024 associates an average plaquette of about 0.640 with an effective Wilson beta of about 2.45, which lies between the beta=2.4 and beta=2.5 values quoted here. Second pass (fact-check): three further, differently worded searches also found no published table. The fact-checker's own recollection agrees with this value to within the quoted +-0.001, but two recollections are not a verification. A Monte Carlo mismatch at the 0.001 level must be reported as 'reference unverified', not tuned away."
       }
     },
-
     "a_sqrt_sigma": {
       "2.2": {
         "value": 0.467,
-        "uncertainty": 0.010,
+        "uncertainty": 0.01,
         "source": "M. Teper, 'Glueball masses and other physical properties of SU(N) gauge theories in D=3+1: a review of lattice results for theorists', arXiv:hep-th/9812187, Appendix A (SU(2)), Table 10.",
         "web_verified": true,
         "verification_level": "search_excerpt",
-        "note": "Extra entry (not requested). The search excerpt wrote 'a sigma = 0.467(10) at beta = 2.2'; interpreted as a*sqrt(sigma) because a^2*sigma would be about 0.22 at this coupling."
+        "note": "Extra entry (not requested). The search excerpt wrote 'a sigma = 0.467(10) at beta = 2.2'; interpreted as a*sqrt(sigma) because a^2*sigma would be about 0.22 at this coupling. Not reproduced by one targeted query in the second pass (flag left as set by the first compiler)."
       },
       "2.3": {
         "value": 0.3687,
@@ -68,7 +89,7 @@
         "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10 ('Various SU(2) lattice calculations of the string tension and lightest J=0 and J=2 masses'), row beta=2.3, 10^4 lattice; original data from C. Michael and M. Teper, Phys. Lett. B199 (1987) 95.",
         "web_verified": true,
         "verification_level": "search_excerpt",
-        "note": "The excerpt showed the row 'beta=2.3, 10^4: 0.3687(22), 1.216(23), 1.94(8)' without column headers; the assignment (a*sqrt(sigma), a*m(0++), a*m(2++)) follows the order in the table caption and is physically unambiguous. Agrees with the orchestrator's from-memory 0.369. Small lattice (L*sqrt(sigma) = 3.7), effective mass from t=a to t=2a."
+        "note": "The excerpt showed the row 'beta=2.3, 10^4: 0.3687(22), 1.216(23), 1.94(8)' without column headers; the assignment (a*sqrt(sigma), a*m(0++), a*m(2++)) follows the order in the table caption and is physically unambiguous. Agrees with the orchestrator's from-memory 0.369. Small lattice (L*sqrt(sigma) = 3.7), effective mass from t=a to t=2a. Not reproduced by one targeted query in the second pass (flag left as set by the first compiler). Consistency: interpolated to beta_c(N_t=4)=2.2986 this gives T_c/sqrt(sigma) = 0.676, 2-4 percent below the literature 0.69-0.71 (see _meta.fact_check)."
       },
       "2.4": {
         "value": 0.2673,
@@ -76,7 +97,17 @@
         "source": "M. Teper, arXiv:hep-th/9812187, Appendix A: 'When I need a single value of the string tension at beta=2.4 or at beta=2.5, I use a sqrt(sigma)=0.2673(15) and a sqrt(sigma)=0.186(3) respectively.'",
         "web_verified": true,
         "verification_level": "search_excerpt",
-        "note": "Agrees with the orchestrator's from-memory 0.267."
+        "note": "Agrees with the orchestrator's from-memory 0.267. Re-seen in the second pass.",
+        "alternatives": [
+          {
+            "value": 0.266,
+            "uncertainty": 0.0021,
+            "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10, row beta=2.4, 16^4 lattice (row '0.2660(21), 0.936(23), 1.520(30)').",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": "Seen in a search excerpt in the second pass; no column headers in the excerpt, first column read as a*sqrt(sigma) following the caption order (string tension, J=0, J=2)."
+          }
+        ]
       },
       "2.5": {
         "value": 0.186,
@@ -84,15 +115,23 @@
         "source": "M. Teper, arXiv:hep-th/9812187, Appendix A (same sentence as for beta=2.4).",
         "web_verified": true,
         "verification_level": "search_excerpt",
-        "note": "The orchestrator's from-memory value was 0.187; consistent within the quoted error.",
+        "note": "The orchestrator's from-memory value was 0.187; consistent within the quoted error. Re-seen in the second pass.",
         "alternatives": [
           {
+            "value": 0.1834,
+            "uncertainty": 0.0026,
+            "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10, row beta=2.5, 16^4 lattice (row '0.1834(26), 0.660(22), 1.028(27)').",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": "Seen in a search excerpt in the second pass; column assignment inferred from the caption order."
+          },
+          {
             "value": 0.1871,
-            "uncertainty": 0.0010,
-            "source": "G. S. Bali, K. Schilling, C. Schlichter, 'Observing long colour flux tubes in SU(2) lattice gauge theory', Phys. Rev. D51 (1995) 5165, arXiv:hep-lat/9409005 (string tension from the static potential).",
-            "web_verified": false,
-            "verification_level": "none",
-            "note": "from memory. The paper and its beta values (2.5, 2.635, 2.74) were confirmed by web search, the number itself was not."
+            "uncertainty": 0.001,
+            "source": "Quoted in M. Teper, arXiv:hep-th/9812187, Appendix A, as another group's calculation at beta=2.5: 0.1871(10) on a 16^4 lattice and 0.1871(32) on a 32^4 lattice. The original reference(s) were not visible in the excerpt.",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": "Corrected in the second pass. The first version attributed 0.1871(10) to G. S. Bali, K. Schilling, C. Schlichter, Phys. Rev. D51 (1995) 5165 (arXiv:hep-lat/9409005) from memory. The 32^4 value 0.1871(32) matches that paper's lattice size and, from memory, its K = a^2 sigma = 0.0350(12) (sqrt gives 0.1871(32)); the 16^4 value with the smaller error is then from a different calculation. Attribution of both remains unconfirmed."
           },
           {
             "value": 0.1905,
@@ -105,7 +144,6 @@
         ]
       }
     },
-
     "a_m_0pp": {
       "2.3": {
         "value": 1.216,
@@ -113,26 +151,35 @@
         "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10, row beta=2.3, 10^4 lattice; original data from C. Michael and M. Teper, Phys. Lett. B199 (1987) 95.",
         "web_verified": true,
         "verification_level": "search_excerpt",
-        "note": "Second number of the row '0.3687(22), 1.216(23), 1.94(8)'; column assignment inferred from the caption order (string tension, J=0, J=2). Effective mass from t=a to t=2a, i.e. a variational upper estimate, on a small 10^4 lattice. Agrees with the orchestrator's 'about 1.2'."
+        "note": "Second number of the row '0.3687(22), 1.216(23), 1.94(8)'; column assignment inferred from the caption order (string tension, J=0, J=2). Effective mass from t=a to t=2a, i.e. a variational upper estimate, on a small 10^4 lattice. Agrees with the orchestrator's 'about 1.2'. Not reproduced by one targeted query in the second pass (flag left as set by the first compiler)."
       },
       "2.4": {
-        "value": 0.94,
-        "uncertainty": 0.03,
-        "source": "Remembered from the Michael-Teper SU(2) data as compiled in arXiv:hep-th/9812187, Table 10 (row not seen in any search excerpt).",
-        "web_verified": false,
-        "verification_level": "none",
-        "note": "from memory. Consistency check only: with a*sqrt(sigma)=0.2673 this gives m/sqrt(sigma)=3.52, as expected from the continuum value 3.78 with an O(a^2 sigma) correction of the size seen at beta=2.3."
+        "value": 0.936,
+        "uncertainty": 0.023,
+        "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10, row beta=2.4, 16^4 lattice (row '0.2660(21), 0.936(23), 1.520(30)').",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Changed in the second pass: the first version had the from-memory value 0.94(3) (consistent). Second number of the row; column assignment (a*sqrt(sigma), a*m(0++), a*m(2++)) inferred from the caption order, the excerpt shows no headers. m/sqrt(sigma) = 0.936/0.2660 = 3.52."
       },
       "2.5": {
-        "value": 0.69,
-        "uncertainty": 0.04,
-        "source": "Remembered range 0.66-0.72 (different lattice sizes / groups) for the 4D SU(2) Wilson action at beta=2.5; rows not seen in any search excerpt of arXiv:hep-th/9812187 Table 10.",
-        "web_verified": false,
-        "verification_level": "none",
-        "note": "from memory. Value is the midpoint of the remembered range, uncertainty covers the range. With a*sqrt(sigma)=0.186 this gives m/sqrt(sigma)=3.5-3.9."
+        "value": 0.66,
+        "uncertainty": 0.022,
+        "source": "M. Teper, arXiv:hep-th/9812187, Appendix A, Table 10, row beta=2.5, 16^4 lattice (row '0.1834(26), 0.660(22), 1.028(27)').",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Changed in the second pass: the first version had the from-memory value 0.69(4). Second number of the row; column assignment inferred from the caption order, the excerpt shows no headers. m/sqrt(sigma) = 0.660/0.1834 = 3.60. 16^4 at beta=2.5 is a small volume (L*sqrt(sigma) = 2.9), so finite-volume effects are possible.",
+        "alternatives": [
+          {
+            "value": 0.69,
+            "uncertainty": 0.04,
+            "source": "Remembered range 0.66-0.72 (different lattice sizes / groups) for the 4D SU(2) Wilson action at beta=2.5.",
+            "web_verified": false,
+            "verification_level": "none",
+            "note": "from memory (this was the primary entry in the first version). Midpoint of the remembered range; the upper end was not found in any search excerpt."
+          }
+        ]
       }
     },
-
     "continuum_m0pp_over_sqrt_sigma": {
       "value": 3.78,
       "uncertainty": 0.07,
@@ -159,15 +206,14 @@
         }
       ]
     },
-
     "beta_c": {
       "4": {
         "value": 2.2986,
         "uncertainty": 0.0006,
-        "source": "Value used in J. Fingberg, U. Heller, F. Karsch, 'Scaling and asymptotic scaling in the SU(2) gauge theory', Nucl. Phys. B392 (1993) 493-517, arXiv:hep-lat/9208012 (for N_t <= 6 that paper takes the critical couplings from earlier finite-size-scaling studies).",
-        "web_verified": false,
-        "verification_level": "none",
-        "note": "from memory. The paper itself and the statement that the N_t<=6 couplings come from earlier work were confirmed by web search; the number was not found.",
+        "source": "Quoted as the Monte Carlo value for N_tau=4 in a table of arXiv:hep-lat/9501036 (which attributes its Monte Carlo column to J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493, arXiv:hep-lat/9208012) and again in arXiv:1807.05295. The original finite-size-scaling determination predates Fingberg et al. (that paper itself determines N_tau=8 and 16); the original reference was not identified.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Second pass: the number 2.2986(6) was seen in search excerpts of the two citing papers named in 'source' (secondary citation, not the original table). The first version had it from memory only.",
         "alternatives": [
           {
             "value": 2.2991,
@@ -175,28 +221,28 @@
             "source": "A. Velytsky, 'Finite temperature SU(2) gauge theory: critical coupling and universality class', Int. J. Mod. Phys. C19 (2008) 1079, arXiv:0711.0748.",
             "web_verified": true,
             "verification_level": "search_excerpt",
-            "note": "The search excerpt says the paper adopts beta_c = 2.2991 for N_t=4 (to be derived there by finite-size scaling); no uncertainty was visible in the excerpt."
+            "note": "The search excerpt says the paper adopts beta_c = 2.2991 for N_t=4 (to be derived there by finite-size scaling); no uncertainty was visible in the excerpt. Not reproduced by one targeted query in the second pass."
           }
         ]
       },
       "6": {
         "value": 2.4265,
-        "uncertainty": 0.0030,
-        "source": "Value used in J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493-517, arXiv:hep-lat/9208012 (taken there from earlier work).",
-        "web_verified": false,
-        "verification_level": "none",
-        "note": "from memory; not found in any search excerpt."
+        "uncertainty": 0.003,
+        "source": "Quoted as the Monte Carlo value for N_tau=6 in a table of arXiv:hep-lat/9501036 (attributed there to J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493, arXiv:hep-lat/9208012) and again in arXiv:1807.05295. Original determination not identified.",
+        "web_verified": true,
+        "verification_level": "search_excerpt",
+        "note": "Second pass: the number 2.4265(30) was seen in search excerpts of the two citing papers named in 'source' (secondary citation). The first version had it from memory only."
       },
       "8": {
         "value": 2.510363,
-        "uncertainty": 0.000071,
+        "uncertainty": 7.1e-05,
         "source": "B. A. Berg, D. A. Clarke, 'Deconfinement, gradient and cooling scales for pure SU(2) lattice gauge theory', Phys. Rev. D95 (2017) 094508, arXiv:1612.07347, infinite-volume extrapolation for N_t=8.",
         "web_verified": true,
         "verification_level": "search_excerpt",
-        "note": "Rounds to the orchestrator's from-memory 2.5104.",
+        "note": "Rounds to the orchestrator's from-memory 2.5104. Not reproduced by one targeted query in the second pass (flag left as set by the first compiler).",
         "alternatives": [
           {
-            "value": 2.5090,
+            "value": 2.509,
             "uncertainty": 0.0006,
             "source": "B. Lucini, M. Teper, U. Wenger, 'The high temperature phase transition in SU(N) gauge theories', JHEP 01 (2004) 061, arXiv:hep-lat/0307017, as quoted in arXiv:1612.07347 ('their estimate beta_c(8)=2.5090(6) is somewhat lower than ours').",
             "web_verified": true,
@@ -213,29 +259,42 @@
           },
           {
             "value": 2.5115,
-            "uncertainty": 0.0040,
+            "uncertainty": 0.004,
             "source": "J. Fingberg, U. Heller, F. Karsch, Nucl. Phys. B392 (1993) 493-517, arXiv:hep-lat/9208012 (their own determination for N_t=8).",
-            "web_verified": false,
-            "verification_level": "none",
-            "note": "from memory. Web search confirmed only that the paper determines beta_c for N_t=8 and 16 and finds T_c/sqrt(sigma)=0.69(2)."
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": "Second pass: the number 2.5115(40) was seen in search excerpts of arXiv:hep-lat/9501036 (table attributed to Fingberg, Heller, Karsch) and arXiv:1807.05295 (secondary citation). Web search also confirmed that the Fingberg et al. paper determines beta_c for N_t=8 and 16 and finds T_c/sqrt(sigma)=0.69(2)."
           }
         ]
       }
     }
   },
-
   "D3_SU2_wilson": {
     "a_sqrt_sigma": {
       "6": {
         "value": 0.2538,
-        "uncertainty": 0.0010,
+        "uncertainty": 0.001,
         "source": "M. Teper, 'SU(N) gauge theories in 2+1 dimensions', Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, table 'SU(2) string tensions as extracted from flux loop masses of length L' (labelled Table 12 in the excerpt), beta=6.0, L=16.",
         "web_verified": true,
         "verification_level": "search_excerpt",
         "note": "Agrees with the orchestrator's from-memory value. Same table: 0.2562(26) at L=24 and 0.2529(33) at L=32.",
         "alternatives": [
-          {"value": 0.2562, "uncertainty": 0.0026, "source": "same table, beta=6.0, L=24", "web_verified": true, "verification_level": "search_excerpt", "note": ""},
-          {"value": 0.2529, "uncertainty": 0.0033, "source": "same table, beta=6.0, L=32", "web_verified": true, "verification_level": "search_excerpt", "note": ""}
+          {
+            "value": 0.2562,
+            "uncertainty": 0.0026,
+            "source": "same table, beta=6.0, L=24",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": ""
+          },
+          {
+            "value": 0.2529,
+            "uncertainty": 0.0033,
+            "source": "same table, beta=6.0, L=32",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": ""
+          }
         ]
       },
       "9": {
@@ -246,7 +305,14 @@
         "verification_level": "search_excerpt",
         "note": "Agrees with the orchestrator's from-memory value. Same table: 0.1622(4) at L=32; the two differ by about one standard deviation, so a comparison should allow for both.",
         "alternatives": [
-          {"value": 0.1622, "uncertainty": 0.0004, "source": "same table, beta=9.0, L=32", "web_verified": true, "verification_level": "search_excerpt", "note": ""}
+          {
+            "value": 0.1622,
+            "uncertainty": 0.0004,
+            "source": "same table, beta=9.0, L=32",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": ""
+          }
         ]
       },
       "12": {
@@ -257,11 +323,17 @@
         "verification_level": "search_excerpt",
         "note": "Agrees with the orchestrator's from-memory value. Same table: 0.1179(8) at L=48.",
         "alternatives": [
-          {"value": 0.1179, "uncertainty": 0.0008, "source": "same table, beta=12.0, L=48", "web_verified": true, "verification_level": "search_excerpt", "note": ""}
+          {
+            "value": 0.1179,
+            "uncertainty": 0.0008,
+            "source": "same table, beta=12.0, L=48",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "note": ""
+          }
         ]
       }
     },
-
     "a_m_0pp": {
       "6": {
         "value": 1.19,
@@ -273,11 +345,11 @@
       },
       "9": {
         "value": 0.765,
-        "uncertainty": 0.010,
+        "uncertainty": 0.01,
         "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, SU(2) glueball mass tables.",
         "web_verified": false,
         "verification_level": "none",
-        "note": "from memory; uncertainty is a rough guess, not taken from the paper. Consistency: 4.718 * 0.1616 = 0.762."
+        "note": "from memory; uncertainty is a rough guess, not taken from the paper. Consistency: 4.718 * 0.1616 = 0.762. Second pass, partial support only: a search excerpt of a follow-up paper by the same group lists 0+ masses 0.764(11), 0.7681(93), 0.766(27) on L = 16, 24, 32 without showing beta or the gauge group; the numbers fit SU(2) at beta=9 but this is an inference, so the flag stays false."
       },
       "12": {
         "value": 0.559,
@@ -288,15 +360,22 @@
         "note": "from memory; uncertainty is a rough guess, not taken from the paper. Consistency: 4.718 * 0.1179 = 0.556."
       }
     },
-
     "continuum_m0pp_over_sqrt_sigma": {
       "value": 4.718,
       "uncertainty": 0.043,
       "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, table of continuum glueball masses in units of the string tension, SU(2).",
       "web_verified": false,
       "verification_level": "none",
-      "note": "from memory; the exact string '4.718(43)' was not found by web search. Indirect support seen in search excerpts: (i) the same paper's large-N fit m(0++)/sqrt(sigma) = 4.046(70) + 2.67(28)/N^2 gives 4.714 at N=2; (ii) the later high-statistics value in 'alternatives'.",
+      "note": "from memory; the exact string '4.718(43)' was not found by web search. Indirect support seen in search excerpts: (i) the same paper's large-N fit m(0++)/sqrt(sigma) = 4.046(70) + 2.67(28)/N^2 gives 4.714 at N=2; (ii) the later high-statistics value in 'alternatives'. Second pass: still not found. The fact-checker independently remembers the same 4.718(43), which is not a verification.",
       "alternatives": [
+        {
+          "value": 4.716,
+          "uncertainty": 0.021,
+          "source": "B. Lucini, M. Teper, 'SU(N) gauge theories in 2+1 dimensions -- further results', arXiv:hep-lat/0206027, table of continuum glueball masses in units of sqrt(sigma) (SU(2): 4.716(21); SU(3): 4.330(24); SU(4): 4.239(34); SU(6): 4.196(27)).",
+          "web_verified": true,
+          "verification_level": "search_excerpt",
+          "note": "Seen in a search excerpt in the second pass. Consistent with the unverified primary value 4.718(43) and with 4.737(6)."
+        },
         {
           "value": 4.737,
           "uncertainty": 0.006,
@@ -307,7 +386,6 @@
         }
       ]
     },
-
     "continuum_sqrt_sigma_over_g2": {
       "value": 0.3353,
       "uncertainty": 0.0018,

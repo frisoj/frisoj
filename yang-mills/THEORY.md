@@ -2,7 +2,7 @@
 
 **Theorie, stand van zaken, en wat dit project wél en níet aantoont**
 
-> **Eerlijke kernboodschap.** Het millenniumprobleem "Yang–Mills: bestaan en massakloof" is op de datum van dit document (11 november 2026) **niet opgelost**, en **dit project lost het ook niet op**. Geen enkele berekening in deze repository is een wiskundig bewijs. Wat hier wél staat: (1) de precieze probleemstelling, (2) de formules die echt vaststaan, elk met uitleg in gewone taal, en (3) de theorie achter de zorgvuldig geteste *numerieke aanwijzingen* (geen bewijs) voor een massakloof in SU(2)-roostertheorie in 2, 3 en 4 dimensies.
+> **Eerlijke kernboodschap.** Het millenniumprobleem "Yang–Mills: bestaan en massakloof" is op de datum van dit document (11 november 2026) **niet opgelost** (over een recente, nog niet te controleren claim die alleen het bestaansdeel betreft: zie de kanttekening in §1), en **dit project lost het ook niet op**. Geen enkele berekening in deze repository is een wiskundig bewijs. Wat hier wél staat: (1) de precieze probleemstelling, (2) de formules die echt vaststaan, elk met uitleg in gewone taal, en (3) de theorie achter de zorgvuldig geteste *numerieke aanwijzingen* (geen bewijs) voor een massakloof in SU(2)-roostertheorie in 2, 3 en 4 dimensies.
 
 ---
 
@@ -10,7 +10,7 @@
 
 De vraag was: *"los het Yang–Mills-millenniumprobleem op en kom met de juiste formule"*. Het eerlijke antwoord heeft drie delen.
 
-**1. Een bewijs is er niet — ook hier niet.** Het probleem vraagt om een wiskundig bewijs over een limiet (roosterafstand naar nul, volume naar oneindig). Een computer kan maar eindig veel roosters doorrekenen, dus een simulatie kan zo'n bewijs per definitie niet leveren (zie §8). En een door een AI-systeem geschreven "bewijs" telt pas als bewijs wanneer vakgenoten elke stap hebben gecontroleerd; in deze sessie is geen bewijs gevonden, en doen alsof zou oneerlijk zijn.
+**1. Een erkend bewijs is er niet — ook hier niet.** Het probleem vraagt om een wiskundig bewijs over een limiet (roosterafstand naar nul, volume naar oneindig). Een computer kan maar eindig veel roosters doorrekenen, dus een simulatie kan zo'n bewijs per definitie niet leveren (zie §8). En een door een AI-systeem geschreven "bewijs" telt pas als bewijs wanneer vakgenoten elke stap hebben gecontroleerd; in deze sessie is geen bewijs gevonden, en doen alsof zou oneerlijk zijn.
 
 **2. "De juiste formule" voor de massakloof bestaat niet als gesloten uitdrukking.** Wat wél vaststaat is het volgende.
 
@@ -74,9 +74,19 @@ Jaffe en Witten leggen ook uit waarom dit natuurkundig belangrijk is: om de ster
 
 ### Status
 
-**Het probleem is op 11 november 2026 onopgelost.** Er is geen door de wiskundige gemeenschap aanvaard bewijs van bestaan-plus-massakloof, en het Clay-instituut heeft de prijs (1 miljoen dollar) niet toegekend. **Dit project lost het probleem niet op en beweert dat ook nergens.**
+**Het probleem geldt op 11 november 2026 als onopgelost.** Er is geen door de wiskundige gemeenschap gecontroleerd en aanvaard bewijs van bestaan-plus-massakloof; een bewijs van de massakloof is, voor zover wij konden nagaan, zelfs door niemand geclaimd; en het Clay-instituut heeft de prijs (1 miljoen dollar) niet toegekend. **Dit project lost het probleem niet op en beweert dat ook nergens.**
 
-> **Kanttekening over recente berichten (door ons niet te verifiëren).** Tijdens het schrijven vonden wij via een zoekmachine secundaire berichtgeving (nieuws- en blogsites) dat OpenAI op 26 oktober 2026 zou hebben aangekondigd dat zijn AI-modellen een bewijs hebben geproduceerd van het **bestaans**deel (de constructie van vierdimensionale Yang–Mills-theorie), uitdrukkelijk **zonder** de massakloof, en dat een werkgroep van natuurkundigen onder voorzitterschap van David Gross het materiaal beoordeelt. Wij konden geen primaire bron openen (de netwerktoegang van deze sessie liet dat niet toe), de berichten spreken elkaar op details tegen, en volgens diezelfde berichten is de claim nog niet onafhankelijk gecontroleerd en niet in een vaktijdschrift verschenen. Wij nemen deze claim daarom **niet** als feit over. Voor dit document verandert het niets: (i) ook volgens die berichten blijft de massakloof — het onderwerp van dit project — open; (ii) het Clay-probleem vereist bestaan **én** massakloof; (iii) de Clay-regels eisen publicatie, minstens twee jaar toetsing en brede aanvaarding (§8).
+> **Kanttekening over recente berichten (stand 11 november 2026; door ons alleen in zoekmachine-uittreksels gezien, geen primaire bron geopend).**
+>
+> *Wat er volgens de berichtgeving is gebeurd.* Eind oktober 2026 (de meeste berichten noemen 26 oktober) heeft het bedrijf OpenAI bekendgemaakt dat zijn AI-modellen een bewijs zouden hebben geproduceerd van het **bestaans**deel van het probleem voor vierdimensionale Yang–Mills-theorie, inclusief een formalisering in de bewijsassistent Lean — en uitdrukkelijk **zonder** een claim over de massakloof.
+>
+> *Waar wij dat zagen.* In zoekresultaten van *Scientific American* (artikel met de titel "OpenAI just scooped human researchers on a million-dollar quantum math problem"), van de nieuwsredactie van *Science*, van het weblog *Not Even Wrong* van Peter Woit, en van een reeks kleinere nieuws- en blogsites (onder meer Interesting Engineering, Let's Data Science, cloudmagazin en OfficeChai). De zoekmachine toont ook een pagina op openai.com met de titel "Working with academic communities to build scientific understanding".
+>
+> *Wat die uittreksels verder zeggen.* (a) Het bewijs is **niet openbaar**: een commissie van vijf natuurkundigen onder voorzitterschap van David Gross (genoemd worden verder Michael Douglas, Arthur Jaffe, Igor Klebanov en Nikita Nekrasov) houdt het materiaal achter totdat zij het zelf heeft beoordeeld en opgeschreven. (b) Een onafhankelijke adviesgroep van wiskundigen (de "Advisory Group on Mathematics and Artificial Intelligence") heeft om openbaarmaking gevraagd. (c) Niemand buiten die kring heeft het bewijs kunnen controleren, en er zijn sceptische reacties van vakgenoten. (d) Dezelfde berichtgeving noemt een afzonderlijke, eveneens nog ongetoetste claim van de wiskundigen Alpöge en Sussman over het bestaansprobleem; over de reikwijdte daarvan (drie dimensies, of ook $\mathbb{R}^4$) zijn de uittreksels het niet eens.
+>
+> *Wat wij níet konden vaststellen.* Wij konden geen enkele primaire bron openen — niet de aankondiging zelf, geen artikel of preprint met het bewijs, geen verklaring van het Clay-instituut; de netwerktoegang van deze sessie liet alleen zoekresultaten toe. De uittreksels spreken elkaar bovendien op details (data, precieze reikwijdte van de claim) tegen. Een verklaring van het Clay-instituut over deze claim hebben wij niet gevonden.
+>
+> *Onze conclusie.* Wij nemen deze claim **niet** als vaststaand feit over, en wij beweren evenmin dat hij onjuist is: hij is op dit moment eenvoudigweg **niet te controleren**. Voor de kern van dit document verandert het niets: (i) ook volgens deze berichten blijft de massakloof — het onderwerp van dit project — open; (ii) het Clay-probleem vereist bestaan **én** massakloof en is niet als opgelost erkend; (iii) de Clay-regels eisen publicatie, minstens twee jaar toetsing en brede aanvaarding (§8).
 
 ---
 
@@ -231,7 +241,7 @@ $$
 \frac{d\ln\Lambda}{d\ln\mu} = 1 + \left(\frac{1}{b_0g^3} - \frac{b_1}{b_0^2g}\right)\left(-b_0g^3 - b_1g^5\right) = \frac{b_1^2}{b_0^2}g^4 ,
 $$
 
-dus nul tot op termen die in de factor $(1+O(g^2))$ worden opgenomen. Voor de tot twee lussen afgekapte vergelijking is die factor exact $\left(1+b_1g^2/b_0\right)^{b_1/(2b_0^2)}$; wij hebben dit numeriek nagerekend door de vergelijking over 40 e-machten in $\mu$ te integreren (de exacte invariant bleef constant tot op $10^{-10}$).
+dus nul tot op termen die in de factor $(1+O(g^2))$ worden opgenomen. Voor de tot twee lussen afgekapte vergelijking is die factor exact $\left(1+b_1g^2/b_0\right)^{b_1/(2b_0^2)}$; wij hebben dit numeriek nagerekend door de vergelijking, startend bij $g^2 = 4/2{,}2$, over 40 e-machten in $\mu$ te integreren (de exacte invariant bleef constant tot op $10^{-10}$).
 
 Omdat $\Lambda$ de enige schaal is, moet elke grootheid met de dimensie van massa een zuiver getal maal $\Lambda$ zijn:
 
@@ -254,7 +264,7 @@ Voor elke macht $n$ geldt $\lim_{x\downarrow0} x^{-n}e^{-1/(2b_0x)} = 0$. *In ge
 ### 4.4 De overige obstakels
 
 1. **Geen kleine parameter op grote afstand.** Bij de schaal $\Lambda$ is de koppeling van orde 1.
-2. **Vier dimensies is het randgeval.** In 2 en 3 dimensies heeft de koppeling een positieve massadimensie ($g^2$ is een massa in het kwadraat in 2D en een massa in 3D) en zijn de ultraviolette divergenties mild ("superrenormaliseerbaar"); daar zijn constructieve methoden deels geslaagd. In 4 dimensies is de koppeling dimensieloos ("marginaal") en moet men oneindig veel schalen tegelijk beheersen. Ter vergelijking: voor de eenvoudigste kandidaat, $\phi^4$-theorie in 4 dimensies, is bewezen dat de continuümlimiet triviaal is (Aizenman en Duminil-Copin 2021); Yang–Mills zou dankzij asymptotische vrijheid juist wél moeten bestaan.
+2. **Vier dimensies is het randgeval.** In 2 en 3 dimensies heeft de koppeling een positieve massadimensie ($g^2$ is een massa in het kwadraat in 2D en een massa in 3D) en zijn de ultraviolette divergenties mild ("superrenormaliseerbaar"); daar zijn constructieve methoden deels geslaagd. In 4 dimensies is de koppeling dimensieloos ("marginaal") en moet men oneindig veel schalen tegelijk beheersen. Ter vergelijking: voor de eenvoudigste kandidaat, $\phi^4$-theorie in 4 dimensies (één reëel veld, roosterregularisatie), is bewezen dat de continuümlimiet triviaal is, dat wil zeggen een vrije theorie zonder wisselwerking (Aizenman en Duminil-Copin 2021); Yang–Mills zou dankzij asymptotische vrijheid juist wél moeten bestaan.
 3. **IJkinvariantie.** De natuurlijke configuratieruimte is "verbindingen modulo ijktransformaties", een oneindig-dimensionale gekromde ruimte; ijkfixatie lukt niet globaal (Gribov-kopieën).
 4. **Infrarood.** Zelfs als de constructie in een eindige doos lukt, moet men het volume naar oneindig sturen én de kloof daarbij uniform van onderen begrenzen. Daarvoor is geen mechanisme bekend dat men kan bewijzen.
 
@@ -301,7 +311,7 @@ $$
 | 2,4 | 0,004600 | 0,2673(15) | 58,1 |
 | 2,5 | 0,003576 | 0,186(3) | 52,0 |
 
-Bij echte asymptotische schaling zou de laatste kolom constant zijn; zij verschuift nog ongeveer 16 procent tussen $\beta=2{,}3$ en $2{,}5$. *In gewone taal:* de twee-lus-formule is een uitspraak over $\beta\to\infty$ en is bij $\beta\approx2{,}5$ nog niet nauwkeurig. De betrouwbaardere toets is daarom **schaling**: verhoudingen van fysische grootheden, zoals $m/\sqrt\sigma$, moeten constant worden met correcties van orde $a^2\sigma$. (De schaal $\Lambda_L$ verschilt bovendien per regularisatie een bekende constante factor van bijvoorbeeld $\Lambda_{\overline{\mathrm{MS}}}$.)
+Bij echte asymptotische schaling zou de laatste kolom constant zijn; zij daalt nog ongeveer 17 procent tussen $\beta=2{,}3$ en $2{,}5$. *In gewone taal:* de twee-lus-formule is een uitspraak over $\beta\to\infty$ en is bij $\beta\approx2{,}5$ nog niet nauwkeurig. De betrouwbaardere toets is daarom **schaling**: verhoudingen van fysische grootheden, zoals $m/\sqrt\sigma$, moeten constant worden met correcties van orde $a^2\sigma$. (De schaal $\Lambda_L$ verschilt bovendien per regularisatie een bekende constante factor van bijvoorbeeld $\Lambda_{\overline{\mathrm{MS}}}$.)
 
 ---
 
@@ -447,7 +457,7 @@ Verificatiestatus van elke verwijzing staat in de Referenties (§9): ✔ = titel
 ### 6.2 Continuümlimiet: gedeeltelijke resultaten in drie en vier dimensies
 
 - **Bałaban (1984–1989)** bewees in een lange reeks artikelen met renormalisatiegroepmethoden **ultraviolette stabiliteit**: de toestandssom van rooster-Yang–Mills in een vast fysisch volume blijft, na renormalisatie, uniform begrensd als $a\to0$ — in drie dimensies (1985) en in vier dimensies (1987–1989). *Waarom dit het probleem niet oplost:* het zijn grenzen op de toestandssom in eindig volume; convergentie van waarneembare grootheden, de axioma's, het oneindige volume en de massakloof volgen er niet uit.
-- **Magnen, Rivasseau en Sénéor (1993)** construeerden de Schwinger-functies van zuivere SU(2)-Yang–Mills in vier dimensies **met een vaste infrarood-afsnijding** (het gedrag op grote afstand wordt kunstmatig afgekapt) en zonder ultraviolet-afsnijding, in een geregulariseerde axiale ijk. *Waarom dit het probleem niet oplost:* de infrarood-afsnijding verwijderen is precies waar de massakloof zit.
+- **Magnen, Rivasseau en Sénéor (1993)** werkten een constructie uit van de Schwinger-functies van zuivere SU(2)-Yang–Mills in vier dimensies **met een vaste infrarood-afsnijding** (het gedrag op grote afstand wordt kunstmatig afgekapt) en zonder ultraviolet-afsnijding, in een geregulariseerde axiale ijk en in de triviale topologische sector. (De auteurs spreken zelf, voor zover wij ons herinneren, voorzichtig van "de basis voor een rigoureuze constructie"; hun afsnijding breekt de ijkinvariantie, die met tegentermen wordt hersteld.) *Waarom dit het probleem niet oplost:* de infrarood-afsnijding verwijderen is precies waar de massakloof zit.
 - **Abelse Higgs-modellen** (elektromagnetisme met een geladen scalair veld) zijn in twee dimensies in het continuüm geconstrueerd door Brydges, Fröhlich en Seiler (1979–1981); voor drie dimensies bestaan resultaten van latere auteurs (uit het geheugen; niet opnieuw gecontroleerd). *Waarom dit het probleem niet oplost:* deze theorieën zijn abels en laag-dimensionaal.
 
 ### 6.3 Twee dimensies: volledig opgelost
@@ -471,7 +481,7 @@ Verificatiestatus van elke verwijzing staat in de Referenties (§9): ✔ = titel
 | Massakloof op het rooster voor alle $\beta$ (SU(2), $D=4$) | **nee** |
 | Continuümlimiet in $D=2$, met alle eigenschappen | ja |
 | Ultraviolette stabiliteit in eindig volume, $D=3,4$ | ja (Bałaban) |
-| Continuümtheorie in $D=3$ of $D=4$ in oneindig volume met axioma's | **nee** (zie de kanttekening in §1 over een recente, ongeverifieerde claim) |
+| Continuümtheorie in $D=3$ of $D=4$ in oneindig volume met axioma's | **nee**: er is geen openbaar, door vakgenoten gecontroleerd bewijs (zie de kanttekening in §1 over een recente claim voor $D=4$ waarvan het bewijs niet openbaar en dus niet te controleren is) |
 | Massakloof in het continuüm, $D=3$ of $D=4$ | **nee** |
 
 ---
@@ -503,7 +513,7 @@ Verificatiestatus van elke verwijzing staat in de Referenties (§9): ✔ = titel
 
 **Een simulatie.** Het millenniumprobleem is een uitspraak over oneindig veel schalen tegelijk (alle $a\to0$, alle volumes). Een simulatie levert eindig veel getallen met statistische onzekerheid. Uit eindig veel benaderende getallen volgt logisch niets over een limiet, tenzij je vooraf *bewezen* foutgrenzen hebt — en die ontbreken hier juist (§5.5). Computerondersteunde bewijzen bestaan wel (vierkleurenstelling, vermoeden van Kepler), maar daar is het probleem eerst door een wiskundig argument teruggebracht tot een eindige, exact controleerbare berekening. Zo'n reductie is voor Yang–Mills niet bekend. Monte-Carlo-resultaten zijn bovendien kansuitspraken, geen zekerheden.
 
-**Een AI-systeem.** Een taalmodel kan tekst produceren die eruitziet als een bewijs. Of zo'n tekst een bewijs *is*, hangt niet af van hoe overtuigend hij klinkt, maar van de vraag of elke stap klopt — en dat moet worden gecontroleerd door deskundigen of door een formeel bewijscontroleprogramma, waarbij ook nog moet worden nagegaan dat de geformaliseerde uitspraak werkelijk het bedoelde probleem is. De obstakels van §4 zijn inhoudelijk: volgens de experts zijn nieuwe wiskundige ideeën nodig. In deze sessie zijn zulke ideeën niet gevonden, en doen alsof zou oneerlijk zijn. De geschiedenis kent bovendien claims die de toetsing niet doorstonden (bijvoorbeeld een in 2007 als preprint verschenen claim van opsluiting voor alle koppelingen in SU(2)-roostertheorie, waar vakgenoten een lacune in aanwezen — uit het geheugen geciteerd). De in §1 genoemde berichten over een door AI geproduceerd bestaansbewijs illustreren hetzelfde punt: zelfs volgens die berichten moet het werk nog door vakgenoten worden gecontroleerd, en betreft het niet de massakloof.
+**Een AI-systeem.** Een taalmodel kan tekst produceren die eruitziet als een bewijs. Of zo'n tekst een bewijs *is*, hangt niet af van hoe overtuigend hij klinkt, maar van de vraag of elke stap klopt — en dat moet worden gecontroleerd door deskundigen of door een formeel bewijscontroleprogramma, waarbij ook nog moet worden nagegaan dat de geformaliseerde uitspraak werkelijk het bedoelde probleem is. De obstakels van §4 zijn inhoudelijk: volgens de experts zijn nieuwe wiskundige ideeën nodig. In deze sessie zijn zulke ideeën niet gevonden, en doen alsof zou oneerlijk zijn. De geschiedenis kent bovendien claims die de toetsing niet doorstonden (bijvoorbeeld een in 2007 als preprint verschenen claim van opsluiting voor alle koppelingen in SU(2)-roostertheorie, waar vakgenoten een lacune in aanwezen — uit het geheugen geciteerd). De in §1 genoemde berichten over een door AI geproduceerd bestaansbewijs illustreren hetzelfde punt: volgens die berichten bestaat er weliswaar een formalisering in een bewijscontroleprogramma, maar zijn bewijs en formalisering niet openbaar, moet het werk nog door vakgenoten worden gecontroleerd (inclusief de vraag of de geformaliseerde uitspraak werkelijk het bedoelde probleem is), en betreft het niet de massakloof.
 
 **Hoe een echte oplossing eruit zou zien.**
 
@@ -518,7 +528,15 @@ Dit document en deze repository zijn geen van deze vier dingen.
 
 ## 9. Referenties
 
-Legenda: ✔ = bibliografische gegevens (en waar vermeld de inhoud) op 11 november 2026 via een zoekmachine teruggevonden; de volledige tekst kon niet worden geopend omdat rechtstreekse toegang tot arxiv.org, claymath.org en andere sites in deze sessie geblokkeerd was. ○ = uit het geheugen geciteerd; jaartal, band of paginanummer kan een fout bevatten.
+Legenda: ✔ = bibliografische gegevens (en waar vermeld de inhoud) op 11 november 2026 via een zoekmachine teruggevonden; de volledige tekst kon niet worden geopend omdat rechtstreekse toegang tot arxiv.org, claymath.org, openai.com en andere sites in deze sessie geblokkeerd was. ○ = uit het geheugen geciteerd; jaartal, band of paginanummer kan een fout bevatten. Dit document en `literature.json` zijn op dezelfde dag een tweede keer onafhankelijk nagelopen (formules opnieuw afgeleid, verwijzingen en getallen opnieuw opgezocht); ook die controle had alleen zoekresultaten tot haar beschikking.
+
+**Recente berichtgeving bij de kanttekening in §1 (alleen als zoekresultaat gezien; geen van deze pagina's kon worden geopend, publicatiedata niet gecontroleerd)**
+
+- ✔ *Scientific American*, "OpenAI just scooped human researchers on a million-dollar quantum math problem" (2026).
+- ✔ *Science* (nieuwsredactie), "AI cracks a 27-year-old pillar of computer science, OpenAI and Anthropic claim" (2026); het uittreksel noemt ook de Yang–Mills-claim en de commissie onder David Gross.
+- ✔ P. Woit, weblog *Not Even Wrong*, bericht "Secret Unified Physics Slop" (2026); kritisch commentaar.
+- ✔ OpenAI, webpagina "Working with academic communities to build scientific understanding" (2026); alleen titel en uittreksel gezien.
+- ✔ Kleinere nieuws- en blogsites met dezelfde strekking: Interesting Engineering, Let's Data Science, cloudmagazin, OfficeChai. Deze zijn geen zelfstandige bevestiging; zij geven de aankondiging van het bedrijf weer.
 
 **Het probleem**
 
@@ -588,6 +606,8 @@ Legenda: ✔ = bibliografische gegevens (en waar vermeld de inhoud) op 11 novemb
 - ✔ A. Velytsky, "Finite temperature SU(2) gauge theory: critical coupling and universality class", arXiv:0711.0748 (○ Int. J. Mod. Phys. C19 (2008) 1079).
 - ✔ G. S. Bali, K. Schilling, C. Schlichter, "Observing long colour flux tubes in SU(2) lattice gauge theory", arXiv:hep-lat/9409005 (○ Phys. Rev. D51 (1995) 5165).
 - ✔ R. Lau, M. Teper, arXiv:1701.06941 (over SO(N)-ijktheorieën in 2+1 dimensies; alleen gebruikt als bron waarin de SU(2)-waarde van Athenodorou en Teper wordt aangehaald; ○ auteursnamen).
+- ✔ B. Lucini, M. Teper, "SU(N) gauge theories in 2+1 dimensions – further results", arXiv:hep-lat/0206027 (○ Phys. Rev. D66 (2002) 097502); bron van de alternatieve continuümwaarde $m(0^{++})/\sqrt\sigma = 4{,}716(21)$ voor SU(2) in $D=3$.
+- ✔ arXiv:hep-lat/9501036 ("Landau Ginzberg model and deconfinement transition for extended SU(2) action") en arXiv:1807.05295 ("Non-abelian lattice gauge theory with a topological action"): alleen gebruikt als bronnen waarin de kritieke koppelingen $\beta_c = 2{,}2986(6)$, $2{,}4265(30)$ en $2{,}5115(40)$ voor $N_t = 4, 6, 8$ worden aangehaald (de eerste schrijft ze toe aan Fingberg, Heller en Karsch).
 - ○ M. Creutz, "Monte Carlo study of quantized SU(2) gauge theory", Phys. Rev. D21 (1980) 2308.
 - ○ M. Lüscher, K. Symanzik, P. Weisz, Nucl. Phys. B173 (1980) 365; M. Lüscher, Nucl. Phys. B180 (1981) 317 (snaarcorrectie).
 
@@ -604,7 +624,7 @@ Alle onderstaande controles zijn op 11 november 2026 met een los Python-script u
 | $b_0g^2 = 11/(6\pi^2\beta)$ en $1/(2b_0g^2) = 3\pi^2\beta/11$ | exacte breuken | klopt |
 | roostervorm van $a\Lambda_L$ gelijk aan algemene formule | numeriek, $\beta = 2{,}2$ t/m $2{,}6$ | relatieve afwijking kleiner dan $10^{-12}$ |
 | roostervorm gelijk aan `ym/exact.py::a_lambda_two_loop` | numeriek | identiek |
-| $\Lambda$ onafhankelijk van $\mu$ (twee-lus-stroming) | numerieke integratie over 40 e-machten | exacte invariant constant tot $10^{-10}$; de genoemde formule verschuift 2,6 procent, precies de voorspelde factor $(1+b_1g^2/b_0)^{b_1/(2b_0^2)}$ |
+| $\Lambda$ onafhankelijk van $\mu$ (twee-lus-stroming) | numerieke integratie over 40 e-machten, start bij $g^2 = 4/2{,}2$ | exacte invariant constant tot $10^{-10}$; de genoemde formule verschuift 2,6 procent, precies de voorspelde factor $(1+b_1g^2/b_0)^{b_1/(2b_0^2)}$ |
 | $x^{-n}e^{-1/(2b_0x)}\to0$ voor $x\downarrow0$ | numeriek voor $n=5$ en $n=20$ | klopt |
 | $Z_1 = 2I_1(\beta)/\beta$ en $\langle\tfrac12\mathrm{Tr}U\rangle = I_2/I_1$ | numerieke integratie over de Haar-maat | klopt tot $10^{-10}$ |
 | $u' = 1 - u^2 - 3u/\beta$ | numerieke afgeleide | klopt tot $10^{-8}$ |
