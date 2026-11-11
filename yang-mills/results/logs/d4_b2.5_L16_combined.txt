@@ -1,0 +1,39 @@
+ensemble d4_b2.5_L16_combined: D=4 shape=16x16x16x16 beta=2.5 | 10300 measurements used (402 discarded), bins of 103 (auto: ceil(10 * tau_int_max), tau_int_max = 10.272), 100 bins
+plaquette   0.65199 +- 0.00001   tau_int = 1.41
+glueball a*m  0.75305 +- 0.01701   [plateau, t*=1]
+   GEVP operators: s28_2x2,s40_2x2,s10_2x2,s4_2x2   overlap 0.897
+   t=0  m_eff = 0.86173 +- 0.00860
+   t=1  m_eff = 0.75305 +- 0.01701
+   t=2  m_eff = 0.74627 +- 0.03712
+   t=3  m_eff = 0.79071 +- 0.07591
+   t=4  m_eff = 0.70485 +- 0.13080
+   t=5  m_eff = 0.61128 +- 0.22004
+   cosh fit t=1..6: 0.75231 +- 0.02542  chi2/dof = 0.24/4
+torelon  a*E  0.48733 +- 0.00652   [plateau, t*=1]
+   GEVP operators: s40,s28   overlap 0.964
+   t=0  m_eff = 0.52396 +- 0.00519
+   t=1  m_eff = 0.48733 +- 0.00652
+   t=2  m_eff = 0.48220 +- 0.01060
+   t=3  m_eff = 0.47418 +- 0.01648
+   t=4  m_eff = 0.48517 +- 0.02511
+   t=5  m_eff = 0.51022 +- 0.03797
+   cosh fit t=1..8: 0.48513 +- 0.01130  chi2/dof = 0.35/6
+a*sqrt(sigma) [luscher, L=16]  0.18587 +- 0.00110
+a*sqrt(sigma) [nambu_goto, L=16]  0.18661 +- 0.00108
+   fixed t=1: a*E = 0.48733 +- 0.00652  ->  a*sqrt(sigma) [luscher] 0.18587 +- 0.00110
+   fixed t=2: a*E = 0.48220 +- 0.01060  ->  a*sqrt(sigma) [luscher] 0.18501 +- 0.00179
+m/sqrt(sigma) [luscher]  4.05144 +- 0.08757
+m/sqrt(sigma) [nambu_goto]  4.03550 +- 0.08724
+m/Lambda_L (two-loop)  210.59814 +- 4.75708   [a*Lambda_L = 0.00357579]
+plaquette, hot-start minus cold-start streams: +1.95e-05 +- 2.3e-05 (+0.87 sigma)
+WARNING: d4_b2.5_L16_s601.npz is an incomplete run (1454 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16_s602.npz is an incomplete run (1443 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16_s603.npz is an incomplete run (1476 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16_s604.npz is an incomplete run (1458 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s605.npz is an incomplete run (1229 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s606.npz is an incomplete run (1219 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s607.npz is an incomplete run (1208 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s608.npz is an incomplete run (1215 of 6000 measurements; reason: maxtime)
+CAVEAT: the error of a mass chosen by plateau rule R5 does not include the selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare with the fixed-t values above and see 'caveats' in the JSON file.
+(numerical evidence for one lattice ensemble; not a proof of the mass gap)
+wrote results/d4_b2.5_L16_combined.json and d4_b2.5_L16_combined_glueball_meff.png, d4_b2.5_L16_combined_torelon_meff.png, d4_b2.5_L16_combined_correlators.png

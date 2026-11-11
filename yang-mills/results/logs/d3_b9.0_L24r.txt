@@ -1,0 +1,35 @@
+ensemble d3_b9.0_L24r: D=3 shape=24x24x24 beta=9 | 38400 measurements used (46 discarded), bins of 15 (auto: ceil(10 * tau_int_max), tau_int_max = 1.491), 2560 bins
+plaquette   0.88546 +- 0.00000   tau_int = 0.55
+glueball a*m  0.75843 +- 0.00992   [plateau, t*=2]
+   GEVP operators: s45_1x1,s30_2x2,s5_2x2   overlap 0.961
+   t=0  m_eff = 0.78715 +- 0.00229
+   t=1  m_eff = 0.76954 +- 0.00468
+   t=2  m_eff = 0.75843 +- 0.00992
+   t=3  m_eff = 0.75397 +- 0.02097
+   t=4  m_eff = 0.70334 +- 0.04120
+   t=5  m_eff = 0.74859 +- 0.08984
+   cosh fit t=2..8: 0.75079 +- 0.01369  chi2/dof = 1.58/5
+torelon  a*E  0.59561 +- 0.00418   [plateau, t*=2]
+   GEVP operators: s45,s30   overlap 0.977
+   t=0  m_eff = 0.61343 +- 0.00132
+   t=1  m_eff = 0.60144 +- 0.00236
+   t=2  m_eff = 0.59561 +- 0.00418
+   t=3  m_eff = 0.59440 +- 0.00743
+   t=4  m_eff = 0.58200 +- 0.01316
+   t=5  m_eff = 0.58071 +- 0.02344
+   cosh fit t=2..9: 0.59330 +- 0.00627  chi2/dof = 2.15/6
+a*sqrt(sigma) [luscher, L=24]  0.16039 +- 0.00054
+a*sqrt(sigma) [nambu_goto, L=24]  0.16045 +- 0.00054
+   fixed t=1: a*E = 0.60144 +- 0.00236  ->  a*sqrt(sigma) [luscher] 0.16115 +- 0.00030
+   fixed t=2: a*E = 0.59561 +- 0.00418  ->  a*sqrt(sigma) [luscher] 0.16039 +- 0.00054
+m/sqrt(sigma) [luscher]  4.72857 +- 0.06387
+m/sqrt(sigma) [nambu_goto]  4.72704 +- 0.06385
+beta*a*m/4 (= m/g^2)  1.70647 +- 0.02231
+plaquette, hot-start minus cold-start streams: -9.62e-06 +- 6.0e-06 (-1.59 sigma)
+WARNING: d3_b9.0_L24r_s305.npz is an incomplete run (9539 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s306.npz is an incomplete run (9700 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s307.npz is an incomplete run (9624 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s308.npz is an incomplete run (9583 of 30000 measurements; reason: maxtime)
+CAVEAT: the error of a mass chosen by plateau rule R5 does not include the selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare with the fixed-t values above and see 'caveats' in the JSON file.
+(numerical evidence for one lattice ensemble; not a proof of the mass gap)
+wrote results/d3_b9.0_L24r.json and d3_b9.0_L24r_glueball_meff.png, d3_b9.0_L24r_torelon_meff.png, d3_b9.0_L24r_correlators.png

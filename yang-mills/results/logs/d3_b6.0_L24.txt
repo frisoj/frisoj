@@ -1,0 +1,35 @@
+ensemble d3_b6.0_L24: D=3 shape=24x24x24 beta=6 | 26829 measurements used (24 discarded), bins of 11 (auto: ceil(10 * tau_int_max), tau_int_max = 1.045), 2439 bins
+plaquette   0.82478 +- 0.00001   tau_int = 0.81
+glueball a*m  1.19257 +- 0.01388   [plateau, t*=1]
+   GEVP operators: s18_1x1,s12_2x2,s2_2x2   overlap 0.966
+   t=0  m_eff = 1.22714 +- 0.00430
+   t=1  m_eff = 1.19257 +- 0.01388
+   t=2  m_eff = 1.18189 +- 0.04485
+   t=3  m_eff = 0.89104 +- 0.10343
+   t=4  m_eff = 1.00663 +- 0.29700
+   t=5  m_eff = 0.41070 +- 0.41397
+   cosh fit t=1..5: 1.18282 +- 0.01622  chi2/dof = 5.47/3
+torelon  a*E  1.69313 +- 0.10394   [no plateau, t*=None, UPPER BOUND ONLY]
+   GEVP operators: s18,s12,s2   overlap 1.339
+   t=0  m_eff = 1.55898 +- 0.00420
+   t=1  m_eff = 1.53513 +- 0.01955
+   t=2  m_eff = 1.69313 +- 0.10394
+   t=3  m_eff = 2.25850 +- 1.01346
+   t=4  m_eff = 0.94923 +- 2.55813
+   t=5  m_eff = n/a
+a*sqrt(sigma) [luscher, L=24]  0.26731 +- 0.00810
+a*sqrt(sigma) [nambu_goto, L=24]  0.26732 +- 0.00810
+   fixed t=1: a*E = 1.53513 +- 0.01955  ->  a*sqrt(sigma) [luscher] 0.25470 +- 0.00160
+   fixed t=2: a*E = 1.69313 +- 0.10394  ->  a*sqrt(sigma) [luscher] 0.26731 +- 0.00810
+m/sqrt(sigma) [luscher]  4.46132 +- 0.14444  (upper bound only)
+m/sqrt(sigma) [nambu_goto]  4.46114 +- 0.14441  (upper bound only)
+beta*a*m/4 (= m/g^2)  1.78885 +- 0.02083
+plaquette, hot-start minus cold-start streams: +3.72e-06 +- 1.4e-05 (+0.27 sigma)
+WARNING: d3_b6.0_L24_s801.npz is an incomplete run (6789 of 80000 measurements; reason: maxtime)
+WARNING: d3_b6.0_L24_s802.npz is an incomplete run (6706 of 80000 measurements; reason: maxtime)
+WARNING: d3_b6.0_L24_s803.npz is an incomplete run (6704 of 80000 measurements; reason: maxtime)
+WARNING: d3_b6.0_L24_s804.npz is an incomplete run (6654 of 80000 measurements; reason: maxtime)
+WARNING: torelon (L=24): no plateau -> the quoted energy is an upper bound only
+CAVEAT: the error of a mass chosen by plateau rule R5 does not include the selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare with the fixed-t values above and see 'caveats' in the JSON file.
+(numerical evidence for one lattice ensemble; not a proof of the mass gap)
+wrote results/d3_b6.0_L24.json and d3_b6.0_L24_glueball_meff.png, d3_b6.0_L24_torelon_meff.png, d3_b6.0_L24_correlators.png

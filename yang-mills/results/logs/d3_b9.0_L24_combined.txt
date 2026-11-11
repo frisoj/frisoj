@@ -1,0 +1,39 @@
+ensemble d3_b9.0_L24_combined: D=3 shape=24x24x24 beta=9 | 66360 measurements used (81 discarded), bins of 15 (auto: ceil(10 * tau_int_max), tau_int_max = 1.480), 4424 bins
+plaquette   0.88545 +- 0.00000   tau_int = 0.55
+glueball a*m  0.77538 +- 0.00358   [plateau, t*=1]
+   GEVP operators: s45_1x1,s30_2x2,s5_2x2   overlap 0.988
+   t=0  m_eff = 0.78764 +- 0.00173
+   t=1  m_eff = 0.77538 +- 0.00358
+   t=2  m_eff = 0.77729 +- 0.00771
+   t=3  m_eff = 0.77367 +- 0.01650
+   t=4  m_eff = 0.72687 +- 0.03356
+   t=5  m_eff = 0.69815 +- 0.06812
+   cosh fit t=1..8: 0.77378 +- 0.00482  chi2/dof = 6.18/6
+torelon  a*E  0.59654 +- 0.00315   [plateau, t*=2]
+   GEVP operators: s45,s30   overlap 0.978
+   t=0  m_eff = 0.61375 +- 0.00099
+   t=1  m_eff = 0.60178 +- 0.00177
+   t=2  m_eff = 0.59654 +- 0.00315
+   t=3  m_eff = 0.59629 +- 0.00565
+   t=4  m_eff = 0.59054 +- 0.01009
+   t=5  m_eff = 0.58304 +- 0.01797
+   cosh fit t=2..9: 0.59512 +- 0.00472  chi2/dof = 1.92/6
+a*sqrt(sigma) [luscher, L=24]  0.16051 +- 0.00041
+a*sqrt(sigma) [nambu_goto, L=24]  0.16057 +- 0.00041
+   fixed t=1: a*E = 0.60178 +- 0.00177  ->  a*sqrt(sigma) [luscher] 0.16119 +- 0.00023
+   fixed t=2: a*E = 0.59654 +- 0.00315  ->  a*sqrt(sigma) [luscher] 0.16051 +- 0.00041
+m/sqrt(sigma) [luscher]  4.83057 +- 0.02524
+m/sqrt(sigma) [nambu_goto]  4.82901 +- 0.02522
+beta*a*m/4 (= m/g^2)  1.74460 +- 0.00806
+plaquette, hot-start minus cold-start streams: -4.05e-06 +- 4.6e-06 (-0.88 sigma)
+WARNING: d3_b9.0_L24_s301.npz is an incomplete run (6987 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24_s302.npz is an incomplete run (7034 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24_s303.npz is an incomplete run (6892 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24_s304.npz is an incomplete run (7082 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s305.npz is an incomplete run (9539 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s306.npz is an incomplete run (9700 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s307.npz is an incomplete run (9624 of 30000 measurements; reason: maxtime)
+WARNING: d3_b9.0_L24r_s308.npz is an incomplete run (9583 of 30000 measurements; reason: maxtime)
+CAVEAT: the error of a mass chosen by plateau rule R5 does not include the selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare with the fixed-t values above and see 'caveats' in the JSON file.
+(numerical evidence for one lattice ensemble; not a proof of the mass gap)
+wrote results/d3_b9.0_L24_combined.json and d3_b9.0_L24_combined_glueball_meff.png, d3_b9.0_L24_combined_torelon_meff.png, d3_b9.0_L24_combined_correlators.png

@@ -1,0 +1,35 @@
+ensemble d4_b2.5_L16x: D=4 shape=16x16x16x16 beta=2.5 | 4514 measurements used (357 discarded), bins of 122 (auto: ceil(10 * tau_int_max), tau_int_max = 12.104), 37 bins
+plaquette   0.65198 +- 0.00002   tau_int = 1.32
+glueball a*m  0.77128 +- 0.02601   [plateau, t*=1]
+   GEVP operators: s28_2x2,s40_2x2,s10_2x2,s4_2x2   overlap 0.907
+   t=0  m_eff = 0.86873 +- 0.01269
+   t=1  m_eff = 0.77128 +- 0.02601
+   t=2  m_eff = 0.74568 +- 0.05836
+   t=3  m_eff = 0.76594 +- 0.11236
+   t=4  m_eff = 0.89156 +- 0.33636
+   t=5  m_eff = 0.63711 +- 0.51578
+   cosh fit t=1..5: 0.76678 +- 0.03762  chi2/dof = 0.12/3
+torelon  a*E  0.45529 +- 0.02041   [plateau, t*=3]
+   GEVP operators: s40,s28   overlap 0.887
+   t=0  m_eff = 0.52186 +- 0.00676
+   t=1  m_eff = 0.48584 +- 0.00933
+   t=2  m_eff = 0.47580 +- 0.01453
+   t=3  m_eff = 0.45529 +- 0.02041
+   t=4  m_eff = 0.46971 +- 0.03242
+   t=5  m_eff = 0.49470 +- 0.05561
+   cosh fit t=3..8: 0.46940 +- 0.03286  chi2/dof = 0.15/4
+a*sqrt(sigma) [luscher, L=16]  0.18041 +- 0.00354
+a*sqrt(sigma) [nambu_goto, L=16]  0.18121 +- 0.00348
+   fixed t=1: a*E = 0.48584 +- 0.00933  ->  a*sqrt(sigma) [luscher] 0.18562 +- 0.00157
+   fixed t=2: a*E = 0.47580 +- 0.01453  ->  a*sqrt(sigma) [luscher] 0.18392 +- 0.00247
+m/sqrt(sigma) [luscher]  4.27528 +- 0.13639
+m/sqrt(sigma) [nambu_goto]  4.25620 +- 0.13545
+m/Lambda_L (two-loop)  215.69608 +- 7.27501   [a*Lambda_L = 0.00357579]
+plaquette, hot-start minus cold-start streams: -9.88e-06 +- 3.3e-05 (-0.30 sigma)
+WARNING: d4_b2.5_L16x_s605.npz is an incomplete run (1229 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s606.npz is an incomplete run (1219 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s607.npz is an incomplete run (1208 of 6000 measurements; reason: maxtime)
+WARNING: d4_b2.5_L16x_s608.npz is an incomplete run (1215 of 6000 measurements; reason: maxtime)
+CAVEAT: the error of a mass chosen by plateau rule R5 does not include the selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare with the fixed-t values above and see 'caveats' in the JSON file.
+(numerical evidence for one lattice ensemble; not a proof of the mass gap)
+wrote results/d4_b2.5_L16x.json and d4_b2.5_L16x_glueball_meff.png, d4_b2.5_L16x_torelon_meff.png, d4_b2.5_L16x_correlators.png
