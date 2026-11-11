@@ -25,6 +25,9 @@ Rules followed in this file
       that 1x1 loops of links smeared with weight w = 0.5 have a very poor overlap; the test
       pins down the cause (w = 0.5 is the stability limit of APE smearing: the staggered mode
       is not damped).
+  (3) integration round: test_fixed_t_values_caveats_and_stream_consistency was added
+      together with the corresponding (purely additive) output of analyze.py; it contains
+      deterministic consistency checks only.
 * These tests validate a measurement and analysis code.  The D=2 results are exact checks of
   the pipeline; nothing here is a proof of anything about continuum Yang-Mills theory.
 """
@@ -736,3 +739,103 @@ def test_full_chain_schema(tmp_path, shape, beta, dkey):
     assert res2["n_meas_total"] == 1200
     assert all(s["n_discarded"] == 100 for s in res2["streams"])
     assert res2["n_meas_used"] <= 1000
+
+
+def test_fixed_t_values_caveats_and_stream_consistency(tmp_path):
+    """Output added to analyze.py in the integration round (review findings: the error quoted
+    with the mass selected by plateau rule R5 under-covers, so the fixed-t effective masses and
+    the caveat must accompany every quoted number; hot-start and cold-start streams should be
+    compared explicitly).  Deterministic consistency checks only:
+
+    * 'fixed_t' of every channel repeats rows 1 and 2 of meff_table; the error of
+      m_eff(1) - m_eff(2) is at most the sum of the two errors;
+    * string_tension.fixed_t is the Luscher / Nambu-Goto formula applied to those energies;
+    * the R5 numbers (mass, err, t_star, flag) do not depend on the new output: they equal
+      a direct call of stats.analyze_channel on the raw arrays (to rounding);
+    * 'caveats' names rule R5 and the summary prints the caveat;
+    * stream_consistency: chi2 of the stream plaquettes (each stream with the error from
+      its own tau_int), hot minus cold with its pull; a stream whose plaquette is shifted by
+      hand (+0.01, tens of sigma) produces both warnings.
+    """
+    shape, beta = (8, 6, 6), 4.0
+    files = []
+    for seed, start in ((21, "hot"), (22, "cold"), (23, "hot")):
+        out = tmp_path / ("c_s%d.npz" % seed)
+        args = rp.build_parser().parse_args(
+            ["--shape", ",".join(map(str, shape)), "--beta", str(beta), "--ntherm", "100",
+             "--nmeas", "500", "--nhb", "1", "--nor", "1", "--levels", "0,1,2", "--w", "0.25",
+             "--seed", str(seed), "--start", start, "--out", str(out)])
+        rp.Run(args).run(out=_Sink())
+        files.append(str(out))
+    res = analyze_mod.analyze(files, outdir=str(tmp_path), make_plots=False, quiet=True)
+    D, T, L = len(shape), shape[0], shape[1]
+    for blk in (res["glueball"], res["torelon"]):
+        ft = blk["fixed_t"]
+        for t in (1, 2):
+            row = blk["meff_table"][t]
+            assert ft["t%d" % t] == {"m": row["m_cosh"], "err": row["err_cosh"]}
+        d = ft["t1_minus_t2"]
+        if d["value"] is not None:
+            assert d["value"] == pytest.approx(ft["t1"]["m"] - ft["t2"]["m"], abs=1e-14)
+            if d["err"] is not None and ft["t1"]["err"] is not None and ft["t2"]["err"] is not None:
+                assert 0 < d["err"] <= ft["t1"]["err"] + ft["t2"]["err"] + 1e-12
+    sft = res["string_tension"]["fixed_t"]
+    assert [e["t"] for e in sft] == [1, 2]
+    for e in sft:
+        row = res["torelon"]["meff_table"][e["t"]]
+        assert e["aE"] == row["m_cosh"] and e["aE_err"] == row["err_cosh"]
+        if e["luscher"] is not None:
+            assert e["luscher"]["a_sqrt_sigma"] == pytest.approx(
+                math.sqrt(stats.sigma_luscher(e["aE"], L, D)), rel=1e-13)
+            assert e["nambu_goto"]["a_sqrt_sigma"] == pytest.approx(
+                math.sqrt(stats.sigma_nambu_goto(e["aE"], L, D)), rel=1e-13)
+            assert e["luscher"]["a_sqrt_sigma_err"] > 0
+    # rule R5 output is untouched by the additions
+    raw = [rp.load_raw(f)[1] for f in files]
+    B = res["binsize"]
+    rg = stats.analyze_channel([a["glue"] for a in raw], T, B, subtract_vev=True)
+    rt = stats.analyze_channel([a["torelon"] for a in raw], T, B, subtract_vev=False)
+    for blk, r in ((res["glueball"], rg), (res["torelon"], rt)):
+        assert blk["flag"] == r["plateau"]["flag"] and blk["t_star"] == r["plateau"]["t_star"]
+        if math.isfinite(r["mass"]):
+            # (1e-12: analyze.py passes the torelon array through a fancy index, which changes
+            #  the memory layout and hence the last bits of the FFT sums)
+            assert blk["mass"] == pytest.approx(r["mass"], rel=1e-12)
+            assert blk["err"] == pytest.approx(r["err"], rel=1e-9)
+        else:
+            assert blk["mass"] is None
+    # caveats
+    assert len(res["caveats"]) >= 3 and any("R5" in c and "selection" in c for c in res["caveats"])
+    assert any("upper" in c.lower() for c in res["caveats"])
+    assert any("not a proof" in c.lower() for c in res["caveats"])
+    text = analyze_mod.summary(res)
+    assert "CAVEAT" in text and "not a proof" in text
+    # stream consistency
+    sc = res["stream_consistency"]
+    assert sc["plaquette"]["n_streams"] == 3 and sc["plaquette"]["dof"] == 2
+    hc = sc["hot_minus_cold"]
+    assert hc["n_hot"] == 2 and hc["n_cold"] == 1 and hc["err"] > 0
+    assert hc["pull"] == pytest.approx(hc["diff"] / hc["err"])
+    each = [stats.mean_err_tau(a["plaq"]) for a in raw]         # hot, cold, hot
+    for si, r in zip(res["streams"], each):
+        assert si["plaquette_err"] == pytest.approx(r["err"], rel=1e-12)
+    wh = [1.0 / each[0]["err"] ** 2, 1.0 / each[2]["err"] ** 2]
+    mean_hot = (wh[0] * each[0]["mean"] + wh[1] * each[2]["mean"]) / (wh[0] + wh[1])
+    assert hc["diff"] == pytest.approx(mean_hot - each[1]["mean"], abs=1e-13)
+    assert hc["err"] == pytest.approx(math.hypot(1.0 / math.sqrt(wh[0] + wh[1]), each[1]["err"]),
+                                      rel=1e-12)
+    print("stream consistency: chi2 = %.2f / %d, hot - cold = %+.2e +- %.1e (%+.2f sigma)"
+          % (sc["plaquette"]["chi2"], sc["plaquette"]["dof"], hc["diff"], hc["err"], hc["pull"]))
+    assert not any("hot-start and cold-start" in w for w in res["warnings"])
+    assert not any("inconsistent" in w for w in res["warnings"])
+    # a stream whose plaquette is shifted (as an unthermalised or wrong-beta stream would be)
+    with np.load(files[1], allow_pickle=False) as z:
+        arrays = {k: z[k] for k in z.files}
+    arrays["plaq"] = arrays["plaq"] + 0.01
+    bad = str(tmp_path / "bad_s22.npz")
+    np.savez(bad, **arrays)
+    res2 = analyze_mod.analyze([files[0], bad, files[2]], name="bad", outdir=str(tmp_path),
+                               make_plots=False, quiet=True)
+    assert abs(res2["stream_consistency"]["hot_minus_cold"]["pull"]) > 4
+    assert any("hot-start and cold-start" in w for w in res2["warnings"])
+    assert any("inconsistent" in w for w in res2["warnings"])

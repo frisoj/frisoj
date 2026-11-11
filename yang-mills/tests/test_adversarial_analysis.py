@@ -1391,15 +1391,18 @@ def test_d2_end_to_end_string_tension_beta8_slow(tmp_path):
 # ==============================================================================================
 # limitations that are documented by a number (they pass as long as the code warns / flags)
 # ==============================================================================================
-def test_one_short_stream_truncates_the_tau_int_window_but_is_flagged(tmp_path):
-    """LIMITATION (reported as 'minor').  stats.autocorrelation() limits the lag range to half
-    the length of the SHORTEST stream, so a single very short stream (e.g. a crashed job)
-    truncates the Madras-Sokal window of the whole ensemble: tau_int and therefore the
-    automatic bin size come out too small.  Here: AR(1) data with tau_int = 5 exactly,
-    streams of 4000, 4000 and 8 measurements.  With the two long streams alone the bin size
-    is >= 40; adding the 8-measurement stream roughly halves it (58 -> 31).  What must hold
-    is that analyze.py does not do this silently: the 'window not reached' warning is present.
-    (Production streams of one ensemble have similar lengths, so this does not affect them.)"""
+def test_one_short_stream_does_not_truncate_the_tau_int_window(tmp_path):
+    """Former LIMITATION (reported as 'minor'), FIXED in the integration round.
+    stats.autocorrelation() limited the lag range to half the length of the SHORTEST stream,
+    so a single very short stream (e.g. a crashed job) truncated the Madras-Sokal window of
+    the whole ensemble: tau_int and therefore the automatic bin size came out too small
+    (58 -> 31 here, with 'window not reached' warnings as the only hint).  stats.tau_int now
+    continues the window search with the streams that are long enough.
+
+    AR(1) data with tau_int = 5 exactly, streams of 4000, 4000 and 8 measurements.  The
+    original assertions are kept; added (criteria written before the first run with the fix):
+    with the 8-measurement stream the bin size is still >= 40, there is no 'window not
+    reached' warning, and tau_int_max changes by less than 5 %."""
     T, shape, beta = 12, (12, 8, 8), 5.0
     rho = 9.0 / 11.0
     masses, amps = [0.7, 1.6], [[1.0, 0.6], [0.8, -0.5]]
@@ -1422,6 +1425,12 @@ def test_one_short_stream_truncates_the_tau_int_window_but_is_flagged(tmp_path):
           % (r2["tau_int_max"], r2["binsize"], r3["tau_int_max"], r3["binsize"], len(w3)))
     assert r2["binsize"] >= 40 and not any("window not reached" in w for w in r2["warnings"])
     assert r3["binsize"] >= 40 or len(w3) > 0
+    # after the fix
+    assert r3["binsize"] >= 40 and len(w3) == 0
+    assert abs(r3["tau_int_max"] - r2["tau_int_max"]) < 0.05 * r2["tau_int_max"]
+    # the short stream is not silently merged: it cannot fill a bin and is counted as dropped
+    s3 = r3["streams"][2]
+    assert s3["n_meas"] == 8 and s3["n_used"] == 0 and s3["n_dropped_binning"] == 8
 
 
 def test_pure_noise_never_produces_a_plateau(tmp_path):

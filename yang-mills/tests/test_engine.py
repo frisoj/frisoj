@@ -22,6 +22,22 @@ Rules followed in this file
   requirement on sigma, so that the test cannot pass merely because the error is large.
 * These tests validate a Monte Carlo code.  They are numerical evidence, not a proof of
   anything about continuum Yang-Mills theory.
+
+Additions by the integrator (after the review round; nothing existing was loosened or removed)
+----------------------------------------------------------------------------------------------
+A reviewer showed by mutation testing that no test pinned the strong-coupling coefficients of
+ym/exact.py: 40 -> 20 in t10 survived every test, 8 -> 7 in t6 survived all default Monte Carlo
+tests.  Added, with criteria written down before their first run:
+* ``test_strong_coupling_coefficients_from_surface_enumeration`` (deterministic, independent
+  brute-force count of closed surfaces);
+* criterion E of ``test_h_strong_coupling_plaquette`` (beta = 1.5, uses the existing runs);
+* ``test_h_d4_beta10_pins_leading_coefficient`` (default) and
+  ``test_slow_strong_coupling_d4_beta125_pins_second_coefficient`` (slow);
+* formula checks for t10 and for negative arguments in ``test_exact_formulas``; argument
+  checks for beta in ``test_cold_start_and_argument_checks``.
+The truncation allowance 3 u^2 |t10| used in the new Monte Carlo criteria was chosen by the
+integrator AFTER seeing the recorded numbers of test (h); see ``SC_TRUNC`` for what it is based
+on and for what the new criteria can and cannot exclude.
 """
 import functools
 import math
@@ -387,6 +403,18 @@ def test_cold_start_and_argument_checks():
         lat.gauge_transform(np.zeros((3, 4)))
     with pytest.raises(ValueError):
         lat.reseed(-1)
+    # beta must be a finite number >= 0 (review finding: a negative beta was silently simulated
+    # as beta = 0, and NaN would make the heatbath loop forever)
+    for bad in (-2.0, -1e-300, float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError):
+            Lattice((4, 4), bad, 0)
+        with pytest.raises(ValueError):
+            lat.beta = bad
+        assert lat.beta == 3.0                      # a rejected assignment changes nothing
+    lat.beta = 2
+    assert lat.beta == 2.0 and isinstance(lat.beta, float)
+    assert lat.copy().beta == 2.0
+    assert Lattice((4, 4), 0.0, 0).beta == 0.0     # beta = 0 (Haar measure) is legitimate
 
 
 # ==============================================================================================
@@ -859,6 +887,45 @@ SC_SHAPE = {3: (12, 12, 12), 4: (8, 8, 8, 8)}
 SC_NMEAS = {3: 8000, 4: 3000}
 SC_SIGMA_MAX = {0.5: 1.0e-4, 1.0: 1.0e-4, 1.5: 1.5e-4}
 
+#: Allowance for the terms neglected after t10, in units of u^2 |t10| (used by the criteria
+#: added in the integration round).  It is an ESTIMATE OF SIZE, NOT A BOUND, and it was fixed
+#: after the recorded results of test (h) were known:
+#:   * the integrator's leading-order estimate of the u^12 term (``sc_t12_estimate`` below, not
+#:     independently verified) is t12 = -3.0 u^2 t10 in D = 3 and -1.2 u^2 t10 in D = 4;
+#:   * in D = 4 the u^14 term (surfaces of three cubes; there are many) is of similar size with
+#:     the opposite sign at beta >= 1.25, so the series does not converge quickly there.
+#: With this allowance the Monte Carlo criteria exclude an error of a factor 2 in the
+#: coefficient 40 (D-2)(2D-5) of t10; they cannot exclude an error of 30 %.  The coefficient
+#: itself is pinned exactly by the surface enumeration test.
+SC_TRUNC = 3.0
+
+
+def sc_t12_estimate(beta, D):
+    """Integrator's estimate of the O(u^11 u') term of the plaquette series (NOT part of
+    ym/exact.py, NOT independently verified; printed for information, never asserted).
+
+    Order u^12 of ln Z per plaquette (N_c = (D-2)/3 cubes and N_d = (D-2)(2D-5) pairs of
+    face-sharing cubes per plaquette, lambda_1 = I_3/I_1 = (2/3) u^2 + ...):
+        + N_c * 9 lambda_1^6           cube with all six faces in the adjoint representation
+        + N_d * 12 u^10 lambda_1       pair of cubes, shared face in the adjoint (three discs
+                                       glued along a circle: prod_i d_i lambda_i^A_i)
+        - N_c * (4 u^6)^2 / 2          cumulant: a cube with itself
+        - N_d * (4 u^6)^2              cumulant: two cubes sharing a face
+        + (N_12 / 12) * 4 u^12         12-plaquette spheres (D = 4 only: N_12 = 80 contain a
+                                       given plaquette, see the enumeration test)
+    Two cubes sharing only an edge factorise exactly (gauge invariance at the two ends of the
+    shared link), so they do not contribute.
+    """
+    u, up = exact.u(beta), exact.du_dbeta(beta)
+    h = 1e-6
+    l1 = exact.lambda_j(beta, 2)
+    l1p = (exact.lambda_j(beta + h, 2) - exact.lambda_j(beta - h, 2)) / (2 * h)
+    n_c = (D - 2) / 3.0
+    n_d = (D - 2) * (2 * D - 5)
+    n_12 = {2: 0.0, 3: 0.0, 4: 80.0 / 12.0}[D]
+    return (n_c * 54.0 * l1 ** 5 * l1p + n_d * (120.0 * u ** 9 * up * l1 + 12.0 * u ** 10 * l1p)
+            + 12.0 * (4.0 * n_12 - 8.0 * n_c - 16.0 * n_d) * u ** 11 * up)
+
 
 def strong_coupling_estimate(D, beta, n_meas=None, seed_offset=0):
     n_meas = SC_NMEAS[D] if n_meas is None else n_meas
@@ -881,6 +948,11 @@ def test_h_strong_coupling_plaquette(D, beta):
          to the corrected formula than to plain P = u;
       D. for beta = 1.0 (where terms beyond t10 are negligible): |P_MC - (P_LO + t10)| <=
          4 sigma + 0.5 |t10|.
+    Added in the integration round (see ``SC_TRUNC``; same runs, nothing above was changed):
+      E. for beta = 1.5 the second term is tested: |P_MC - (P_LO + t10)| <= 4 sigma +
+         SC_TRUNC u^2 |t10|, and in D = 4 (where t10 = 3.1e-3) sigma <= |t10| / 20, so that an
+         error of a factor 2 in the coefficient of t10 fails.  (Criterion B alone let a
+         mutant with 20 instead of 40 pass.)
     """
     est = strong_coupling_estimate(D, beta)
     u, t6, t10 = exact.strong_coupling_terms(beta, D)
@@ -899,6 +971,178 @@ def test_h_strong_coupling_plaquette(D, beta):
         assert abs(est.mean - p_lo) < 0.5 * t6
     if beta == 1.0:                                                        # D
         assert abs(est.mean - p_nlo) <= 4.0 * est.err + 0.5 * abs(t10)
+    if beta == 1.5:                                                        # E
+        t12 = sc_t12_estimate(beta, D)
+        print("[h] D=%d beta=%g: (P-u-t6)/t10 = %.3f +- %.3f ; allowance SC_TRUNC*u^2 = %.3f ; "
+              "integrator's t12 estimate %.2e -> P - (LO+t10+t12) = %+.2e (%+.2f sigma; not "
+              "asserted)" % (D, beta, (est.mean - u - t6) / t10, est.err / abs(t10),
+                             SC_TRUNC * u * u, t12, est.mean - p_nlo - t12,
+                             nsig(est.mean, p_nlo + t12, est.err)))
+        assert abs(est.mean - p_nlo) <= 4.0 * est.err + SC_TRUNC * u * u * abs(t10)
+        if D == 4:
+            assert est.err <= abs(t10) / 20.0
+
+
+def test_h_d4_beta10_pins_leading_coefficient():
+    """D = 4, beta = 1.0, 8^4, 10000 heatbath sweeps (own seed): the leading coefficient
+    8 (D-2) of the strong-coupling correction is pinned by Monte Carlo in the DEFAULT suite.
+    (Review finding: the six default cases of (h) could not tell 8 from 7.)
+
+    Criteria (written before the first run):
+      A. sigma <= 4.5e-5;
+      B. |P_MC - (u + t6 + t10)| <= 4 sigma + SC_TRUNC u^2 |t10|;
+      C. teeth: that allowance is at most 0.6 * |t6| / 8, i.e. a coefficient 7 or 9 instead
+         of 8 would be off by more than 1.6 times the allowance.
+    """
+    D, beta = 4, 1.0
+    est = strong_coupling_estimate(D, beta, n_meas=10000, seed_offset=100)
+    u, t6, t10 = exact.strong_coupling_terms(beta, D)
+    unit = (D - 2) * u ** 5 * exact.du_dbeta(beta)           # one unit of the coefficient
+    allow = 4.0 * est.err + SC_TRUNC * u * u * abs(t10)
+    print("[h] D=4 beta=1.0, 10000 sweeps: P = %s | u+t6+t10 = %.6f (%+.2f sigma) | measured "
+          "leading coefficient (P-u-t10)/((D-2)u^5u') = %.3f +- %.3f (prediction 8) | allowance "
+          "%.2e = %.2f units" % (est, u + t6 + t10, nsig(est.mean, u + t6 + t10, est.err),
+                                 (est.mean - u - t10) / unit, est.err / unit, allow,
+                                 allow / unit))
+    assert est.err <= 4.5e-5                                               # A
+    assert abs(est.mean - (u + t6 + t10)) <= allow                         # B
+    assert allow <= 0.6 * abs(t6) / 8.0                                    # C
+
+
+# ----------------------------------------------------------------------------------------------
+# independent derivation of the strong-coupling coefficients: brute-force surface enumeration
+# ----------------------------------------------------------------------------------------------
+def _plaquette_links(p):
+    """The four links (site, direction) on the boundary of the plaquette p = (site, mu, nu)."""
+    x, mu, nu = p
+    xm = list(x)
+    xm[mu] += 1
+    xn = list(x)
+    xn[nu] += 1
+    return ((x, mu), (tuple(xm), nu), (tuple(xn), mu), (x, nu))
+
+
+def _link_plaquettes(link, D):
+    """The 2 (D-1) plaquettes that contain the link (site, mu)."""
+    x, mu = link
+    out = []
+    for nu in range(D):
+        if nu == mu:
+            continue
+        a, b = (mu, nu) if mu < nu else (nu, mu)
+        out.append((x, a, b))
+        xd = list(x)
+        xd[nu] -= 1
+        out.append((tuple(xd), a, b))
+    return out
+
+
+def closed_surfaces(D, nmax):
+    """All connected closed surfaces (sets of plaquettes of the infinite hypercubic lattice in
+    which every link belongs to an even number of plaquettes) that contain the plaquette p0 at
+    the origin in the (0, 1) plane and have at most nmax plaquettes.
+
+    Depth-first search: the set is grown by adding, at the smallest link that currently belongs
+    to an odd number of plaquettes, each plaquette containing that link in turn; a branch ends
+    when the set is closed or when it cannot be closed any more (every added plaquette changes
+    the parity of exactly four links, so r remaining plaquettes can cure at most 4 r odd links).
+    Nothing about cubes is assumed.
+    """
+    from collections import Counter
+    p0 = (tuple([0] * D), 0, 1)
+    members = [p0]
+    inside = {p0}
+    odd = set(_plaquette_links(p0))
+    found = set()
+
+    def toggle(p):
+        for link in _plaquette_links(p):
+            if link in odd:
+                odd.discard(link)
+            else:
+                odd.add(link)
+
+    def grow():
+        if not odd:
+            found.add(frozenset(members))
+            return
+        r = nmax - len(members)
+        if r <= 0 or len(odd) > 4 * r:
+            return
+        for q in _link_plaquettes(min(odd), D):
+            if q not in inside:
+                members.append(q)
+                inside.add(q)
+                toggle(q)
+                grow()
+                toggle(q)
+                inside.discard(q)
+                members.pop()
+
+    grow()
+    out = []
+    for surf in found:
+        links = Counter(link for p in surf for link in _plaquette_links(p))
+        sites = set()
+        for (x, mu) in links:
+            sites.add(x)
+            y = list(x)
+            y[mu] += 1
+            sites.add(tuple(y))
+        out.append({"n": len(surf), "euler": len(sites) - len(links) + len(surf),
+                    "max_per_link": max(links.values())})
+    return out
+
+
+def test_strong_coupling_coefficients_from_surface_enumeration():
+    """Independent derivation of the coefficients 8 (D-2) and 40 (D-2)(2D-5) in ym/exact.py.
+
+    Character expansion: ln Z = N_p ln f_0 + sum over closed surfaces S, all plaquettes in the
+    fundamental representation, of d^chi(S) u^|S| + (terms of order u^12), d = 2; for a surface
+    with the topology of a sphere chi = 2.  With P = u + (1/N_p) d(ln Z')/d(beta) and N_n = the
+    number of n-plaquette surfaces that CONTAIN A GIVEN plaquette (each surface has n
+    plaquettes, so there are N_n / n surfaces per plaquette):
+
+        t_n = (N_n / n) * 4 * n u^(n-1) u' = 4 N_n u^(n-1) u'.
+
+    The surfaces are found by brute force (``closed_surfaces``); the formula in exact.py was
+    obtained by counting cubes.  Expected: no closed surface in D = 2; N_6 = 2 (D-2);
+    N_8 = 0; N_10 = 10 (D-2)(2D-5); all of them spheres with exactly two plaquettes per link.
+    At n = 12 (the first neglected order) the search finds, in D = 4 only, 80 spheres (three
+    or four mutually adjacent cubes of a tesseract) plus, in D = 3 and 4, pairs of cubes
+    sharing an edge (four plaquettes on that link; they factorise and do not contribute).
+
+    This test fails for the reviewer's mutants (20 instead of 40, 7 instead of 8).
+    """
+    assert closed_surfaces(2, 12) == []
+    expect_12 = {3: {"spheres": 0, "pinched": 10}, 4: {"spheres": 80, "pinched": 100}}
+    for D in (3, 4):
+        surfaces = closed_surfaces(D, 12)
+        counts = {}
+        for sf in surfaces:
+            counts[sf["n"]] = counts.get(sf["n"], 0) + 1
+        n6, n10 = 2 * (D - 2), 10 * (D - 2) * (2 * D - 5)
+        spheres12 = sum(1 for sf in surfaces
+                        if sf["n"] == 12 and sf["euler"] == 2 and sf["max_per_link"] == 2)
+        pinched12 = sum(1 for sf in surfaces if sf["n"] == 12 and sf["max_per_link"] == 4)
+        print("[enum] D=%d: closed surfaces through one plaquette by size: %s ; n=12: %d "
+              "spheres, %d edge-sharing cube pairs" % (D, dict(sorted(counts.items())),
+                                                        spheres12, pinched12))
+        assert set(counts) == {6, 10, 12}                  # in particular nothing at n = 4, 8
+        assert counts[6] == n6 and counts[10] == n10
+        for sf in surfaces:
+            if sf["n"] <= 10:                              # spheres, two plaquettes per link
+                assert sf["euler"] == 2 and sf["max_per_link"] == 2
+        assert spheres12 == expect_12[D]["spheres"] and pinched12 == expect_12[D]["pinched"]
+        assert spheres12 + pinched12 == counts[12]
+        for beta in (0.5, 1.0, 1.5, 2.3):
+            uu, up = exact.u(beta), exact.du_dbeta(beta)
+            u_ret, t6, t10 = exact.strong_coupling_terms(beta, D)
+            assert u_ret == uu
+            assert t6 == pytest.approx(4.0 * counts[6] * uu ** 5 * up, rel=1e-13)
+            assert t10 == pytest.approx(4.0 * counts[10] * uu ** 9 * up, rel=1e-13)
+            assert exact.plaquette_strong_coupling(beta, D, order=2) == pytest.approx(
+                uu + 4.0 * (counts[6] * uu ** 5 + counts[10] * uu ** 9) * up, rel=1e-13)
 
 
 # ==============================================================================================
@@ -1023,6 +1267,23 @@ def test_exact_formulas():
             assert exact.plaquette_strong_coupling(beta, D) == pytest.approx(
                 uu + 8 * (D - 2) * uu ** 5 * up, rel=1e-14)
             assert exact.plaquette_strong_coupling(beta, D, order=0) == uu
+            # second term (guards against edits; the coefficients themselves are derived
+            # independently in test_strong_coupling_coefficients_from_surface_enumeration)
+            t10 = 40 * (D - 2) * (2 * D - 5) * uu ** 9 * up
+            assert exact.plaquette_strong_coupling(beta, D, order=2) == pytest.approx(
+                uu + 8 * (D - 2) * uu ** 5 * up + t10, rel=1e-14)
+            terms = exact.strong_coupling_terms(beta, D)
+            assert terms[0] == uu
+            assert terms[1] == pytest.approx(8 * (D - 2) * uu ** 5 * up, rel=1e-14)
+            assert terms[2] == pytest.approx(t10, rel=1e-14)
+        with pytest.raises(ValueError):
+            exact.plaquette_strong_coupling(beta, 3, order=3)
+        # negative arguments: u is odd and u' is even (review finding: the Taylor polynomial of
+        # the small-beta branch used to be returned for every beta < 0)
+        from scipy.special import iv as _iv
+        assert exact.u(-beta) == -exact.u(beta)
+        assert exact.u(-beta) == pytest.approx(_iv(2, -beta) / _iv(1, -beta), rel=1e-12)
+        assert exact.du_dbeta(-beta) == exact.du_dbeta(beta)
     # small and large beta limits, vectorisation
     assert exact.u(0.0) == 0.0 and exact.du_dbeta(0.0) == 0.25
     assert exact.u(1e-5) == pytest.approx(2.5e-6, rel=1e-9)
@@ -1031,6 +1292,11 @@ def test_exact_formulas():
     assert exact.u(1e4) == pytest.approx(1 - 1.5e-4 + 0.375e-8, abs=1e-11)
     arr = exact.u(np.array([0.5, 1.0, 2.0]))
     assert arr.shape == (3,) and arr[1] == exact.u(1.0)
+    arr = exact.u(np.array([-2.0, -5e-5, 0.0, 5e-5, 2.0]))
+    assert np.array_equal(arr, -arr[::-1]) and arr[4] == exact.u(2.0)
+    assert exact.u(-5e-5) == pytest.approx(-5e-5 / 4 + 5e-5 ** 3 / 96, rel=1e-12)
+    assert exact.du_dbeta(-5e-5) == exact.du_dbeta(5e-5)
+    assert math.isnan(exact.u(float("nan")))
     # exact torus plaquette = (1/N_p) d ln Z / d beta with Z = sum_j [(2/beta) I_{2j+1}]^N_p
     for beta, n_plaq in ((4.0, 4), (8.0, 8), (2.0, 6)):
         def ln_z(b):
@@ -1097,6 +1363,34 @@ def test_slow_strong_coupling_d4_beta10_resolves_second_term():
     assert est.err <= 2.8e-5
     assert abs(est.mean - (u + t6 + t10)) <= 4.0 * est.err + 0.5 * t10
     assert est.mean - (u + t6) > 4.0 * est.err
+
+
+@pytest.mark.slow
+def test_slow_strong_coupling_d4_beta125_pins_second_coefficient():
+    """D = 4, beta = 1.25, 8^4, 30000 heatbath sweeps: Monte Carlo test of the coefficient
+    40 (D-2)(2D-5) = 240 of the second term, t10 = 8.2e-4 here.  Added in the integration round
+    (review finding: no assertion pinned that coefficient; at beta = 1.0 the statistics of the
+    existing slow test, (P-u-t6)/t10 = 0.95 +- 0.14, cannot exclude a factor 2 at 4 sigma).
+
+    Criteria (written before the first run):
+      A. sigma <= |t10| / 25;
+      B. |P_MC - (u + t6 + t10)| <= 4 sigma + SC_TRUNC u^2 |t10|  (SC_TRUNC u^2 = 0.26: the
+         test excludes a factor 2, i.e. r = (P-u-t6)/t10 = 2 or 0.5, not an error of 30 %);
+      C. the term is resolved: P_MC - (u + t6) > 10 sigma.
+    """
+    D, beta = 4, 1.25
+    est = strong_coupling_estimate(D, beta, n_meas=30000, seed_offset=5000)
+    u, t6, t10 = exact.strong_coupling_terms(beta, D)
+    t12 = sc_t12_estimate(beta, D)
+    print("[slow h] D=4 beta=1.25: P = %s | LO = %.6f (%+.2f sigma) | LO+t10 = %.6f "
+          "(%+.2f sigma) | r = (P-u-t6)/t10 = %.3f +- %.3f | allowance SC_TRUNC*u^2 = %.3f | "
+          "integrator's t12 estimate %.2e (t12/t10 = %.3f, not asserted)" % (
+              est, u + t6, nsig(est.mean, u + t6, est.err), u + t6 + t10,
+              nsig(est.mean, u + t6 + t10, est.err), (est.mean - u - t6) / t10, est.err / t10,
+              SC_TRUNC * u * u, t12, t12 / t10))
+    assert est.err <= abs(t10) / 25.0                                      # A
+    assert abs(est.mean - (u + t6 + t10)) <= 4.0 * est.err + SC_TRUNC * u * u * abs(t10)   # B
+    assert est.mean - (u + t6) > 10.0 * est.err                            # C
 
 
 @pytest.mark.slow

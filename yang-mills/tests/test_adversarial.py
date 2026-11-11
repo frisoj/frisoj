@@ -1248,34 +1248,46 @@ def test_exact_torus_formulas_against_brute_force_haar_integration():
 
 
 # ==============================================================================================
-# 9. known limitations (documented with xfail so that they stay visible; see the review report)
+# 9. former limitations (found in the review as 'minor', fixed in the integration round; these
+#    were non-strict xfail tests and are now ordinary tests)
 # ==============================================================================================
-@pytest.mark.xfail(reason="REVIEW FINDING (minor): negative beta is neither rejected nor "
-                          "simulated; the heatbath silently samples beta = 0", strict=False)
 def test_negative_beta_is_rejected_or_simulated_correctly():
-    try:
-        lat = Lattice((4, 4), -2.0, SEED + 130)
-    except ValueError:
-        return                                    # rejecting the input would be fine
+    """Review finding: a negative beta was neither rejected nor simulated (the heatbath
+    silently sampled beta = 0, P ~ 0 instead of -u(|beta|)), and beta = NaN was accepted.
+    Fix: Lattice raises ValueError for beta that is negative or not finite, at construction
+    and on assignment.  beta = 0 stays legal and gives the Haar measure."""
+    for bad in (-2.0, float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            Lattice((4, 4), bad, SEED + 130)
+    lat = Lattice((4, 4), 2.0, SEED + 130)
+    for bad in (-2.0, float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            lat.beta = bad
+    assert lat.beta == 2.0
+    # beta = 0: plaquettes of Haar-random links average to zero
+    lat = Lattice((4, 4), 0.0, SEED + 131)
     lat.hot_start()
-    lat.update(200, 0)
+    lat.update(50, 0)
     p = np.empty(20000)
     for i in range(len(p)):
         lat.update(1, 0)
         p[i] = lat.plaquette()
-    # for SU(2) on a bipartite lattice beta -> -beta is a symmetry with P -> -P
-    assert abs(p.mean() + bessel_u(2.0)) < 5.0 * bin_err(p, 40)
+    err = bin_err(p, 40)
+    print("[beta=0] P = %.5f +- %.5f" % (p.mean(), err))
+    assert err < 2.5e-3
+    assert abs(p.mean()) < 4.0 * err
 
 
-@pytest.mark.xfail(reason="REVIEW FINDING (minor): exact.u(beta < 0) silently returns the "
-                          "small-beta Taylor polynomial instead of I2/I1 or an error",
-                   strict=False)
 def test_exact_u_negative_argument():
-    try:
-        val = exact.u(-2.0)
-    except ValueError:
-        return
-    assert val == pytest.approx(iv(2, -2.0) / iv(1, -2.0), rel=1e-10)
+    """Review finding: exact.u(beta < 0) returned the small-beta Taylor polynomial.  Fix: u is
+    evaluated as the odd function it is, u' as an even function."""
+    for b in (-2.0, -0.3, -30.0, -1e-3):
+        assert exact.u(b) == pytest.approx(iv(2, b) / iv(1, b), rel=1e-10)
+        h = 1e-6 * max(1.0, abs(b))
+        assert exact.du_dbeta(b) == pytest.approx((exact.u(b + h) - exact.u(b - h)) / (2 * h),
+                                                  rel=1e-6)
+    assert exact.u(-2.0) == -exact.u(2.0)
+    assert exact.du_dbeta(-2.0) == exact.du_dbeta(2.0)
 
 
 # ==============================================================================================

@@ -36,6 +36,9 @@ Rules followed in this file
   (2) test_string_tension_formulas: the first version also inverted the Nambu-Goto formula at
       parameters where the Nambu-Goto energy is imaginary (D=4, L=8, sigma=0.03); that was an
       error of the test, which now checks that NaN is returned there.
+  (3) integration round: test_tau_int_streams_of_unequal_length was added together with a fix
+      of stats.tau_int (review finding: one very short stream truncated the Madras-Sokal
+      window of the whole ensemble).  Its criteria were written before its first run.
 * These tests validate an analysis code.  They are not evidence about Yang-Mills theory.
 """
 import math
@@ -223,6 +226,94 @@ def test_tau_int_streams_and_error_of_mean():
     assert abs(jerr / true_err - 1.0) < 0.15
     print("tau %.3f(%.3f) exact %.3f; err(tau) %.5f, err(binned) %.5f, true %.5f"
           % (tau, dtau, exact, r["err"], jerr, true_err))
+
+
+def _brute_rho(streams, maxlag):
+    """Literal definition: Gamma(t) = sum_r sum_i d_i d_(i+t) / sum_r max(N_r - t, 0)."""
+    m = sum(s.sum() for s in streams) / sum(s.size for s in streams)
+    g = np.empty(maxlag + 1)
+    for t in range(maxlag + 1):
+        num = sum(float(np.dot((s - m)[:s.size - t], (s - m)[t:])) for s in streams if s.size > t)
+        den = sum(s.size - t for s in streams if s.size > t)
+        g[t] = num / den
+    return g / g[0]
+
+
+def test_tau_int_streams_of_unequal_length():
+    """Review finding (minor): the lag range of the pooled autocorrelation function was limited
+    to half the length of the SHORTEST stream, so one very short stream (a job that died early)
+    silently truncated the Madras-Sokal window of the whole ensemble and tau_int - hence the
+    automatic bin size - came out too small.  Fixed in stats.tau_int: if the window is not
+    reached within N_min / 2 the search continues up to N_max / 2 with the streams that are
+    long enough.
+
+    AR(1) data with tau_int = 5 exactly; streams of 4000, 4000 and 8 measurements.  Criteria
+    (written before the first run):
+      * the pooled rho(t) equals the literal definition (1e-10), with the default lag range
+        and with an explicit one beyond the shortest stream;
+      * with the short stream added, the window is reached (finite error), tau_int differs by
+        less than 5 % from the value of the two long streams alone, and it is within 4 sigma
+        of the exact value 5 with a relative error below 25 %;
+      * streams of equal length, and unequal streams whose window IS reached within N_min / 2,
+        give bit-for-bit what the previous implementation gave (re-implemented here).
+    """
+    rho = 9.0 / 11.0
+    rng = np.random.default_rng(2310)
+    a, b, c = ar1(rng, 4000, rho) + 1.0, ar1(rng, 4000, rho) + 1.0, ar1(rng, 8, rho) + 1.0
+    # literal definition
+    assert np.allclose(stats.autocorrelation([a, b, c]), _brute_rho([a, b, c], 4),
+                       rtol=0, atol=1e-10)
+    assert np.allclose(stats.autocorrelation([a, b, c], maxlag=60), _brute_rho([a, b, c], 60),
+                       rtol=0, atol=1e-10)
+    assert stats.autocorrelation([a, b, c], maxlag=10 ** 9).size == 4000    # clipped at N_max - 1
+    t2 = stats.tau_int([a, b])
+    t3 = stats.tau_int([a, b, c])
+    print("two long streams: tau_int = %.3f +- %.3f (W = %d); plus a stream of 8: "
+          "%.3f +- %.3f (W = %d); exact 5" % (t2 + t3))
+    assert math.isfinite(t2[1]) and math.isfinite(t3[1])
+    assert t3[2] > 4                                   # not cut off at N_min / 2 = 4
+    assert abs(t3[0] - t2[0]) < 0.05 * t2[0]
+    assert abs(t3[0] - 5.0) < 4.0 * t3[1] and t3[1] / 5.0 < 0.25
+    # a stream of a single measurement must not switch the estimate off either
+    t1 = stats.tau_int([a, b, np.array([1.0])])
+    assert math.isfinite(t1[1]) and abs(t1[0] - t2[0]) < 0.05 * t2[0]
+
+    def old_tau_int(streams, cc=6.0):
+        """The implementation before the fix (lag range N_min / 2 for every stream)."""
+        ntot = sum(x.size for x in streams)
+        nmin = min(x.size for x in streams)
+        maxlag = nmin // 2
+        m = sum(x.sum() for x in streams) / ntot
+        num = np.zeros(maxlag + 1)
+        den = np.zeros(maxlag + 1)
+        for x in streams:
+            d = x - m
+            nfft = 1
+            while nfft < d.size + maxlag + 1:
+                nfft *= 2
+            f = np.fft.rfft(d, nfft)
+            num += np.fft.irfft(f * np.conj(f), nfft)[:maxlag + 1]
+            den += d.size - np.arange(maxlag + 1)
+        r = num / den
+        r = r / r[0]
+        tau = 0.5 + np.cumsum(r[1:])
+        w = np.arange(1, r.size)
+        ok = np.nonzero(w >= cc * np.maximum(tau, 0.5))[0]
+        if ok.size == 0:
+            return float(tau[-1]), float("inf"), int(w[-1])
+        i = int(ok[0])
+        t = max(float(tau[i]), 1e-3)
+        return t, float(t * math.sqrt(2.0 * (2 * int(w[i]) + 1) / ntot)), int(w[i])
+
+    for streams in ([a, b], [a], [a, b[:3500]], [a[:1000], b, a[1000:3100]]):
+        assert stats.tau_int(streams) == old_tau_int(streams)
+    assert old_tau_int([a, b, c])[2] == 4 and not math.isfinite(old_tau_int([a, b, c])[1])
+    # still honest when the window cannot be reached at all: linear ramps of 40 and 30 points
+    # (deterministic, strongly correlated; tau_int(W) grows with W over the whole lag range).
+    # [The first version of this auxiliary check used a[:40], b[:30], for which the window IS
+    #  reached (tau 2.99); that was an error of the check, not of the code.]
+    ramp = stats.tau_int([np.arange(40.0), np.arange(30.0)])
+    assert not math.isfinite(ramp[1]) and ramp[2] == 20
 
 
 # ==============================================================================================

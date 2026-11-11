@@ -28,9 +28,17 @@ JSON schema (all quantities in lattice units; null = not available)
 ensemble, generated_utc, analysis_format, disclaimer
 D, shape, T, L_spatial, beta, update{nhb,nor,nskip}, smearing{levels,w,loops}
 streams[]            {file, seed, start, ntherm, n_meas, n_discarded, n_dropped_binning, n_used,
-                      complete, plaquette_mean, therm_check{first_quarter,rest,pull}}
-n_meas_total, n_meas_used, n_discarded_total, binsize, binsize_rule, n_bins, tau_int_max,
+                      complete, plaquette_mean, plaquette_err, wall_clock_s, seconds_per_cycle,
+                      therm_check{first_quarter,rest,pull}}
+                     (n_discarded = dropped by --discard only; plaquette_err = error of this
+                      stream alone from its own tau_int, null for fewer than 8 measurements)
+n_meas_total, n_meas_used, n_discarded_total (= n_meas_total - n_meas_used, i.e. dropped by
+                     --discard PLUS dropped because they do not fill a bin),
+binsize, binsize_rule, n_bins, tau_int_max,
 tau_int_table[]      {quantity, tau_int, tau_int_err, window}
+stream_consistency   {plaquette{chi2, dof, n_streams}, hot_minus_cold{diff, err, pull,
+                      n_hot, n_cold}}   independent streams / start types must agree
+caveats[]            statements that must accompany every number quoted from this file
 plaquette            {mean, err, tau_int, tau_int_err, err_from_tau_int, err_naive,
                       spatial{mean,err}, temporal{mean,err}}
 glueball (D >= 3)    channel block, see below, with  am, am_err
@@ -38,14 +46,17 @@ torelon              channel block of the PRIMARY winding length (largest L), wi
                      n_directions, vev_check[] {direction, operator, mean, err}
 torelon_all[]        one channel block per distinct spatial extent
 string_tension       {L, luscher{sigma_a2, sigma_a2_err, a_sqrt_sigma, a_sqrt_sigma_err},
-                      nambu_goto{...same...}, upper_bound_only}
+                      nambu_goto{...same...}, upper_bound_only,
+                      fixed_t[] {t, aE, aE_err, luscher{a_sqrt_sigma, a_sqrt_sigma_err},
+                                 nambu_goto{...}}  for t = 1, 2 (no plateau selection)}
 ratios               {m_over_sqrt_sigma{luscher{value,err}, nambu_goto{value,err}},
                       upper_bound_only}
 D3 (D = 3)           {beta_am_over_4{value,err}  (= m/g^2 up to lattice artefacts),
                       beta_a_sqrt_sigma_over_4{value,err}  (= sqrt(sigma)/g^2)}
 D4 (D = 4)           {a_lambda_two_loop, m_over_lambda{value,err}, sqrt_sigma_over_lambda{...}}
-D2 (D = 2)           {sigma_exact, torelon_energy_exact, pull_sigma, torelon_correlator[] ...,
-                      plaquette_exact, plaquette_null_test{...}}
+D2 (D = 2)           {sigma_exact, torelon_energy_exact, pull_torelon_energy,
+                      torelon_correlator[] ..., plaquette_exact, plaquette_pull,
+                      plaquette_null_test{...}}
 binning_check        {binsize, glueball{am,am_err,t_star,flag}, torelon{aE,aE_err,t_star,flag}}
 plots[], warnings[]
 
@@ -55,6 +66,10 @@ channel block:
     t_value              the t whose m_eff is quoted
     meff_table[]         {t, m_cosh, err_cosh, m_log, err_log, C, C_err}  for t = 0 .. T/2-1
     meff_t0_5[]          the first six rows (always present)
+    fixed_t              {t1{m,err}, t2{m,err}, t1_minus_t2{value,err}}: effective masses at
+                         FIXED t = 1 and 2 and their difference (jackknife error of the
+                         difference).  No selection is involved, so these errors have nominal
+                         coverage; quote them next to the R5 value (see ``caveats``)
     plateau_checks[]     numbers that entered rule R5 for every tested t
     gevp                 {t0, min_eig, operators[], selected[], eigenvalues[], lambda0_err,
                           eigenvector[], decisions[], quality[], naive_energies[], n_fallback}
@@ -90,6 +105,25 @@ ENSEMBLE_KEYS = ("shape", "beta", "nhb", "nor", "nskip", "levels", "w", "loops")
 DISCLAIMER = ("Numerical Monte Carlo evidence for one lattice ensemble (finite lattice spacing, "
               "finite volume, statistical errors only). Not a proof of the Yang-Mills mass gap.")
 BIN_TAU_FACTOR = 10.0
+#: Statements that must accompany every number quoted from an analysis file.  They describe
+#: declared properties of the pre-registered rules (ym/stats.py), quantified by the review
+#: tests (tests/test_stats.py, tests/test_adversarial_analysis.py); the rules themselves are
+#: not changed.
+CAVEATS = (
+    "Plateau rule R5 chooses t* with the same data that give m_eff(t*): the quoted jackknife "
+    "error does not include this selection effect. Synthetic tests at production-like "
+    "signal-to-noise found 52-65 % of the results within 1 sigma of the truth (nominal 68 %), "
+    "91-97 % within 2 sigma, rms pull 1.1-1.2. Always read the fixed-t values (blocks "
+    "'fixed_t', 'meff_table') next to the R5 value, treat m_eff(1) - m_eff(2) as a systematic "
+    "uncertainty, and do not claim agreement or disagreement with other results at the "
+    "1 sigma level from the R5 number alone.",
+    "m_eff(t*) of a positive correlator is a variational UPPER estimate of the ground-state "
+    "energy; its error is statistical only.",
+    "A value flagged 'upper_bound_only' ('no plateau') is not a measurement and must not be "
+    "quoted as one; rule R5 has no significance requirement on the correlator itself.",
+    "One lattice spacing and one volume: no continuum or infinite-volume extrapolation is "
+    "contained in this file. Numerical evidence, not a proof of the mass gap.",
+)
 
 
 # ==============================================================================================
@@ -144,6 +178,7 @@ def channel_block(r, labels, T):
     blk["operators"] = ops
     if r.get("gevp") is None:
         blk.update({"error": r.get("error"), "meff_table": [], "meff_t0_5": [],
+                    "fixed_t": None,
                     "plateau_checks": [], "gevp": None, "overlap": None, "cosh_fit": None})
         return blk
     me = r["meff"]
@@ -154,6 +189,18 @@ def channel_block(r, labels, T):
                       "C": r["Cproj"][t], "C_err": r["Cproj_err"][t]})
     blk["meff_table"] = table
     blk["meff_t0_5"] = table[:6]
+    # effective masses at FIXED t (no selection), to be quoted next to the value of rule R5
+    mjk = np.asarray(me["m_cosh_jk"], dtype=np.float64)
+    ft = {}
+    for t in (1, 2):
+        if t < T // 2:
+            ft["t%d" % t] = {"m": me["m_cosh"][t], "err": me["err_cosh"][t]}
+    if T // 2 > 2:
+        d = me["m_cosh"][1] - me["m_cosh"][2]
+        ft["t1_minus_t2"] = {"value": d,
+                             "err": (stats.jackknife_error(mjk[:, 1] - mjk[:, 2])
+                                     if np.isfinite(d) else None)}
+    blk["fixed_t"] = ft
     blk["plateau_checks"] = r["plateau"]["checks"]
     g = r["gevp"]
     lam = np.asarray(g["eigenvalues"], dtype=np.float64)
@@ -386,6 +433,7 @@ def analyze(paths, name=None, outdir="results", binsize=None, discard=0, make_pl
                             "n_discarded": discard, "n_dropped_binning": int(n - (n // B) * B),
                             "n_used": int((n // B) * B), "complete": bool(m.get("complete")),
                             "plaquette_mean": float(s["plaq"].mean()),
+                            "plaquette_err": None,
                             "wall_clock_s": m.get("wall_clock_s"),
                             "seconds_per_cycle": m.get("seconds_per_cycle"),
                             "therm_check": tc})
@@ -402,6 +450,50 @@ def analyze(paths, name=None, outdir="results", binsize=None, discard=0, make_pl
            "streams": stream_info, "n_meas_total": int(n_total), "n_meas_used": int(n_used),
            "n_discarded_total": int(n_total - n_used), "binsize": B, "binsize_rule": rule,
            "n_bins": int(n_bins), "tau_int_max": tau_max, "tau_int_table": tau_table}
+
+    # ------------------------------------------------------------------ stream consistency
+    # Independent streams (and hot-start vs cold-start streams) must agree.  Plaquette only:
+    # for the masses, analyse subsets of the files (e.g. the hot and the cold streams
+    # separately) with this program.  Every stream gets its OWN autocorrelation-corrected
+    # error here (not the ensemble bin size: if the streams disagree, the pooled
+    # autocorrelation function, and with it the bin size, is inflated by the disagreement).
+    per = []
+    for si, m, s_ in zip(stream_info, metas, S):
+        if s_["plaq"].shape[0] >= 8:
+            r_ = stats.mean_err_tau(s_["plaq"])
+            if math.isfinite(r_["err"]) and r_["err"] > 0:
+                si["plaquette_err"] = r_["err"]
+                per.append((m["start"], r_["mean"], r_["err"]))
+
+    def _wmean(items):
+        w = np.array([1.0 / e ** 2 for _, _, e in items])
+        v = np.array([x for _, x, _ in items])
+        return float(np.sum(w * v) / np.sum(w)), float(1.0 / math.sqrt(np.sum(w)))
+
+    sc = {"plaquette": None, "hot_minus_cold": None,
+          "note": "plaquette means of the individual streams, each with the error from its own "
+                  "integrated autocorrelation time; chi2 about their weighted mean"}
+    if len(per) >= 2:
+        wm, _ = _wmean(per)
+        chi2 = float(sum(((x - wm) / e) ** 2 for _, x, e in per))
+        dof = len(per) - 1
+        sc["plaquette"] = {"chi2": chi2, "dof": dof, "n_streams": len(per)}
+        if chi2 > dof + 4.0 * math.sqrt(2.0 * dof):
+            warnings.append("the plaquette means of the %d streams are inconsistent: chi2 = "
+                            "%.1f for %d degrees of freedom" % (len(per), chi2, dof))
+    hot = [x for x in per if x[0] == "hot"]
+    cold = [x for x in per if x[0] == "cold"]
+    if hot and cold:
+        (mh, eh), (mc, ec) = _wmean(hot), _wmean(cold)
+        diff, derr = mh - mc, math.hypot(eh, ec)
+        sc["hot_minus_cold"] = {"diff": diff, "err": derr, "pull": diff / derr,
+                                "n_hot": len(hot), "n_cold": len(cold)}
+        if abs(diff) > 4.0 * derr:
+            warnings.append("hot-start and cold-start streams differ in the plaquette by "
+                            "%.1f sigma (thermalisation or ergodicity problem?)"
+                            % (diff / derr))
+    out["stream_consistency"] = sc
+    out["caveats"] = list(CAVEATS)
 
     # ------------------------------------------------------------------ plaquette
     def binned(key):
@@ -490,6 +582,25 @@ def analyze(paths, name=None, outdir="results", binsize=None, discard=0, make_pl
             st[key] = {"sigma_a2": s0, "sigma_a2_err": stats.jackknife_error(sj),
                        "a_sqrt_sigma": math.sqrt(s0) if s0 > 0 else None,
                        "a_sqrt_sigma_err": (stats.jackknife_error(np.sqrt(sj)) if ok else None)}
+    # the same at FIXED t = 1 and 2 (no plateau selection), for comparison with the R5 value
+    st["fixed_t"] = []
+    if rt.get("meff") is not None:
+        for t in (1, 2):
+            if t >= T // 2:
+                continue
+            e0 = float(rt["meff"]["m_cosh"][t])
+            ej = np.asarray(rt["meff"]["m_cosh_jk"][:, t], dtype=np.float64)
+            ent = {"t": t, "aE": e0, "aE_err": rt["meff"]["err_cosh"][t],
+                   "luscher": None, "nambu_goto": None}
+            if math.isfinite(e0) and np.all(np.isfinite(ej)):
+                for key, fn in (("luscher", stats.sigma_luscher),
+                                ("nambu_goto", stats.sigma_nambu_goto)):
+                    s0 = fn(e0, Lp, D)
+                    sj = fn(ej, Lp, D)
+                    if s0 > 0 and np.all(sj > 0):
+                        ent[key] = {"a_sqrt_sigma": math.sqrt(s0),
+                                    "a_sqrt_sigma_err": stats.jackknife_error(np.sqrt(sj))}
+            st["fixed_t"].append(ent)
     out["string_tension"] = st
 
     ratios = {"m_over_sqrt_sigma": None, "upper_bound_only": None}
@@ -672,6 +783,12 @@ def summary(res):
             lines.append("a*sqrt(sigma) [%s, L=%d]  %s"
                          % (key, st["L"], _fmt(st[key]["a_sqrt_sigma"],
                                                 st[key]["a_sqrt_sigma_err"])))
+    for ent in st.get("fixed_t") or []:
+        if ent.get("luscher"):
+            lines.append("   fixed t=%d: a*E = %s  ->  a*sqrt(sigma) [luscher] %s"
+                         % (ent["t"], _fmt(ent["aE"], ent["aE_err"]),
+                            _fmt(ent["luscher"]["a_sqrt_sigma"],
+                                 ent["luscher"]["a_sqrt_sigma_err"])))
     r = res["ratios"]["m_over_sqrt_sigma"]
     if r:
         for key in ("luscher", "nambu_goto"):
@@ -694,8 +811,15 @@ def summary(res):
                         "%+.2f" % d2["pull_torelon_energy"]
                         if d2["pull_torelon_energy"] is not None else "n/a",
                         d2["plaquette_null_test"]["max_abs_pull"]))
+    hc = (res.get("stream_consistency") or {}).get("hot_minus_cold")
+    if hc and hc.get("pull") is not None:
+        lines.append("plaquette, hot-start minus cold-start streams: %+.2e +- %.1e (%+.2f sigma)"
+                     % (hc["diff"], hc["err"], hc["pull"]))
     for w in res["warnings"]:
         lines.append("WARNING: " + w)
+    lines.append("CAVEAT: the error of a mass chosen by plateau rule R5 does not include the "
+                 "selection of t* (about 55-65 % coverage at 1 sigma in synthetic tests); compare "
+                 "with the fixed-t values above and see 'caveats' in the JSON file.")
     lines.append("(numerical evidence for one lattice ensemble; not a proof of the mass gap)")
     return "\n".join(lines)
 

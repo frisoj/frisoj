@@ -1,8 +1,19 @@
 # raw Monte Carlo time series (large, reproducible from seeds)
 results/raw/
+
+# python / pytest / numba caches
 __pycache__/
+*.py[cod]
 .pytest_cache/
 *.nbi
 *.nbc
+
+# temporary files
 *.tmp
+.*.tmp.*
+*~
+*.swp
+.DS_Store
+
+# mutation-testing scratch copies
 _mutant_*.py

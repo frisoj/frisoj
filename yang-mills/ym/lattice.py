@@ -600,7 +600,10 @@ class Lattice:
     Parameters
     ----------
     shape : sequence of D even ints >= 2, (L0, ..., L_{D-1}); axis 0 is Euclidean time.
-    beta  : Wilson coupling (beta = 4/g^2 in D = 4).  May be changed later (attribute).
+    beta  : Wilson coupling (beta = 4/g^2 in D = 4), a finite number >= 0.  May be changed
+            later (``lat.beta = ...``); a negative, infinite or NaN value raises ValueError
+            (the heatbath sampler is only defined for beta >= 0: it would silently sample
+            beta = 0 for a negative coupling and never terminate for NaN).
     seed  : int in [0, 2^32); seeds numba's global RNG stream (see module docstring).
 
     Attributes
@@ -633,6 +636,18 @@ class Lattice:
         self.reseed(seed)
 
     # ------------------------------------------------------------------ bookkeeping
+    @property
+    def beta(self):
+        """Wilson coupling (float, finite, >= 0)."""
+        return self._beta
+
+    @beta.setter
+    def beta(self, value):
+        value = float(value)
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError("beta must be a finite number >= 0, got %r" % (value,))
+        self._beta = value
+
     def reseed(self, seed):
         """(Re-)seed numba's global RNG stream; 0 <= seed < 2^32."""
         seed = int(seed)

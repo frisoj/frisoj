@@ -197,32 +197,45 @@ def autocorrelation(x, maxlag=None):
     """Normalised autocorrelation function rho(t), t = 0 .. maxlag, of a time series (or of
     several independent streams of the same observable, list of 1-d arrays).
 
-    Gamma(t) = sum_streams sum_i (x_i - m)(x_{i+t} - m) / sum_streams (N_r - t) with the global
-    mean m;  rho(t) = Gamma(t) / Gamma(0).
+    Gamma(t) = sum_streams sum_i (x_i - m)(x_{i+t} - m) / sum_streams max(N_r - t, 0) with the
+    global mean m;  rho(t) = Gamma(t) / Gamma(0).  A stream of length N_r contributes to the
+    lags t < N_r only.  Default maxlag: half the length of the SHORTEST stream (every stream
+    then contributes to every lag); an explicit maxlag may be as large as N_max - 1.
     """
     streams = _as_streams(x)
     ntot = sum(s.size for s in streams)
     nmin = min(s.size for s in streams)
+    nmax = max(s.size for s in streams)
     if maxlag is None:
         maxlag = nmin // 2
-    maxlag = int(max(0, min(maxlag, nmin - 1)))
+    maxlag = int(max(0, min(maxlag, nmax - 1)))
     m = sum(s.sum() for s in streams) / ntot
     num = np.zeros(maxlag + 1)
     den = np.zeros(maxlag + 1)
     for s in streams:
         d = s - m
         n = d.size
+        k = min(maxlag, n - 1)             # this stream contributes to the lags 0 .. k
         nfft = 1
-        while nfft < n + maxlag + 1:
+        while nfft < n + k + 1:
             nfft *= 2
         f = np.fft.rfft(d, nfft)
-        ac = np.fft.irfft(f * np.conj(f), nfft)[:maxlag + 1]
-        num += ac
-        den += n - np.arange(maxlag + 1)
+        ac = np.fft.irfft(f * np.conj(f), nfft)[:k + 1]
+        num[:k + 1] += ac
+        den[:k + 1] += n - np.arange(k + 1)
     gamma = num / den
     if gamma[0] <= 0.0:
         return np.zeros(maxlag + 1)
     return gamma / gamma[0]
+
+
+def _ms_window(rho, c):
+    """Madras-Sokal window on rho[0 .. maxlag].  Returns (tau, w, i): tau[k] = tau_int(W = w[k]),
+    w = 1 .. maxlag, and i = index of the first window with w >= c * max(tau, 1/2) or None."""
+    tau = 0.5 + np.cumsum(rho[1:])
+    w = np.arange(1, rho.size)
+    ok = np.nonzero(w >= c * np.maximum(tau, 0.5))[0]
+    return tau, w, (int(ok[0]) if ok.size else None)
 
 
 def tau_int(x, c=6.0, maxlag=None):
@@ -233,21 +246,32 @@ def tau_int(x, c=6.0, maxlag=None):
     series, for which the plain criterion would stop at W = 1).  Convention: uncorrelated data
     have tau_int = 1/2 and the variance of the mean is  2 tau_int var(x) / N.
 
-    Returns (tau, dtau, W): dtau = tau sqrt(2 (2W + 1) / N) (Madras-Sokal).  If the window
-    criterion is not met within maxlag (default N_min / 2) the last value is returned with
+    Returns (tau, dtau, W): dtau = tau sqrt(2 (2W + 1) / N) (Madras-Sokal).  The window is
+    searched up to maxlag (default N_min / 2, N_min = length of the shortest stream).  If it
+    is not reached there and the streams have different lengths, the search continues up to
+    N_max / 2 using, at every lag, the streams that are long enough (so that one very short
+    stream, e.g. a job that died early, cannot truncate the window of the whole ensemble; a
+    result for which the window IS reached within N_min / 2 is not affected by this in any
+    bit).  If the window criterion is still not met the last value is returned with
     dtau = inf.  A constant series returns (0.5, 0.0, 0).
     """
     streams = _as_streams(x)
     ntot = sum(s.size for s in streams)
     rho = autocorrelation(streams, maxlag)
-    if rho.size < 2 or not np.any(rho):
+    tau = w = i = None
+    if rho.size >= 2 and np.any(rho):
+        tau, w, i = _ms_window(rho, c)
+    if i is None and maxlag is None:
+        nmin = min(s.size for s in streams)
+        nmax = max(s.size for s in streams)
+        if nmax // 2 > nmin // 2:          # unequal streams: extend the lag range
+            rho = autocorrelation(streams, nmax // 2)
+            if rho.size >= 2 and np.any(rho):
+                tau, w, i = _ms_window(rho, c)
+    if tau is None:
         return 0.5, 0.0, 0
-    tau = 0.5 + np.cumsum(rho[1:])
-    w = np.arange(1, rho.size)
-    ok = np.nonzero(w >= c * np.maximum(tau, 0.5))[0]
-    if ok.size == 0:
+    if i is None:
         return float(tau[-1]), float("inf"), int(w[-1])
-    i = int(ok[0])
     t = max(float(tau[i]), 1e-3)      # anticorrelated series legitimately have tau_int < 1/2
     W = int(w[i])
     return t, float(t * math.sqrt(2.0 * (2 * W + 1) / ntot)), W

@@ -48,25 +48,31 @@ def u(beta):
     """u(beta) = I_2(beta) / I_1(beta), the fundamental character coefficient.
 
     Uses exponentially scaled Bessel functions (``scipy.special.ive``), so it is stable for
-    arbitrarily large beta; for beta < 1e-4 the series beta/4 - beta^3/96 is used (the neglected
+    arbitrarily large beta; for |beta| < 1e-4 the series beta/4 - beta^3/96 is used (the neglected
     term is beta^5/1536, i.e. relative error < 1e-17).  Scalar in -> float out, array in -> array.
+
+    u is an ODD function of beta (I_2 is even, I_1 is odd); negative arguments are evaluated as
+    u(-beta) = -u(beta).  (For SU(2) on a bipartite lattice beta -> -beta maps P -> -P.)  The
+    project itself only uses beta >= 0.
     """
     b = np.asarray(beta, dtype=np.float64)
-    small = b < _SMALL
-    bs = np.where(small, 1.0, b)                      # dummy argument where the series is used
-    out = np.where(small, b / 4.0 - b ** 3 / 96.0, ive(2, bs) / ive(1, bs))
+    ab = np.abs(b)
+    small = ab < _SMALL
+    bs = np.where(small, 1.0, ab)                     # dummy argument where the series is used
+    out = np.where(small, b / 4.0 - b ** 3 / 96.0, np.sign(b) * (ive(2, bs) / ive(1, bs)))
     return float(out) if out.ndim == 0 else out
 
 
 def du_dbeta(beta):
-    """u'(beta) = 1 - u^2 - 3 u / beta.
+    """u'(beta) = 1 - u^2 - 3 u / beta  (an EVEN function of beta).
 
     Derivation: I_2' = I_1 - (2/beta) I_2 and I_1' = I_2 + (1/beta) I_1, hence
     u' = I_2'/I_1 - u I_1'/I_1 = 1 - 2u/beta - u^2 - u/beta.  (u'(0) = 1/4.)
     """
     b = np.asarray(beta, dtype=np.float64)
-    small = b < _SMALL
-    bs = np.where(small, 1.0, b)
+    ab = np.abs(b)
+    small = ab < _SMALL
+    bs = np.where(small, 1.0, ab)
     us = np.asarray(u(bs))
     out = np.where(small, 0.25 - b ** 2 / 32.0, 1.0 - us ** 2 - 3.0 * us / bs)
     return float(out) if out.ndim == 0 else out
@@ -133,6 +139,11 @@ def plaquette_2d_torus(beta, n_plaq, n_rep=200):
     P = (1/n_plaq) d ln Z / d beta = sum_j lambda_j^n_plaq * (f_j'/f_j) / sum_j lambda_j^n_plaq,
     with f_j'/f_j = I_{2j+1}'/I_{2j+1} - 1/beta = I_{2j+2}/I_{2j+1} + 2j/beta.
     The j = 0 term alone gives u(beta).
+
+    Requires beta > 0.  The sum is truncated at ``n_rep`` representations (default 200), which
+    is exact to double precision as long as beta * n_plaq is not huge: on a 2x2 torus the
+    default is good to 1e-10 at beta = 5e3 and off by 8e-7 at beta = 5e4; pass a larger
+    ``n_rep`` for extreme couplings on tiny tori.
     """
     beta = float(beta)
     twoj = np.arange(n_rep)
@@ -221,6 +232,16 @@ def plaquette_strong_coupling(beta, D, order=1):
 
     For D = 2 all corrections vanish and P = u exactly.  The series is only useful for small
     beta (u << 1); at beta = 1.5 in D = 4 the order-2 term is already ~20% of the order-1 term.
+
+    Status of the coefficients: 8 (D-2) and 40 (D-2)(2D-5) are reproduced by a brute-force
+    enumeration of closed surfaces and by Monte Carlo (tests/test_engine.py: leading
+    coefficient 7.90 +- 0.10 in D = 4 at beta = 1.0; second term (P-u-t6)/t10 = 0.99 +- 0.02 at
+    beta = 1.25, where neglected higher orders may contribute several per cent).  Use
+    beta <= 1.0 for quantitative checks.
+
+    This is the BULK series.  It does not apply to lattices with two (or more) directions of
+    extent 2: surfaces wrapping the small 2x2 torus add terms of lower order (in D = 3 on
+    2 x 2 x L: + u^3 u' / 3, see tests/test_adversarial.py).
     """
     uu, t6, t10 = strong_coupling_terms(beta, D)
     if order == 0:
@@ -249,6 +270,8 @@ def a_lambda_two_loop(beta):
 
     (b1/(2 b0^2) = [17/(96 pi^4)] * [576 pi^4/(2*121)] = 51/121;  1/(2 b0 g^2) = 3 pi^2 beta/11;
     1/(b0 g^2) = 6 pi^2 beta/11.)  Valid only asymptotically for large beta.
+    Numerical range: the result is a denormal number above beta of about 263 and underflows to
+    exactly 0.0 above about 277 (so its logarithm fails there); irrelevant for lattice work.
     """
     b = np.asarray(beta, dtype=np.float64)
     out = (6.0 * np.pi ** 2 * b / 11.0) ** (51.0 / 121.0) * np.exp(-3.0 * np.pi ** 2 * b / 11.0)
