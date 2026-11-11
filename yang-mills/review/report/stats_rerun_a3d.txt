@@ -1,0 +1,38 @@
+Bz=25
+d3_b9.0_L24_combined: production m_eff(1) 0.7753 m_eff(2) 0.7773 torelon E_eff(1) 0.6018 ; history files: 8, spacing 2 updates
+   updates    16-1000  n=3800: glue m_eff(1) 0.791(15)    (z +1.0)  m_eff(2) 0.784(32)    (z +0.2)  torelon E_eff(1) 0.5930(77)   (z -1.1)  C_glue(1)/eq 0.986(14)   C_tor(0)/eq 1.0043(50)
+   updates  1000-2000  n=4000: glue m_eff(1) 0.821(16)    (z +2.8)  m_eff(2) 0.901(39)    (z +3.2)  torelon E_eff(1) 0.6115(73)   (z +1.3)  C_glue(1)/eq 0.979(13)   C_tor(0)/eq 1.0048(44)
+Bz=50
+d3_b9.0_L24_combined: production m_eff(1) 0.7753 m_eff(2) 0.7773 torelon E_eff(1) 0.6018 ; history files: 8, spacing 2 updates
+   updates    16-1000  n=3600: glue m_eff(1) 0.792(16)    (z +1.1)  m_eff(2) 0.783(31)    (z +0.2)  torelon E_eff(1) 0.5907(79)   (z -1.4)  C_glue(1)/eq 0.988(16)   C_tor(0)/eq 1.0055(57)
+   updates  1000-2000  n=4000: glue m_eff(1) 0.821(16)    (z +2.8)  m_eff(2) 0.901(42)    (z +2.9)  torelon E_eff(1) 0.6115(79)   (z +1.2)  C_glue(1)/eq 0.979(11)   C_tor(0)/eq 1.0048(45)
+Bz=4
+d3_b12.0_L32: production m_eff(1) 0.5692 m_eff(2) 0.5691 torelon E_eff(1) 0.4359 ; history files: 4, spacing 5 updates
+   updates    40-1000  n= 768: glue m_eff(1) 0.550(16)    (z -1.2)  m_eff(2) 0.527(28)    (z -1.5)  torelon E_eff(1) 0.4238(85)   (z -1.4)  C_glue(1)/eq 1.023(25)   C_tor(0)/eq 0.9936(95)
+   updates  1000-1300  n= 240: glue m_eff(1) 0.614(31)    (z +1.4)  m_eff(2) 0.590(61)    (z +0.3)  torelon E_eff(1) 0.438(16)    (z +0.1)  C_glue(1)/eq 0.985(46)   C_tor(0)/eq 0.974(17) 
+Bz=8
+d3_b12.0_L32: production m_eff(1) 0.5692 m_eff(2) 0.5691 torelon E_eff(1) 0.4359 ; history files: 4, spacing 5 updates
+   updates    40-1000  n= 768: glue m_eff(1) 0.550(17)    (z -1.2)  m_eff(2) 0.527(29)    (z -1.5)  torelon E_eff(1) 0.4238(89)   (z -1.4)  C_glue(1)/eq 1.023(25)   C_tor(0)/eq 0.9936(98)
+   updates  1000-1300  n= 224: glue m_eff(1) 0.608(29)    (z +1.3)  m_eff(2) 0.595(61)    (z +0.4)  torelon E_eff(1) 0.435(19)    (z -0.0)  C_glue(1)/eq 0.987(43)   C_tor(0)/eq 0.972(18) 
+Bz=16
+d3_b12.0_L32: production m_eff(1) 0.5692 m_eff(2) 0.5691 torelon E_eff(1) 0.4359 ; history files: 4, spacing 5 updates
+   updates    40-1000  n= 768: glue m_eff(1) 0.550(16)    (z -1.2)  m_eff(2) 0.527(27)    (z -1.6)  torelon E_eff(1) 0.4238(93)   (z -1.3)  C_glue(1)/eq 1.023(25)   C_tor(0)/eq 0.9936(99)
+   updates  1000-1300  n= 192: glue m_eff(1) 0.610(43)    (z +0.9)  m_eff(2) 0.572(69)    (z +0.0)  torelon E_eff(1) 0.437(23)    (z +0.0)  C_glue(1)/eq 1.005(45)   C_tor(0)/eq 0.975(22) 
+Bz=4
+d4_b2.5_L16: production m_eff(1) 0.7397 m_eff(2) 0.7555 torelon E_eff(1) 0.4893 ; history files: 4, spacing 10 updates
+   updates    40-1000  n= 384: glue m_eff(1) 0.863(56)    (z +2.2)  m_eff(2) 0.81(14)     (z +0.4)  torelon E_eff(1) 0.512(20)    (z +1.2)  C_glue(1)/eq 0.990(38)   C_tor(0)/eq 0.981(14) 
+Bz=8
+d4_b2.5_L16: production m_eff(1) 0.7397 m_eff(2) 0.7555 torelon E_eff(1) 0.4893 ; history files: 4, spacing 10 updates
+   updates    40-1000  n= 384: glue m_eff(1) 0.863(53)    (z +2.3)  m_eff(2) 0.81(12)     (z +0.5)  torelon E_eff(1) 0.512(20)    (z +1.2)  C_glue(1)/eq 0.990(38)   C_tor(0)/eq 0.981(13) 
+Bz=4
+d4_b2.4_L12: production m_eff(1) 0.9933 m_eff(2) 0.9826 torelon E_eff(1) 0.7300 ; history files: 4, spacing 10 updates
+   updates    40-1000  n= 384: glue m_eff(1) 1.18(11)     (z +1.6)  m_eff(2) 1.35(49)     (z +0.8)  torelon E_eff(1) 0.815(32)    (z +2.7)  C_glue(1)/eq 0.999(49)   C_tor(0)/eq 0.992(14) 
+Bz=8
+d4_b2.4_L12: production m_eff(1) 0.9933 m_eff(2) 0.9826 torelon E_eff(1) 0.7300 ; history files: 4, spacing 10 updates
+   updates    40-1000  n= 384: glue m_eff(1) 1.18(12)     (z +1.5)  m_eff(2) 1.35(55)     (z +0.7)  torelon E_eff(1) 0.815(33)    (z +2.6)  C_glue(1)/eq 0.999(50)   C_tor(0)/eq 0.992(14) 
+Bz=4
+d4_b2.4_L16: production m_eff(1) 0.9838 m_eff(2) 1.0184 torelon E_eff(1) 1.0566 ; history files: 4, spacing 10 updates
+   updates    40-1000  n= 384: glue m_eff(1) 0.875(80)    (z -1.4)  m_eff(2) 0.73(16)     (z -1.8)  torelon E_eff(1) 1.116(66)    (z +0.9)  C_glue(1)/eq 1.079(47)   C_tor(0)/eq 0.994(11) 
+Bz=8
+d4_b2.4_L16: production m_eff(1) 0.9838 m_eff(2) 1.0184 torelon E_eff(1) 1.0566 ; history files: 4, spacing 10 updates
+   updates    40-1000  n= 384: glue m_eff(1) 0.875(80)    (z -1.4)  m_eff(2) 0.73(14)     (z -2.1)  torelon E_eff(1) 1.116(64)    (z +0.9)  C_glue(1)/eq 1.079(42)   C_tor(0)/eq 0.9937(95)

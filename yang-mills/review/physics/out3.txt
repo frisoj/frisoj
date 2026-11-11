@@ -1,0 +1,56 @@
+===== d4_b2.3_L10 bins 1203  L*sqrt(sigma) 3.69  2E_tor(t=1) 2.4999(0.0276)
+  ground state m_eff(0): pipeline subset 1.2868(0.0073) | + W 1.2857(0.0073) | shift -0.0011(0.0003) = -3.4 sigma
+  ground state m_eff(1): pipeline subset 1.1951(0.0223) | + W 1.1960(0.0222) | shift +0.0010(0.0011) = +0.9 sigma
+  ground state m_eff(2): pipeline subset 1.1492(0.0704) | + W 1.1456(0.0701) | shift -0.0036(0.0035) = -1.0 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 3.242(0.061) | + W 3.244(0.061)
+  second state: pipeline subset m_eff(0,1,2) = 2.575(0.023) 2.114(0.197) 5.592(nan) | + W: 2.527(0.022) 2.167(0.193) 1.794(1.162)
+  gap (second - ground, + W basis, t=1): 0.971(0.194) ; (second level)/(2E_tor) = 0.867
+===== d4_b2.4_L12 bins 568  L*sqrt(sigma) 3.14  2E_tor(t=1) 1.4611(0.0117)
+  ground state m_eff(0): pipeline subset 1.0690(0.0060) | + W 1.0588(0.0060) | shift -0.0103(0.0012) = -8.7 sigma
+  ground state m_eff(1): pipeline subset 0.9926(0.0148) | + W 0.9914(0.0146) | shift -0.0012(0.0030) = -0.4 sigma
+  ground state m_eff(2): pipeline subset 0.9809(0.0404) | + W 0.9773(0.0403) | shift -0.0036(0.0075) = -0.5 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 3.790(0.058) | + W 3.786(0.057)
+  second state: pipeline subset m_eff(0,1,2) = 2.147(0.015) 1.875(0.099) 1.373(0.372) | + W: 1.630(0.013) 1.500(0.044) 1.257(0.147)
+  gap (second - ground, + W basis, t=1): 0.509(0.045) ; (second level)/(2E_tor) = 1.027
+===== d4_b2.4_L16 bins 178  L*sqrt(sigma) 4.24  2E_tor(t=1) 2.1170(0.0437)
+  ground state m_eff(0): pipeline subset 1.0802(0.0124) | + W 1.0790(0.0124) | shift -0.0012(0.0005) = -2.2 sigma
+  ground state m_eff(1): pipeline subset 0.9863(0.0309) | + W 0.9874(0.0309) | shift +0.0011(0.0014) = +0.8 sigma
+  ground state m_eff(2): pipeline subset 1.0215(0.0850) | + W 1.0209(0.0852) | shift -0.0006(0.0039) = -0.2 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 3.718(0.125) | + W 3.722(0.125)
+  second state: pipeline subset m_eff(0,1,2) = 2.143(0.032) 2.043(0.217) nan(nan) | + W: 2.139(0.032) 2.041(0.217) nan(nan)
+  gap (second - ground, + W basis, t=1): 1.054(0.214) ; (second level)/(2E_tor) = 0.964
+===== d4_b2.5_L16 bins 52  L*sqrt(sigma) 3.00  2E_tor(t=1) 0.9825(0.0186)
+  ground state m_eff(0): pipeline subset 0.8578(0.0108) | + W 0.8298(0.0122) | shift -0.0279(0.0050) = -5.6 sigma
+  ground state m_eff(1): pipeline subset 0.7420(0.0216) | + W 0.7313(0.0222) | shift -0.0106(0.0084) = -1.3 sigma
+  ground state m_eff(2): pipeline subset 0.7667(0.0494) | + W 0.7462(0.0523) | shift -0.0205(0.0182) = -1.1 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 3.962(0.112) | + W 3.905(0.112)
+  second state: pipeline subset m_eff(0,1,2) = 1.553(0.020) 1.292(0.070) 1.376(0.221) | + W: 1.097(0.016) 0.973(0.030) 0.993(0.088)
+  gap (second - ground, + W basis, t=1): 0.242(0.036) ; (second level)/(2E_tor) = 0.990
+===== d4_b2.5_L16x bins 37  L*sqrt(sigma) 2.98  2E_tor(t=1) 0.9717(0.0187)
+  ground state m_eff(0): pipeline subset 0.8687(0.0127) | + W 0.8486(0.0131) | shift -0.0201(0.0049) = -4.1 sigma
+  ground state m_eff(1): pipeline subset 0.7713(0.0260) | + W 0.7563(0.0239) | shift -0.0149(0.0082) = -1.8 sigma
+  ground state m_eff(2): pipeline subset 0.7457(0.0584) | + W 0.7303(0.0503) | shift -0.0154(0.0190) = -0.8 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 4.139(0.129) | + W 4.059(0.115)
+  second state: pipeline subset m_eff(0,1,2) = 1.594(0.019) 1.259(0.071) 1.347(0.281) | + W: 1.138(0.014) 1.077(0.039) 1.103(0.122)
+  gap (second - ground, + W basis, t=1): 0.321(0.042) ; (second level)/(2E_tor) = 1.109
+===== d4_b2.5_L16_combined bins 100  L*sqrt(sigma) 2.99  2E_tor(t=1) 0.9747(0.0130)
+  ground state m_eff(0): pipeline subset 0.8617(0.0086) | + W 0.8370(0.0090) | shift -0.0247(0.0037) = -6.7 sigma
+  ground state m_eff(1): pipeline subset 0.7531(0.0170) | + W 0.7392(0.0163) | shift -0.0138(0.0059) = -2.3 sigma
+  ground state m_eff(2): pipeline subset 0.7463(0.0371) | + W 0.7264(0.0354) | shift -0.0199(0.0132) = -1.5 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 4.036(0.087) | + W 3.962(0.082)
+  second state: pipeline subset m_eff(0,1,2) = 1.570(0.014) 1.302(0.046) 1.380(0.180) | + W: 1.114(0.011) 1.011(0.023) 1.037(0.072)
+  gap (second - ground, + W basis, t=1): 0.272(0.026) ; (second level)/(2E_tor) = 1.038
+===== d3_b9.0_L24_combined bins 4424  L*sqrt(sigma) 3.87  2E_tor(t=1) 1.2036(0.0035)
+  ground state m_eff(0): pipeline subset 0.7876(0.0017) | + W 0.7870(0.0017) | shift -0.0006(0.0001) = -7.3 sigma
+  ground state m_eff(1): pipeline subset 0.7754(0.0036) | + W 0.7751(0.0036) | shift -0.0003(0.0002) = -1.5 sigma
+  ground state m_eff(2): pipeline subset 0.7773(0.0077) | + W 0.7768(0.0077) | shift -0.0005(0.0004) = -1.3 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 4.809(0.023) | + W 4.807(0.023)
+  second state: pipeline subset m_eff(0,1,2) = 1.223(0.003) 1.196(0.009) 1.186(0.028) | + W: 1.206(0.003) 1.179(0.008) 1.154(0.027)
+  gap (second - ground, + W basis, t=1): 0.404(0.009) ; (second level)/(2E_tor) = 0.979
+===== d3_b12.0_L32 bins 532  L*sqrt(sigma) 3.81  2E_tor(t=1) 0.8717(0.0052)
+  ground state m_eff(0): pipeline subset 0.5788(0.0029) | + W 0.5781(0.0028) | shift -0.0007(0.0002) = -4.2 sigma
+  ground state m_eff(1): pipeline subset 0.5693(0.0049) | + W 0.5687(0.0049) | shift -0.0006(0.0003) = -2.0 sigma
+  ground state m_eff(2): pipeline subset 0.5696(0.0083) | + W 0.5691(0.0083) | shift -0.0005(0.0006) = -0.9 sigma
+  m_eff(1)/sqrt(sigma)(t=1,NG): pipeline subset 4.788(0.042) | + W 4.782(0.042)
+  second state: pipeline subset m_eff(0,1,2) = 0.912(0.004) 0.884(0.010) 0.879(0.023) | + W: 0.892(0.004) 0.868(0.010) 0.852(0.022)
+  gap (second - ground, + W basis, t=1): 0.299(0.011) ; (second level)/(2E_tor) = 0.995

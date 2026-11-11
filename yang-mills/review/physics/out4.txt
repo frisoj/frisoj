@@ -1,0 +1,10 @@
+  pipeline subset      t=1..4: best m=0.7425 (A=0.880, m'=3.462) chi2=0.69/1 ; dchi2<=1: [0.703,0.765] ; <=4: [0.648,0.783] ; m=0.6600: dchi2=3.13 (A=0.72, m'=1.71) ; m=0.6857: dchi2=1.68 (A=0.78, m'=1.93) ; m=0.7200: dchi2=0.31 (A=0.84, m'=2.50)
+  pipeline subset      t=1..5: best m=0.7475 (A=0.885, m'=3.806) chi2=1.41/2 ; dchi2<=1: [0.708,0.768] ; <=4: [0.650,0.785] ; m=0.6600: dchi2=3.32 (A=0.72, m'=1.69) ; m=0.6857: dchi2=1.92 (A=0.77, m'=1.91) ; m=0.7200: dchi2=0.47 (A=0.84, m'=2.45)
+  pipeline subset      correlated single-cosh fit t=1..4: m=0.7519(0.0161) chi2=0.79/2
+  pipeline subset      correlated single-cosh fit t=2..5: m=0.7462(0.0350) chi2=1.40/2
+  pipeline subset      correlated single-cosh fit t=1..6: m=0.7524(0.0156) chi2=1.73/4
+  pipeline subset + W  t=1..4: best m=0.7200 (A=0.873, m'=2.734) chi2=0.67/1 ; dchi2<=1: [0.677,0.750] ; <=4: [0.620,0.768] ; m=0.6600: dchi2=1.70 (A=0.76, m'=1.71) ; m=0.6857: dchi2=0.66 (A=0.81, m'=1.98) ; m=0.7200: dchi2=0.00 (A=0.87, m'=2.73)
+  pipeline subset + W  t=1..5: best m=0.7200 (A=0.874, m'=2.748) chi2=0.69/2 ; dchi2<=1: [0.677,0.750] ; <=4: [0.618,0.765] ; m=0.6600: dchi2=1.68 (A=0.76, m'=1.72) ; m=0.6857: dchi2=0.64 (A=0.81, m'=1.98) ; m=0.7200: dchi2=0.00 (A=0.87, m'=2.75)
+  pipeline subset + W  correlated single-cosh fit t=1..4: m=0.7392(0.0152) chi2=1.02/2
+  pipeline subset + W  correlated single-cosh fit t=2..5: m=0.7187(0.0316) chi2=0.61/2
+  pipeline subset + W  correlated single-cosh fit t=1..6: m=0.7377(0.0144) chi2=1.13/4

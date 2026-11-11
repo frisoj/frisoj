@@ -1,0 +1,102 @@
+==============================================================================================================
+d3_b6.0_L16  B=12  bins=10836
+ [glue] sel=[6, 5, 1]
+   m_eff(1): pipeline 1.1959(77) | mine(fixed v) 1.1959(77) | Gamma: tau=0.54(0.01) W=3 err/pipe=1.012 | err(W)/pipe: W5:1.01  W10:1.00  W20:1.01  W50:1.02  W100:1.00  W200:0.97  W400:0.98
+   m_eff(2): pipeline 1.203(26) | mine(fixed v) 1.203(26) | Gamma: tau=0.54(0.01) W=3 err/pipe=0.999 | err(W)/pipe: W5:1.01  W10:1.01  W20:1.00  W50:1.01  W100:1.02  W200:0.98  W400:0.93
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[10836]  2x:1.00,1.00[5417]  4x:1.00,1.00[2707]  8x:0.98,1.00[1352]  16x:0.98,1.00[675]  32x:0.96,0.98[336]  64x:1.03,0.96[167]  128x:1.03,0.95[83]  256x:1.00,0.94[40]  512x:0.96,0.92[20]
+   tau_int ingredients: b (time-slice average) 0.98(0.01) [W50 0.98, W200 0.98]; a(0) 0.61(0.01) [W50 0.64, W200 0.62]; a(1) 0.58(0.01) [W50 0.57, W200 0.59]; a(2) 0.56(0.01) [W50 0.57, W200 0.51]
+   chunk scatter m_eff(1): 4/stream (n=16): err 1.07(+-0.20) x pipeline, p_up=0.304; 8/stream (n=32): err 1.11(+-0.14) x pipeline, p_up=0.181
+   chunk scatter m_eff(2): 4/stream (n=16): err 1.01(+-0.18) x pipeline, p_up=0.434; 8/stream (n=32): err 0.97(+-0.12) x pipeline, p_up=0.551
+ [torelon] sel=[3, 2]
+   m_eff(1): pipeline 0.9874(36) | mine(fixed v) 0.9874(36) | Gamma: tau=0.56(0.01) W=3 err/pipe=1.005 | err(W)/pipe: W5:1.01  W10:1.01  W20:1.02  W50:1.04  W100:1.01  W200:1.01  W400:1.09
+   m_eff(2): pipeline 0.9983(95) | mine(fixed v) 0.9983(95) | Gamma: tau=0.56(0.01) W=3 err/pipe=1.015 | err(W)/pipe: W5:1.02  W10:1.03  W20:1.03  W50:1.02  W100:1.04  W200:1.01  W400:1.01
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[10836]  2x:1.01,1.01[5417]  4x:1.02,1.02[2707]  8x:1.02,1.03[1352]  16x:1.04,1.01[675]  32x:1.10,1.04[336]  64x:1.08,1.04[167]  128x:1.00,1.06[83]  256x:0.96,1.19[40]  512x:1.11,1.18[20]
+   tau_int ingredients: b (time-slice average) 1.18(0.02) [W50 1.22, W200 1.10]; a(0) 0.62(0.01) [W50 0.61, W200 0.64]; a(1) 0.63(0.01) [W50 0.64, W200 0.67]; a(2) 0.61(0.01) [W50 0.65, W200 0.66]
+   chunk scatter m_eff(1): 4/stream (n=16): err 0.85(+-0.16) x pipeline, p_up=0.763; 8/stream (n=32): err 0.90(+-0.11) x pipeline, p_up=0.764
+   chunk scatter m_eff(2): 4/stream (n=16): err 1.18(+-0.22) x pipeline, p_up=0.136; 8/stream (n=32): err 1.09(+-0.14) x pipeline, p_up=0.217
+ [plaquette] 0.8247817  tau=0.78(0.01) W=4  Gamma err 5.50e-06  pipeline 5.44e-06  ratio 1.011 | err(W)/pipe W5:1.02  W10:1.02  W20:1.02  W50:1.02  W100:1.04  W200:0.96  W400:1.04
+==============================================================================================================
+d3_b6.0_L24  B=11  bins=2439
+ [glue] sel=[6, 5, 1]
+   m_eff(1): pipeline 1.193(14) | mine(fixed v) 1.193(14) | Gamma: tau=0.54(0.01) W=3 err/pipe=1.001 | err(W)/pipe: W5:1.01  W10:1.00  W20:1.01  W50:0.99  W100:0.95  W200:0.99  W400:0.95
+   m_eff(2): pipeline 1.182(45) | mine(fixed v) 1.182(45) | Gamma: tau=0.52(0.01) W=3 err/pipe=0.993 | err(W)/pipe: W5:1.00  W10:1.02  W20:1.02  W50:1.00  W100:0.97  W200:0.96  W400:0.90
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[2439]  2x:1.01,1.02[1218]  4x:0.98,1.04[609]  8x:1.05,1.04[304]  16x:1.04,1.01[151]  32x:1.04,1.01[75]  64x:0.93,0.85[36]  128x:1.13,0.80[16]
+   tau_int ingredients: b (time-slice average) 1.05(0.03) [W50 1.05, W200 1.10]; a(0) 0.58(0.01) [W50 0.62, W200 0.43]; a(1) 0.57(0.01) [W50 0.58, W200 0.54]; a(2) 0.56(0.01) [W50 0.54, W200 0.50]
+   chunk scatter m_eff(1): 4/stream (n=16): err 1.07(+-0.20) x pipeline, p_up=0.303; 8/stream (n=32): err 0.97(+-0.12) x pipeline, p_up=0.546
+   chunk scatter m_eff(2): 4/stream (n=16): err 0.86(+-0.16) x pipeline, p_up=0.753; 8/stream (n=32): err 0.84(+-0.11) x pipeline, p_up=0.892
+ [torelon] sel=[3, 2, 0]
+   m_eff(1): pipeline 1.535(20) | mine(fixed v) 1.535(20) | Gamma: tau=0.52(0.01) W=3 err/pipe=0.995 | err(W)/pipe: W5:0.98  W10:1.00  W20:0.99  W50:1.00  W100:0.96  W200:1.01  W400:0.96
+   m_eff(2): pipeline 1.69(10) | mine(fixed v) 1.69(10) | Gamma: tau=0.51(0.01) W=3 err/pipe=1.014 | err(W)/pipe: W5:1.01  W10:1.00  W20:1.03  W50:0.99  W100:0.91  W200:0.88  W400:0.97
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[2439]  2x:1.00,1.01[1218]  4x:1.00,1.02[609]  8x:1.02,1.00[304]  16x:0.99,0.97[151]  32x:0.96,1.01[75]  64x:1.04,1.14[36]  128x:1.17,1.16[16]
+   tau_int ingredients: b (time-slice average) 0.69(0.02) [W50 0.80, W200 0.76]; a(0) 0.55(0.01) [W50 0.49, W200 0.51]; a(1) 0.54(0.01) [W50 0.55, W200 0.47]; a(2) 0.53(0.01) [W50 0.54, W200 0.52]
+   chunk scatter m_eff(1): 4/stream (n=16): err 1.06(+-0.19) x pipeline, p_up=0.324; 8/stream (n=32): err 1.05(+-0.13) x pipeline, p_up=0.330
+   chunk scatter m_eff(2): 4/stream (n=16): err 1.09(+-0.20) x pipeline, p_up=0.275; 8/stream (n=32): err 1.02(+-0.13) x pipeline, p_up=0.407
+ [plaquette] 0.8247805  tau=0.81(0.02) W=5  Gamma err 6.80e-06  pipeline 6.65e-06  ratio 1.022 | err(W)/pipe W5:1.02  W10:1.03  W20:1.04  W50:1.03  W100:1.01  W200:0.89  W400:0.92
+==============================================================================================================
+d3_b9.0_L24  B=15  bins=1864
+ [glue] sel=[6, 5, 1]
+   m_eff(1): pipeline 0.7834(56) | mine(fixed v) 0.7834(56) | Gamma: tau=0.54(0.01) W=3 err/pipe=0.996 | err(W)/pipe: W5:1.01  W10:1.00  W20:0.99  W50:1.03  W100:1.09  W200:1.16  W400:1.15
+   m_eff(2): pipeline 0.804(12) | mine(fixed v) 0.804(12) | Gamma: tau=0.54(0.01) W=3 err/pipe=1.009 | err(W)/pipe: W5:1.01  W10:1.01  W20:1.00  W50:1.03  W100:1.03  W200:1.13  W400:1.20
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[1864]  2x:1.00,0.99[931]  4x:1.01,1.02[465]  8x:1.12,1.05[232]  16x:1.12,1.11[115]  32x:1.17,1.14[56]  64x:1.08,1.06[28]  128x:1.35,1.31[12]
+   tau_int ingredients: b (time-slice average) 1.06(0.03) [W50 1.13, W200 1.28]; a(0) 0.67(0.02) [W50 0.64, W200 0.59]; a(1) 0.64(0.02) [W50 0.64, W200 0.63]; a(2) 0.61(0.02) [W50 0.64, W200 0.76]
+   chunk scatter m_eff(1): 4/stream (n=16): err 1.19(+-0.22) x pipeline, p_up=0.128; 8/stream (n=32): err 1.14(+-0.15) x pipeline, p_up=0.116
+   chunk scatter m_eff(2): 4/stream (n=16): err 1.18(+-0.22) x pipeline, p_up=0.137; 8/stream (n=32): err 1.14(+-0.14) x pipeline, p_up=0.124
+ [torelon] sel=[3, 2]
+   m_eff(1): pipeline 0.6022(27) | mine(fixed v) 0.6022(27) | Gamma: tau=0.61(0.02) W=4 err/pipe=1.017 | err(W)/pipe: W5:1.02  W10:1.01  W20:1.02  W50:0.98  W100:1.00  W200:0.98  W400:0.94
+   m_eff(2): pipeline 0.5978(48) | mine(fixed v) 0.5978(48) | Gamma: tau=0.61(0.02) W=4 err/pipe=1.036 | err(W)/pipe: W5:1.03  W10:1.00  W20:1.00  W50:1.02  W100:1.03  W200:0.96  W400:0.80
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[1864]  2x:1.01,0.99[931]  4x:0.99,1.03[465]  8x:1.02,1.05[232]  16x:0.98,1.04[115]  32x:0.91,0.97[56]  64x:0.81,0.83[28]  128x:0.88,0.92[12]
+   tau_int ingredients: b (time-slice average) 1.46(0.05) [W50 1.46, W200 1.21]; a(0) 0.68(0.02) [W50 0.74, W200 0.86]; a(1) 0.69(0.02) [W50 0.76, W200 0.90]; a(2) 0.70(0.02) [W50 0.70, W200 0.79]
+   chunk scatter m_eff(1): 4/stream (n=16): err 0.78(+-0.14) x pipeline, p_up=0.872; 8/stream (n=32): err 0.91(+-0.12) x pipeline, p_up=0.748
+   chunk scatter m_eff(2): 4/stream (n=16): err 1.06(+-0.19) x pipeline, p_up=0.332; 8/stream (n=32): err 0.90(+-0.11) x pipeline, p_up=0.773
+ [plaquette] 0.8854477  tau=0.55(0.01) W=3  Gamma err 3.53e-06  pipeline 3.56e-06  ratio 0.991 | err(W)/pipe W5:1.00  W10:1.00  W20:0.99  W50:1.01  W100:1.00  W200:0.88  W400:0.80
+==============================================================================================================
+d3_b9.0_L24r  B=15  bins=2560
+ [glue] sel=[6, 5, 1]
+   m_eff(1): pipeline 0.7695(47) | mine(fixed v) 0.7695(47) | Gamma: tau=0.55(0.01) W=3 err/pipe=1.011 | err(W)/pipe: W5:1.02  W10:1.02  W20:0.99  W50:0.99  W100:0.99  W200:0.90  W400:0.80
+   m_eff(2): pipeline 0.7584(99) | mine(fixed v) 0.7584(99) | Gamma: tau=0.53(0.01) W=3 err/pipe=0.985 | err(W)/pipe: W5:0.98  W10:1.00  W20:1.03  W50:1.06  W100:1.11  W200:1.12  W400:1.07
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[2560]  2x:1.00,1.02[1279]  4x:1.01,1.05[638]  8x:1.04,1.08[318]  16x:1.01,1.18[158]  32x:0.94,1.19[78]  64x:0.99,1.23[38]  128x:0.99,1.08[18]
+   tau_int ingredients: b (time-slice average) 1.09(0.03) [W50 1.05, W200 1.16]; a(0) 0.66(0.01) [W50 0.66, W200 0.60]; a(1) 0.63(0.01) [W50 0.62, W200 0.57]; a(2) 0.59(0.01) [W50 0.59, W200 0.50]
+   chunk scatter m_eff(1): 4/stream (n=16): err 0.97(+-0.18) x pipeline, p_up=0.526; 8/stream (n=32): err 0.93(+-0.12) x pipeline, p_up=0.682
+   chunk scatter m_eff(2): 4/stream (n=16): err 0.92(+-0.17) x pipeline, p_up=0.624; 8/stream (n=32): err 1.13(+-0.14) x pipeline, p_up=0.135
+ [torelon] sel=[3, 2]
+   m_eff(1): pipeline 0.6014(24) | mine(fixed v) 0.6014(24) | Gamma: tau=0.63(0.01) W=4 err/pipe=1.004 | err(W)/pipe: W5:1.01  W10:1.01  W20:1.03  W50:1.05  W100:1.08  W200:1.00  W400:1.08
+   m_eff(2): pipeline 0.5956(42) | mine(fixed v) 0.5956(42) | Gamma: tau=0.62(0.01) W=4 err/pipe=1.013 | err(W)/pipe: W5:1.01  W10:1.01  W20:1.02  W50:0.99  W100:0.96  W200:0.92  W400:0.94
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[2560]  2x:1.02,1.01[1279]  4x:1.06,1.01[638]  8x:1.05,0.98[318]  16x:1.03,0.99[158]  32x:1.03,0.93[78]  64x:1.06,0.79[38]  128x:0.91,0.59[18]
+   tau_int ingredients: b (time-slice average) 1.48(0.04) [W50 1.36, W200 1.31]; a(0) 0.69(0.02) [W50 0.77, W200 0.89]; a(1) 0.71(0.02) [W50 0.78, W200 0.90]; a(2) 0.72(0.02) [W50 0.80, W200 0.86]
+   chunk scatter m_eff(1): 4/stream (n=16): err 1.14(+-0.21) x pipeline, p_up=0.190; 8/stream (n=32): err 0.98(+-0.12) x pipeline, p_up=0.528
+   chunk scatter m_eff(2): 4/stream (n=16): err 0.98(+-0.18) x pipeline, p_up=0.505; 8/stream (n=32): err 0.85(+-0.11) x pipeline, p_up=0.866
+ [plaquette] 0.8854574  tau=0.54(0.01) W=3  Gamma err 3.00e-06  pipeline 2.98e-06  ratio 1.007 | err(W)/pipe W5:1.01  W10:0.99  W20:0.99  W50:0.99  W100:0.95  W200:0.85  W400:0.81
+==============================================================================================================
+d3_b9.0_L24_combined  B=15  bins=4424
+ [glue] sel=[6, 5, 1]
+   m_eff(1): pipeline 0.7754(36) | mine(fixed v) 0.7754(36) | Gamma: tau=0.55(0.01) W=3 err/pipe=1.004 | err(W)/pipe: W5:1.01  W10:1.01  W20:0.99  W50:1.01  W100:1.03  W200:1.03  W400:0.98
+   m_eff(2): pipeline 0.7773(77) | mine(fixed v) 0.7773(77) | Gamma: tau=0.53(0.01) W=3 err/pipe=0.995 | err(W)/pipe: W5:1.00  W10:1.01  W20:1.02  W50:1.05  W100:1.09  W200:1.14  W400:1.16
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[4424]  2x:1.00,1.01[2210]  4x:1.01,1.04[1103]  8x:1.08,1.07[550]  16x:1.06,1.16[273]  32x:1.05,1.18[134]  64x:1.04,1.19[66]  128x:1.14,1.23[30]  256x:1.29,1.21[12]
+   tau_int ingredients: b (time-slice average) 1.07(0.02) [W50 1.09, W200 1.23]; a(0) 0.67(0.01) [W50 0.66, W200 0.61]; a(1) 0.63(0.01) [W50 0.63, W200 0.60]; a(2) 0.60(0.01) [W50 0.61, W200 0.61]
+   chunk scatter m_eff(1): 4/stream (n=32): err 1.15(+-0.15) x pipeline, p_up=0.109; 8/stream (n=64): err 1.09(+-0.10) x pipeline, p_up=0.139
+   chunk scatter m_eff(2): 4/stream (n=32): err 1.19(+-0.15) x pipeline, p_up=0.058; 8/stream (n=64): err 1.20(+-0.11) x pipeline, p_up=0.014
+ [torelon] sel=[3, 2]
+   m_eff(1): pipeline 0.6018(18) | mine(fixed v) 0.6018(18) | Gamma: tau=0.62(0.01) W=4 err/pipe=1.010 | err(W)/pipe: W5:1.01  W10:1.01  W20:1.02  W50:1.02  W100:1.05  W200:0.99  W400:1.02
+   m_eff(2): pipeline 0.5965(32) | mine(fixed v) 0.5965(31) | Gamma: tau=0.62(0.01) W=4 err/pipe=1.023 | err(W)/pipe: W5:1.02  W10:1.01  W20:1.01  W50:1.00  W100:0.99  W200:0.94  W400:0.89
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[4424]  2x:1.02,1.00[2210]  4x:1.03,1.02[1103]  8x:1.04,1.01[550]  16x:1.01,1.01[273]  32x:0.98,0.94[134]  64x:0.96,0.80[66]  128x:0.89,0.71[30]  256x:1.13,0.73[12]
+   tau_int ingredients: b (time-slice average) 1.47(0.03) [W50 1.40, W200 1.27]; a(0) 0.69(0.01) [W50 0.76, W200 0.88]; a(1) 0.70(0.01) [W50 0.77, W200 0.90]; a(2) 0.71(0.01) [W50 0.76, W200 0.83]
+   chunk scatter m_eff(1): 4/stream (n=32): err 0.95(+-0.12) x pipeline, p_up=0.629; 8/stream (n=64): err 0.94(+-0.08) x pipeline, p_up=0.729
+   chunk scatter m_eff(2): 4/stream (n=32): err 1.02(+-0.13) x pipeline, p_up=0.412; 8/stream (n=64): err 0.88(+-0.08) x pipeline, p_up=0.908
+ [plaquette] 0.8854533  tau=0.55(0.01) W=3  Gamma err 2.29e-06  pipeline 2.29e-06  ratio 1.000 | err(W)/pipe W5:1.00  W10:1.00  W20:0.99  W50:1.00  W100:0.98  W200:0.88  W400:0.84
+==============================================================================================================
+d3_b12.0_L32  B=19  bins=532
+ [glue] sel=[6, 5, 3]
+   m_eff(1): pipeline 0.5693(49) | mine(fixed v) 0.5693(49) | Gamma: tau=0.53(0.02) W=3 err/pipe=0.988 | err(W)/pipe: W5:0.98  W10:0.97  W20:0.99  W50:1.01  W100:1.07  W200:0.98  W400:0.93
+   m_eff(2): pipeline 0.5696(83) | mine(fixed v) 0.5696(84) | Gamma: tau=0.52(0.02) W=3 err/pipe=1.007 | err(W)/pipe: W5:0.99  W10:1.02  W20:0.97  W50:0.93  W100:0.92  W200:0.80  W400:0.97
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[532]  2x:0.98,0.97[264]  4x:0.98,0.93[132]  8x:1.11,0.96[64]  16x:1.16,0.93[32]  32x:0.88,0.83[16]
+   tau_int ingredients: b (time-slice average) 1.17(0.06) [W50 1.49, W200 1.46]; a(0) 0.64(0.03) [W50 0.61, W200 0.49]; a(1) 0.60(0.03) [W50 0.56, W200 0.44]; a(2) 0.58(0.02) [W50 0.59, W200 0.46]
+   chunk scatter m_eff(1): 4/stream (n=16): err 0.90(+-0.16) x pipeline, p_up=0.678; 8/stream (n=32): err 0.98(+-0.12) x pipeline, p_up=0.518
+   chunk scatter m_eff(2): 4/stream (n=16): err 0.88(+-0.16) x pipeline, p_up=0.701; 8/stream (n=32): err 0.87(+-0.11) x pipeline, p_up=0.823
+ [torelon] sel=[3, 2]
+   m_eff(1): pipeline 0.4359(26) | mine(fixed v) 0.4359(26) | Gamma: tau=0.66(0.03) W=4 err/pipe=1.010 | err(W)/pipe: W5:1.01  W10:1.04  W20:1.06  W50:1.13  W100:1.12  W200:0.85  W400:0.92
+   m_eff(2): pipeline 0.4342(39) | mine(fixed v) 0.4342(39) | Gamma: tau=0.61(0.03) W=4 err/pipe=1.001 | err(W)/pipe: W5:1.00  W10:1.01  W20:1.11  W50:1.19  W100:1.30  W200:1.14  W400:1.25
+   bin scan e1/e1(B), e2/e2(B) [bins]: 1x:1.00,1.00[532]  2x:1.06,1.07[264]  4x:1.12,1.15[132]  8x:1.24,1.24[64]  16x:1.10,1.35[32]  32x:1.07,1.34[16]
+   tau_int ingredients: b (time-slice average) 1.79(0.11) [W50 1.69, W200 1.78]; a(0) 0.76(0.03) [W50 1.03, W200 0.52]; a(1) 0.77(0.03) [W50 1.07, W200 0.58]; a(2) 0.78(0.03) [W50 1.08, W200 0.58]
+   chunk scatter m_eff(1): 4/stream (n=16): err 1.04(+-0.19) x pipeline, p_up=0.375; 8/stream (n=32): err 0.99(+-0.13) x pipeline, p_up=0.496
+   chunk scatter m_eff(2): 4/stream (n=16): err 1.34(+-0.24) x pipeline, p_up=0.030; 8/stream (n=32): err 1.24(+-0.16) x pipeline, p_up=0.031
+ [plaquette] 0.9148259  tau=0.50(0.02) W=3  Gamma err 2.68e-06  pipeline 2.77e-06  ratio 0.970 | err(W)/pipe W5:0.97  W10:0.99  W20:1.03  W50:1.05  W100:1.06  W200:1.02  W400:0.85

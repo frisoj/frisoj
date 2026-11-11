@@ -1,0 +1,64 @@
+ensemble       quantity           stream chi2/3 (p)     hot-cold   10-chunk chi2/9 (p)   z(first tenth)  max|z| chunk
+d3_b6.0_L16    plaquette            0.60 (0.895)        +0.39        6.44 (0.696)        -1.76          1.76
+d3_b6.0_L16    glue m_eff(1)        3.68 (0.298)        +0.73        9.59 (0.385)        -0.56          1.98
+d3_b6.0_L16    torelon E_eff(1)     2.39 (0.495)        -1.32        7.69 (0.565)        +0.80          1.52
+d3_b6.0_L16    glue m_eff(2)        3.44 (0.328)        -0.61        8.79 (0.457)        -2.12          2.12
+d3_b6.0_L16    torelon E_eff(2)     2.59 (0.459)        -1.40       18.92 (0.026)        +1.28          2.65
+d3_b6.0_L24    plaquette            1.99 (0.574)        +0.26        9.80 (0.367)        -2.35          2.35
+d3_b6.0_L24    glue m_eff(1)        3.91 (0.272)        +1.58        4.45 (0.879)        +1.29          1.29
+d3_b6.0_L24    torelon E_eff(1)     2.94 (0.401)        +0.94       11.07 (0.271)        -0.70          2.15
+d3_b6.0_L24    glue m_eff(2)        1.32 (0.725)        +0.81        4.60 (0.867)        +1.51          1.51
+d3_b6.0_L24    torelon E_eff(2)     3.88 (0.275)        +0.04       11.84 (0.222)        +1.02          2.18
+d3_b9.0_L24    plaquette            0.21 (0.976)        +0.45        5.59 (0.780)        -1.13          1.58
+d3_b9.0_L24    glue m_eff(1)        0.85 (0.838)        -0.71       21.51 (0.011)        +3.29          3.29
+d3_b9.0_L24    torelon E_eff(1)     1.88 (0.598)        +0.69        6.41 (0.698)        +0.90          1.40
+d3_b9.0_L24    glue m_eff(2)        1.48 (0.687)        -0.10       16.25 (0.062)        +3.08          3.08
+d3_b9.0_L24    torelon E_eff(2)     0.49 (0.920)        +0.21        6.92 (0.646)        +1.51          1.51
+d3_b9.0_L24r   plaquette            4.58 (0.205)        -1.62        7.93 (0.541)        -1.45          1.57
+d3_b9.0_L24r   glue m_eff(1)        4.10 (0.250)        +0.25        4.34 (0.888)        +0.69          1.49
+d3_b9.0_L24r   torelon E_eff(1)     1.79 (0.616)        +1.01        5.63 (0.776)        +0.14          1.48
+d3_b9.0_L24r   glue m_eff(2)        2.55 (0.466)        -0.36        4.60 (0.868)        +1.11          1.22
+d3_b9.0_L24r   torelon E_eff(2)     0.38 (0.945)        -0.17        2.78 (0.972)        -0.60          0.81
+d3_b12.0_L32   plaquette            1.54 (0.673)        -0.44       11.84 (0.222)        -0.49          1.77
+d3_b12.0_L32   glue m_eff(1)        6.37 (0.095)        +2.31        6.27 (0.712)        -0.17          1.30
+d3_b12.0_L32   torelon E_eff(1)     5.50 (0.139)        -0.50       10.02 (0.349)        +1.29          1.83
+d3_b12.0_L32   glue m_eff(2)        2.43 (0.488)        +0.76        9.26 (0.414)        +0.10          2.04
+d3_b12.0_L32   torelon E_eff(2)     6.34 (0.096)        -0.69       11.21 (0.261)        +1.56          1.87
+d4_b2.3_L10    plaquette            1.00 (0.801)        +0.63        5.41 (0.797)        -0.85          1.08
+d4_b2.3_L10    glue m_eff(1)        3.30 (0.348)        +1.81       13.45 (0.143)        +0.68          2.81
+d4_b2.3_L10    torelon E_eff(1)     1.26 (0.739)        +1.01        5.26 (0.811)        +0.04          1.45
+d4_b2.3_L10    glue m_eff(2)        1.34 (0.720)        +0.83       12.08 (0.209)        +2.34          2.34
+d4_b2.3_L10    torelon E_eff(2)     1.42 (0.701)        -0.27        8.75 (0.460)        -0.24          1.80
+d4_b2.4_L12    plaquette            1.89 (0.596)        -0.28        9.16 (0.423)        -1.20          1.65
+d4_b2.4_L12    glue m_eff(1)        0.60 (0.895)        -0.45        4.75 (0.855)        +0.10          1.17
+d4_b2.4_L12    torelon E_eff(1)     4.33 (0.228)        -0.23        6.20 (0.720)        +0.02          1.30
+d4_b2.4_L12    glue m_eff(2)        3.11 (0.375)        +0.07       12.29 (0.198)        -0.18          2.24
+d4_b2.4_L12    torelon E_eff(2)     0.96 (0.810)        +0.30        6.72 (0.666)        +0.44          2.06
+d4_b2.4_L16    plaquette            7.72 (0.052)        -2.07        7.70 (0.564)        +0.50          2.14
+d4_b2.4_L16    glue m_eff(1)        2.39 (0.496)        -0.73       14.58 (0.103)        +0.71          2.35
+d4_b2.4_L16    torelon E_eff(1)     1.32 (0.725)        +0.98       13.08 (0.159)        -1.08          2.83
+d4_b2.4_L16    glue m_eff(2)        4.66 (0.198)        -1.40        6.31 (0.708)        +0.71          1.66
+d4_b2.4_L16    torelon E_eff(2)     2.61 (0.455)        +1.01        7.32 (0.604)        -0.67          1.60
+d4_b2.5_L16    plaquette            5.12 (0.164)        +1.52       13.82 (0.129)        +1.30          2.38
+d4_b2.5_L16    glue m_eff(1)        2.88 (0.410)        -1.41       11.77 (0.226)        -1.23          1.68
+d4_b2.5_L16    torelon E_eff(1)     2.78 (0.427)        -1.66       13.87 (0.127)        -0.54          2.44
+d4_b2.5_L16    glue m_eff(2)        5.19 (0.158)        -0.93        8.80 (0.456)        -0.98          1.87
+d4_b2.5_L16    torelon E_eff(2)     2.39 (0.496)        -1.09       16.52 (0.057)        +0.22          2.07
+d4_b2.5_L16x   plaquette            0.11 (0.991)        -0.30        7.56 (0.579)        -0.75          1.86
+d4_b2.5_L16x   glue m_eff(1)        3.09 (0.378)        +1.17       20.27 (0.016)        -1.51          2.98
+d4_b2.5_L16x   torelon E_eff(1)     4.33 (0.228)        -1.45       10.15 (0.339)        -0.37          1.54
+d4_b2.5_L16x   glue m_eff(2)        1.27 (0.737)        -0.08       16.38 (0.059)        -0.17          3.07
+d4_b2.5_L16x   torelon E_eff(2)     4.62 (0.202)        -0.90        9.60 (0.384)        -0.76          1.76
+
+Totals over the 10 independent ensembles:
+  plaquette          stream chi2 24.8/30 (p=0.736) | hot-cold: sum z^2 10.4/10 (p=0.404), mean z -0.15*sqrt(n) = -0.47 | chunk chi2 85.3/90 (p=0.622) | first tenth: sum z/sqrt(n) -2.58, sum z^2 16.8/10
+  glue m_eff(1)      stream chi2 31.2/30 (p=0.406) | hot-cold: sum z^2 16.3/10 (p=0.092), mean z +0.46*sqrt(n) = +1.44 | chunk chi2 111.0/90 (p=0.066) | first tenth: sum z/sqrt(n) +1.04, sum z^2 18.1/10
+  torelon E_eff(1)   stream chi2 28.5/30 (p=0.543) | hot-cold: sum z^2 11.2/10 (p=0.340), mean z -0.05*sqrt(n) = -0.17 | chunk chi2 89.4/90 (p=0.498) | first tenth: sum z/sqrt(n) +0.16, sum z^2 5.2/10
+  glue m_eff(2)      stream chi2 26.8/30 (p=0.634) | hot-cold: sum z^2 5.3/10 (p=0.874), mean z -0.10*sqrt(n) = -0.32 | chunk chi2 99.4/90 (p=0.234) | first tenth: sum z/sqrt(n) +1.71, sum z^2 24.5/10
+  torelon E_eff(2)   stream chi2 25.7/30 (p=0.691) | hot-cold: sum z^2 5.7/10 (p=0.840), mean z -0.30*sqrt(n) = -0.94 | chunk chi2 100.6/90 (p=0.209) | first tenth: sum z/sqrt(n) +1.19, sum z^2 9.1/10
+
+smallest 10-chunk p-values of 50 tests: 0.0106 (d3_b9.0_L24 glue m_eff(1)), 0.0163 (d4_b2.5_L16x glue m_eff(1)), 0.0259 (d3_b6.0_L16 torelon E_eff(2)), 0.0568 (d4_b2.5_L16 torelon E_eff(2))
+  probability that the smallest of 50 independent p-values is <= 0.0106: 0.41
+smallest stream-chi2 p-values: 0.0521 (d4_b2.4_L16 plaquette), 0.0948 (d3_b12.0_L32 glue m_eff(1)), 0.0960 (d3_b12.0_L32 torelon E_eff(2)), 0.1386 (d3_b12.0_L32 torelon E_eff(1))
+largest |z(first tenth)|: +3.29 (d3_b9.0_L24 glue m_eff(1)), +3.08 (d3_b9.0_L24 glue m_eff(2)), -2.35 (d3_b6.0_L24 plaquette), +2.34 (d4_b2.3_L10 glue m_eff(2)), -2.12 (d3_b6.0_L16 glue m_eff(2))
+largest |hot-cold|: +2.31 (d3_b12.0_L32 glue m_eff(1)), -2.07 (d4_b2.4_L16 plaquette), +1.81 (d4_b2.3_L10 glue m_eff(1)), -1.66 (d4_b2.5_L16 torelon E_eff(1)), -1.62 (d3_b9.0_L24r plaquette)

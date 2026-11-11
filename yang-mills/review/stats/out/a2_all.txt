@@ -1,0 +1,210 @@
+====================================================================================================
+d3_b12.0_L32 starts: ['hot', 'cold', 'hot', 'cold'] n: [2538, 2543, 2542, 2529]
+  plaquette                                  | w=20: hot -0.7 cold +0.1 all -0.4 | w=50: hot -1.7 cold -0.0 all -1.2 | w=100: hot -1.0 cold -1.1 all -1.5 | w=200: hot -1.0 cold -1.1 all -1.5 | w=400: hot -1.3 cold +0.0 all -0.9
+  glue vev, least smeared 1x1                | w=20: hot -1.1 cold +1.6 all +0.4 | w=50: hot -1.1 cold +0.6 all -0.3 | w=100: hot -1.7 cold -0.4 all -1.5 | w=200: hot -2.0 cold +0.8 all -0.8 | w=400: hot -0.2 cold +1.0 all +0.6
+  glue vev, most smeared 1x1                 | w=20: hot -0.3 cold +0.3 all +0.0 | w=50: hot +0.2 cold +0.1 all +0.2 | w=100: hot -0.5 cold -0.6 all -0.8 | w=200: hot -1.0 cold +0.7 all -0.2 | w=400: hot +0.3 cold +0.2 all +0.4
+  glue vev, most smeared 2x2                 | w=20: hot -0.2 cold +0.3 all +0.0 | w=50: hot +0.2 cold +0.1 all +0.2 | w=100: hot -0.5 cold -0.6 all -0.8 | w=200: hot -1.0 cold +0.7 all -0.2 | w=400: hot +0.3 cold +0.2 all +0.4
+  glue projected: b                          | w=20: hot +0.3 cold -0.3 all -0.0 | w=50: hot -0.1 cold -0.1 all -0.1 | w=100: hot +0.6 cold +0.7 all +0.9 | w=200: hot +1.1 cold -0.7 all +0.3 | w=400: hot -0.3 cold -0.3 all -0.4
+  glue projected: a(0)                       | w=20: hot -0.5 cold -1.9 all -1.8 | w=50: hot +0.1 cold -1.2 all -0.8 | w=100: hot +0.6 cold -0.3 all +0.2 | w=200: hot +0.9 cold -1.4 all -0.4 | w=400: hot +0.4 cold -0.9 all -0.3
+  glue projected: a(1)                       | w=20: hot -0.8 cold -1.8 all -1.8 | w=50: hot +0.2 cold -0.7 all -0.4 | w=100: hot +0.7 cold -0.2 all +0.3 | w=200: hot +0.8 cold -1.2 all -0.3 | w=400: hot +0.6 cold -1.0 all -0.3
+  glue projected: a(2)                       | w=20: hot -0.7 cold -1.4 all -1.4 | w=50: hot +0.1 cold -0.2 all -0.1 | w=100: hot +0.4 cold +0.1 all +0.3 | w=200: hot +0.6 cold -0.6 all -0.0 | w=400: hot +0.6 cold -1.2 all -0.4
+  glue m_eff(1) linearised                   | w=20: hot +0.3 cold +0.2 all +0.4 | w=50: hot -0.1 cold -0.6 all -0.4 | w=100: hot +0.3 cold -0.5 all -0.1 | w=200: hot -0.2 cold -0.5 all -0.5 | w=400: hot -0.4 cold +1.1 all +0.4
+  glue m_eff(2) linearised                   | w=20: hot -0.7 cold +0.0 all -0.5 | w=50: hot -1.0 cold +0.0 all -0.7 | w=100: hot -0.4 cold +0.3 all -0.1 | w=200: hot -0.8 cold -0.1 all -0.6 | w=400: hot -0.5 cold +0.6 all +0.0
+  torelon projected: a(0)                    | w=20: hot +0.6 cold -0.7 all -0.1 | w=50: hot +1.2 cold -0.4 all +0.5 | w=100: hot +0.2 cold -1.2 all -0.7 | w=200: hot +0.5 cold +0.4 all +0.7 | w=400: hot +1.1 cold +0.9 all +1.4
+  torelon projected: a(1)                    | w=20: hot +0.9 cold -1.0 all -0.1 | w=50: hot +1.5 cold -0.5 all +0.7 | w=100: hot +0.7 cold -1.2 all -0.4 | w=200: hot +0.7 cold +0.4 all +0.8 | w=400: hot +1.2 cold +1.2 all +1.7
+  torelon E_eff(1) linearised                | w=20: hot +0.0 cold +1.7 all +1.2 | w=50: hot -1.1 cold +0.9 all -0.2 | w=100: hot -0.5 cold +1.7 all +0.8 | w=200: hot +0.4 cold +0.7 all +0.7 | w=400: hot -0.7 cold -0.2 all -0.6
+  torelon signed mean (dir 1, most smeared)  | w=20: hot -1.6 cold -1.9 all -2.5 | w=50: hot -1.8 cold -1.4 all -2.3 | w=100: hot -1.3 cold -1.1 all -1.7 | w=200: hot -2.3 cold -2.3 all -3.3 | w=400: hot -1.9 cold -0.8 all -1.9
+  torelon signed mean of first 20 vs 0: max |z| 1.8, chi2 7.4 / 8
+  torelon signed mean of first 50 vs 0: max |z| 2.1, chi2 9.8 / 8
+  torelon signed mean of first 100 vs 0: max |z| 2.8, chi2 13.8 / 8
+  torelon signed mean of first 200 vs 0: max |z| 2.6, chi2 20.7 / 8
+  torelon signed mean of first 400 vs 0: max |z| 1.8, chi2 13.7 / 8
+====================================================================================================
+d4_b2.5_L16 starts: ['hot', 'cold', 'hot', 'cold'] n: [1454, 1443, 1476, 1458]
+  plaquette                                  | w=20: hot +0.2 cold +1.5 all +1.2 | w=50: hot +0.4 cold +0.9 all +0.9 | w=100: hot +0.5 cold +0.9 all +1.0 | w=200: hot +0.8 cold +0.2 all +0.7
+  glue vev, least smeared 1x1                | w=20: hot +0.8 cold +1.8 all +1.8 | w=50: hot +0.8 cold +1.8 all +1.9 | w=100: hot +1.1 cold +1.0 all +1.5 | w=200: hot +1.0 cold +0.8 all +1.2
+  glue vev, most smeared 1x1                 | w=20: hot +0.7 cold +2.0 all +1.9 | w=50: hot +0.6 cold +1.6 all +1.6 | w=100: hot +1.3 cold +0.2 all +1.1 | w=200: hot +1.4 cold +0.9 all +1.6
+  glue vev, most smeared 2x2                 | w=20: hot +0.7 cold +2.0 all +1.9 | w=50: hot +0.6 cold +1.6 all +1.6 | w=100: hot +1.3 cold +0.2 all +1.1 | w=200: hot +1.4 cold +0.9 all +1.6
+  glue projected: b                          | w=20: hot -0.8 cold -2.0 all -2.0 | w=50: hot -0.6 cold -1.6 all -1.6 | w=100: hot -1.3 cold -0.3 all -1.1 | w=200: hot -1.3 cold -0.8 all -1.5
+  glue projected: a(0)                       | w=20: hot -0.5 cold +1.3 all +0.6 | w=50: hot -1.4 cold +0.7 all -0.5 | w=100: hot -2.0 cold +2.3 all +0.2 | w=200: hot -2.0 cold +1.0 all -0.8
+  glue projected: a(1)                       | w=20: hot +0.2 cold +1.4 all +1.2 | w=50: hot -0.8 cold +0.9 all +0.1 | w=100: hot -1.5 cold +2.9 all +1.0 | w=200: hot -1.4 cold +0.9 all -0.4
+  glue projected: a(2)                       | w=20: hot +0.4 cold +1.5 all +1.3 | w=50: hot -0.9 cold +0.5 all -0.3 | w=100: hot -1.4 cold +2.6 all +0.9 | w=200: hot -1.2 cold +0.8 all -0.3
+  glue m_eff(1) linearised                   | w=20: hot -0.5 cold -1.2 all -1.2 | w=50: hot +0.9 cold +0.0 all +0.7 | w=100: hot +1.1 cold -1.7 all -0.5 | w=200: hot +0.8 cold -0.4 all +0.3
+  glue m_eff(2) linearised                   | w=20: hot +0.9 cold -1.1 all -0.1 | w=50: hot +0.3 cold -0.3 all -0.0 | w=100: hot +0.0 cold -1.7 all -1.2 | w=200: hot +0.1 cold -1.2 all -0.8
+  torelon projected: a(0)                    | w=20: hot -0.7 cold +1.4 all +0.5 | w=50: hot -0.3 cold +0.5 all +0.2 | w=100: hot +0.3 cold +0.6 all +0.6 | w=200: hot +0.9 cold +0.3 all +0.8
+  torelon projected: a(1)                    | w=20: hot -0.7 cold +1.5 all +0.6 | w=50: hot -0.3 cold +0.7 all +0.3 | w=100: hot +0.2 cold +0.8 all +0.7 | w=200: hot +0.9 cold +0.5 all +0.9
+  torelon E_eff(1) linearised                | w=20: hot +0.3 cold -1.8 all -1.1 | w=50: hot +0.4 cold -1.0 all -0.4 | w=100: hot +0.1 cold -1.4 all -1.0 | w=200: hot -0.8 cold -0.8 all -1.2
+  torelon signed mean (dir 1, most smeared)  | w=20: hot -0.2 cold +0.5 all +0.2 | w=50: hot -0.7 cold +0.8 all +0.1 | w=100: hot -0.9 cold +1.4 all +0.4 | w=200: hot +0.8 cold +0.4 all +0.8
+  torelon signed mean of first 20 vs 0: max |z| 2.1, chi2 9.4 / 12
+  torelon signed mean of first 50 vs 0: max |z| 1.6, chi2 9.7 / 12
+  torelon signed mean of first 100 vs 0: max |z| 1.8, chi2 10.4 / 12
+  torelon signed mean of first 200 vs 0: max |z| 2.0, chi2 13.0 / 12
+  torelon signed mean of first 400 vs 0: max |z| 2.2, chi2 16.1 / 12
+====================================================================================================
+d4_b2.5_L16x starts: ['hot', 'cold', 'hot', 'cold'] n: [1229, 1219, 1208, 1215]
+  plaquette                                  | w=20: hot -0.1 cold -0.2 all -0.2 | w=50: hot -0.1 cold -0.4 all -0.4 | w=100: hot +0.2 cold -1.5 all -0.9 | w=200: hot -0.6 cold -1.5 all -1.4
+  glue vev, least smeared 1x1                | w=20: hot -0.4 cold -0.5 all -0.6 | w=50: hot -0.6 cold -0.3 all -0.6 | w=100: hot -0.1 cold -2.0 all -1.4 | w=200: hot -0.6 cold -1.7 all -1.6
+  glue vev, most smeared 1x1                 | w=20: hot -0.6 cold -0.3 all -0.6 | w=50: hot -0.6 cold +0.1 all -0.4 | w=100: hot -0.6 cold -1.9 all -1.7 | w=200: hot -0.7 cold -1.7 all -1.7
+  glue vev, most smeared 2x2                 | w=20: hot -0.6 cold -0.3 all -0.6 | w=50: hot -0.6 cold +0.1 all -0.4 | w=100: hot -0.6 cold -1.9 all -1.7 | w=200: hot -0.7 cold -1.7 all -1.7
+  glue projected: b                          | w=20: hot +0.6 cold +0.3 all +0.6 | w=50: hot +0.7 cold -0.1 all +0.4 | w=100: hot +0.5 cold +1.9 all +1.7 | w=200: hot +0.8 cold +1.7 all +1.7
+  glue projected: a(0)                       | w=20: hot +2.2 cold -0.9 all +0.9 | w=50: hot +0.5 cold +0.3 all +0.6 | w=100: hot +1.0 cold +1.1 all +1.5 | w=200: hot +0.5 cold +2.2 all +1.9
+  glue projected: a(1)                       | w=20: hot +1.2 cold -1.0 all +0.1 | w=50: hot +0.1 cold +0.1 all +0.1 | w=100: hot +1.0 cold +0.7 all +1.2 | w=200: hot +0.5 cold +1.9 all +1.7
+  glue projected: a(2)                       | w=20: hot +1.0 cold -1.1 all -0.0 | w=50: hot +0.4 cold -0.2 all +0.1 | w=100: hot +0.8 cold +1.0 all +1.3 | w=200: hot -0.0 cold +1.8 all +1.3
+  glue m_eff(1) linearised                   | w=20: hot -0.8 cold +0.9 all +0.0 | w=50: hot -0.7 cold +0.5 all -0.1 | w=100: hot -0.6 cold -1.1 all -1.2 | w=200: hot +0.4 cold -1.4 all -0.7
+  glue m_eff(2) linearised                   | w=20: hot +0.5 cold +0.3 all +0.6 | w=50: hot +1.1 cold +0.3 all +1.0 | w=100: hot +0.9 cold -1.6 all -0.5 | w=200: hot +0.6 cold -1.0 all -0.3
+  torelon projected: a(0)                    | w=20: hot +1.2 cold -0.2 all +0.7 | w=50: hot +0.9 cold -0.3 all +0.5 | w=100: hot +1.3 cold -0.6 all +0.4 | w=200: hot +0.9 cold -0.4 all +0.3
+  torelon projected: a(1)                    | w=20: hot +1.0 cold -0.4 all +0.5 | w=50: hot +0.7 cold -0.5 all +0.1 | w=100: hot +1.2 cold -1.1 all +0.1 | w=200: hot +0.9 cold -0.6 all +0.2
+  torelon E_eff(1) linearised                | w=20: hot -1.1 cold +0.7 all -0.3 | w=50: hot -0.4 cold +0.3 all -0.1 | w=100: hot -1.1 cold +1.1 all -0.0 | w=200: hot -1.1 cold +0.8 all -0.2
+  torelon signed mean (dir 1, most smeared)  | w=20: hot +0.3 cold -0.6 all -0.2 | w=50: hot -0.1 cold -1.2 all -0.9 | w=100: hot -0.4 cold -1.6 all -1.4 | w=200: hot -1.7 cold -1.7 all -2.4
+  torelon signed mean of first 20 vs 0: max |z| 1.8, chi2 11.0 / 12
+  torelon signed mean of first 50 vs 0: max |z| 1.8, chi2 15.9 / 12
+  torelon signed mean of first 100 vs 0: max |z| 1.8, chi2 13.4 / 12
+  torelon signed mean of first 200 vs 0: max |z| 2.7, chi2 21.4 / 12
+  torelon signed mean of first 400 vs 0: max |z| 2.4, chi2 19.6 / 12
+====================================================================================================
+d4_b2.4_L16 starts: ['hot', 'cold', 'hot', 'cold'] n: [1334, 1354, 1327, 1363]
+  plaquette                                  | w=20: hot +0.5 cold -1.5 all -0.7 | w=50: hot +1.4 cold -0.1 all +0.9 | w=100: hot +1.3 cold +0.5 all +1.3 | w=200: hot +0.4 cold +0.6 all +0.7
+  glue vev, least smeared 1x1                | w=20: hot +0.1 cold -0.8 all -0.5 | w=50: hot +1.2 cold +0.1 all +0.9 | w=100: hot +1.5 cold +0.1 all +1.2 | w=200: hot +1.1 cold +0.2 all +0.9
+  glue vev, most smeared 1x1                 | w=20: hot +0.7 cold -0.1 all +0.5 | w=50: hot +1.3 cold -0.1 all +0.8 | w=100: hot +1.4 cold -0.5 all +0.6 | w=200: hot +0.7 cold -0.4 all +0.2
+  glue vev, most smeared 2x2                 | w=20: hot +0.7 cold -0.0 all +0.5 | w=50: hot +1.3 cold -0.1 all +0.8 | w=100: hot +1.4 cold -0.5 all +0.6 | w=200: hot +0.7 cold -0.4 all +0.2
+  glue projected: b                          | w=20: hot -0.6 cold +0.3 all -0.2 | w=50: hot -1.2 cold -0.0 all -0.8 | w=100: hot -1.3 cold +0.3 all -0.7 | w=200: hot -0.8 cold +0.2 all -0.4
+  glue projected: a(0)                       | w=20: hot +2.5 cold -0.6 all +1.4 | w=50: hot +1.3 cold +1.4 all +1.9 | w=100: hot +0.6 cold +0.4 all +0.7 | w=200: hot +0.3 cold -0.1 all +0.1
+  glue projected: a(1)                       | w=20: hot +2.6 cold -0.6 all +1.4 | w=50: hot +1.0 cold +1.5 all +1.8 | w=100: hot +0.6 cold +1.1 all +1.2 | w=200: hot -0.5 cold -0.4 all -0.6
+  glue projected: a(2)                       | w=20: hot +2.2 cold -0.5 all +1.2 | w=50: hot +0.7 cold +1.4 all +1.5 | w=100: hot -0.5 cold +0.8 all +0.2 | w=200: hot -1.6 cold -0.6 all -1.5
+  glue m_eff(1) linearised                   | w=20: hot -1.5 cold +0.4 all -0.8 | w=50: hot -0.4 cold -1.1 all -1.1 | w=100: hot +0.9 cold -0.5 all +0.3 | w=200: hot +1.9 cold +0.5 all +1.7
+  glue m_eff(2) linearised                   | w=20: hot +0.0 cold -0.8 all -0.5 | w=50: hot +1.7 cold -2.3 all -0.5 | w=100: hot +3.0 cold -1.2 all +1.3 | w=200: hot +3.2 cold -0.3 all +2.1
+  torelon projected: a(0)                    | w=20: hot +0.6 cold +0.7 all +0.9 | w=50: hot +0.4 cold -0.0 all +0.3 | w=100: hot -0.1 cold -0.0 all -0.1 | w=200: hot +0.1 cold +1.1 all +0.8
+  torelon projected: a(1)                    | w=20: hot +1.1 cold +0.9 all +1.4 | w=50: hot -0.0 cold +0.3 all +0.2 | w=100: hot -0.1 cold +0.2 all +0.1 | w=200: hot +0.5 cold +0.9 all +1.0
+  torelon E_eff(1) linearised                | w=20: hot -1.4 cold -0.8 all -1.6 | w=50: hot -0.8 cold +0.6 all -0.2 | w=100: hot -0.7 cold +0.5 all -0.1 | w=200: hot +0.0 cold -1.1 all -0.8
+  torelon signed mean (dir 1, most smeared)  | w=20: hot +1.5 cold -0.7 all +0.5 | w=50: hot -0.4 cold -0.3 all -0.5 | w=100: hot +0.1 cold -0.1 all -0.0 | w=200: hot -0.1 cold -0.4 all -0.4
+  torelon signed mean of first 20 vs 0: max |z| 1.4, chi2 10.4 / 12
+  torelon signed mean of first 50 vs 0: max |z| 1.8, chi2 7.9 / 12
+  torelon signed mean of first 100 vs 0: max |z| 1.2, chi2 5.2 / 12
+  torelon signed mean of first 200 vs 0: max |z| 1.5, chi2 7.7 / 12
+  torelon signed mean of first 400 vs 0: max |z| 1.4, chi2 7.6 / 12
+====================================================================================================
+d4_b2.4_L12 starts: ['hot', 'cold', 'hot', 'cold'] n: [4959, 4965, 5017, 5036]
+  plaquette                                  | w=20: hot -0.6 cold -0.0 all -0.5 | w=50: hot -0.2 cold -1.1 all -0.9 | w=100: hot -0.8 cold -1.2 all -1.4 | w=200: hot -0.9 cold -2.1 all -2.2 | w=400: hot +0.5 cold -2.2 all -1.2
+  glue vev, least smeared 1x1                | w=20: hot -0.8 cold +0.3 all -0.3 | w=50: hot +0.1 cold -1.0 all -0.6 | w=100: hot -1.1 cold -0.3 all -1.0 | w=200: hot -1.0 cold -1.3 all -1.6 | w=400: hot +0.5 cold -1.4 all -0.7
+  glue vev, most smeared 1x1                 | w=20: hot +0.3 cold -0.2 all +0.0 | w=50: hot +1.3 cold -0.9 all +0.3 | w=100: hot +0.1 cold -0.2 all -0.0 | w=200: hot -0.1 cold -1.2 all -0.9 | w=400: hot +1.5 cold -1.0 all +0.4
+  glue vev, most smeared 2x2                 | w=20: hot +0.3 cold -0.3 all +0.0 | w=50: hot +1.3 cold -0.9 all +0.3 | w=100: hot +0.1 cold -0.2 all -0.0 | w=200: hot -0.1 cold -1.2 all -0.9 | w=400: hot +1.4 cold -1.0 all +0.3
+  glue projected: b                          | w=20: hot +0.2 cold -0.0 all +0.1 | w=50: hot -0.9 cold +0.9 all -0.0 | w=100: hot +0.5 cold +0.2 all +0.5 | w=200: hot +0.6 cold +1.2 all +1.3 | w=400: hot -1.2 cold +1.2 all +0.0
+  glue projected: a(0)                       | w=20: hot +0.2 cold -0.4 all -0.1 | w=50: hot +0.2 cold +0.6 all +0.6 | w=100: hot +0.0 cold -0.6 all -0.4 | w=200: hot -0.8 cold +0.9 all +0.0 | w=400: hot -1.5 cold +1.3 all -0.1
+  glue projected: a(1)                       | w=20: hot +0.2 cold -0.5 all -0.2 | w=50: hot +0.8 cold +0.1 all +0.7 | w=100: hot +1.0 cold -0.8 all +0.2 | w=200: hot -0.3 cold +0.5 all +0.1 | w=400: hot -0.3 cold +1.2 all +0.6
+  glue projected: a(2)                       | w=20: hot +0.6 cold -0.9 all -0.2 | w=50: hot +0.7 cold -1.1 all -0.3 | w=100: hot +0.3 cold -1.2 all -0.6 | w=200: hot -0.6 cold -0.2 all -0.5 | w=400: hot -0.2 cold +0.7 all +0.3
+  glue m_eff(1) linearised                   | w=20: hot -0.6 cold +1.0 all +0.2 | w=50: hot -0.5 cold +1.6 all +0.8 | w=100: hot +0.2 cold +1.2 all +1.0 | w=200: hot +0.6 cold +0.6 all +0.8 | w=400: hot +0.1 cold -0.3 all -0.1
+  glue m_eff(2) linearised                   | w=20: hot +0.5 cold +1.2 all +1.2 | w=50: hot +0.6 cold -0.2 all +0.3 | w=100: hot +1.2 cold -0.0 all +0.8 | w=200: hot +2.0 cold -0.3 all +1.2 | w=400: hot +0.9 cold -0.6 all +0.2
+  torelon projected: a(0)                    | w=20: hot +0.2 cold +0.2 all +0.3 | w=50: hot +1.2 cold -0.9 all +0.2 | w=100: hot -0.4 cold -0.4 all -0.6 | w=200: hot -0.8 cold -1.3 all -1.5 | w=400: hot -0.2 cold -0.9 all -0.7
+  torelon projected: a(1)                    | w=20: hot +0.3 cold +0.9 all +0.8 | w=50: hot +1.1 cold -0.2 all +0.7 | w=100: hot +0.2 cold -0.1 all +0.0 | w=200: hot -0.4 cold -1.1 all -1.1 | w=400: hot +0.1 cold -1.0 all -0.6
+  torelon E_eff(1) linearised                | w=20: hot -1.2 cold +0.2 all -0.7 | w=50: hot -0.8 cold -0.6 all -1.0 | w=100: hot -0.6 cold -0.6 all -0.9 | w=200: hot +0.2 cold +0.3 all +0.4 | w=400: hot -0.1 cold +0.8 all +0.5
+  torelon signed mean (dir 1, most smeared)  | w=20: hot +1.1 cold -2.0 all -0.7 | w=50: hot +0.6 cold -2.6 all -1.4 | w=100: hot +0.3 cold -1.9 all -1.2 | w=200: hot +0.5 cold -1.0 all -0.3 | w=400: hot +0.8 cold -0.3 all +0.4
+  torelon signed mean of first 20 vs 0: max |z| 2.4, chi2 16.6 / 12
+  torelon signed mean of first 50 vs 0: max |z| 2.5, chi2 21.3 / 12
+  torelon signed mean of first 100 vs 0: max |z| 2.3, chi2 16.2 / 12
+  torelon signed mean of first 200 vs 0: max |z| 1.3, chi2 7.0 / 12
+  torelon signed mean of first 400 vs 0: max |z| 2.0, chi2 13.2 / 12
+====================================================================================================
+d4_b2.3_L10 starts: ['hot', 'cold', 'hot', 'cold'] n: [6661, 6627, 6581, 6631]
+  plaquette                                  | w=20: hot +0.1 cold -0.2 all -0.0 | w=50: hot +0.1 cold +0.3 all +0.3 | w=100: hot -1.6 cold -0.6 all -1.6 | w=200: hot -2.2 cold +0.1 all -1.5 | w=400: hot -2.1 cold -0.4 all -1.7
+  glue vev, least smeared 1x1                | w=20: hot +0.1 cold -0.4 all -0.2 | w=50: hot +0.3 cold +0.2 all +0.4 | w=100: hot -1.4 cold -0.7 all -1.5 | w=200: hot -2.0 cold +0.2 all -1.3 | w=400: hot -1.5 cold -0.2 all -1.2
+  glue vev, most smeared 1x1                 | w=20: hot -0.4 cold -0.5 all -0.6 | w=50: hot -0.7 cold -0.2 all -0.7 | w=100: hot -1.7 cold -1.2 all -2.0 | w=200: hot -1.7 cold -0.2 all -1.3 | w=400: hot -1.1 cold -0.4 all -1.0
+  glue vev, most smeared 2x2                 | w=20: hot -0.5 cold -0.5 all -0.7 | w=50: hot -0.8 cold -0.2 all -0.7 | w=100: hot -1.7 cold -1.2 all -2.0 | w=200: hot -1.6 cold -0.2 all -1.3 | w=400: hot -1.0 cold -0.4 all -1.0
+  glue projected: b                          | w=20: hot -0.0 cold +0.7 all +0.4 | w=50: hot +0.0 cold +0.1 all +0.1 | w=100: hot +1.4 cold +1.1 all +1.8 | w=200: hot +1.7 cold +0.1 all +1.3 | w=400: hot +1.2 cold +0.4 all +1.2
+  glue projected: a(0)                       | w=20: hot +0.2 cold +0.4 all +0.4 | w=50: hot -0.3 cold +1.0 all +0.5 | w=100: hot +0.9 cold +1.2 all +1.5 | w=200: hot +2.3 cold +1.0 all +2.4 | w=400: hot +2.0 cold +0.1 all +1.5
+  glue projected: a(1)                       | w=20: hot -0.5 cold -0.9 all -1.0 | w=50: hot -1.4 cold -0.1 all -1.0 | w=100: hot +1.0 cold +0.1 all +0.8 | w=200: hot +2.5 cold +0.6 all +2.1 | w=400: hot +1.3 cold -0.1 all +0.8
+  glue projected: a(2)                       | w=20: hot -2.5 cold -0.8 all -2.3 | w=50: hot -3.2 cold -0.5 all -2.6 | w=100: hot -1.2 cold -0.8 all -1.4 | w=200: hot +0.3 cold -0.5 all -0.1 | w=400: hot +0.7 cold -1.2 all -0.4
+  glue m_eff(1) linearised                   | w=20: hot +2.8 cold +0.6 all +2.4 | w=50: hot +3.3 cold +0.6 all +2.7 | w=100: hot +1.8 cold +1.0 all +2.0 | w=200: hot +0.6 cold +0.8 all +1.0 | w=400: hot -0.3 cold +1.5 all +0.8
+  glue m_eff(2) linearised                   | w=20: hot +1.3 cold +0.6 all +1.4 | w=50: hot +0.9 cold +0.2 all +0.7 | w=100: hot +0.5 cold +1.0 all +1.1 | w=200: hot +0.7 cold +1.0 all +1.2 | w=400: hot +0.2 cold +1.4 all +1.1
+  torelon projected: a(0)                    | w=20: hot -1.3 cold -1.1 all -1.8 | w=50: hot -0.9 cold -0.6 all -1.1 | w=100: hot -1.5 cold -1.0 all -1.7 | w=200: hot -0.9 cold -0.3 all -0.8 | w=400: hot -0.9 cold -0.5 all -1.0
+  torelon projected: a(1)                    | w=20: hot +0.6 cold -0.8 all -0.1 | w=50: hot -0.1 cold -0.3 all -0.3 | w=100: hot -0.1 cold -1.8 all -1.3 | w=200: hot -0.7 cold -0.7 all -1.0 | w=400: hot -0.9 cold -0.2 all -0.8
+  torelon E_eff(1) linearised                | w=20: hot +0.4 cold +1.2 all +1.1 | w=50: hot -0.5 cold +2.2 all +1.2 | w=100: hot -0.3 cold +1.7 all +1.0 | w=200: hot +0.1 cold +0.9 all +0.7 | w=400: hot -0.7 cold +1.2 all +0.3
+  torelon signed mean (dir 1, most smeared)  | w=20: hot +0.2 cold -0.0 all +0.1 | w=50: hot +1.2 cold +0.2 all +1.0 | w=100: hot +0.8 cold +1.5 all +1.6 | w=200: hot +1.7 cold +0.9 all +1.8 | w=400: hot +2.2 cold +1.3 all +2.5
+  torelon signed mean of first 20 vs 0: max |z| 1.8, chi2 12.3 / 12
+  torelon signed mean of first 50 vs 0: max |z| 2.2, chi2 15.0 / 12
+  torelon signed mean of first 100 vs 0: max |z| 2.1, chi2 14.1 / 12
+  torelon signed mean of first 200 vs 0: max |z| 2.8, chi2 22.0 / 12
+  torelon signed mean of first 400 vs 0: max |z| 2.8, chi2 21.0 / 12
+====================================================================================================
+d3_b9.0_L24 starts: ['hot', 'cold', 'hot', 'cold'] n: [6987, 7034, 6892, 7082]
+  plaquette                                  | w=20: hot +1.5 cold -0.3 all +0.9 | w=50: hot +0.3 cold -1.3 all -0.7 | w=100: hot +1.0 cold -1.2 all -0.2 | w=200: hot +1.4 cold -1.1 all +0.2 | w=400: hot +1.5 cold -0.8 all +0.5
+  glue vev, least smeared 1x1                | w=20: hot +2.0 cold -1.0 all +0.7 | w=50: hot +3.0 cold +0.2 all +2.2 | w=100: hot +2.2 cold +0.3 all +1.8 | w=200: hot +1.9 cold +0.9 all +2.0 | w=400: hot +1.3 cold +0.1 all +0.9
+  glue vev, most smeared 1x1                 | w=20: hot +0.1 cold -0.6 all -0.4 | w=50: hot +0.2 cold -0.2 all -0.0 | w=100: hot +1.2 cold -0.7 all +0.4 | w=200: hot -0.1 cold -0.1 all -0.1 | w=400: hot +0.6 cold +1.1 all +1.2
+  glue vev, most smeared 2x2                 | w=20: hot +0.1 cold -0.6 all -0.4 | w=50: hot +0.2 cold -0.2 all -0.0 | w=100: hot +1.2 cold -0.7 all +0.3 | w=200: hot -0.1 cold -0.1 all -0.1 | w=400: hot +0.6 cold +1.1 all +1.2
+  glue projected: b                          | w=20: hot -0.2 cold +0.7 all +0.3 | w=50: hot -0.4 cold +0.1 all -0.2 | w=100: hot -1.3 cold +0.6 all -0.5 | w=200: hot -0.1 cold +0.0 all -0.0 | w=400: hot -0.6 cold -1.0 all -1.2
+  glue projected: a(0)                       | w=20: hot +1.6 cold +0.3 all +1.3 | w=50: hot +1.6 cold -0.2 all +1.0 | w=100: hot +0.6 cold -0.0 all +0.4 | w=200: hot +0.4 cold +0.3 all +0.5 | w=400: hot -0.2 cold -0.3 all -0.3
+  glue projected: a(1)                       | w=20: hot +1.4 cold +0.6 all +1.4 | w=50: hot +1.4 cold +0.2 all +1.1 | w=100: hot +0.1 cold -0.2 all -0.0 | w=200: hot -0.4 cold +0.5 all +0.1 | w=400: hot -0.8 cold -0.5 all -0.9
+  glue projected: a(2)                       | w=20: hot +1.6 cold -0.5 all +0.8 | w=50: hot +1.5 cold -0.5 all +0.7 | w=100: hot -0.2 cold -1.1 all -0.9 | w=200: hot -1.6 cold -0.2 all -1.2 | w=400: hot -1.9 cold -1.5 all -2.4
+  glue m_eff(1) linearised                   | w=20: hot -1.4 cold +1.4 all +0.0 | w=50: hot -1.1 cold +0.9 all -0.1 | w=100: hot +0.4 cold +1.7 all +1.5 | w=200: hot +2.3 cold +0.8 all +2.2 | w=400: hot +2.5 cold +2.0 all +3.1
+  glue m_eff(2) linearised                   | w=20: hot -0.9 cold +1.6 all +0.5 | w=50: hot -1.8 cold +1.1 all -0.5 | w=100: hot -0.1 cold +2.1 all +1.4 | w=200: hot +1.5 cold +2.1 all +2.5 | w=400: hot +1.8 cold +3.3 all +3.6
+  torelon projected: a(0)                    | w=20: hot +1.1 cold -0.1 all +0.7 | w=50: hot +1.0 cold -0.4 all +0.4 | w=100: hot +1.8 cold -0.2 all +1.1 | w=200: hot +0.6 cold +0.3 all +0.6 | w=400: hot +2.1 cold +0.8 all +2.1
+  torelon projected: a(1)                    | w=20: hot +1.3 cold +0.4 all +1.2 | w=50: hot +0.9 cold -0.4 all +0.4 | w=100: hot +1.8 cold -0.5 all +0.9 | w=200: hot +0.3 cold -0.2 all +0.0 | w=400: hot +2.3 cold +0.4 all +1.9
+  torelon E_eff(1) linearised                | w=20: hot +0.5 cold +2.0 all +1.8 | w=50: hot -0.3 cold +1.9 all +1.1 | w=100: hot -1.1 cold +1.7 all +0.4 | w=200: hot +0.6 cold +3.7 all +3.0 | w=400: hot -1.9 cold +2.1 all +0.1
+  torelon signed mean (dir 1, most smeared)  | w=20: hot -0.7 cold -0.6 all -0.9 | w=50: hot +0.3 cold -1.8 all -1.1 | w=100: hot +1.3 cold -1.0 all +0.3 | w=200: hot +1.5 cold +0.2 all +1.2 | w=400: hot +0.4 cold +0.2 all +0.5
+  torelon signed mean of first 20 vs 0: max |z| 1.3, chi2 7.2 / 8
+  torelon signed mean of first 50 vs 0: max |z| 2.1, chi2 11.0 / 8
+  torelon signed mean of first 100 vs 0: max |z| 1.6, chi2 7.8 / 8
+  torelon signed mean of first 200 vs 0: max |z| 1.7, chi2 9.1 / 8
+  torelon signed mean of first 400 vs 0: max |z| 1.6, chi2 6.7 / 8
+====================================================================================================
+d3_b9.0_L24r starts: ['hot', 'cold', 'hot', 'cold'] n: [9539, 9700, 9624, 9583]
+  plaquette                                  | w=20: hot -0.6 cold -0.4 all -0.7 | w=50: hot -1.9 cold -2.3 all -3.0 | w=100: hot -0.5 cold -1.3 all -1.3 | w=200: hot -0.7 cold -0.9 all -1.1 | w=400: hot -1.4 cold -1.0 all -1.7
+  glue vev, least smeared 1x1                | w=20: hot -1.4 cold -0.3 all -1.2 | w=50: hot -0.9 cold -1.7 all -1.8 | w=100: hot -0.5 cold -2.5 all -2.1 | w=200: hot -0.3 cold -1.6 all -1.4 | w=400: hot -0.8 cold -1.1 all -1.3
+  glue vev, most smeared 1x1                 | w=20: hot -2.4 cold -0.2 all -1.8 | w=50: hot -1.9 cold -1.9 all -2.7 | w=100: hot -1.6 cold -1.6 all -2.2 | w=200: hot -1.4 cold -1.2 all -1.8 | w=400: hot -1.3 cold -0.1 all -1.0
+  glue vev, most smeared 2x2                 | w=20: hot -2.4 cold -0.2 all -1.8 | w=50: hot -1.9 cold -1.9 all -2.7 | w=100: hot -1.6 cold -1.5 all -2.2 | w=200: hot -1.4 cold -1.2 all -1.8 | w=400: hot -1.3 cold -0.1 all -1.0
+  glue projected: b                          | w=20: hot +2.4 cold +0.1 all +1.8 | w=50: hot +1.9 cold +1.9 all +2.7 | w=100: hot +1.5 cold +1.7 all +2.3 | w=200: hot +1.4 cold +1.3 all +1.9 | w=400: hot +1.3 cold +0.2 all +1.1
+  glue projected: a(0)                       | w=20: hot +1.5 cold -1.2 all +0.2 | w=50: hot +0.9 cold +1.5 all +1.7 | w=100: hot +0.0 cold +1.3 all +0.9 | w=200: hot +0.3 cold +1.3 all +1.1 | w=400: hot -0.2 cold +0.3 all +0.1
+  glue projected: a(1)                       | w=20: hot +1.2 cold -0.9 all +0.2 | w=50: hot +0.9 cold +1.2 all +1.5 | w=100: hot -0.0 cold +1.2 all +0.8 | w=200: hot +0.2 cold +1.1 all +1.0 | w=400: hot -0.2 cold +0.3 all +0.1
+  glue projected: a(2)                       | w=20: hot +0.5 cold -0.5 all -0.0 | w=50: hot +0.3 cold +1.3 all +1.1 | w=100: hot +0.0 cold +0.7 all +0.5 | w=200: hot +0.6 cold -0.0 all +0.4 | w=400: hot +0.3 cold -0.8 all -0.4
+  glue m_eff(1) linearised                   | w=20: hot +0.3 cold +0.1 all +0.2 | w=50: hot +0.3 cold -1.0 all -0.4 | w=100: hot -0.1 cold -0.1 all -0.1 | w=200: hot -0.8 cold +1.1 all +0.2 | w=400: hot -0.7 cold +1.6 all +0.6
+  glue m_eff(2) linearised                   | w=20: hot +0.0 cold -1.5 all -1.1 | w=50: hot +1.3 cold -2.2 all -0.7 | w=100: hot +1.2 cold -0.4 all +0.5 | w=200: hot +0.6 cold -0.2 all +0.3 | w=400: hot +1.0 cold -0.4 all +0.4
+  torelon projected: a(0)                    | w=20: hot -1.1 cold -0.5 all -1.1 | w=50: hot -1.5 cold -0.2 all -1.2 | w=100: hot -2.5 cold -0.1 all -1.8 | w=200: hot -2.2 cold +0.7 all -1.1 | w=400: hot -1.1 cold -0.5 all -1.1
+  torelon projected: a(1)                    | w=20: hot -0.6 cold -0.2 all -0.5 | w=50: hot -1.4 cold -0.1 all -1.1 | w=100: hot -2.5 cold -0.2 all -1.9 | w=200: hot -1.9 cold +0.8 all -0.8 | w=400: hot -0.7 cold -0.6 all -0.9
+  torelon E_eff(1) linearised                | w=20: hot -0.3 cold -0.1 all -0.3 | w=50: hot +0.4 cold +0.9 all +0.9 | w=100: hot +1.1 cold +1.3 all +1.7 | w=200: hot -0.5 cold +0.6 all +0.1 | w=400: hot -0.0 cold +2.0 all +1.4
+  torelon signed mean (dir 1, most smeared)  | w=20: hot +0.1 cold +0.5 all +0.4 | w=50: hot +0.8 cold +0.7 all +1.1 | w=100: hot +0.3 cold +0.2 all +0.4 | w=200: hot -0.1 cold +0.0 all -0.1 | w=400: hot -0.6 cold +0.2 all -0.2
+  torelon signed mean of first 20 vs 0: max |z| 1.0, chi2 3.6 / 8
+  torelon signed mean of first 50 vs 0: max |z| 1.5, chi2 6.0 / 8
+  torelon signed mean of first 100 vs 0: max |z| 2.8, chi2 8.3 / 8
+  torelon signed mean of first 200 vs 0: max |z| 0.6, chi2 1.2 / 8
+  torelon signed mean of first 400 vs 0: max |z| 0.8, chi2 2.2 / 8
+====================================================================================================
+d3_b6.0_L24 starts: ['hot', 'cold', 'hot', 'cold'] n: [6789, 6706, 6704, 6654]
+  plaquette                                  | w=20: hot -1.6 cold -1.2 all -2.0 | w=50: hot -1.2 cold -1.7 all -2.1 | w=100: hot -0.6 cold -0.3 all -0.6 | w=200: hot -1.2 cold -0.9 all -1.5 | w=400: hot -0.8 cold -1.5 all -1.7
+  glue vev, least smeared 1x1                | w=20: hot -0.5 cold -0.2 all -0.4 | w=50: hot -1.0 cold +0.1 all -0.6 | w=100: hot -0.4 cold -0.1 all -0.4 | w=200: hot -1.2 cold -0.3 all -1.1 | w=400: hot -0.0 cold -1.6 all -1.1
+  glue vev, most smeared 1x1                 | w=20: hot -0.7 cold -0.5 all -0.8 | w=50: hot -1.6 cold +0.3 all -1.0 | w=100: hot -1.1 cold +0.3 all -0.6 | w=200: hot -1.4 cold -0.3 all -1.3 | w=400: hot -1.3 cold -1.0 all -1.6
+  glue vev, most smeared 2x2                 | w=20: hot -0.7 cold -0.5 all -0.8 | w=50: hot -1.6 cold +0.2 all -1.0 | w=100: hot -1.2 cold +0.3 all -0.6 | w=200: hot -1.4 cold -0.3 all -1.3 | w=400: hot -1.4 cold -1.0 all -1.6
+  glue projected: b                          | w=20: hot +0.7 cold +0.4 all +0.8 | w=50: hot +1.6 cold -0.2 all +1.0 | w=100: hot +1.1 cold -0.2 all +0.6 | w=200: hot +1.4 cold +0.4 all +1.3 | w=400: hot +1.2 cold +1.1 all +1.6
+  glue projected: a(0)                       | w=20: hot +0.9 cold -0.4 all +0.4 | w=50: hot +2.3 cold -0.5 all +1.2 | w=100: hot +1.7 cold -1.2 all +0.4 | w=200: hot +2.0 cold -0.7 all +0.9 | w=400: hot +1.1 cold +0.5 all +1.2
+  glue projected: a(1)                       | w=20: hot +1.2 cold -0.4 all +0.6 | w=50: hot +2.0 cold +0.1 all +1.5 | w=100: hot +1.2 cold -0.6 all +0.4 | w=200: hot +1.8 cold -1.0 all +0.6 | w=400: hot +0.7 cold +0.7 all +1.0
+  glue projected: a(2)                       | w=20: hot +1.3 cold +1.2 all +1.8 | w=50: hot +1.5 cold +1.7 all +2.3 | w=100: hot -0.5 cold +0.6 all +0.1 | w=200: hot -0.6 cold +0.3 all -0.2 | w=400: hot -0.6 cold +0.4 all -0.1
+  glue m_eff(1) linearised                   | w=20: hot -1.1 cold -1.5 all -1.9 | w=50: hot -1.0 cold -2.0 all -2.1 | w=100: hot +1.1 cold -1.0 all +0.1 | w=200: hot +1.5 cold -0.8 all +0.5 | w=400: hot +1.0 cold -0.2 all +0.5
+  glue m_eff(2) linearised                   | w=20: hot -0.3 cold -0.1 all -0.2 | w=50: hot -0.7 cold +0.1 all -0.4 | w=100: hot -0.2 cold +0.8 all +0.5 | w=200: hot +0.8 cold +0.8 all +1.1 | w=400: hot +1.5 cold -0.7 all +0.5
+  torelon projected: a(0)                    | w=20: hot +1.0 cold -0.6 all +0.3 | w=50: hot +0.1 cold -0.6 all -0.4 | w=100: hot -0.5 cold -0.4 all -0.6 | w=200: hot -0.6 cold +0.7 all +0.1 | w=400: hot -0.8 cold +0.6 all -0.2
+  torelon projected: a(1)                    | w=20: hot -0.5 cold +0.2 all -0.2 | w=50: hot -1.0 cold -1.4 all -1.7 | w=100: hot -0.2 cold -0.1 all -0.2 | w=200: hot -0.1 cold +1.0 all +0.6 | w=400: hot +0.3 cold +0.5 all +0.6
+  torelon E_eff(1) linearised                | w=20: hot -0.4 cold +2.1 all +1.2 | w=50: hot -0.6 cold +0.6 all -0.1 | w=100: hot -2.8 cold -0.6 all -2.4 | w=200: hot -2.3 cold -1.3 all -2.6 | w=400: hot -2.4 cold +0.3 all -1.5
+  torelon signed mean (dir 1, most smeared)  | w=20: hot -1.8 cold -0.9 all -1.9 | w=50: hot -2.3 cold -1.7 all -2.8 | w=100: hot -2.1 cold -1.4 all -2.4 | w=200: hot -1.1 cold -2.1 all -2.3 | w=400: hot -0.5 cold -1.9 all -1.7
+  torelon signed mean of first 20 vs 0: max |z| 2.1, chi2 8.3 / 8
+  torelon signed mean of first 50 vs 0: max |z| 2.4, chi2 13.9 / 8
+  torelon signed mean of first 100 vs 0: max |z| 2.2, chi2 13.7 / 8
+  torelon signed mean of first 200 vs 0: max |z| 2.6, chi2 16.2 / 8
+  torelon signed mean of first 400 vs 0: max |z| 1.7, chi2 8.1 / 8
+====================================================================================================
+d3_b6.0_L16 starts: ['hot', 'cold', 'hot', 'cold'] n: [32223, 32681, 32621, 32528]
+  plaquette                                  | w=20: hot -0.4 cold -0.2 all -0.4 | w=50: hot +0.0 cold -0.1 all -0.1 | w=100: hot +0.6 cold +0.7 all +0.9 | w=200: hot +0.9 cold +1.0 all +1.3 | w=400: hot +0.2 cold +0.7 all +0.7
+  glue vev, least smeared 1x1                | w=20: hot -0.5 cold +0.4 all -0.0 | w=50: hot +0.6 cold +1.1 all +1.2 | w=100: hot +0.5 cold +0.8 all +0.9 | w=200: hot +1.4 cold +0.3 all +1.2 | w=400: hot +1.0 cold -0.3 all +0.5
+  glue vev, most smeared 1x1                 | w=20: hot +0.7 cold -0.6 all +0.1 | w=50: hot +1.0 cold +0.2 all +0.8 | w=100: hot +1.2 cold +0.3 all +1.1 | w=200: hot +1.6 cold -0.8 all +0.5 | w=400: hot +1.6 cold -1.0 all +0.5
+  glue vev, most smeared 2x2                 | w=20: hot +0.7 cold -0.6 all +0.1 | w=50: hot +1.0 cold +0.1 all +0.8 | w=100: hot +1.2 cold +0.2 all +1.0 | w=200: hot +1.6 cold -0.9 all +0.5 | w=400: hot +1.6 cold -1.0 all +0.4
+  glue projected: b                          | w=20: hot -0.6 cold +0.4 all -0.1 | w=50: hot -1.0 cold -0.3 all -0.9 | w=100: hot -1.2 cold -0.4 all -1.1 | w=200: hot -1.6 cold +0.7 all -0.6 | w=400: hot -1.6 cold +0.9 all -0.5
+  glue projected: a(0)                       | w=20: hot -1.4 cold -1.0 all -1.7 | w=50: hot -1.2 cold -1.8 all -2.1 | w=100: hot -2.0 cold -1.6 all -2.6 | w=200: hot -1.3 cold -1.0 all -1.6 | w=400: hot -1.9 cold -0.0 all -1.4
+  glue projected: a(1)                       | w=20: hot -0.6 cold -1.0 all -1.1 | w=50: hot -0.0 cold -1.7 all -1.2 | w=100: hot -1.3 cold -1.5 all -2.0 | w=200: hot -0.8 cold -0.8 all -1.2 | w=400: hot -1.3 cold -0.4 all -1.2
+  glue projected: a(2)                       | w=20: hot -1.1 cold +0.3 all -0.5 | w=50: hot -1.2 cold +0.3 all -0.7 | w=100: hot -2.2 cold -0.2 all -1.7 | w=200: hot -2.0 cold +0.7 all -0.9 | w=400: hot -1.8 cold +0.8 all -0.7
+  glue m_eff(1) linearised                   | w=20: hot +1.0 cold -0.8 all +0.1 | w=50: hot +1.5 cold -1.1 all +0.3 | w=100: hot +2.1 cold -0.4 all +1.2 | w=200: hot +2.0 cold -1.2 all +0.6 | w=400: hot +1.6 cold -1.2 all +0.3
+  glue m_eff(2) linearised                   | w=20: hot +0.6 cold +0.4 all +0.7 | w=50: hot +0.8 cold -0.5 all +0.2 | w=100: hot +1.3 cold +0.0 all +0.9 | w=200: hot +1.5 cold -1.4 all +0.1 | w=400: hot +1.1 cold -0.9 all +0.1
+  torelon projected: a(0)                    | w=20: hot +0.1 cold -1.2 all -0.7 | w=50: hot -1.5 cold -1.7 all -2.3 | w=100: hot -0.1 cold -2.1 all -1.6 | w=200: hot -0.3 cold -2.0 all -1.6 | w=400: hot -0.1 cold -1.4 all -1.1
+  torelon projected: a(1)                    | w=20: hot +0.3 cold -1.2 all -0.6 | w=50: hot -1.1 cold -1.7 all -1.9 | w=100: hot +0.1 cold -2.2 all -1.5 | w=200: hot -0.2 cold -1.8 all -1.4 | w=400: hot +0.0 cold -1.8 all -1.2
+  torelon E_eff(1) linearised                | w=20: hot +1.0 cold -0.6 all +0.3 | w=50: hot +1.1 cold +1.3 all +1.7 | w=100: hot +1.0 cold +2.3 all +2.3 | w=200: hot +0.6 cold +0.8 all +1.0 | w=400: hot +0.4 cold +1.5 all +1.3
+  torelon signed mean (dir 1, most smeared)  | w=20: hot +1.0 cold -0.4 all +0.4 | w=50: hot +0.5 cold -0.8 all -0.2 | w=100: hot +0.7 cold -0.4 all +0.2 | w=200: hot +1.4 cold -0.4 all +0.7 | w=400: hot +1.0 cold -0.9 all +0.1
+  torelon signed mean of first 20 vs 0: max |z| 1.3, chi2 4.1 / 8
+  torelon signed mean of first 50 vs 0: max |z| 1.3, chi2 3.3 / 8
+  torelon signed mean of first 100 vs 0: max |z| 1.4, chi2 5.5 / 8
+  torelon signed mean of first 200 vs 0: max |z| 1.4, chi2 8.2 / 8
+  torelon signed mean of first 400 vs 0: max |z| 1.7, chi2 10.1 / 8

@@ -249,7 +249,7 @@ $$
 m = c_G\cdot\Lambda, \qquad \sqrt{\sigma} = c'_G\cdot\Lambda, \qquad \text{dus} \quad \frac{m}{\sqrt{\sigma}} = \frac{c_G}{c'_G} = \text{een zuiver getal.}
 $$
 
-*In gewone taal:* de theorie heeft geen vrij instelbare parameters; verhoudingen zoals $m/\sqrt\sigma$ zijn vaste getallen die de theorie zelf bepaalt. **Het millenniumprobleem vraagt te bewijzen dat $c_G$ bestaat en strikt positief is.** De formule zegt niets over de waarde van $c_G$.
+*In gewone taal:* de theorie heeft geen vrij instelbare parameters; verhoudingen zoals $m/\sqrt\sigma$ zijn vaste getallen die de theorie zelf bepaalt. **In deze taal komt het massakloof-deel van het millenniumprobleem erop neer dat $c_G$ bestaat en strikt positief is.** (Dit is een parafrase: de officiële opgave in §1 noemt $\Lambda$ niet en vraagt om het bestaan van de theorie en een kloof $\Delta \gt 0$.) De formule zegt niets over de waarde van $c_G$.
 
 ### 4.3 Waarom storingsrekening de kloof nooit kan vinden
 
@@ -311,7 +311,7 @@ $$
 | 2,4 | 0,004600 | 0,2673(15) | 58,1 |
 | 2,5 | 0,003576 | 0,186(3) | 52,0 |
 
-Bij echte asymptotische schaling zou de laatste kolom constant zijn; zij daalt nog ongeveer 17 procent tussen $\beta=2{,}3$ en $2{,}5$. *In gewone taal:* de twee-lus-formule is een uitspraak over $\beta\to\infty$ en is bij $\beta\approx2{,}5$ nog niet nauwkeurig. De betrouwbaardere toets is daarom **schaling**: verhoudingen van fysische grootheden, zoals $m/\sqrt\sigma$, moeten constant worden met correcties van orde $a^2\sigma$. (De schaal $\Lambda_L$ verschilt bovendien per regularisatie een bekende constante factor van bijvoorbeeld $\Lambda_{\overline{\mathrm{MS}}}$.)
+Bij echte asymptotische schaling zou de laatste kolom constant zijn; zij daalt nog ongeveer 17 procent tussen $\beta=2{,}3$ en $2{,}5$. *In gewone taal:* de twee-lus-formule is een uitspraak over $\beta\to\infty$ en is bij $\beta\approx2{,}5$ nog niet nauwkeurig. De betrouwbaardere toets is daarom **schaling**: verhoudingen van fysische grootheden, zoals $m/\sqrt\sigma$, moeten constant worden met correcties van orde $a^2\sigma$. Onze eigen data halen die toets in $D=3$ binnen 1 à 2 %, maar in $D=4$ niet (§7.3). (De schaal $\Lambda_L$ verschilt bovendien per regularisatie een bekende constante factor van bijvoorbeeld $\Lambda_{\overline{\mathrm{MS}}}$.)
 
 ---
 
@@ -371,11 +371,11 @@ $$
 a\ m_{\mathrm{eff}}(t) = \ln\frac{C(t)}{C(t+a)} \qquad\left(\text{of de oplossing van } \frac{C(t)}{C(t+a)} = \frac{\cosh\left(m_{\mathrm{eff}}(t-T/2)\right)}{\cosh\left(m_{\mathrm{eff}}(t+a-T/2)\right)}\right).
 $$
 
-*In gewone taal:* je leest de massa af uit hoe snel de correlator per tijdstap daalt. Omdat alle gewichten positief zijn, daalt $m_{\mathrm{eff}}(t)$ (voor $T\to\infty$) monotoon naar de echte laagste massa in dat kanaal. **Belangrijke eerlijkheidsclausule:** een gemeten plateau is dus een *bovengrens* die in de praktijk nauwkeurig is, maar een simulatie kan nooit uitsluiten dat een nog lichtere toestand bestaat die zó zwak aan $\mathcal{O}$ koppelt dat zij in de ruis verdwijnt.
+*In gewone taal:* je leest de massa af uit hoe snel de correlator per tijdstap daalt. Omdat alle gewichten positief zijn, daalt $m_{\mathrm{eff}}(t)$ (voor $T\to\infty$) monotoon naar de echte laagste massa in dat kanaal. **Belangrijke eerlijkheidsclausule:** een gemeten plateau is dus een *bovengrens*. Hoe dicht die bij de echte massa ligt, hangt af van de operatoren en van het bereik in $t$: in onze $D=4$-metingen berust het "plateau" op de overeenstemming van twee tijdstappen en ligt het bij $\beta=2{,}4$ en $2{,}5$ 5 tot 14 % boven de literatuurwaarden, afhankelijk van de referentie (§7.3). Bovendien kan een simulatie nooit uitsluiten dat een nog lichtere toestand bestaat die zó zwak aan $\mathcal{O}$ koppelt dat zij in de ruis verdwijnt.
 
 Operatoren in dit project:
 
-- **Glueball ($0^{++}$):** de som over een tijdlaag van ruimtelijke plaquettes (eventueel "uitgesmeerd" om de overlap met de grondtoestand te vergroten), met aftrek van de vacuümverwachting.
+- **Glueball ($0^{++}$):** de som over een tijdlaag van ruimtelijke lussen van $1\times1$ en $2\times2$ roosterstappen, gemeten op 4 of 5 niveaus van "uitsmering" (APE-smearing, om de overlap met de grondtoestand te vergroten) en variationeel gecombineerd (GEVP, regels R2 en R3 in `ym/stats.py`), met aftrek van de vacuümverwachting.
 - **Snaarspanning via de torelon:** de Polyakov-lus rond een ruimtelijke richting van lengte $L$, namelijk $\mathcal{P}(t) = \sum_{x_\perp}\tfrac12\mathrm{Tr}\prod_{k=0}^{L-1}U_1(x+k\hat1)$. Deze maakt een gesloten fluxbuis ("torelon") met energie
 
 $$
@@ -392,7 +392,7 @@ Het rooster is een hulpmiddel; de theorie waar het om gaat ontstaat in de limiet
 - **$D=4$.** Volgens §4.5 betekent $a\to0$ dat $\beta\to\infty$. Fysische massa's zijn $m = \lim (am)(\beta)/a(\beta)$; in de praktijk bekijkt men dimensieloze verhoudingen: $m/\sqrt\sigma = \lim_{\beta\to\infty}(am)/(a\sqrt\sigma)$, met leidende roosterfout van orde $a^2\sigma$. In de taal van de statistische fysica is $\beta=\infty$ een kritiek punt: de correlatielengte $\xi/a$ divergeert.
 - **$D=3$.** Hier heeft $g^2$ de dimensie van massa en is $a = 4/(\beta g^2)$; alle massa's zijn een getal maal $g^2$, bijvoorbeeld $\sqrt\sigma/g^2 = \lim_{\beta\to\infty}\beta\cdot a\sqrt\sigma/4$. Literatuur (Teper 1998): $\sqrt\sigma/g^2 = 0{,}3353(18)$ en $m(0^{++})/\sqrt\sigma\approx4{,}72$. Ook in drie dimensies is de massakloof wiskundig onbewezen.
 - **$D=2$.** Exact oplosbaar (§5.6): met $\beta = 4/(g^2a^2)$ volgt $\sigma = \lim_{a\to0}\left(-\ln u(\beta)\right)/a^2 = \tfrac38g^2$.
-- **Volume.** Tegelijk moet de doos groot zijn ten opzichte van de correlatielengte: $a\ll\xi\ll La$.
+- **Volume.** Tegelijk moet de doos groot zijn ten opzichte van de correlatielengte: $a\ll\xi\ll La$. Op onze roosters is $\xi = 1/(am)$ maar 0,8 tot 1,8 roosterafstanden, zodat aan $a\ll\xi$ niet is voldaan (§7.3).
 
 ### 5.5 Wat er wiskundig precies ontbreekt
 
@@ -491,14 +491,14 @@ Verificatiestatus van elke verwijzing staat in de Referenties (§9): ✔ = titel
 ### 7.1 Wat de simulaties wél kunnen aantonen
 
 1. **Dat de code klopt**, door vergelijking met formules die exact bekend zijn (§5.6): in $D=2$ de plaquette, Wilson-lussen en de torelon-energie; bij kleine $\beta$ in $D=3,4$ de sterke-koppelingsreeks.
-2. **Dat de code bekende resultaten reproduceert** in $D=3$ en $D=4$: plaquette, snaarspanning en glueballmassa vergeleken met de literatuurwaarden in `literature.json` (waarin per getal staat of het in deze sessie is teruggevonden of uit het geheugen komt).
-3. **Numerieke aanwijzingen voor een massakloof**: nagaan of op de gesimuleerde roosters de glueballmassa $am$ en de snaarspanning $a^2\sigma$ binnen de foutmarge ongelijk aan nul zijn, en of de dimensieloze verhouding $m/\sqrt\sigma$ weinig verandert als het rooster fijner wordt ("schaling"), zoals verwacht als de continuümtheorie een kloof $m = c\cdot\Lambda$ heeft. Of en hoe goed dit gelukt is, staat in §7.3; een toets die niet slaagt wordt daar als zodanig gemeld.
+2. **Of de code bekende resultaten reproduceert** in $D=3$ en $D=4$: plaquette, snaarspanning en glueballmassa vergeleken met de literatuurwaarden in `literature.json` (waarin per getal staat of het in deze sessie is teruggevonden of uit het geheugen komt). Uitkomst (§7.3): gehaald voor de plaquette en voor de snaarspanning in $D=3$; niet gehaald voor de glueballmassa in $D=4$ bij $\beta=2{,}4$ en $2{,}5$ en voor de snaarspanning bij $\beta=2{,}4$ op $L=12$.
+3. **Numerieke aanwijzingen voor een massakloof**: nagaan of op de gesimuleerde roosters de glueballmassa $am$ en de snaarspanning $a^2\sigma$ binnen de foutmarge ongelijk aan nul zijn, en of de dimensieloze verhouding $m/\sqrt\sigma$ weinig verandert als het rooster fijner wordt ("schaling"), zoals verwacht als de continuümtheorie een kloof $m = c\cdot\Lambda$ heeft. Of en hoe goed dit gelukt is, staat in §7.3; een toets die niet slaagt wordt daar als zodanig gemeld. Uitkomst: de schaaltoets is in $D=3$ gehaald binnen 1 à 2 % en in $D=4$ niet gehaald.
 
 ### 7.2 Wat de simulaties níet aantonen
 
 - **Geen bewijs.** Elk getal heeft een statistische fout en geldt voor één eindig rooster bij één eindige $\beta$.
 - **Geen continuümlimiet.** Wij rekenen bij enkele waarden van $a$; de uitspraak van het probleem gaat over $a\to0$. Extrapolatie is een aanname, geen stelling.
-- **Geen oneindig volume.** Effecten van de eindige doos zijn gecontroleerd waar mogelijk, niet uitgesloten.
+- **Geen oneindig volume.** In ronde 1 en 2 is er één volumevergelijking per dimensie (bij $\beta=6$ en bij $\beta=2{,}4$) en geen bij $\beta=2{,}5$; juist daar is een dooseffect gevonden (een torelonpaar vlak boven de glueball, §7.3). Effecten van de eindige doos zijn dus maar beperkt gecontroleerd en niet uitgesloten. <!-- R3 -->
 - **Geen uitsluiting van lichtere toestanden** die zwak aan onze operatoren koppelen (§5.3).
 - **Alleen SU(2).** Het probleem vraagt om alle compacte enkelvoudige groepen.
 - **Niets over de axioma's** (bestaan van de theorie in de zin van §3).
@@ -522,13 +522,15 @@ De volledige uitkomsten, alle controles en alle spanningen staan in `REPORT.md`;
 | d4_b2.5_L16x (extra) | 4 | 2,5 | 16⁴ | 0.7713(260) [1] | 0.7713(260) | 0.7457(584) | 0.1864(16) | 4.256(135) | 4.139(129) |
 | d4_b2.5_L16_combined | 4 | 2,5 | 16⁴ | 0.7531(170) [1] | 0.7531(170) | 0.7463(371) | 0.1866(11) | 4.036(87) | 4.036(87) |
 
-Herkomst: `results/<ensemble>.json` (uitvoer van `analyze.py`); de verhoudingen bij vaste t uit `results/independent/<ensemble>.json`. De regels "_combined" bevatten dezelfde data als de twee regels erboven.
+Herkomst: `results/<ensemble>.json` (uitvoer van `analyze.py`); de verhoudingen bij vaste t uit `results/independent/<ensemble>.json`. De regels "_combined" bevatten dezelfde data als de twee regels erboven. Bij $\beta=9$ is de herhaling het primaire getal: de R5-waarde van ronde 1 en de gecombineerde waarde bij t = 2 zijn door selectie naar boven vertekend (`REPORT.md` §4.4).
+
+Ronde 3 (d4_b2.5_L20, een volumecontrole op $20^4$ bij $\beta=2{,}5$; doel, voorspellingen en criterium vooraf vastgelegd in `run_round3_production.sh`) liep bij het schrijven nog en staat niet in deze tabel; zie `REPORT.md` §4.5. <!-- R3 -->
 
 **Wat geslaagd is.** De code reproduceert de exacte tweedimensionale formules van §5.6 en doorstaat de onafhankelijke controles (`REPORT.md` §2 en §4). In $D=3$ verandert $m/\sqrt\sigma$ bij vaste t = 1 maar 1,1 tot 1,5 % terwijl de roosterafstand een factor 2,1 verandert (met bij $\beta=9$ de herhaling of beide runs samen; met alleen ronde 1 is het 2,6 %), en $am$ verandert niet meetbaar (verschil 0.0033(159)) als het rooster bij $\beta=6$ van $16^3$ naar $24^3$ gaat.
 
-**Wat niet geslaagd is.** (i) De vooraf vastgelegde waarde in $D=3$ bij $\beta=9$, 0.8041(123), kwam bij herhaling met nieuwe seeds niet terug (0.7584(99), een verschil van 2,9σ); de plateauregel had een toevalsfluctuatie gekozen. (ii) In $D=4$ is de schaaltoets van §7.1 punt 3 niet gehaald: $m/\sqrt\sigma$ loopt op van 3.325(82) naar 4.036(87) (5,9σ), terwijl $am\cdot L$ over de drie vooraf vastgelegde roosters constant is (11.95(22), 11.91(18), 11.87(35)). Dat laatste is het patroon van een kloof die alleen door de eindige doos ontstaat; die lezing is alleen bij $\beta=2{,}4$ door een groter volume uitgesloten (7,4σ). (iii) Punt 2 van §7.1 is voor $D=4$ maar ten dele gehaald: de glueballmassa ligt bij $\beta=2{,}4$ 2,1σ en bij $\beta=2{,}5$ 1,0 tot 3,9σ (afhankelijk van de referentie) boven literatuurwaarden, en de snaarspanning bij $\beta=2{,}4$ op het rooster $16\times12^3$ ligt 3,1σ onder de literatuurwaarde. Die literatuurwaarden zijn alleen in zoekfragmenten gezien.
+**Wat niet geslaagd is.** (i) De vooraf vastgelegde waarde in $D=3$ bij $\beta=9$, 0.8041(123), kwam bij herhaling met nieuwe seeds niet terug (0.7584(99), een verschil van 2,9σ); de plateauregel had een toevalsfluctuatie gekozen. (ii) In $D=4$ is de schaaltoets van §7.1 punt 3 niet gehaald: $m/\sqrt\sigma$ loopt op van 3.325(82) naar 4.036(87) (5,9σ), terwijl $am\cdot L$ over de drie vooraf vastgelegde roosters constant is (11.951(223), 11.912(177), 11.871(345)). Dat laatste is het patroon van een kloof die alleen door de eindige doos ontstaat; die lezing is in ronde 1 en 2 alleen bij $\beta=2{,}4$ door een groter volume uitgesloten (7,4σ). (iii) Punt 2 van §7.1 is voor $D=4$ maar ten dele gehaald: de glueballmassa ligt bij $\beta=2{,}4$ 2,1σ en bij $\beta=2{,}5$ 1,0 tot 3,9σ (afhankelijk van de referentie) boven literatuurwaarden, en de snaarspanning bij $\beta=2{,}4$ op het rooster $16\times12^3$ ligt 3,1σ onder de literatuurwaarde. Die literatuurwaarden zijn alleen in zoekfragmenten gezien. <!-- R3 -->
 
-**Conclusie.** Op elk gesimuleerd rooster is de kloof ongelijk aan nul, maar dat is op een eindig rooster vanzelfsprekend (§5.5). Als numeriek bewijsmateriaal voor een massakloof telt alleen de stabiliteit onder verfijning en vergroting van het rooster: die is er binnen 1 à 2 % in $D=3$, en is in $D=4$ niet aangetoond. Niets hiervan is een bewijs. (De kanttekening over recente berichten in §1 is geschreven vóór de berichten van 9 tot 11 november 2026; zie `REPORT.md` §5.2.)
+**Conclusie.** Op elk gesimuleerd rooster is de kloof ongelijk aan nul, maar dat is op een eindig rooster vanzelfsprekend (§5.5). Als numeriek bewijsmateriaal voor een massakloof telt alleen de stabiliteit onder verfijning en vergroting van het rooster: die is er binnen 1 à 2 % in $D=3$, en is in $D=4$ niet aangetoond; een continuümwaarde voor $D=4$ geven wij niet. Niets hiervan is een bewijs. <!-- R3 --> (De kanttekening over recente berichten in §1 is geschreven vóór de berichten van 9 tot 11 november 2026; zie `REPORT.md` §5.2.)
 
 ---
 
@@ -631,6 +633,9 @@ Legenda: ✔ = bibliografische gegevens (en waar vermeld de inhoud) op 11 novemb
 - ✔ R. Lau, M. Teper, arXiv:1701.06941 (over SO(N)-ijktheorieën in 2+1 dimensies; alleen gebruikt als bron waarin de SU(2)-waarde van Athenodorou en Teper wordt aangehaald; ○ auteursnamen).
 - ✔ B. Lucini, M. Teper, "SU(N) gauge theories in 2+1 dimensions – further results", arXiv:hep-lat/0206027 (○ Phys. Rev. D66 (2002) 097502); bron van de alternatieve continuümwaarde $m(0^{++})/\sqrt\sigma = 4{,}716(21)$ voor SU(2) in $D=3$.
 - ✔ arXiv:hep-lat/9501036 ("Landau Ginzberg model and deconfinement transition for extended SU(2) action") en arXiv:1807.05295 ("Non-abelian lattice gauge theory with a topological action"): alleen gebruikt als bronnen waarin de kritieke koppelingen $\beta_c = 2{,}2986(6)$, $2{,}4265(30)$ en $2{,}5115(40)$ voor $N_t = 4, 6, 8$ worden aangehaald (de eerste schrijft ze toe aan Fingberg, Heller en Karsch).
+- ✔ N. Yamanaka, H. Iida, A. Nakamura, M. Wakayama, "Interglueball potential in SU($N_c$) lattice gauge theory", PoS(LATTICE2019)013, arXiv:1911.03048; bron van de alternatieve waarde $am(0^{++}) = 0{,}6857(28)$ bij $\beta=2{,}5$ op $16^3\times24$ (alleen in een zoekresultaat gezien).
+- ✔ J. D. Stack, R. Filipczyk, "Abelian Links, Monopoles and Glueballs in SU(2) Lattice Gauge Theory", arXiv:hep-lat/9809019; bron van de alternatieve waarde $am(0^{++}) = 0{,}72(3)$ bij $\beta=2{,}5$ (één keer in een zoekresultaat gezien).
+- ✔ arXiv:hep-lat/9403027 ("The Spatial String Tension in High Temperature Lattice Gauge Theories"; auteurs niet in het zoekresultaat gezien): alleen gebruikt als bron waarin $T_c/\sqrt\sigma = 1{,}121(8)$ voor SU(2) in 2+1 dimensies wordt aangehaald.
 - ○ M. Creutz, "Monte Carlo study of quantized SU(2) gauge theory", Phys. Rev. D21 (1980) 2308.
 - ○ M. Lüscher, K. Symanzik, P. Weisz, Nucl. Phys. B173 (1980) 365; M. Lüscher, Nucl. Phys. B180 (1981) 317 (snaarcorrectie).
 

@@ -1,0 +1,73 @@
+streams: [(301, 'hot'), (302, 'cold'), (303, 'hot'), (304, 'cold'), (305, 'hot'), (306, 'cold'), (307, 'hot'), (308, 'cold')] lengths [6987, 7034, 6892, 7082, 9539, 9700, 9624, 9583]
+
+(a) per-stream values (common GEVP vector from the combined sample; each stream with its own vacuum subtraction; bins of 15)
+   s301 hot   m_eff(1) 0.780(11)  m_eff(2) 0.786(25)  m_eff(3) 0.840(56) | torelon E(1) 0.6003(52) E(2) 0.5942(94)
+   s302 cold  m_eff(1) 0.782(11)  m_eff(2) 0.795(24)  m_eff(3) 0.751(45) | torelon E(1) 0.6024(54) E(2) 0.597(10)
+   s303 hot   m_eff(1) 0.781(11)  m_eff(2) 0.823(25)  m_eff(3) 0.844(60) | torelon E(1) 0.6083(54) E(2) 0.6037(93)
+   s304 cold  m_eff(1) 0.792(12)  m_eff(2) 0.815(25)  m_eff(3) 0.784(53) | torelon E(1) 0.5983(55) E(2) 0.5963(95)
+   s305 hot   m_eff(1) 0.7634(89)  m_eff(2) 0.747(20)  m_eff(3) 0.796(43) | torelon E(1) 0.6034(45) E(2) 0.5926(82)
+   s306 cold  m_eff(1) 0.7574(95)  m_eff(2) 0.742(19)  m_eff(3) 0.729(40) | torelon E(1) 0.5962(46) E(2) 0.5989(83)
+   s307 hot   m_eff(1) 0.7783(94)  m_eff(2) 0.763(20)  m_eff(3) 0.727(41) | torelon E(1) 0.6043(49) E(2) 0.5971(83)
+   s308 cold  m_eff(1) 0.7796(95)  m_eff(2) 0.784(21)  m_eff(3) 0.766(44) | torelon E(1) 0.6019(48) E(2) 0.5938(87)
+   glueball m_eff(1): 8-stream chi2 = 8.36 / 7 (p = 0.302); round-1 streams 0.68/3, replication 4.08/3
+   glueball m_eff(2): 8-stream chi2 = 12.76 / 7 (p = 0.078); round-1 streams 1.47/3, replication 2.63/3
+   glueball m_eff(3): 8-stream chi2 = 5.83 / 7 (p = 0.560); round-1 streams 2.29/3, replication 1.86/3
+
+(b) set difference round 1 - replication (common vector), and with one stream left out
+   t=1: round 1 0.7835(56), replication 0.7695(47), diff +0.0140 = +1.92 sigma
+   t=2: round 1 0.804(12), replication 0.7584(99), diff +0.0457 = +2.90 sigma
+   without s301: t=1 +1.92 sigma, t=2 +3.01 sigma
+   without s302: t=1 +1.80 sigma, t=2 +2.80 sigma
+   without s303: t=1 +1.87 sigma, t=2 +2.29 sigma
+   without s304: t=1 +1.44 sigma, t=2 +2.47 sigma
+   without s305: t=1 +1.53 sigma, t=2 +2.48 sigma
+   without s306: t=1 +1.27 sigma, t=2 +2.36 sigma
+   without s307: t=1 +2.18 sigma, t=2 +2.82 sigma
+   without s308: t=1 +2.23 sigma, t=2 +3.23 sigma
+
+(c) all 35 splits of the 8 streams into two groups of 4 (look-elsewhere scale): |pull| at t=2 and t=1
+   t=2: largest |pull| 2.90 for split [301, 302, 303, 304]; the actual split (0,1,2,3) has rank 1 of 35; rms over splits 1.35
+   t=1: largest |pull| 1.97 for split [301, 305, 306, 307]; actual split rank 3 of 35; rms 1.14
+
+(d) pull versus bin size (underestimated errors?)
+   B=  15: t=1 0.7835(56) vs 0.7695(47) -> +1.92 sigma | t=2 0.804(12) vs 0.7584(99) -> +2.90 sigma
+   B=  60: t=1 0.7835(56) vs 0.7695(47) -> +1.90 sigma | t=2 0.805(13) vs 0.758(10) -> +2.85 sigma
+   B= 240: t=1 0.7826(62) vs 0.7693(47) -> +1.70 sigma | t=2 0.804(14) vs 0.758(12) -> +2.55 sigma
+   B= 480: t=1 0.7802(65) vs 0.7695(44) -> +1.36 sigma | t=2 0.796(14) vs 0.759(12) -> +2.00 sigma
+   B= 960: t=1 0.7802(60) vs 0.7690(46) -> +1.48 sigma | t=2 0.796(13) vs 0.758(12) -> +2.14 sigma
+
+(e) cross-correlation between streams at equal and shifted Monte Carlo time (lags -200..200)
+   plaquette                            lag 0: rms z 1.10, max |z| 2.51 (28 pairs) | all lags: rms 1.002, max |z| 4.01 over 11228 values (Gaussian max ~ 3.9)
+   glue b (projected, time-slice mean)  lag 0: rms z 1.03, max |z| 2.67 (28 pairs) | all lags: rms 1.108, max |z| 4.70 over 11228 values (Gaussian max ~ 3.9)
+   glue a(1)                            lag 0: rms z 1.08, max |z| 2.65 (28 pairs) | all lags: rms 1.003, max |z| 4.27 over 11228 values (Gaussian max ~ 3.9)
+   m_eff(1) linearised                  lag 0: rms z 0.83, max |z| 1.46 (28 pairs) | all lags: rms 1.008, max |z| 4.01 over 11228 values (Gaussian max ~ 3.9)
+   torelon a(1)                         lag 0: rms z 0.93, max |z| 1.89 (28 pairs) | all lags: rms 1.019, max |z| 3.68 over 11228 values (Gaussian max ~ 3.9)
+
+(f) duplicate check: number of plaquette values shared between any two streams (exact float equality)
+   distinct values per stream / length: [(6987, 6987), (7034, 7034), (6892, 6892), (7082, 7082), (9539, 9539), (9700, 9700), (9624, 9624), (9583, 9583)]
+   first three plaquette values per stream:
+     s301 hot: [0.8863003833 0.8851813489 0.8855904708]
+     s302 cold: [0.8869651963 0.8860286071 0.8846069947]
+     s303 hot: [0.8852176826 0.8859473229 0.8858264022]
+     s304 cold: [0.8855334221 0.8852385645 0.8852548953]
+     s305 hot: [0.8843868799 0.8848679865 0.8859307101]
+     s306 cold: [0.8853414078 0.8846727323 0.886081378 ]
+     s307 hot: [0.885546164  0.885600167  0.8860601256]
+     s308 cold: [0.8851399907 0.8847127845 0.8852351203]
+
+(g) time dependence: linearised m_eff(t) in 10 equal chunks of every stream, pooled over the 4 streams of a set;
+    z of each chunk against the other nine (errors from the Gamma method of the set)
+   round 1     m_eff(1): z per chunk +3.3 -0.8 -0.9 -0.3 -0.5 -1.3 -1.8 +2.4 -0.4 +0.4 | chi2 21.5/9 (p=0.011)
+   round 1     m_eff(2): z per chunk +3.1 -0.6 -1.1 -0.6 -0.0 -2.1 -0.7 +0.7 +0.8 +0.7 | chi2 16.3/9 (p=0.061)
+   replication m_eff(1): z per chunk +0.7 -0.3 +0.6 +0.1 +0.1 -1.5 +1.1 -0.2 -0.0 -0.6 | chi2 4.4/9 (p=0.886)
+   replication m_eff(2): z per chunk +1.1 -0.3 -0.4 -1.2 +1.1 -0.2 +0.4 -0.7 -0.3 +0.4 | chi2 4.6/9 (p=0.866)
+
+(h) first tenth of each stream against the rest of the same stream (linearised m_eff(1), m_eff(2))
+   m_eff(1): s301(h) +1.0 s302(c) +1.3 s303(h) +2.0 s304(c) +2.3 s305(h) +0.1 s306(c) +0.9 s307(h) +0.4 s308(c) -0.1
+   m_eff(2): s301(h) +1.3 s302(c) +2.7 s303(h) +0.1 s304(c) +2.0 s305(h) +0.4 s306(c) -0.5 s307(h) +2.3 s308(c) -0.0
+
+(i) values with the first part of every stream discarded (common vector)
+   discard  0 %: round 1 t1 0.7835(56) t2 0.804(12) | replication t1 0.7695(47) t2 0.7584(99) | pulls t1 +1.92 t2 +2.90
+   discard 10 %: round 1 t1 0.7772(58) t2 0.793(13) | replication t1 0.7685(50) t2 0.755(10) | pulls t1 +1.14 t2 +2.31
+   discard 25 %: round 1 t1 0.7779(65) t2 0.795(14) | replication t1 0.7677(54) t2 0.755(11) | pulls t1 +1.21 t2 +2.21
+   discard 50 %: round 1 t1 0.7805(79) t2 0.799(17) | replication t1 0.7658(65) t2 0.756(14) | pulls t1 +1.43 t2 +1.95

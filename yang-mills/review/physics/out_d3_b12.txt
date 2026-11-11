@@ -1,0 +1,24 @@
+===== d3_b12.0_L32 T 32 bins 532 binsize 19  pipeline reproduced: a*m(R5) = 0.5693(0.0049)
+  m_eff(0,1,2,3) = 0.5788(0.0029) 0.5693(0.0049) 0.5696(0.0083) 0.5724(0.0141)
+  d0 = m_eff(0)-m_eff(1) = 0.0094(0.0040)  [1.7 % of m_eff(1)] ; d1 = m_eff(1)-m_eff(2) = -0.0002(0.0068)
+  GEVP second level -ln(lambda_1) = 0.912 (upper estimate of the first excited state); gap to m_eff(1): 0.343
+   if ALL t=0 contamination sits in one state with gap = level2 - m_eff(1)     = 0.343: r=0.71, implied bias of m_eff(1) = 0.023 (4 %), implied d1 = 0.0067 vs measured -0.0002(0.0068): -1.0 sigma
+      data alone (d1) allow a bias of m_eff(1) up to 0.023 (1 sigma) / 0.046 (2 sigma) for this gap
+   if ALL t=0 contamination sits in one state with gap = 0.6*m_eff(1)          = 0.342: r=0.71, implied bias of m_eff(1) = 0.023 (4 %), implied d1 = 0.0067 vs measured -0.0002(0.0068): -1.0 sigma
+      data alone (d1) allow a bias of m_eff(1) up to 0.023 (1 sigma) / 0.046 (2 sigma) for this gap
+   if ALL t=0 contamination sits in one state with gap = 2E_torelon - m_eff(1) = 0.302: r=0.74, implied bias of m_eff(1) = 0.027 (5 %), implied d1 = 0.0070 vs measured -0.0002(0.0068): -1.1 sigma
+      data alone (d1) allow a bias of m_eff(1) up to 0.025 (1 sigma) / 0.051 (2 sigma) for this gap
+  H: true mass = 0.559 with ONE excited state: needs A=0.960, m'=1.223; predicts m_eff(2)=0.5644 (measured 0.5696(0.0083)); ln[C(3)meas/C(3)pred] = -0.0052(0.0068) -> -0.76 sigma
+  H: true mass = 0.567 with ONE excited state: needs A=0.985, m'=2.193; predicts m_eff(2)=0.5675 (measured 0.5696(0.0083)); ln[C(3)meas/C(3)pred] = -0.0021(0.0074) -> -0.28 sigma
+  H: true mass = 0.551 with ONE excited state: needs A=0.923, m'=0.989; predicts m_eff(2)=0.5630 (measured 0.5696(0.0083)); ln[C(3)meas/C(3)pred] = -0.0066(0.0069) -> -0.95 sigma
+  correlated two-state fit t=1..4 (C(0)=1 exact): m=0.5693 A=0.991 m'=30.022 chi2=0.06/1 ; Delta chi2<=1: m in [0.558,0.572]; <=4: [0.285,0.578] (lower edge of scan!) ; at literature m=0.559: Delta chi2 = 0.78 (A=0.96, m'=1.25)
+  correlated two-state fit t=1..5 (C(0)=1 exact): m=0.5692 A=0.991 m'=31.357 chi2=0.91/2 ; Delta chi2<=1: m in [0.555,0.572]; <=4: [0.285,0.578] (lower edge of scan!) ; at literature m=0.559: Delta chi2 = 0.70 (A=0.96, m'=1.23)
+  GEVP t0=1 (exploratory; subset ['s80_1x1', 's50_2x2', 's10_2x2']): m_eff(1,2,3) = 0.5703(0.0049) 0.5706(0.0084) 0.5718(0.0141) ; n_fallback 0
+  W(tor pair, lev s80)         alone: C(1)/C(0)=0.4043(0.0023) m_eff(0,1,2)= 0.906(0.006) 0.868(0.011) 0.838(0.024)   [2*E_torelon(t=1) = 0.8717]
+  W(tor pair, lev s50)         alone: C(1)/C(0)=0.3954(0.0023) m_eff(0,1,2)= 0.928(0.006) 0.892(0.011) 0.860(0.026)   [2*E_torelon(t=1) = 0.8717]
+  equal-time correlation coefficient of the pipeline ground-state operator with W: -0.2661(0.0018) -0.2662(0.0019)  -> squared: 0.07080 0.07087
+  extended basis (glue ops + W): R2 selected ['s80_1x1', 's50_2x2', 's25_2x2', 'W(tor pair, lev s80)', 'W(tor pair, lev s50)']
+     naive energies 0.578 0.892 0.984 1.248 1.359 ; ground state m_eff(0,1,2) = 0.5781(0.0028) 0.5687(0.0049) 0.5690(0.0083)  (pipeline basis: 0.5788(0.0029) 0.5693(0.0049) 0.5696(0.0083))
+     ground-state eigenvector (normalised basis): -1.097 +0.350 -0.292 -0.064 +0.015
+     forced basis pipeline subset + W(top): -ln(lambda) = 0.578 0.892 0.984 1.250 ; W-component of the two lowest states: -0.050 +0.499 ; min eig of Chat(0) 0.0110
+     forced basis ground state m_eff(0,1,2) = 0.5781(0.0028) 0.5687(0.0049) 0.5691(0.0083)
