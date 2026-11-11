@@ -14,6 +14,7 @@ betrouwbaarheid) in `literature.json`.
 
 | pad | wat |
 | --- | --- |
+| `REPORT.md` | eindrapport: wat er gemeten is, alle controles en spanningen, en wat het wel en niet bewijst |
 | `ym/lattice.py` | motor: heatbath (Creutz / Kennedy–Pendleton) + overrelaxatie, plaquette, Wilson- en Polyakov-lussen |
 | `ym/exact.py` | exacte D=2-formules, sterke-koppelingsreeks, twee-lus-schaalformule |
 | `ym/observables.py` | APE-smearing, glueball- (0++) en torelon-operatoren per tijdplak |
@@ -22,6 +23,9 @@ betrouwbaarheid) in `literature.json`.
 | `run_production.py` | productierun: één Monte-Carlo-stroom → ruw `.npz`-bestand |
 | `analyze.py` | analyse van één ensemble (meerdere stromen) → JSON + figuren |
 | `run_all_production.sh`, `run_extra_production.sh` | de productie-ensembles zoals ze gedraaid zijn |
+| `independent_analysis.py` | onafhankelijke heranalyse van de ruwe data (deelt geen code met `ym/stats.py` en `analyze.py`; bootstrapfouten) → `results/independent/` |
+| `summarize.py` | synthese over alle ensembles: tabellen, schaalfits, volume- en replicatievergelijkingen, vergelijking met `literature.json` → `results/summary.json`, `results/summary.md` en drie figuren |
+| `results/` | uitkomsten: per ensemble `<naam>.json` en drie figuren (uitvoer van `analyze.py`), `logs/` (dezelfde samenvattingen als tekst), `summary.*` (uitvoer van `summarize.py`), `independent/` (uitvoer van `independent_analysis.py`, met `COMPARISON.md`); `raw/` bevat de ruwe data en staat niet in git |
 | `tests/` | testsuite (zie hieronder) |
 
 Conventies: een SU(2)-element is een eenheidsquaternion `(a0, a1, a2, a3)`; as 0 is de tijd;

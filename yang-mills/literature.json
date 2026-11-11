@@ -37,6 +37,19 @@
         "D3_m0pp_over_sqrt_sigma": "1.19/0.2538 = 4.69, 0.765/0.1616 = 4.73, 0.559/0.1179 = 4.74: inside 4.6-4.8. Note that the three masses are from memory, so this checks only that the remembered numbers are mutually plausible.",
         "D3_sqrt_sigma_over_g2": "beta*a*sqrt(sigma)/4 = 0.3807, 0.3636, 0.3537 at beta = 6, 9, 12: decreasing towards the continuum 0.3353(18). A naive extrapolation in the bare 1/beta gives 0.327 (linear) or 0.319 (quadratic through the three points), i.e. 2-5 percent below 0.3353; the published value uses a different (improved-coupling) extrapolation and more beta values, so only the direction and rough size of the drift are tested here."
       }
+    },
+    "physics_review_additions": {
+      "who": "Third pass on 2026-11-11 (adversarial review of the physics and literature claims). Entries were ADDED only; no existing value, flag or note was changed or removed. Same limitation as before: only the web-search tool worked, no full text could be opened, and what the tool returns is a summary of the pages it found.",
+      "added": [
+        "D4 a_m_0pp 2.5: alternatives 0.6857(28) (arXiv:1911.03048, 16^3 x 24, about 1.0e6 configurations) and 0.72(3) (arXiv:hep-lat/9809019).",
+        "D3 continuum m0pp/sqrt(sigma): alternative 4.718(43) with level search_excerpt (secondary citation); the from-memory primary entry is left as it was.",
+        "D3 Tc_over_sqrt_sigma (new key): 1.121(8), alternative 'roughly 1.06'.",
+        "D3 a_sqrt_sigma_interpolation (new key): formula 1.336(10)/beta + 1.122/beta^2, no value entered."
+      ],
+      "corroboration_of_existing_entries": "A result text for the query 'Yamanaka Iida Nakamura Wakayama SU(2) glueball mass lattice unit beta=2.4 beta=2.3 \"m_phi\" table \"0.6857\" OR \"2.4\" \"16^3 x 24\" dark matter Yang-Mills Phys. Rev. D 102 054507 results per beta' described a 2021 slide deck of the same group that lists a*sqrt(sigma) values for beta = 2.1 to 2.5 'including 0.3687(22) at beta=2.3 and 0.2660(21) at beta=2.4', and arXiv:1911.03048 uses 0.1834(26) at beta=2.5. This supports reading the first column of Table 10 of hep-th/9812187 as a*sqrt(sigma); it is not an independent measurement.",
+      "searched_and_not_found": "Lattice-unit 0++ masses for D=3 SU(2) at beta = 6, 9, 12 (hep-lat/9804008 tables; arXiv:1609.03873 Appendix A); SU(2) rows of the lattice tables of arXiv:hep-lat/0404008 and arXiv:2106.00364; per-beta glueball masses at beta = 2.3 and 2.4 of arXiv:1910.07756; further rows of Table 10 of hep-th/9812187. One or two queries each returned titles and abstracts but no table content.",
+      "consequence": "At beta=2.5 the published values now on file for a*m(0++) span 0.660(22) to 0.72(3), with one high-statistics value 0.6857(28). They do not all agree with each other within errors, so a pull against a single one of them must not be reported as 'the' deviation from the literature.",
+      "corroboration_of_extrapolation_form": "A result text for the query 'Lucini Teper Wenger \"Glueballs and k-strings in SU(N) gauge theories: calculations with improved operators\" SU(2) beta=2.4265 beta=2.5115 a sqrt(sigma) a m 0++ table' said that the related D=2+1 paper arXiv:hep-lat/0206027 extrapolates the string tension to the continuum with the mean-field improved coupling, 'beta_I a sqrt(sigma) = c0 + c1/beta_I'. This supports, at excerpt level and for that paper only, the from-memory remark about the improved coupling in the note of D3 continuum_sqrt_sigma_over_g2; whether hep-lat/9804008 eq. (38) uses the same form was not seen."
     }
   },
   "D4_SU2_wilson": {
@@ -176,6 +189,24 @@
             "web_verified": false,
             "verification_level": "none",
             "note": "from memory (this was the primary entry in the first version). Midpoint of the remembered range; the upper end was not found in any search excerpt."
+          },
+          {
+            "value": 0.6857,
+            "uncertainty": 0.0028,
+            "source": "N. Yamanaka, H. Iida, A. Nakamura, M. Wakayama, 'Interglueball potential in SU(Nc) lattice gauge theory', PoS(LATTICE2019)013, arXiv:1911.03048: 0++ glueball mass in lattice units for SU(2) at beta=2.5, standard plaquette (Wilson) action, lattice 16^3 x 24, about 1,045,000 configurations.",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "search_query": "\"Interglueball potential in SU(Nc) lattice gauge theory\" Yamanaka SU(2) beta=2.5 \"0.6857\" glueball mass lattice units 16^3 x 24 configurations",
+            "note": "Seen on 2026-11-11 in the text that the web-search tool returned for the query given in 'search_query' (a search-result summary quoting the cited source); the paper itself could not be opened. Added in the third pass (physics review). The same number came back for three differently worded queries (the first one did not contain the number). The result text also says that this paper sets the SU(2) scale at beta=2.5 with a*sqrt(sigma) = 0.1834(26), which is the 16^4 Table-10 value of hep-th/9812187 already listed in this file. Same spatial size (16) as our d4_b2.5_L16 ensembles; time extent 24 instead of 16. Operator basis, smearing and fit range were not visible. A different result text (query: SU(2) lattice gauge theory beta=2.5 scalar glueball mass 0++ lattice units string tension \"beta=2.5\" Wilson action table \"0.1871\" OR \"0.72\" OR \"0.66\") said that arXiv:2112.06785 (Dudal, Oliveira, Roelfs), re-analysing the data of arXiv:1910.07756 by the same group, lists a 0++ central value 0.696 at beta=2.5 next to a value 0.595 in another column; the column assignment was ambiguous there, so 0.696 is NOT entered as a value."
+          },
+          {
+            "value": 0.72,
+            "uncertainty": 0.03,
+            "source": "J. D. Stack, R. Filipczyk, 'Abelian Links, Monopoles and Glueballs in SU(2) Lattice Gauge Theory', arXiv:hep-lat/9809019: table of 0+ glueball masses at beta=2.5, Wilson action, entry for full SU(2) (same table: 0.69(1) from abelian links, 0.70(1) from monopoles).",
+            "web_verified": true,
+            "verification_level": "search_excerpt",
+            "search_query": "SU(2) lattice gauge theory beta=2.5 scalar glueball mass 0++ lattice units string tension \"beta=2.5\" Wilson action table \"0.1871\" OR \"0.72\" OR \"0.66\"",
+            "note": "Seen on 2026-11-11 in the text that the web-search tool returned for the query given in 'search_query' (a search-result summary quoting the cited source); the paper itself could not be opened. Added in the third pass (physics review). Lattice size not visible in the result text. NOT reproduced by one targeted follow-up query, which returned only the abstract. It is not known whether 0.72(3) is that paper's own measurement or a value it quotes from earlier work. Compatible with the from-memory range 0.66-0.72 of the entry above. The same result text repeated a*sqrt(sigma) = 0.1871(10), 0.1871(32) on 16^4, 32^4 at beta=2.5 from hep-th/9812187 (already in this file)."
           }
         ]
       }
@@ -383,6 +414,15 @@
           "web_verified": true,
           "verification_level": "search_excerpt",
           "note": "Seen only as quoted in arXiv:1701.06941 ('M_0+/sqrt(sigma_f) = 4.737(6)' for SU(2) in D=2+1)."
+        },
+        {
+          "value": 4.718,
+          "uncertainty": 0.043,
+          "source": "M. Teper, Phys. Rev. D59 (1999) 014512, arXiv:hep-lat/9804008, continuum 0++ mass of SU(2) in D=2+1 in units of sqrt(sigma), as quoted in a later paper (the result list pointed to arXiv:hep-ph/0012287 and arXiv:hep-lat/0206027; which of them carried the number was not shown).",
+          "web_verified": true,
+          "verification_level": "search_excerpt",
+          "search_query": "hep-lat/9804008 Teper \"lightest SU(2) masses\" table \"beta=9.0\" OR \"beta=9\" \"0++\" \"0.7\" L=24 \"beta=12.0\" L=32 \"0.5\" glueball lattice masses SU(2) D=2+1 Table 23 Table 24",
+          "note": "Seen on 2026-11-11 in the text that the web-search tool returned for the query given in 'search_query' (a search-result summary quoting the cited source); the paper itself could not be opened. Added in the third pass (physics review). Same value as the primary entry of this node, which stays flagged 'none' because it was entered from memory; this alternative records that the number 4.718(43) has now been seen in a result text (secondary citation). The same text gave 4.65(10) for an asymmetric action with r=0.25. The query was aimed at the lattice masses at beta = 6, 9, 12; those were NOT returned, so the three a_m_0pp entries of this section remain unverified."
         }
       ]
     },
@@ -393,6 +433,36 @@
       "web_verified": true,
       "verification_level": "search_excerpt",
       "note": "g^2 has dimension of mass in D=3 and is defined through beta = 4/(a g^2), so sqrt(sigma)/g^2 = lim_{beta->inf} beta*a*sqrt(sigma)/4. The excerpt quotes 0.3375(130) as 'consistent with the value of 0.3353(18) in eqn(38)'. Cross-check from another excerpt: Teper's fit sqrt(sigma)/g^2 = 0.1974(12) N - 0.120(8)/N (arXiv:hep-lat/9711011) gives 0.3348 at N=2. Warning: at beta = 6, 9, 12 the naive ratio beta*a*sqrt(sigma)/4 is 0.381, 0.364, 0.354, i.e. still 5-14 percent above the continuum value; Teper extrapolates with a mean-field improved coupling (statement about the improved coupling is from memory)."
+    },
+    "Tc_over_sqrt_sigma": {
+      "value": 1.121,
+      "uncertainty": 0.008,
+      "source": "Quoted for SU(2) in 2+1 dimensions ('near the continuum limit') in arXiv:hep-lat/9403027 ('The Spatial String Tension in High Temperature Lattice Gauge Theories'); the original determination was not visible in the result text.",
+      "web_verified": true,
+      "verification_level": "search_excerpt",
+      "search_query": "SU(2) gauge theory 2+1 dimensions deconfining temperature T_c/sqrt(sigma) \"1.12\" OR \"1.1224\" OR \"1.121\" Liddle Teper deconfining phase transition D=2+1 SU(N)",
+      "note": "Seen on 2026-11-11 in the text that the web-search tool returned for the query given in 'search_query' (a search-result summary quoting the cited source); the paper itself could not be opened. Added in the third pass (physics review). Used only to compare the lattice extent with the deconfinement length 1/T_c: L*sqrt(sigma) must be well above 1/1.121 = 0.89. Agrees with the reviewer's from-memory 1.12. The numbers 1.1224 and a Liddle-Teper result were searched for and not found.",
+      "alternatives": [
+        {
+          "value": 1.06,
+          "uncertainty": null,
+          "source": "Bielefeld study arXiv:hep-lat/9608099 ('A Study of Finite Temperature Gauge Theory in (2+1) Dimensions'): SU(2) table entries for N_tau = 2 and 4 read 'roughly 1.06' according to the result text, which also says the lattice result is 7 percent above the string-model value sqrt(3/(pi(d-2))) = 0.977 for d=3.",
+          "web_verified": true,
+          "verification_level": "search_excerpt",
+          "search_query": "SU(2) gauge theory 2+1 dimensions deconfining temperature T_c/sqrt(sigma) \"1.12\" OR \"1.1224\" OR \"1.121\" Liddle Teper deconfining phase transition D=2+1 SU(N)",
+          "note": "Rough number at coarse N_tau, wording of the result text ('roughly'); no uncertainty visible. Kept only to show that the two sources differ by 5 percent; irrelevant for our lattices, whose extent is 4.3 to 6.9 times 1/T_c with either value."
+        }
+      ]
+    },
+    "a_sqrt_sigma_interpolation": {
+      "formula": "a*sqrt(sigma) = 1.336(10)/beta + 1.122/beta^2",
+      "value": null,
+      "uncertainty": null,
+      "source": "Zero-temperature string tension of SU(2) in 2+1 dimensions as used in arXiv:hep-lat/9403027; the origin of the coefficients (presumably earlier work by M. Teper) was not visible in the result text.",
+      "web_verified": true,
+      "verification_level": "search_excerpt",
+      "search_query": "SU(2) gauge theory 2+1 dimensions deconfining temperature T_c/sqrt(sigma) \"1.12\" OR \"1.1224\" OR \"1.121\" Liddle Teper deconfining phase transition D=2+1 SU(N)",
+      "note": "Seen on 2026-11-11 in the text that the web-search tool returned for the query given in 'search_query' (a search-result summary quoting the cited source); the paper itself could not be opened. Added in the third pass (physics review). No number is entered as 'value' because the formula is an interpolation, not a measurement at our beta values. Evaluated by the reviewer (error from the first coefficient only): 0.2538(17) at beta=6, 0.1623(11) at beta=9, 0.1191(8) at beta=12; continuum sqrt(sigma)/g^2 = 1.336/4 = 0.334(3). These are DERIVED numbers and are consistent with the Table-12 entries above."
     }
   }
 }

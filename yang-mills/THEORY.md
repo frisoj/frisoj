@@ -505,7 +505,30 @@ Verificatiestatus van elke verwijzing staat in de Referenties (§9): ✔ = titel
 
 ### 7.3 Resultaten
 
-<!-- RESULTS_PLACEHOLDER -->
+De volledige uitkomsten, alle controles en alle spanningen staan in `REPORT.md`; de volledige tabellen in `results/summary.md` en `results/independent/COMPARISON.md`. Notatie: 1.1959(77) betekent 1,1959 ± 0,0077; de fouten zijn alleen statistisch. Alle massa's zijn variationele bovengrens-schattingen. "R5" is de vooraf vastgelegde plateauregel (waarvan de opgegeven fout te klein is, zie `README.md`); "t = 1" en "t = 2" zijn de effectieve massa's bij vaste tijd, zonder keuze achteraf.
+
+| ensemble | D | β | rooster | a·m R5 [t\*] | a·m, t = 1 | a·m, t = 2 | a√σ, t = 1 | m/√σ R5 | m/√σ, t = 1 |
+|---|---|---|---|---|---|---|---|---|---|
+| d3_b6.0_L16 | 3 | 6 | 16³ | 1.1959(77) [1] | 1.1959(77) | 1.2035(259) | 0.25257(44) | 4.710(37) | 4.735(31) |
+| d3_b6.0_L24 | 3 | 6 | 24³ | 1.1926(139) [1] | 1.1926(139) | 1.1819(449) | 0.2547(16) | geen meting | 4.682(61) |
+| d3_b9.0_L24 (ronde 1) | 3 | 9 | 24³ | 0.8041(123) [2] | 0.7834(56) | 0.8041(123) | 0.16130(35) | 5.003(78) | 4.857(36) |
+| d3_b9.0_L24r (herhaling) | 3 | 9 | 24³ | 0.7584(99) [2] | 0.7695(47) | 0.7584(99) | 0.16120(30) | 4.727(64) | 4.774(30) |
+| d3_b9.0_L24_combined | 3 | 9 | 24³ | 0.7754(36) [1] | 0.7754(36) | 0.7773(77) | 0.16124(23) | 4.829(25) | 4.809(23) |
+| d3_b12.0_L32 | 3 | 12 | 32³ | 0.5693(49) [1] | 0.5693(49) | 0.5696(83) | 0.11892(34) | 4.788(42) | 4.788(42) |
+| d4_b2.3_L10 | 4 | 2,3 | 12×10³ | 1.1951(223) [1] | 1.1951(223) | 1.1492(704) | 0.3687(19) | 3.325(82) | 3.242(61) |
+| d4_b2.4_L12 | 4 | 2,4 | 16×12³ | 0.9926(148) [1] | 0.9926(148) | 0.9809(404) | 0.26189(92) | 3.790(58) | 3.790(58) |
+| d4_b2.4_L16 | 4 | 2,4 | 16⁴ | 0.9863(309) [1] | 0.9863(309) | 1.0215(850) | 0.2653(26) | 3.718(125) | 3.718(125) |
+| d4_b2.5_L16 (ronde 1) | 4 | 2,5 | 16⁴ | 0.7420(216) [1] | 0.7420(216) | 0.7667(494) | 0.1873(15) | 3.962(112) | 3.962(112) |
+| d4_b2.5_L16x (extra) | 4 | 2,5 | 16⁴ | 0.7713(260) [1] | 0.7713(260) | 0.7457(584) | 0.1864(16) | 4.256(135) | 4.139(129) |
+| d4_b2.5_L16_combined | 4 | 2,5 | 16⁴ | 0.7531(170) [1] | 0.7531(170) | 0.7463(371) | 0.1866(11) | 4.036(87) | 4.036(87) |
+
+Herkomst: `results/<ensemble>.json` (uitvoer van `analyze.py`); de verhoudingen bij vaste t uit `results/independent/<ensemble>.json`. De regels "_combined" bevatten dezelfde data als de twee regels erboven.
+
+**Wat geslaagd is.** De code reproduceert de exacte tweedimensionale formules van §5.6 en doorstaat de onafhankelijke controles (`REPORT.md` §2 en §4). In $D=3$ verandert $m/\sqrt\sigma$ bij vaste t = 1 maar 1,1 tot 1,5 % terwijl de roosterafstand een factor 2,1 verandert (met bij $\beta=9$ de herhaling of beide runs samen; met alleen ronde 1 is het 2,6 %), en $am$ verandert niet meetbaar (verschil 0.0033(159)) als het rooster bij $\beta=6$ van $16^3$ naar $24^3$ gaat.
+
+**Wat niet geslaagd is.** (i) De vooraf vastgelegde waarde in $D=3$ bij $\beta=9$, 0.8041(123), kwam bij herhaling met nieuwe seeds niet terug (0.7584(99), een verschil van 2,9σ); de plateauregel had een toevalsfluctuatie gekozen. (ii) In $D=4$ is de schaaltoets van §7.1 punt 3 niet gehaald: $m/\sqrt\sigma$ loopt op van 3.325(82) naar 4.036(87) (5,9σ), terwijl $am\cdot L$ over de drie vooraf vastgelegde roosters constant is (11.95(22), 11.91(18), 11.87(35)). Dat laatste is het patroon van een kloof die alleen door de eindige doos ontstaat; die lezing is alleen bij $\beta=2{,}4$ door een groter volume uitgesloten (7,4σ). (iii) Punt 2 van §7.1 is voor $D=4$ maar ten dele gehaald: de glueballmassa ligt bij $\beta=2{,}4$ 2,1σ en bij $\beta=2{,}5$ 1,0 tot 3,9σ (afhankelijk van de referentie) boven literatuurwaarden, en de snaarspanning bij $\beta=2{,}4$ op het rooster $16\times12^3$ ligt 3,1σ onder de literatuurwaarde. Die literatuurwaarden zijn alleen in zoekfragmenten gezien.
+
+**Conclusie.** Op elk gesimuleerd rooster is de kloof ongelijk aan nul, maar dat is op een eindig rooster vanzelfsprekend (§5.5). Als numeriek bewijsmateriaal voor een massakloof telt alleen de stabiliteit onder verfijning en vergroting van het rooster: die is er binnen 1 à 2 % in $D=3$, en is in $D=4$ niet aangetoond. Niets hiervan is een bewijs. (De kanttekening over recente berichten in §1 is geschreven vóór de berichten van 9 tot 11 november 2026; zie `REPORT.md` §5.2.)
 
 ---
 
