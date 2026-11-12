@@ -1,0 +1,5 @@
+tests/test_summarize.py::test_round3_block_on_synthetic_files
+tests/test_summarize.py::test_real_results_are_reproduced_exactly_and_inputs_untouched
+tests/test_summarize.py::test_figures_are_written_to_the_output_directory_only
+
+369 tests collected in 0.87s

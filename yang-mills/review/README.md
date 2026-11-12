@@ -1,8 +1,8 @@
 # review/ — scripts en uitvoer van de controleronde
 
 Numeriek bewijsmateriaal, geen bewijs. Deze map bevat de scripts waarmee de
-twee kritische controles (statistiek, natuurkunde) en de rapportstap hun
-getallen hebben berekend, met de tekstuitvoer van die runs. In `REPORT.md`
+twee kritische controles (statistiek, natuurkunde), de rapportstap en de
+getallencontrole hun getallen hebben berekend, met de tekstuitvoer van die runs. In `REPORT.md`
 heten deze bronnen [C1], [C2] en [A].
 
 De scripts staan hier **ongewijzigd, zoals ze zijn gedraaid**. Ze horen niet
@@ -14,6 +14,7 @@ bij de geteste code (`ym/`, `analyze.py`, `independent_analysis.py`,
 | `stats/` | statistische controle [C1]: foutencontrole (`a1_errors.py`), thermalisatie (`a2_therm.py`, `a3*.py`), het punt bij β = 9 (`a4_beta9.py`), schaalfits (`a5_ratios_fits.py`), toets op massa nul (`a6_zero_mass.py`), onafhankelijkheid en operatorkeuze (`a8`, `a11`–`a13`), overzicht (`a9_survey.py`); gedeelde functies in `lib.py`; uitvoer in `out/` |
 | `physics/` | natuurkundige controle [C2]: formules, volumes en schaalfits uit `results/*.json` (`checks1.py`), verkennende toetsen op de ruwe data (`checks2.py`–`checks4.py`: bijmenging, torelonpaar, fit met twee toestanden); uitvoer in `out*.txt`, `rows.json` |
 | `report/` | rekensommen voor de tabellen van het rapport [A] (`make_tables.py`, `table3.py` → `tables.txt`, `table3.txt`), een herhaling van `physics/checks1.py` (`checks1.txt`), testuitvoer [T] (`t_rP.txt`) en de uitvoer van een herhaling van vier scripts van de statistische controle (`stats_rerun_a3*.txt`) |
+| `numcheck/` | de getallencontrole van het eindrapport: vergelijking van alle tabelcellen met `results/*.json` (`check_tables.py`), nagerekende fits, volumevergelijkingen en ronde 3 (`check2.py`, `check3.py`), literatuurverschillen (`check4.py`), formules (`check5.py`), herkomst van elk getal in de tekst (`trace_tokens.py`), het model voor de selectievertekening bij β = 9 (`bias_model.py`), en de uitvoer van de testsuite (`pytest_default.txt`: 340 geslaagd, 29 overgeslagen; `slow_out_*.txt`: de 29 trage tests) |
 
 ## Opnieuw draaien
 

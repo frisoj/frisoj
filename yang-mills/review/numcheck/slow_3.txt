@@ -1,0 +1,7 @@
+tests/test_adversarial_analysis.py::test_d2_end_to_end_string_tension_beta8_slow
+tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d2_b4.0]
+tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b2.3]
+tests/test_engine.py::test_slow_strong_coupling_d4_beta05_resolves_leading_correction
+tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.3]
+tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[0.5]
+tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[200.0]

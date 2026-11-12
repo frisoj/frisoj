@@ -1,0 +1,7 @@
+tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D4_4x4x6x6_b2.3]
+tests/test_crosscheck.py::test_b_reference_reproduces_exact_d2_high_statistics[4.0]
+tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b1.0]
+tests/test_crosscheck.py::test_e_strong_coupling_coefficient_high_statistics[4]
+tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.2]
+tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[0.05]
+tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[30.0]

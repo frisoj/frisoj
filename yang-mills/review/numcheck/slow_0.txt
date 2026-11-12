@@ -1,0 +1,7 @@
+tests/test_adversarial_analysis.py::test_plateau_rule_coverage_at_production_like_signal_to_noise_slow
+tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d3_b3.0]
+tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b2.5]
+tests/test_engine.py::test_slow_strong_coupling_d4_beta10_resolves_second_term
+tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.4]
+tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[2.0]
+tests/test_engine.py::test_slow_d2_high_precision[2.5]
