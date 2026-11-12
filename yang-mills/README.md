@@ -5,7 +5,12 @@ met analyse van de lichtste glueballmassa en de snaarspanning.
 
 **Wat dit is — en wat niet.** Dit project levert *numeriek bewijsmateriaal* voor een massakloof
 in het roostermodel: een lichtste glueballmassa en een snaarspanning die niet nul zijn, bij
-eindige roosterafstand en eindig volume, met statistische fouten. Het is **geen bewijs** van het
+eindige roosterafstand en eindig volume, met statistische fouten. Een massa ongelijk aan nul is
+op een eindig rooster vanzelfsprekend; wat telt, staat in `REPORT.md` §0: in D = 3 is m/√σ bij
+vaste t stabiel binnen 1 à 2 % over een factor 2,1 in roosterafstand (achteraf samengestelde
+set); in D = 4 is alleen uitgesloten dat de kloof als 1/L met de doos meekrimpt (bij β = 2,4 en
+2,5, telkens met twee doosgroottes), is volume-onafhankelijkheid niet aangetoond en is er geen
+aanwijzing voor schaalgedrag. Het is **geen bewijs** van het
 millenniumprobleem "Yang–Mills: bestaan en massakloof" en mag nooit zo worden gepresenteerd. De
 achtergrond en de precieze reikwijdte staan in `THEORY.md`; literatuurwaarden (met bron en
 betrouwbaarheid) in `literature.json`.
@@ -86,8 +91,8 @@ python3 run_production.py --shape 16,16,16 --beta 6.0 --ntherm 1000 --nmeas 2000
   (stabiliteitsgrens; het programma waarschuwt).
 - β moet eindig en ≥ 0 zijn; de toevalsgenerator is één stroom per proces (één rooster per
   proces draaien).
-- De gedraaide ensembles, seeds en tijdsbudgetten staan in `run_all_production.sh` en
-  `run_extra_production.sh` (4 stromen per ensemble, afwisselend warme en koude start).
+- De gedraaide ensembles, seeds en tijdsbudgetten staan in `run_all_production.sh`,
+  `run_extra_production.sh` en `run_round3_production.sh` (4 stromen per ensemble, afwisselend warme en koude start).
   Ruwe data komen in `results/raw/` (niet in git; reproduceerbaar uit de seeds).
 
 ## Analyse
@@ -127,7 +132,8 @@ Deze staan ook in elk JSON-bestand onder `caveats`.
 
 ## Herkomst van de data
 
-De productieruns zijn gedraaid met de code van git-commit `8613969`. Latere wijzigingen aan
+De productieruns van ronde 1 en 2 zijn gedraaid met de code van git-commit `8613969`; voor
+ronde 3 zegt `run_round3_production.sh` dat dezelfde code-snapshot is gebruikt. Latere wijzigingen aan
 `ym/lattice.py` (alleen controle van β) veranderen geen enkel getal dat een productierun
 wegschrijft; dat is bit voor bit nagegaan. Wijzigingen aan `analyze.py` zijn puur toevoegend
 (extra velden); `ym/stats.py` geeft alleen een ander τ_int in het geval dat stromen sterk in

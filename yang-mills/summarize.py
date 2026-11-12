@@ -2358,7 +2358,7 @@ def _sup(label):
     return (label.replace("^2", "²").replace("^3", "³").replace("^4", "⁴").replace("x", "×"))
 
 
-def _ratio_panel(ax, blk, lit_cont, derived, title, show_fit):
+def _ratio_panel(ax, blk, lit_cont, derived, title, show_fit, show_intercept=True):
     """m/sqrt(sigma) versus a^2 sigma for the three variants of one data set."""
     xmax = max(p["x"] for v in VARIANTS for p in blk[v]["points"] if ok(p["x"]))
     for d_ in derived:
@@ -2387,12 +2387,17 @@ def _ratio_panel(ax, blk, lit_cont, derived, title, show_fit):
             xs = np.array([0.0, xmax / 1.12])
             ax.plot(xs, fl["intercept"] + fl["slope"] * xs, color=COL[v], linewidth=2.0,
                     alpha=0.75, zorder=3, solid_capstyle="round")
-            ax.errorbar([dx[v]], [fl["intercept"]], yerr=[fl["intercept_err"]], fmt=MARK[v],
-                        color=COL[v], markersize=7, markerfacecolor=COL["surface"],
-                        markeredgecolor=COL[v], markeredgewidth=1.6, elinewidth=1.6, capsize=3,
-                        zorder=5)
-            lines.append(f"{v}: rechte lijn → {fmt_ve(fl['intercept'], fl['intercept_err'], 3)}"
-                         f"  (χ²/dof {fl['chi2']:.2f}/{fl['dof']}"
+            if show_intercept:
+                ax.errorbar([dx[v]], [fl["intercept"]], yerr=[fl["intercept_err"]],
+                            fmt=MARK[v], color=COL[v], markersize=7,
+                            markerfacecolor=COL["surface"], markeredgecolor=COL[v],
+                            markeredgewidth=1.6, elinewidth=1.6, capsize=3, zorder=5)
+            # where the straight line is not an extrapolation (D = 4) its intercept is not
+            # printed in the figure: the number is in summary.json, with its warning
+            lines.append(f"{v}: rechte lijn"
+                         + (f" → {fmt_ve(fl['intercept'], fl['intercept_err'], 3)}"
+                            if show_intercept else "")
+                         + f"  (χ²/dof {fl['chi2']:.2f}/{fl['dof']}"
                          + ("" if fl.get("acceptable") else f", p < {ACCEPT_P}") + ")")
         fc = blk[v].get("fit_constant")
         if fc and v in ("R5", "t1"):
@@ -2415,9 +2420,10 @@ def make_figures(S, outdir):
     recs = S["ensembles"]
     lc = S["literature_comparison"]
     files = []
+    foot_open = ("Open symbolen bij a²σ = 0: snijpunt van de rechte lijn (drie punten; geen "
+                 "gecontroleerde continuümlimiet). ")
     foot = ("Fouten: alleen statistisch. Massa's zijn variationele bovengrens-schattingen. "
-            "Open symbolen bij a²σ = 0: snijpunt van de rechte lijn (drie punten; geen "
-            "gecontroleerde continuümlimiet). Punten van t = 1 en t = 2 zijn horizontaal iets "
+            + foot_open + "Punten van t = 1 en t = 2 zijn horizontaal iets "
             "verschoven. Literatuurwaarden: niet tegen de gepubliceerde tabel gecontroleerd.")
 
     # ------------------------------------------------------------------ D = 3
@@ -2494,8 +2500,10 @@ def make_figures(S, outdir):
         der = [r for r in lc["derived_ratio_rows"] if r["ensemble"] in names]
         lines = _ratio_panel(ax, d4["sets"][set_name], d4["literature"]
                              ["continuum_m0pp_over_sqrt_sigma"], der, title,
-                             lambda fl: bool(fl) and fl.get("extrapolation_reported"))
-        lines.append("rechte lijn: formeel aanvaardbaar, géén continuümlimiet (zie voetregel)")
+                             lambda fl: bool(fl) and fl.get("extrapolation_reported"),
+                             show_intercept=False)
+        lines.append("rechte lijn: past formeel, maar is géén continuümlimiet; het snijpunt "
+                     "wordt hier niet getoond (zie voetregel)")
         ax.text(0.03, 0.03, "\n".join(lines), transform=ax.transAxes, fontsize=8,
                 color=COL["text2"], va="bottom", ha="left")
         _legend(ax, loc="upper right")
@@ -2551,8 +2559,9 @@ def make_figures(S, outdir):
     _legend(ax, loc="upper right")
     fig.suptitle(f"SU(2) in D = 4: schaalgedrag — {TAGLINE_NL}", color=COL["text"], fontsize=13,
                  x=0.01, ha="left")
-    fig.text(0.01, 0.008, foot + " In D = 4 loopt m/√σ op met β; de rechte lijn is geen "
-             "continuümextrapolatie.", fontsize=8, color=COL["text2"], ha="left", va="bottom",
+    fig.text(0.01, 0.008, foot.replace(foot_open, "") + "\nIn D = 4 loopt m/√σ op met β; de "
+             "rechte lijn is geen continuümextrapolatie en haar snijpunt wordt niet getoond.",
+             fontsize=8, color=COL["text2"], ha="left", va="bottom",
              wrap=True)
     fig.tight_layout(rect=(0, 0.04, 1, 0.955))
     path = os.path.join(outdir, "summary_scaling_d4.png")
