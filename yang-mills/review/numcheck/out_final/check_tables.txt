@@ -1,0 +1,13 @@
+=== In het kort table
+=== Table 1
+=== Table 2
+  no-plateau ensemble: d3_b6.0_L24 | report cells: geen plateau | geen meting | geen meting
+=== Table 3 (all at t=1; errors uncorrelated for the last two columns)
+lightest-state count (torelon lighter) over 9 lattices: 6
+xi range: 0.8362099384620696 1.7564490865385236
+d3_b6.0_L24 torelon t1,t2: 1.5351(196) 1.6931(1039) flag no plateau
+d4_b2.3_L10 L sqrt(sigma) with R5: 3.59(6)
+amL round1 b2.5: 11.871477608681435 0.3449601236137328
+=== THEORY 7.3 table
+OK count 381  mismatches 0
+total meas round1+2 (10 indep sets): 296056 round3 9600 streams 44

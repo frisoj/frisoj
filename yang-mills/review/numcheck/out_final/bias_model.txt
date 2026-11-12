@@ -1,0 +1,7 @@
+errors 0.005574347314496775 0.01225276245961101 0.010499334264666559 rho 0.5195191605418855
+weights of round 1 in the combined value: t1 0.41317669153560854 t2 0.39620598554377917
+rise > 0 sigma: bias round1 t2 +0.0087, t1 +0.0003; combined t2 +0.0035, t1 +0.0001
+rise > 1.0 sigma: bias round1 t2 +0.0167, t1 +0.0006; combined t2 +0.0066, t1 +0.0003
+rise > 1.5 sigma: bias round1 t2 +0.0212, t1 +0.0008; combined t2 +0.0084, t1 +0.0003
+rise > 1.97 sigma: bias round1 t2 +0.0256, t1 +0.0010; combined t2 +0.0102, t1 +0.0004
+rise > 2.0 sigma: bias round1 t2 +0.0259, t1 +0.0010; combined t2 +0.0103, t1 +0.0004

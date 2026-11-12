@@ -17,3 +17,6 @@ __pycache__/
 
 # mutation-testing scratch copies
 _mutant_*.py
+
+# intermediate files of the pdf build
+pdf/build/

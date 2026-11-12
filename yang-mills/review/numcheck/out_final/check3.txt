@@ -1,0 +1,115 @@
+##### 3.4 D=3
+lattice spacing factor b6/b12 (t1): report 2.12  computed 2.1239
+chi2: report 11.7  computed 11.726
+p: report 0.003  computed 0.00284
+R5 line chi2: report 7.6  computed 7.557
+p: report 0.006  computed 0.00598
+t1 repl chi2: report 1.3  computed 1.281
+t1 repl pull vs 4.716(21): report 1.6  computed 1.606
+   spread 1.11 %  (1.01 sigma); line: icpt 4.802(0.040) slope/err -1.13 chi2 0.00; percent above 4.716: 0.97
+t1 both chi2: report 3.6  computed 3.630
+t1 both pull vs 4.716(21): report 2.5  computed 2.494
+   spread 1.55 %  (1.90 sigma); line: icpt 4.837(0.036) slope/err -1.71 chi2 0.70; percent above 4.716: 1.43
+t2 repl chi2: report 0.6  computed 0.575
+t2 repl pull vs 4.716(21): report 0.8  computed 0.812
+   spread 1.50 %  (0.74 sigma); line: icpt 4.782(0.083) slope/err -0.38 chi2 0.43; percent above 4.716: 0.83
+t2 both chi2: report 0.9  computed 0.858
+t2 both pull vs 4.716(21): report 2.3  computed 2.296
+   spread 2.11 %  (0.88 sigma); line: icpt 4.855(0.078) slope/err -0.58 chi2 0.52; percent above 4.716: 2.11
+phys repl chi2: report 0.7  computed 0.720
+phys repl pull vs 4.716(21): report 0.8  computed 0.770
+   spread 1.50 %  (0.74 sigma); line: icpt 4.777(0.071) slope/err -0.53 chi2 0.44; percent above 4.716: 0.55
+phys both chi2: report 3.5  computed 3.484
+phys both pull vs 4.716(21): report 1.6  computed 1.632
+   spread 2.22 %  (1.82 sigma); line: icpt 4.869(0.064) slope/err -1.70 chi2 0.60; percent above 4.716: 1.12
+range of constants 4.741845488084029 4.815542931480206
+round-1 t1 spread %: report 2.6  computed 2.551
+sqrt(sigma)/g2 R5 all data: ['0.3809(18)', '0.3613(9)', '0.3568(10)']  report 0.3809(18), 0.3613(9), 0.3568(10)
+chi2: report 7.5  computed 7.458
+##### 3.5 D=4
+sigma: report 5.9  computed 5.921
+const chi2 R5: report 37.5  computed 37.526
+   line icpt 4.305(103) pull vs 3.78(7): 4.21 chi2 0.011
+   our rise / lit rise = 2.36302542666473
+b2.5 16^4 vs 3.78(7): report 2.3  computed 2.284
+b2.5 20^4 t1 vs 3.78(7): report 0.8  computed 0.849
+   t1 series: ['3.242(61)', '3.790(58)', '4.036(87)']
+sigma: report 3.9  computed 3.889
+   2.4->2.5 step: R5/t1 2.35  t1(indep) 2.35  t2 1.13  phys time (2.5 t2 vs 2.4 t1) 1.15  round1-only R5 1.37  report: 2,1 tot 2,3
+   torelon b2.3 t=1,2,3: ['1.2499(138)', '1.1824(455)', '1.0929(1292)']  report 1.2499(138), 1.1824(455), 1.0929(1292)
+   amL: ['11.951(223)', '11.912(177)', '11.871(345)']  report 11.951(223), 11.912(177), 11.871(345)
+amL const chi2: report 0.04  computed 0.0410
+   L sqrt(sigma) t1: [3.687, 3.143, 2.996, 2.986, 4.244, 3.759]
+sigma b2.4: report 7.4  computed 7.358
+sigma b2.5: report 6.7  computed 6.702
+sigma d3 b6: report 26.7  computed 26.713
+largest-volume const chi2 (jackknife corr. errors): report 47.1  computed 47.106
+   summary.json largest_volume_set: {"ensembles": ["d4_b2.3_L10", "d4_b2.4_L16", "d4_b2.5_L20"], "note": "largest volume at each beta; shown next to the pre-registered primary set, not instead of it. No continuum value is quoted from either set. Fixed-t ratio errors: uncorrelated propagation (see ratio_error_check).", "t1": {"points": [{"ensemble": "d4_b2.3_L10", "beta": 2.3, "lattice": "12x10^3", "x": 0.1359040627465603, "x_err": 0.0013740061524578399, "y": 3.241717567000974, "y_err": 0.06257897751806957, "err_kind": "uncorrelated propagation", "is_measurement": true, "a_sqrt_sigma": 0.36865168214258875, "a_sqrt_sigma_err": 0.0
+sigma: report 3.4  computed 3.411
+sigma: report 1.0  computed 1.018
+   rise 2.3->2.5 largest volumes: 0.622(93) 6.69 sigma  (report 6.1: "6,7σ over de grootste roosters")
+16^4 -> 20^4 ratio t1: report 1.5  computed 1.535
+same, R5: report 1.2  computed 1.189
+
+##### beta_I fit with summary definition (beta_I a sqrt(sigma)/4 vs 1/beta_I)
+chi2: report 5.6  computed 5.600
+
+##### 1.4 / 3.5 two-loop formula
+  beta 2.2: formula 0.007597  ym.exact 0.007597  THEORY table 0.007597  P[D4] 
+  beta 2.3: formula 0.005914  ym.exact 0.005914  THEORY table 0.005914  P[D4] 
+  beta 2.4: formula 0.004600  ym.exact 0.004600  THEORY table 0.0046  P[D4] 
+  beta 2.5: formula 0.003576  ym.exact 0.003576  THEORY table 0.003576  P[D4] 0.0035757856719900666
+  THEORY table sqrt(sigma)/Lambda:  [61.5, 62.3, 58.1, 52.0]  report 61,5 62,3 58,1 52,0 ; drop 2.3->2.5 %: 16.559709002624956
+  sqrt(sigma)/Lambda R5: ['60.8(1.1)', '56.9(0.2)', '52.2(0.3)']  report 60.8(1.1), 56.9(2), 52.2(3)
+  drop -14.1 +- 1.6 %  (report 14,1 ± 1,6)
+  m/Lambda: ['202.1(3.8)', '215.8(3.2)', '210.6(4.8)']  report 202.1(3.8), 215.8(3.2), 210.6(4.8)
+  m/Lambda const chi2: report 7.7  computed 7.678
+two-loop ratio: report 1.654  computed 1.65400
+  a ratio from a*m: 1.587(0.046); log-rate m vs formula: 0.918 -> 8.2 % slower, -1.44 sigma (report: binnen 8 %, 1,4 sigma)
+  log-rate sigma vs formula: 1.303 -> 30.3 % faster, 7.65 sigma (report: 30 % sneller, 8 sigma)
+
+##### 4.4 beta=9
+  round1 m1-m2: 0.0207(105) 1.97 (report 0.0207(105), 2,0σ)
+  t1 diff sigma: report 1.9  computed 1.912
+  t2 diff sigma: report 2.9  computed 2.898
+  ratio R5 diff sigma (4.8 item 9): report 2.7  computed 2.736
+  plaquette diff sigma: report -2.1  computed -2.129
+
+##### 4.5 finite volume table
+D3 b6 dm sigma: report 0.2  computed 0.208
+D3 b6 ds sigma: report -1.3  computed -1.291
+    rel. err of diff 1.33 % ; large is 0.28 % lower; L ratio 1.500; err ratio large/small: glue t1 1.81 glue t2 1.73 as t1 3.64 tor t1 5.50 ratio t1 1.97
+    torelon ratio large/small 1.555(0.021); NG prediction from small box 1.528 (check E_small NG 0.9874 vs 0.9874); pull 1.28
+D4 b2.4 dm sigma: report 0.2  computed 0.185
+D4 b2.4 ds sigma: report -1.2  computed -1.242
+    rel. err of diff 3.45 % ; large is 0.64 % lower; L ratio 1.333; err ratio large/small: glue t1 2.09 glue t2 2.10 as t1 2.78 tor t1 3.74 ratio t1 2.18
+    torelon ratio large/small 1.449(0.032); NG prediction from small box 1.410 (check E_small NG 0.7306 vs 0.7306); pull 1.22
+D4 b2.5 dm sigma: report 1.3  computed 1.268
+D4 b2.5 ds sigma: report -0.9  computed -0.919
+    rel. err of diff 2.80 % ; large is 3.55 % lower; L ratio 1.250; err ratio large/small: glue t1 0.73 glue t2 0.71 as t1 0.93 tor t1 1.17 ratio t1 0.80
+    torelon ratio large/small 1.338(0.024); NG prediction from small box 1.317 (check E_small NG 0.4873 vs 0.4873); pull 0.88
+b2.4 sqrt(sigma) small-large Luscher: report -1.45  computed -1.4526
+  NG-Luscher b2.4 L12 t1: 0.0008276151052905023  max over ensembles: 0.0008276151052905023 0.0008276151052905023
+  b2.3 sqrt(sigma) t1 vs t2 rel diff %: 2.5732692429040416
+
+##### 4.5 round 3
+  n_meas 9600 used 9516 bins 156 binsize 61 tau_max 6.090127334403837 per stream [2400, 2400, 2400, 2400] seeds [901, 902, 903, 904] ['hot', 'cold', 'hot', 'cold'] complete [True, True, True, True]
+t1 meas-A sigma: report 6.7  computed 6.702
+t1 meas-16 sigma: report -1.3  computed -1.268
+    exponent q t1: 0.162(0.127)  (report 0.16(13), 0.17(28))
+t2 meas-A sigma: report 3.1  computed 3.063
+t2 meas-16 sigma: report -0.6  computed -0.609
+    exponent q t2: 0.170(0.277)  (report 0.16(13), 0.17(28))
+    exponent q b2.4: 0.022(0.121) (report 0.02(12))
+  script-rounded prediction 0.7531*16/20 = 0.60248  unrounded 0.6024430541338304  meas vs 0.6025(136): 6.701310563339314
+  S round3: {"reference": "d4_b2.5_L16_combined", "ensemble": "d4_b2.5_L20", "L_reference": 16, "L": 20, "criterion_sigma": 3.0, "primary_quantity": "am t1 (m_eff(1))", "R5": {"measured": {"value": 0.7262913496537391, "err": 0.01250123677901857}, "reference": {"value": 0.7530538176672879, "err": 0.01701031232737365}, "both_measurements": true, "reading_A_prediction": {"value": 0.6024430541338304, "err": 0.01360824986189892}, "measured_minus_A": {"diff": 0.12384829551990872, "err": 0.018478782029910917, "sigma": 6.7021893174257965}, "measured_minus_reference": {"diff": -0.026762468013548757, "err": 0.02110998925816606, "sigma": -1.2677632227214954}, "amL_reference": {"value": 12.048861082676606, "err": 0.2721649972379784}, "amL_measured": {"value": 14.525826993074782, "err": 0.2500247355803714}, "exponent_q": {"value": 0.16216222092589458, "err": 0.12726801893975193, "note": "m ~ L^-q from the two volumes; q = 1 pure finite-size gap, q = 0 volume-independent gap"}}, "t1": {"measured": {"value": 0.7262913496537391, "err": 0.01250123677901857}, "reference": {"value": 0.7530538176672879, "err": 0.01701031232737365}, "both_measurements": true, "reading_A_prediction": {"value": 0.6024430541338304, "err": 0.01360824986189892}, "measured_minus_A": {"diff": 0.12384829551990872, "err": 0.018478782029910917, "sigma": 6.7021893174257965}, "measured_minus_reference": {"diff": -0.026762468013548757, "err": 0.02110998925816606, "sigma": -1.2677632227214954}, "amL_reference": {"value": 12.04886108267660
+  string: 20^4 t1 0.1880(10) t2 0.1864(17) R5 t* 2 | 16^4 t1 0.1866(11) t2 0.1858(18)
+  ds t1 sigma: report -0.9  computed -0.919
+  ds t2 sigma: report -0.3  computed -0.271
+  torelon aE t1: 20^4 0.6522(76)  16^4 0.4873(65) (report 0.6522(76) vs 0.4873(65))
+  ratio: t1 3.864(70) R5 3.896(78) t2 3.855(143) vs 4.036(87)
+  plaquette 0.651987(8) vs 16^4c 0.651985(11) hot-cold pull -0.8677570657252685
+  max dev indep: 9.676822716e-14  stream chi2 glue m1: {'boot': {'chi2': 6.396383617, 'dof': 3, 'chi2_per_dof': 2.132127872, 'p': 0.09383967969, 'mean': 0.7258202663, 'err_of_mean': 0.01207522051, 'n': 4}, 'jack': {'chi2': 5.904886889, 'dof': 3, 'chi2_per_dof': 1.96829563, 'p': 0.1163305016, 'mean': 0.7265516285, 'err_of_mean': 0.01245346046, 'n': 4}, 'scaled': {'chi2': 5.365104972, 'dof': 3, 'chi2_per_dof': 1.788368324, 'p': 0.1469331785, 'mean': 0.7295607126, 'err_of_mean': 0.01253664964, 'n': 4}}
+  therm cuts: [(0.1, {'value': 0.730236235, 'err_boot': 0.01333453979, 'err_jack': 0.01350628919, 'n_boot_undefined': 0}), (0.25, {'value': 0.7307564443, 'err_boot': 0.0148618783, 'err_jack': 0.01508188635, 'n_boot_undefined': 0})]
+  flags: [{"type": "rebinning_error_change", "quantity": "glue.single.m1", "factor": 4, "n_bins": 36, "error_ratio_boot": 1.211859936, "error_ratio_jack": 1.236707028, "z_vs_expected_scatter": 1.970478278, "z_jack": 2.250792186}]
+  hot-cold indep: {'plaq': {'hot': {'value': 0.651979338, 'err_boot': 9.984346535e-06, 'err_jack': 1.039772677e-05, 'n_boot_undefined': 0}, 'cold': {'value': 0.6519949106, 'err_boot': 1.07331607e-05, 'err_jack': 1.08898428e-05, 'n_boot_undefined': 0}, 'diff': -1.557259356e-05, 'diff_err_boot': 1.465905571e-05, 'pull_boot': -1.062319011, 'diff_err_jack': 1.505660647e-05, 'pull_jack': -1.034269813}, 'glue.gevp.m1': {'hot': {'value': 0.7143901155, 'err_boot': 0.0158741574, 'err_jack': 0.0165761113, 'n_boot_undefined': 0}, 'cold': {'value': 0.7405748136, 'err_boot': 0.01868437989, 'err_jack': 0.01925010065, 'n_boot_undefined': 0}, 'diff': -0.02618469818, 'diff_err_boot': 0.02451723731, 'pull_boot': -1.068011777, 'diff_err_jack': 0.02540342183, 'pull_jack': -1.030754768}, 'tor.gevp.m1': {'hot': {'value': 0.658537992, 'err_boot': 0.01204231395, 'err_jack': 0.01200780321, 'n_boot_undefined': 0}, 'cold': {'value': 0.6458241982, 'err_boot': 0.009494719378, 'err_jack': 0.009427863049, 'n_boot_undefined': 0}, 'diff': 0.01271379382, 'diff_err_boot': 0.01533515638, 'pull_boot': 0.8290618953, 'diff_err_jack': 0.0152666938, 'pull_jack': 0.8327797742}}

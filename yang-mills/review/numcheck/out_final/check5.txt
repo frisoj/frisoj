@@ -1,0 +1,23 @@
+shift keys: ['plaq', 'glue.gevp.m0', 'glue.gevp.m1', 'glue.gevp.m2', 'glue.fixedvec.m0', 'glue.fixedvec.m1', 'glue.fixedvec.m2', 'glue.pruned.m0', 'glue.pruned.m1', 'glue.pruned.m2', 'glue.single.m0', 'glue.single.m1'] <class 'dict'> 0.3333333333
+  10 sets (rounds 1+2) glue.gevp.m1 [-2.02, -2.02]
+  10 sets (rounds 1+2) plaq [2.92, 3.16]
+  11 sets glue.gevp.m1 [-1.65, -1.74]
+  11 sets plaq [2.78, 3.11]
+rows: 219  rows rounds 1+2: 202  jack ratio range 1.0 1.0
+boot ratio range all rows: (0.894655966, 'd3_b6.0_L24', 'torelon E_eff(3)') (1.301810487, 'd4_b2.4_L16', 'glueball m_eff(3)')
+boot ratio, t=1/2 quantities: (0.9610625728, 'd4_b2.4_L16', 'torelon E_eff(1)-E_eff(2)') (1.056831634, 'd3_b6.0_L24', 'torelon E_eff(2)')
+max dev rounds1+2: 3.395317649e-10
+single vs gevp t=1, % higher: 0.2 2.3  max in sigma(gevp err): 0.82 [('d4_b2.5_L20', 1.0, 0.58)]
+ratio err boot/jack - 1: min (-0.0333070271304311, 'd4_b2.5_L16', 't1') max (0.054164985302733504, 'd3_b6.0_L24', 't2')
+largest hot-cold pulls (boot): [(2.35, 'd3_b12.0_L32', 'glue.gevp.m1'), (-2.29, 'd4_b2.4_L16', 'plaq'), (-1.96, 'd4_b2.5_L16', 'tor.gevp.m1'), (1.76, 'd4_b2.3_L10', 'glue.gevp.m1'), (-1.66, 'd3_b9.0_L24r', 'plaq'), (-1.63, 'd4_b2.5_L16', 'glue.gevp.m1')]  n comparisons 55
+smallest stream chi2 p: [(0.0273, 'd4_b2.4_L16', 'plaq'), (0.0531, 'd4_b2.5_L16x', 'tor.single.m2'), (0.0535, 'd4_b2.5_L16x', 'tor.fixedvec.m2'), (0.0544, 'd4_b2.5_L16x', 'tor.gevp.m2')]
+702 streams plaq: [(701, 'hot', '0.629992(40)'), (702, 'cold', '0.630110(34)'), (703, 'hot', '0.629965(40)'), (704, 'cold', '0.630017(36)')]
+bins per stream b2.5: {'d4_b2.5_L16': [13, 13, 13, 13], 'd4_b2.5_L16x': [10, 9, 9, 9], 'd4_b2.5_L20': [39, 39, 39, 39]}
+stream lengths b2.5: {'d4_b2.5_L16': [1454, 1443, 1476, 1458], 'd4_b2.5_L16x': [1229, 1219, 1208, 1215]}  dropped: {'d4_b2.5_L16': (319, 5831, 5.47), 'd4_b2.5_L16x': (357, 4871, 7.33), 'd4_b2.5_L16_combined': (402, 10702, 3.76), 'd4_b2.5_L20': (84, 9600, 0.88)}
+err of err 1/sqrt(2(n-1)) for 52, 37, 100, 156 bins: [9.9, 11.8, 7.1, 5.7]
+cross-stream rms z per (ensemble, quantity): min (0.39405972345120066, 'd3_b6.0_L24', 'torelon best op: C(1)', 11) max (1.7416487306723374, 'd3_b6.0_L16', 'plaquette', 120)
+am/err t1 range: (29.648907869471678, 'd4_b2.5_L16x') (216.3967195019705, 'd3_b9.0_L24_combined')
+nskip: {'d3_b6.0_L16': 1, 'd3_b6.0_L24': 1, 'd3_b9.0_L24': 2, 'd3_b9.0_L24r': 2, 'd3_b12.0_L32': 3, 'd4_b2.3_L10': 1, 'd4_b2.4_L12': 1, 'd4_b2.4_L16': 1, 'd4_b2.5_L16': 1, 'd4_b2.5_L16x': 1, 'd4_b2.5_L20': 1}
+levels: {'d3_b6.0_L16': 4, 'd3_b6.0_L24': 4, 'd3_b9.0_L24': 4, 'd3_b9.0_L24r': 4, 'd3_b12.0_L32': 4, 'd4_b2.3_L10': 5, 'd4_b2.4_L12': 5, 'd4_b2.4_L16': 5, 'd4_b2.5_L16': 5, 'd4_b2.5_L16x': 5, 'd4_b2.5_L20': 5} ntherm: {1000} starts ok: True
+m0->m1 jump %: {'d3_b6.0_L16': 2.5, 'd3_b6.0_L24': 2.9, 'd3_b9.0_L24': 0.6, 'd3_b9.0_L24r': 2.3, 'd3_b9.0_L24_combined': 1.6, 'd3_b12.0_L32': 1.7, 'd4_b2.3_L10': 7.7, 'd4_b2.4_L12': 7.7, 'd4_b2.4_L16': 9.5, 'd4_b2.5_L16': 15.6, 'd4_b2.5_L16x': 12.6, 'd4_b2.5_L16_combined': 14.4, 'd4_b2.5_L20': 17.0}
+err t2/t1: {'d3_b6.0_L16': 3.37, 'd3_b6.0_L24': 3.23, 'd3_b9.0_L24': 2.2, 'd3_b9.0_L24r': 2.12, 'd3_b9.0_L24_combined': 2.15, 'd3_b12.0_L32': 1.72, 'd4_b2.3_L10': 3.16, 'd4_b2.4_L12': 2.73, 'd4_b2.4_L16': 2.75, 'd4_b2.5_L16': 2.29, 'd4_b2.5_L16x': 2.24, 'd4_b2.5_L16_combined': 2.18, 'd4_b2.5_L20': 2.11}

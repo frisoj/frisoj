@@ -1,0 +1,38 @@
+12c12,15
+< h2 { font-size: 15pt; margin: 0 0 0.6em 0; padding-bottom: 0.18em; border-bottom: 1.2px solid #c9ced6; break-before: page; }
+---
+> h2 { font-size: 15pt; margin: 2.1em 0 0.6em 0; padding-bottom: 0.18em; border-bottom: 1.2px solid #c9ced6; }
+> /* new page only for the major divisions: verification, start of the report (section 0), appendices.
+>    Sections 1 to 6 run on, so that a section ending in a few lines does not leave a nearly empty page. */
+> h2[id^="verificatie"], h2[id^="0-"], h2[id^="bijlage-"] { break-before: page; margin-top: 0; }
+17a21
+> ol:has(> li:nth-child(10)) { padding-left: 2.15em; }   /* two-digit item numbers */
+19a24
+> p:has(+ ul), p:has(+ ol) { break-after: avoid; }   /* keep the line that introduces a list with its first item */
+32a38,39
+> div.sourceCode { break-inside: avoid; }
+> p:has(+ div.sourceCode), p:has(+ pre) { break-after: avoid; }   /* keep the introducing line with its code block */
+46a54,57
+> /* a short table is not split over two pages; a long one keeps at least two rows on either side of a break */
+> table:not(:has(tbody tr:nth-child(13))) { break-inside: avoid; }
+> thead, tbody tr:first-child { break-after: avoid; }
+> tbody tr:last-child { break-before: avoid; }
+56a68
+> p > img[src$="_glueball_meff.png"]:only-child, p > img[src$="_torelon_meff.png"]:only-child { width: 84%; }
+77d88
+< nav#TOC { break-after: page; }
+88,90c99,108
+< table.checks td:first-child, table.checks th:first-child { width: 1.6em; }
+< table.checks td:nth-child(2) { width: 30%; }
+< table.checks td:nth-child(4) { width: 25%; }
+---
+> /* verification table (follows the heading "Wat bevestigd is"): file names are not broken in the middle */
+> #wat-bevestigd-is + p + table td:first-child, #wat-bevestigd-is + p + table th:first-child { width: 1.6em; }
+> #wat-bevestigd-is + p + table td:nth-child(2) { width: 21%; }
+> #wat-bevestigd-is + p + table td:nth-child(4) { width: 30%; }   /* grows to the longest file name, not further */
+> #wat-bevestigd-is + p + table td:nth-child(4) code { white-space: nowrap; font-size: 0.86em; }
+> /* table of appendix A: labels and file names stay in one piece */
+> #bijlage-a-herkomst-van-de-getallen + table td:first-child { white-space: nowrap; }
+> #bijlage-a-herkomst-van-de-getallen + table td:nth-child(2) code { white-space: nowrap; }
+> /* appendix C: the branch name in the first paragraph is not broken at its hyphen */
+> #bijlage-c-vingerafdrukken-en-hoe-deze-pdf-is-gemaakt + p code { white-space: nowrap; }

@@ -1,0 +1,55 @@
+OK   title: lattices (distinct D, beta, shape over the 13 JSON files): pdf 9  evidence 9
+OK   title: measurements (sum n_meas_total over the 11 non-combined JSON files): pdf 305656  evidence 305656
+OK   title: same sum from the per-stream n_meas: pdf 305656  evidence 305656
+OK   title: streams (non-combined): pdf 44  evidence 44
+OK   title: all stream seeds distinct: pdf 44  evidence 44
+OK   title: all stream files distinct: pdf 44  evidence 44
+OK   d3_b9.0_L24_combined: streams = streams of its two parts: pdf [(301, 6987), (302, 7034), (303, 6892), (304, 7082), (305, 9539), (306, 9700), (307, 9624), (308, 9583)]  evidence [(301, 6987), (302, 7034), (303, 6892), (304, 7082), (305, 9539), (306, 9700), (307, 9624), (308, 9583)]
+OK   d4_b2.5_L16_combined: streams = streams of its two parts: pdf [(601, 1454), (602, 1443), (603, 1476), (604, 1458), (605, 1229), (606, 1219), (607, 1208), (608, 1215)]  evidence [(601, 1454), (602, 1443), (603, 1476), (604, 1458), (605, 1229), (606, 1219), (607, 1208), (608, 1215)]
+OK   title: git commit (last commit touching the content paths): pdf '34500c9'  evidence '34500c9'
+OK   title: that commit is HEAD: pdf '34500c9'  evidence '34500c9'
+OK   title: content paths have no uncommitted changes: pdf ''  evidence ''
+OK   title: date = commit date: pdf (12, 'november', '2026')  evidence (12, 'november', '2026')
+OK   row 1: passed: pdf 340  evidence 340
+OK   row 1: skipped: pdf 29  evidence 29
+OK   row 1: total: pdf 369  evidence 369
+OK   row 1: pytest_final_tree.txt: exit=0, no 'failed', no 'error': pdf (True, False, False)  evidence (True, False, False)
+OK   row 1: progress characters in pytest_final_tree.txt (dots, s): pdf (340, 29)  evidence (340, 29)
+OK   row 1: slow group 0: passed == ids listed in slow_0.txt, exit=0, no fail: pdf (7, True, False)  evidence (7, True, False)
+OK   row 1: slow group 1: passed == ids listed in slow_1.txt, exit=0, no fail: pdf (8, True, False)  evidence (8, True, False)
+OK   row 1: slow group 2: passed == ids listed in slow_2.txt, exit=0, no fail: pdf (7, True, False)  evidence (7, True, False)
+OK   row 1: slow group 3: passed == ids listed in slow_3.txt, exit=0, no fail: pdf (7, True, False)  evidence (7, True, False)
+OK   row 1: slow tests passed (sum of 4 groups): pdf 29  evidence 29
+OK   row 1: slow tests announced: pdf 29  evidence 29
+OK   row 1: the 4 groups together = slow_ids.txt, no duplicates: pdf (['tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D3_4x6x8_b5]', 'tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D4_4x4x6x6_b2.3]', 'tests/test_adversarial_analysis.py::test_d2_end_to_end_string_tension_beta8_slow', 'tests/test_adversarial_analysis.py::test_plateau_rule_coverage_at_production_like_signal_to_noise_slow', 'tests/test_crosscheck.py::test_b_reference_reproduces_exact_d2_high_statistics[2.5]', 'tests/test_crosscheck.py::test_b_reference_reproduces_exact_d2_high_statistics[4.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d2_b4.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d3_b3.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d3_b6.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b1.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b2.3]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b2.5]', 'tests/test_crosscheck.py::test_e_strong_coupling_coefficient_high_statistics[3]', 'tests/test_crosscheck.py::test_e_strong_coupling_coefficient_high_statistics[4]', 'tests/test_engine.py::test_slow_d2_high_precision[2.5]', 'tests/test_engine.py::test_slow_d2_high_precision[8.0]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.2]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.3]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.4]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.5]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[0.05]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[0.5]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[2.0]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[200.0]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[30.0]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[8.0]', 'tests/test_engine.py::test_slow_strong_coupling_d4_beta05_resolves_leading_correction', 'tests/test_engine.py::test_slow_strong_coupling_d4_beta10_resolves_second_term', 'tests/test_engine.py::test_slow_strong_coupling_d4_beta125_pins_second_coefficient'], 29)  evidence (['tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D3_4x6x8_b5]', 'tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D4_4x4x6x6_b2.3]', 'tests/test_adversarial_analysis.py::test_d2_end_to_end_string_tension_beta8_slow', 'tests/test_adversarial_analysis.py::test_plateau_rule_coverage_at_production_like_signal_to_noise_slow', 'tests/test_crosscheck.py::test_b_reference_reproduces_exact_d2_high_statistics[2.5]', 'tests/test_crosscheck.py::test_b_reference_reproduces_exact_d2_high_statistics[4.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d2_b4.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d3_b3.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d3_b6.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b1.0]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b2.3]', 'tests/test_crosscheck.py::test_d_engine_agrees_with_reference_high_statistics[d4_b2.5]', 'tests/test_crosscheck.py::test_e_strong_coupling_coefficient_high_statistics[3]', 'tests/test_crosscheck.py::test_e_strong_coupling_coefficient_high_statistics[4]', 'tests/test_engine.py::test_slow_d2_high_precision[2.5]', 'tests/test_engine.py::test_slow_d2_high_precision[8.0]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.2]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.3]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.4]', 'tests/test_engine.py::test_slow_d4_literature_plaquette_12x4[2.5]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[0.05]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[0.5]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[2.0]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[200.0]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[30.0]', 'tests/test_engine.py::test_slow_heatbath_x0_distribution_high_statistics[8.0]', 'tests/test_engine.py::test_slow_strong_coupling_d4_beta05_resolves_leading_correction', 'tests/test_engine.py::test_slow_strong_coupling_d4_beta10_resolves_second_term', 'tests/test_engine.py::test_slow_strong_coupling_d4_beta125_pins_second_coefficient'], 29)
+OK   row 1: collect.txt total: pdf 369  evidence 369
+OK   row 4: number of analyses: pdf 13  evidence 13
+OK   row 4: largest deviation: pdf 3.4e-10  evidence 3.4e-10
+OK   row 4: largest deviation recomputed from the 13 independent JSON files (max_abs_dev_sigma): pdf '3.4e-10'  evidence '3.4e-10'
+OK   row 4: same from the individual comparison rows: pdf '3.4e-10'  evidence '3.4e-10'
+     rows compared in the independent files: 219
+     (mine - pipeline)/pipeline_err recomputed from the rows: max = 0.000e+00
+OK   row 5: streams regenerated and fully bit-identical: pdf 24  evidence 24
+OK   row 5: streams listed in the file: pdf 24  evidence 24
+OK   row 5: streams of rounds 1 and 2: pdf 40  evidence 40
+OK   row 5: every regenerated seed is a round-1/2 production seed with the same start: pdf True  evidence True
+OK   row 6: cells: pdf 381  evidence 381
+OK   row 6: mismatches: pdf 0  evidence 0
+OK   row 6: no MISMATCH/UNPARSABLE line in check_tables.txt: pdf 0  evidence 0
+OK   row 7: count as printed in check4.txt: pdf 124  evidence 124
+OK   row 7: mismatches: pdf 0  evidence 0
+OK   row 7: no MISMATCH/UNPARSABLE/CHECK line in check4.txt: pdf 0  evidence 0
+OK   row 8: distinct tokens: pdf 273  evidence 273
+OK   row 8: by hand: pdf 2  evidence 2
+OK   row 8: automatic: pdf 271  evidence 271
+OK   row 8: UNTRACED lines in the file: pdf 2  evidence 2
+OK   row 8: distinct value(error) tokens in the current REPORT.md (own count): pdf 273  evidence 273
+OK   row 9: sigma (check3.txt, 2 decimals): pdf '6.70'  evidence '6.70'
+OK   row 9: sigma (summary.json round3.t1.measured_minus_A.sigma): pdf '6.70'  evidence '6.70'
+OK   row 9: threshold: pdf 3.0  evidence 3.0
+OK   row 9: sigma recomputed from results/d4_b2.5_L20.json and d4_b2.5_L16_combined.json: pdf '6.70'  evidence '6.70'
+     own value: measured 0.726291 +- 0.012501, prediction A = 16/20 x 0.753054 = 0.602443 +- 0.013608, difference = +6.7022 sigma
+OK   row 9: verdict in summary.json: reading A excluded: pdf True  evidence True
+OK   row 9: no MISMATCH line in check2.txt / check3.txt: pdf 0  evidence 0
+
+front matter: 50 checks, 50 OK, 0 mismatches

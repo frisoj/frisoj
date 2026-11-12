@@ -1,0 +1,9 @@
+analysis rows on the page: 13 | order as expected: True
+other files on the page: ['REPORT.md', 'literature.json', 'results/summary.json', 'results/independent/COMPARISON.md']
+OK    REPORT.md 761350f3d5c285a2 761350f3d5c285a2
+OK    literature.json da3bfa13c7818d05 da3bfa13c7818d05
+OK    results/summary.json 5c03f4ab1f0f1a67 5c03f4ab1f0f1a67
+OK    results/independent/COMPARISON.md af117d6d8e706bbc af117d6d8e706bbc
+fingerprints: 30 match, 0 mismatch (of 30); all hex strings are 16 characters
+files identical to their version in commit 34500c9: 30 of 30
+commit/branch on the page: 34500c9 | claude/sweet-hypatia-qxubnl | git: 34500c9 claude/sweet-hypatia-qxubnl

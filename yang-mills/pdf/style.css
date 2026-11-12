@@ -1,0 +1,118 @@
+/* Print stylesheet for REPORT.pdf (A4, Chromium). */
+@page { size: A4; }
+html { font-size: 9.6pt; }
+body {
+  font-family: "Inter", "DejaVu Sans", "Liberation Sans", sans-serif;
+  color: #1b1d21; line-height: 1.42; margin: 0; background: #fff;
+  /* plain digits and punctuation: with tabular figures or contextual alternates the font uses
+     glyphs without a Unicode code point, and some pdf readers then cannot extract the numbers */
+  font-variant-numeric: normal; font-feature-settings: "calt" 0;
+}
+li::marker { font-variant-numeric: normal; font-feature-settings: "calt" 0; }
+p { margin: 0 0 0.62em 0; orphans: 3; widows: 3; }
+h1, h2, h3, h4 { font-weight: 650; line-height: 1.2; break-after: avoid; color: #111418; }
+h1 { font-size: 20pt; margin: 0 0 0.5em 0; }
+h2 { font-size: 15pt; margin: 2.1em 0 0.6em 0; padding-bottom: 0.18em; border-bottom: 1.2px solid #c9ced6; }
+/* new page only for the major divisions: verification, start of the report (section 0), appendices.
+   Sections 1 to 6 run on, so that a section ending in a few lines does not leave a nearly empty page. */
+h2[id^="verificatie"], h2[id^="0-"], h2[id^="bijlage-"] { break-before: page; margin-top: 0; }
+h3 { font-size: 11.6pt; margin: 1.25em 0 0.45em 0; }
+h4 { font-size: 10.2pt; margin: 1.1em 0 0.4em 0; }
+hr { display: none; }
+a { color: #1f4f8f; text-decoration: none; overflow-wrap: anywhere; }
+ul, ol { margin: 0 0 0.62em 0; padding-left: 1.45em; }
+ol:has(> li:nth-child(10)) { padding-left: 2.15em; }   /* two-digit item numbers */
+li { margin-bottom: 0.3em; }
+li > p { margin-bottom: 0.3em; }
+p:has(+ ul), p:has(+ ol) { break-after: avoid; }   /* keep the line that introduces a list with its first item */
+strong { font-weight: 650; }
+sup, sub { font-size: 0.72em; line-height: 0; }
+
+code {
+  font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 0.86em;
+  background: #f1f3f6; padding: 0.04em 0.26em; border-radius: 2.5px; overflow-wrap: anywhere;
+}
+pre {
+  background: #f4f5f8; border: 0.6px solid #d9dde3; border-radius: 4px; padding: 0.7em 0.85em;
+  font-size: 7.1pt; line-height: 1.38; white-space: pre-wrap; overflow-wrap: anywhere;
+  break-inside: avoid; margin: 0.4em 0 0.9em 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+div.sourceCode { break-inside: avoid; }
+p:has(+ div.sourceCode), p:has(+ pre) { break-after: avoid; }   /* keep the introducing line with its code block */
+
+blockquote {
+  margin: 0.6em 0 0.9em 0; padding: 0.55em 0.9em; background: #f6f1e4;
+  border-left: 3.2px solid #b8892b; border-radius: 0 4px 4px 0;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+table {
+  border-collapse: collapse; width: 100%; margin: 0.45em 0 0.95em 0; font-size: 7.7pt;
+  line-height: 1.3;
+}
+p:has(+ table), p:has(+ div.figrow) { break-after: avoid; }   /* keep a caption line with its table */
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+/* a short table is not split over two pages; a long one keeps at least two rows on either side of a break */
+table:not(:has(tbody tr:nth-child(13))) { break-inside: avoid; }
+thead, tbody tr:first-child { break-after: avoid; }
+tbody tr:last-child { break-before: avoid; }
+th {
+  text-align: left; font-weight: 650; background: #eceff3; border-bottom: 1px solid #aab1bb;
+  padding: 0.34em 0.5em; vertical-align: bottom;
+}
+td { padding: 0.3em 0.5em; border-bottom: 0.5px solid #d9dde3; vertical-align: top; }
+tbody tr:nth-child(even) td { background: #fafbfc; }
+td code, th code { font-size: 0.92em; }
+
+img { max-width: 100%; height: auto; display: block; margin: 0.5em auto 0.25em auto; }
+p > img:only-child { break-inside: avoid; }
+p > img[src$="_glueball_meff.png"]:only-child, p > img[src$="_torelon_meff.png"]:only-child { width: 84%; }
+p:not(.formula):has(> img:only-child) { break-inside: avoid; break-after: avoid; }
+p:not(.formula):has(> img:only-child) + p { break-before: avoid; font-size: 8.4pt; color: #3a4049; }
+
+/* display formulas (vector images made by make_pdf.py) */
+p.formula { text-align: center; margin: 0.85em 0 0.95em 0; break-inside: avoid; }
+p.formula img { display: inline-block; margin: 0; max-width: 100%; }
+
+/* ---------------------------------------------------------------- title page */
+.titlepage { height: 250mm; display: flex; flex-direction: column; justify-content: center; break-after: page; }
+.titlepage .kicker { font-size: 10.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: #5a626e; margin-bottom: 1.1em; }
+.titlepage .doctitle { font-size: 31pt; font-weight: 700; margin: 0 0 0.35em 0; border: 0; break-before: auto; }
+.titlepage .subtitle { font-size: 13pt; color: #2f353d; max-width: 150mm; margin-bottom: 2.2em; line-height: 1.35; }
+.statusbox { border: 1.3px solid #b8892b; background: #fbf6ea; border-radius: 5px; padding: 1em 1.2em; max-width: 160mm; margin-bottom: 2em; }
+.statusbox p { font-size: 10.4pt; margin-bottom: 0.55em; }
+.statusbox p:last-child { margin-bottom: 0; }
+table.meta { width: auto; font-size: 9pt; margin: 0; }
+table.meta td { border: 0; padding: 0.16em 1.4em 0.16em 0; background: none !important; }
+table.meta td:first-child { color: #5a626e; }
+
+/* ---------------------------------------------------------------- contents */
+nav#TOC::before { content: "Inhoud"; display: block; font-size: 15pt; font-weight: 650; margin-bottom: 0.7em; padding-bottom: 0.18em; border-bottom: 1.2px solid #c9ced6; }
+nav#TOC ul { list-style: none; padding-left: 0; margin: 0; }
+nav#TOC > ul > li { margin: 0.5em 0 0.2em 0; font-weight: 600; font-size: 10pt; }
+nav#TOC ul ul { padding-left: 1.3em; margin-top: 0.16em; }
+nav#TOC ul ul li { font-weight: 400; font-size: 9pt; margin: 0.1em 0; }
+nav#TOC a { color: #1b1d21; display: flex; justify-content: space-between; gap: 1.5em; }
+nav#TOC .pg { font-weight: 400; color: #3a4049; }
+
+/* ---------------------------------------------------------------- verification and appendices */
+.ok { color: #1c6b3a; font-weight: 650; }      /* a check with a pass/fail outcome that passed */
+.done { color: #2f353d; font-weight: 650; }    /* work that was done; not a verdict */
+/* verification table (follows the heading "Wat bevestigd is"): it is longer than a page, so it
+   may break between rows; file names are not broken in the middle */
+#wat-bevestigd-is + p + table { break-inside: auto; }
+#wat-bevestigd-is + p + table td:first-child, #wat-bevestigd-is + p + table th:first-child { width: 1.6em; }
+#wat-bevestigd-is + p + table td:nth-child(2) { width: 21%; }
+#wat-bevestigd-is + p + table td:nth-child(4) { width: 30%; }   /* grows to the longest file name, not further */
+#wat-bevestigd-is + p + table td:nth-child(4) code { white-space: nowrap; font-size: 0.86em; }
+/* table of appendix A: labels and file names stay in one piece */
+#bijlage-a-herkomst-van-de-getallen + table td:first-child { white-space: nowrap; }
+#bijlage-a-herkomst-van-de-getallen + table td:nth-child(2) code { white-space: nowrap; }
+/* appendix C: the branch name in the first paragraph is not broken at its hyphen */
+#bijlage-c-vingerafdrukken-en-hoe-deze-pdf-is-gemaakt + p code { white-space: nowrap; }
+.ens { break-inside: avoid-page; margin-top: 1.5em; }
+.ens h3 { margin-top: 0; padding-top: 0.5em; border-top: 0.8px solid #c9ced6; }
+.figrow { display: flex; gap: 2.5mm; break-inside: avoid; margin: 0.3em 0 0.2em 0; }
+.figrow img { width: 49.3%; margin: 0; }

@@ -1,0 +1,28 @@
+REPORT.md: value(error) tokens: 516 occurrences, 274 distinct (with a decimal point in the value: 516 occurrences, 273 distinct after dropping the sign)
+  tokens without a decimal point in the value: []
+
+[pdftotext raw order] PDF pages 3-30: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pdftotext -layout] PDF pages 3-30: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pdfium] PDF pages 3-30: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pdfplumber + ActualText map] PDF pages 3-30: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+whole PDF (44 pages): 895 value(error) occurrences, 472 distinct
