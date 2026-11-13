@@ -1,0 +1,30 @@
+mode: raw
+analyses found in appendix B, in order: ['d3_b6.0_L16', 'd3_b6.0_L24', 'd3_b9.0_L24', 'd3_b9.0_L24r', 'd3_b9.0_L24_combined', 'd3_b12.0_L32', 'd4_b2.3_L10', 'd4_b2.4_L12', 'd4_b2.4_L16', 'd4_b2.5_L16', 'd4_b2.5_L16x', 'd4_b2.5_L16_combined', 'd4_b2.5_L20']
+
+checks passed: 204  failed: 13
+       1  analyses present
+      13  binsize
+      13  heading D
+      13  heading beta
+      13  heading lattice
+      13  heading round
+      13  independent counts == pipeline counts
+      13  n_bins
+      13  n_meas_total
+      13  n_meas_used
+      60  stream seed/start/count
+      13  stream sum == total (JSON internal)
+      13  tau_int_max
+MISMATCH ('d3_b6.0_L16', '5x3 table', 'glueball a·m 1.1959(77) [t* = 1] 1.1959(77) 1.203(26) torelon a·E (L = 16) a√σ (Nambu–Goto) 0.9983(95) [t* = 2] 0.2539(12) 0.9874(36) 0.25257(44) 0.9983(95) 0.2539(12) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.2538(12) 4.710(37) 0.25251(44) 4.735(31) 0.2538(12) 4.74(10)', 'parsable')
+MISMATCH ('d3_b6.0_L24', '5x3 table', 'glueball a·m 1.193(14) [t* = 1] 1.193(14) 1.182(45) torelon a·E (L = 24) a√σ (Nambu–Goto) geen plateau; 1.69(10) bij t = 2 is alleen een bovengrens geen meting 1.535(20) 0.2547(16) 1.69(10) 0.2673(81) a√σ (Lüscher) m/√σ (Nambu–Goto) geen meting geen meting 0.2547(16) 4.682(61) 0.2673(81) 4.42(21)', 'parsable')
+MISMATCH ('d3_b9.0_L24', '5x3 table', 'glueball a·m 0.804(12) [t* = 2] 0.7834(56) 0.804(12) torelon a·E (L = 24) a√σ (Nambu–Goto) 0.5978(48) [t* = 2] 0.16073(62) 0.6022(27) 0.16130(35) 0.5978(48) 0.16073(62) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.16068(62) 5.003(78) 0.16125(35) 4.857(36) 0.16068(62) 5.003(78)', 'parsable')
+MISMATCH ('d3_b9.0_L24r', '5x3 table', 'glueball a·m 0.7584(99) [t* = 2] 0.7695(47) 0.7584(99) torelon a·E (L = 24) a√σ (Nambu–Goto) 0.5956(42) [t* = 2] 0.16045(54) 0.6014(24) 0.16120(30) 0.5956(42) 0.16045(54) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.16039(54) 4.727(64) 0.16115(30) 4.774(30) 0.16039(54) 4.727(64)', 'parsable')
+MISMATCH ('d3_b9.0_L24_combined', '5x3 table', 'glueball a·m 0.7754(36) [t* = 1] 0.7754(36) 0.7773(77) torelon a·E (L = 24) a√σ (Nambu–Goto) 0.5965(32) [t* = 2] 0.16057(41) 0.6018(18) 0.16124(23) 0.5965(32) 0.16057(41) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.16051(41) 4.829(25) 0.16119(23) 4.809(23) 0.16051(41) 4.841(49)', 'parsable')
+MISMATCH ('d3_b12.0_L32', '5x3 table', 'glueball a·m 0.5693(49) [t* = 1] 0.5693(49) 0.5696(83) torelon a·E (L = 32) a√σ (Nambu–Goto) 0.4359(26) [t* = 1] 0.11892(34) 0.4359(26) 0.11892(34) 0.4342(39) 0.11870(52) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.11888(34) 4.788(42) 0.11888(34) 4.788(42) 0.11866(52) 4.798(72)', 'parsable')
+MISMATCH ('d4_b2.3_L10', '5x3 table', 'glueball a·m 1.195(22) [t* = 1] 1.195(22) 1.149(70) torelon a·E (L = 10) a√σ (Nambu–Goto) 1.182(45) [t* = 2] 0.3594(63) 1.250(14) 0.3687(19) 1.182(45) 0.3594(63) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.3588(63) 3.325(82) 0.3681(19) 3.242(61) 0.3588(63) 3.20(20)', 'parsable')
+MISMATCH ('d4_b2.4_L12', '5x3 table', 'glueball a·m 0.993(15) [t* = 1] 0.993(15) 0.981(40) torelon a·E (L = 12) a√σ (Nambu–Goto) 0.7306(58) [t* = 1] 0.26189(92) 0.7306(58) 0.26189(92) 0.733(12) 0.2622(18) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.26106(93) 3.790(58) 0.26106(93) 3.790(58) 0.2614(18) 3.74(16)', 'parsable')
+MISMATCH ('d4_b2.4_L16', '5x3 table', 'glueball a·m 0.986(31) [t* = 1] 0.986(31) 1.022(85) torelon a·E (L = 16) a√σ (Nambu–Goto) 1.058(22) [t* = 1] 0.2653(26) 1.058(22) 0.2653(26) 1.025(55) 0.2613(66) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.2650(26) 3.72(13) 0.2650(26) 3.72(13) 0.2610(66) 3.91(34)', 'parsable')
+MISMATCH ('d4_b2.5_L16', '5x3 table', 'glueball a·m 0.742(22) [t* = 1] 0.742(22) 0.767(49) torelon a·E (L = 16) a√σ (Nambu–Goto) 0.4913(93) [t* = 1] 0.1873(15) 0.4913(93) 0.1873(15) 0.491(13) 0.1872(22) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.1865(16) 3.96(11) 0.1865(16) 3.96(11) 0.1865(22) 4.10(25)', 'parsable')
+MISMATCH ('d4_b2.5_L16x', '5x3 table', 'glueball a·m 0.771(26) [t* = 1] 0.771(26) 0.746(58) torelon a·E (L = 16) a√σ (Nambu–Goto) 0.455(20) [t* = 3] 0.1812(35) 0.4858(93) 0.1864(16) 0.476(15) 0.1847(24) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.1804(35) 4.26(14) 0.1856(16) 4.14(13) 0.1839(25) 4.04(29)', 'parsable')
+MISMATCH ('d4_b2.5_L16_combined', '5x3 table', 'glueball a·m 0.753(17) [t* = 1] 0.753(17) 0.746(37) torelon a·E (L = 16) a√σ (Nambu–Goto) 0.4873(65) [t* = 1] 0.1866(11) 0.4873(65) 0.1866(11) 0.482(11) 0.1858(18) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.1859(11) 4.036(87) 0.1859(11) 4.036(87) 0.1850(18) 4.02(19)', 'parsable')
+MISMATCH ('d4_b2.5_L20', '5x3 table', 'glueball a·m 0.726(13) [t* = 1] 0.726(13) 0.719(26) torelon a·E (L = 20) a√σ (Nambu–Goto) 0.641(13) [t* = 2] 0.1864(17) 0.6522(76) 0.1880(10) 0.641(13) 0.1864(17) a√σ (Lüscher) m/√σ (Nambu–Goto) 0.1861(17) 3.896(78) 0.1877(10) 3.864(70) 0.1861(17) 3.85(14)', 'parsable')

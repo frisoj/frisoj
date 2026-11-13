@@ -1,0 +1,50 @@
+REPORT.md: value(error) tokens: 516 occurrences, 274 distinct (with a decimal point in the value: 516 occurrences, 273 distinct after dropping the sign)
+  tokens without a decimal point in the value: []
+
+[pdftotext raw order] PDF pages 2 and 6-27: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pdftotext -layout] PDF pages 2 and 6-27: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pdfium] PDF pages 2 and 6-27: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pdfplumber (plain, no map)] PDF pages 2 and 6-27: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+[pypdf (plain, no map)] PDF pages 2 and 6-27: 516 occurrences, 274 distinct
+   tokens of REPORT.md found with the same count: 274 of 274
+   fewer in PDF (md count, pdf count): {}
+   of those not found either in the whitespace-free text: []
+   more in PDF than in REPORT.md (md count, pdf count): {}
+
+whole PDF (42 pages) [pdftotext raw order]: 897 value(error) occurrences, 471 distinct
+whole PDF (42 pages) [pdftotext -layout]: 897 value(error) occurrences, 471 distinct
+   difference from [pdftotext raw order] (token: count there, count here): {}
+whole PDF (42 pages) [pdfium]: 897 value(error) occurrences, 471 distinct
+   difference from [pdftotext raw order] (token: count there, count here): {}
+whole PDF (42 pages) [pdfplumber (plain, no map)]: 897 value(error) occurrences, 471 distinct
+   difference from [pdftotext raw order] (token: count there, count here): {}
+whole PDF (42 pages) [pypdf (plain, no map)]: 897 value(error) occurrences, 471 distinct
+   difference from [pdftotext raw order] (token: count there, count here): {}
+   p2 + p6-27 (report)                                   516 occurrences
+   p1, p3-5 (title, contents excluded, verification)       0 occurrences  {}
+   p28 (appendix B introduction)                           4 occurrences  {'0.7263(125)': 1, '1.203(26)': 1, '1.2035(259)': 1, '1.1(1.4)': 1}
+   p29-41 (appendix B, 13 analyses)                      377 occurrences
+   p42 (appendix C)                                        0 occurrences  {}
+   sum of the parts: 897
+
+TOTAL token problems: 0

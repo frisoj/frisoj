@@ -1,0 +1,37 @@
+--- /tmp/claude-0/-home-user-frisoj/c2e79863-26e2-54ce-9b2d-e39a90258140/scratchpad/qa/layout3/style_before.css	2026-11-13 12:46:01.611171181 +0000
++++ pdf/style.css	2026-11-13 12:57:43.459180588 +0000
+@@ -12,7 +12,7 @@
+ p { margin: 0 0 0.62em 0; orphans: 3; widows: 3; }
+ h1, h2, h3, h4 { font-weight: 650; line-height: 1.2; break-after: avoid; color: #111418; }
+ h1 { font-size: 20pt; margin: 0 0 0.5em 0; }
+-h2 { font-size: 15pt; margin: 2.1em 0 0.6em 0; padding-bottom: 0.18em; border-bottom: 1.2px solid #c9ced6; }
++h2 { font-size: 15pt; margin: 1.8em 0 0.6em 0; padding-bottom: 0.18em; border-bottom: 1.2px solid #c9ced6; }
+ /* new page only for the major divisions: verification, start of the report (section 0), appendices.
+    Sections 1 to 6 run on, so that a section ending in a few lines does not leave a nearly empty page. */
+ h2[id^="verificatie"], h2[id^="0-"], h2[id^="bijlage-"] { break-before: page; margin-top: 0; }
+@@ -25,6 +25,7 @@
+ li { margin-bottom: 0.3em; }
+ li > p { margin-bottom: 0.3em; }
+ p:has(+ ul), p:has(+ ol) { break-after: avoid; }   /* keep the line that introduces a list with its first item */
++ol + p:has(+ hr) { break-before: avoid; }   /* a line that closes a numbered list at the end of a section is not left alone on the next page */
+ strong { font-weight: 650; }
+ sup, sub { font-size: 0.72em; line-height: 0; }
+ 
+@@ -73,7 +74,7 @@
+ p:not(.formula):has(> img:only-child) + p { break-before: avoid; font-size: 8.4pt; color: #3a4049; }
+ 
+ /* display formulas (vector images made by make_pdf.py) */
+-p.formula { text-align: center; margin: 0.85em 0 0.95em 0; break-inside: avoid; }
++p.formula { text-align: center; margin: 0.75em 0 0.85em 0; break-inside: avoid; }
+ p.formula img { display: inline-block; margin: 0; max-width: 100%; }
+ 
+ /* ---------------------------------------------------------------- title page */
+@@ -104,7 +105,7 @@
+    may break between rows; file names are not broken in the middle */
+ #wat-bevestigd-is + p + table { break-inside: auto; }
+ #wat-bevestigd-is + p + table td:first-child, #wat-bevestigd-is + p + table th:first-child { width: 1.6em; }
+-#wat-bevestigd-is + p + table td:nth-child(2) { width: 21%; }
++#wat-bevestigd-is + p + table td:nth-child(2) { width: 17%; }   /* not narrower than its longest word; the room goes to the text column */
+ #wat-bevestigd-is + p + table td:nth-child(4) { width: 30%; }   /* grows to the longest file name, not further */
+ #wat-bevestigd-is + p + table td:nth-child(4) code { white-space: nowrap; font-size: 0.86em; }
+ /* table of appendix A: labels and file names stay in one piece */

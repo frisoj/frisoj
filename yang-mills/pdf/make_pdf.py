@@ -286,6 +286,9 @@ def report_parts():
 
 
 def title_page(ev, commit, date_nl):
+    import datetime
+    today = datetime.date.today()
+    build_nl = f"{today.day} {MONTHS[today.month - 1]} {today.year}"
     return f"""<section class="titlepage">
 <p class="kicker">Eindrapport met alle uitslagen en verificatie</p>
 <p class="doctitle">Yang–Mills en de massakloof</p>
@@ -302,7 +305,7 @@ natuurkundige conclusies vaststaan. Het hoofdstuk “Verificatie” zegt precies
 is bevestigd.</p>
 </div>
 <table class="meta">
-<tr><td>Datum</td><td>{date_nl}</td></tr>
+<tr><td>Datum</td><td>rapport en resultaten: {date_nl}; deze pdf: {build_nl}</td></tr>
 <tr><td>Omvang</td><td>{ev['n_lattices']} roosters, {ev['n_meas']} metingen in {ev['n_streams']} onafhankelijke stromen (meetreeksen)</td></tr>
 <tr><td>Stand van de bestanden</td><td>rapport, code en resultaten: git-commit <code>{commit}</code></td></tr>
 <tr><td>Opgesteld en gecontroleerd door</td><td>een AI-assistent (Claude Code); door geen mens nagekeken, ook niet door een natuurkundige</td></tr>
@@ -331,7 +334,8 @@ def verification(ev):
          "In twee dimensies, waar de uitkomst exact bekend is, geeft de simulatie die uitkomst "
          f"terug binnen de statistische fout: {ev['n_2d']} vergelijkingen van plaquette en "
          f"Wilson-lussen, grootste afwijking {nl(ev['max_2d'], 1)}σ; in de twee andere tests in "
-         "hetzelfde bestand (energie van de fluxbuis en een nultest) is de grootste afwijking "
+         "twee dimensies in dezelfde uitvoer (de energie van de fluxbuis, en een grootheid die "
+         "nul moet zijn) is de grootste afwijking "
          f"{nl(ev['max_2d_other'], 1)}σ (de grens was vooraf 4σ). Ze voldoet ook aan de "
          "Schwinger–Dyson-identiteiten (vergelijkingen die bij een goed werkende simulatie "
          f"moeten gelden) bij de {ev['sd_couplings']} waarden van β waarbij is gemeten, getest op "
@@ -355,8 +359,9 @@ def verification(ev):
          f"{ev['flags']} automatische signaleringen: plekken waar een getal een vooraf "
          "ingestelde grens overschrijdt. Dat zijn aanleidingen om te kijken, geen vastgestelde "
          "fouten. De meeste gaan over foutmarges bij grotere blokken en over het punt bij β = 9 "
-         "en zijn besproken in §4.2 tot en met §4.4; die over de onderlinge consistentie van de "
-         "stromen in vier dimensies komen alleen voor een deel aan bod (§4.9).",
+         "en zijn besproken in §4.2 tot en met §4.4; de overige, over de onderlinge consistentie "
+         "van de stromen en over de fout van de effectieve massa bij t = 3 (alle in vier "
+         "dimensies), komen alleen voor een deel aan bod (§4.9).",
          "`results/independent/COMPARISON.md`"),
         ("Herkomst van de ruwe data (steekproef)", ok("klopt (steekproef)"),
          f"Het begin van {ev['regen_streams']} van de {ev['streams_r12']} stromen van ronde 1 en "
@@ -365,7 +370,8 @@ def verification(ev):
          f"de opgeslagen data. Dat is {nl(pct, 1)} % van de {ev['meas_r12']} metingen van ronde "
          f"1 en 2. De andere {rest} stromen en de {ev['streams_r3']} stromen van ronde 3 zijn "
          "niet opnieuw gegenereerd (§2, §4.5). De ruwe data zelf staan niet in git; wie ze wil "
-         "controleren, moet de simulatie opnieuw draaien (§6.1, §6.2).",
+         "controleren, moet de simulatie opnieuw draaien, en krijgt op een andere computer "
+         "andere aantallen metingen (§6.1, §6.2).",
          "`review/report/stats_rerun_a3_hist.txt`"),
         ("Tabellen tegen de bestanden", ok("klopt"),
          "Elke cel van de tabellen in §0 en §3.2 en van de resultaattabel in `THEORY.md` is "
@@ -425,7 +431,7 @@ Je vroeg om een pdf met alle uitslagen en de bevestiging dat het correct is. Die
 
 ### Wat bevestigd is
 
-De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn wat de opgeslagen meetdata opleveren, berekend met geteste code. De hoofdgetallen (plaquette, effectieve massa's bij t = 0 tot en met 3, snaarspanning bij t = 1 en 2, en de verhouding volgens regel R5) zijn met een tweede, apart geschreven analyse nagerekend. Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan. De verhouding m/√σ bij vaste t komt uit die tweede analyse: de waarde volgt ook uit de getallen van de eerste, de fout niet. Voor de literatuurwaarden en een deel van de controlegetallen geldt dit alles niet (zie “Wat niet bevestigd is”). Elke regel hieronder noemt waar de uitkomst van de controle staat; de aantallen in de derde kolom zijn door het bouwscript uit die bestanden gelezen of uit `results/summary.json` berekend. “Geslaagd”, “klopt” en “nagerekend” betekenen hier: de test is geslaagd, of het getal in de tekst is gelijk aan wat de bestanden opleveren. Het betekent niet dat de uitkomst natuurkundig juist is. In de tabel staat lopende tekst, met decimale komma's.
+De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn wat de opgeslagen meetdata opleveren, berekend met geteste code. De hoofdgetallen (plaquette, effectieve massa's bij t = 0 tot en met 3, snaarspanning bij t = 1 en 2, en de verhouding volgens regel R5) zijn met een tweede, apart geschreven analyse nagerekend. De effectieve massa's bij t = 4 tot en met 6 heeft de tweede analyse ook berekend, maar ze zitten niet in haar opgeslagen vergelijking met de eerste. De consistentiegetallen in bijlage B (χ² van de stromen, warm min koud, autocorrelatietijd) komen uit de eerste analyse; de tweede berekent zulke getallen op een eigen manier en komt daardoor niet op precies dezelfde waarden. De verhouding m/√σ bij vaste t komt uit die tweede analyse: de waarde volgt ook uit de getallen van de eerste, de fout niet. Voor de literatuurwaarden en een deel van de controlegetallen geldt dit alles niet (zie “Wat niet bevestigd is”). Elke regel hieronder noemt waar de uitkomst van de controle staat; de aantallen in de derde kolom zijn door het bouwscript uit die bestanden gelezen of uit `results/summary.json` berekend. “Geslaagd”, “klopt” en “nagerekend” betekenen hier: de test is geslaagd, twee aparte berekeningen geven hetzelfde, of het getal in de tekst is gelijk aan wat de bestanden opleveren. Het betekent niet dat de uitkomst natuurkundig juist is. In de tabel staat lopende tekst, met decimale komma's.
 
 {table}
 
@@ -548,15 +554,15 @@ def appendix_b(ev):
         budget = (" De runs van ronde 1 en 2 zijn op een vast tijdsbudget gestopt, bij "
                   f"{100 * ev['maxtime_min']:.0f} tot {100 * ev['maxtime_max']:.0f} % van het "
                   "ingestelde maximum aantal metingen; de resultaatbestanden melden dat als "
-                  "waarschuwing. Zo was het opgezet: het maximum was een bovengrens, geen doel "
-                  "(§6.2).")
+                  "waarschuwing. Zo was het opgezet: het tijdsbudget bepaalde het aantal "
+                  "metingen; het ingestelde maximum was alleen een plafond (§6.2).")
     intro = f"""## Bijlage B: de uitslagen per analyse
 
 Deze bijlage geeft voor elk van de {len(S.TABLE_ORDER)} analyses de hoofduitkomsten: de waarde volgens de vooraf vastgelegde regel R5, de waarden bij vaste t = 1 en t = 2, de effectieve massa's bij t = 0 tot en met {T_MAX_APPENDIX}, de plaquette en de onderlinge consistentie van de stromen. Het zijn {len(S.TABLE_ORDER)} analyses van {ev['n_lattices']} roosters: op twee roosters is twee keer gemeten, en van elk van die paren is er ook een samengevoegde analyse.{budget} Alles wat de analyse verder heeft berekend, staat in `results/<ensemble>.json`.
 
 De getallen zijn door `pdf/make_pdf.py` rechtstreeks uit `results/<ensemble>.json` gezet; de verhouding m/√σ bij vaste t komt uit `results/independent/<ensemble>.json`. Notatie: `0.7263(125)` betekent 0,7263 ± 0,0125, alleen de statistische fout. Het aantal decimalen is zo gekozen dat de fout twee cijfers heeft; daardoor staan sommige getallen hier met een cijfer minder dan in de tabellen van het rapport (hier 1.203(26), daar 1.2035(259)); het is hetzelfde getal, anders afgerond. Een fout met een punt erin, zoals 1.1(1.4), betekent 1,1 ± 1,4.
 
-Hoe je dit leest: de effectieve massa hoort bij grotere t vlak te worden. Dat de waarden bij t = 1 en t = 2 binnen hun fout gelijk zijn, is daarvoor nodig maar bewijst het niet: de fout bij t = 2 is twee tot drie keer zo groot (§4.7). Bij grotere t groeit de fout snel; waarden waarvan de fout bijna zo groot is als de waarde zelf, zeggen niets meer. Alle massa's zijn schattingen die eerder te hoog dan te laag uitvallen (§3.1). Staat er bij R5 "geen plateau" of "geen meting", dan vond de regel geen vlak stuk; het getal dat erbij staat is dan alleen een bovengrens en telt niet als meting (§3.2). [t\\* = 1] zegt bij welke t de regel de waarde heeft afgelezen. Bij de consistentie van de stromen hoort χ² ongeveer gelijk te zijn aan het aantal vrijheidsgraden; een veel grotere waarde wijst op stromen die het onderling niet eens zijn. De analyses met "_combined" in de naam bevatten dezelfde data als de twee analyses die erin zijn samengevoegd.
+Hoe je dit leest: de effectieve massa hoort bij grotere t vlak te worden. Dat de waarden bij t = 1 en t = 2 binnen hun fout gelijk zijn, is daarvoor nodig maar bewijst het niet: de fout bij t = 2 is twee tot drie keer zo groot (§4.7). Bij grotere t groeit de fout snel; waarden waarvan de fout bijna zo groot is als de waarde zelf, zeggen niets meer. Alle massa's zijn schattingen die eerder te hoog dan te laag uitvallen (§3.1). Staat er bij R5 "geen plateau", dan vond de regel geen vlak stuk; het getal dat erbij staat is dan alleen een bovengrens en telt niet als meting. "Geen meting" staat bij de grootheden die uit zo'n waarde zouden volgen (§3.2). De toevoeging tussen rechte haken, bijvoorbeeld [t\\* = 1], zegt bij welke t de regel de waarde heeft afgelezen. Bij de consistentie van de stromen hoort χ² ongeveer gelijk te zijn aan het aantal vrijheidsgraden; een veel grotere waarde wijst op stromen die het onderling niet eens zijn. De analyses met "_combined" in de naam bevatten dezelfde data als de twee analyses die erin zijn samengevoegd.
 
 De figuren tonen per analyse de effectieve massa van de glueball (links) en de effectieve energie van de torelon (rechts) tegen de tijdsafstand t.
 """
@@ -587,14 +593,16 @@ def appendix_c(commit, branch):
             "de kleine tekst in de figuren, witruimte onderaan sommige pagina's, de bronregel van "
             "tabel 1 die op de volgende pagina valt, en de voetregel op de titelpagina. Daarna "
             "zijn de titelpagina, het hoofdstuk \"Verificatie\" en de inleidingen van bijlage B en "
-            "C herschreven. In een tweede ronde is die nieuwe tekst opnieuw nagelopen; de "
-            "formuleringen die toen nog te ruim waren, zijn aangepast. De bouw die je nu voor je "
-            "hebt, bevat die laatste aanpassingen; of en hoe die bouw zelf nog is nagelopen, "
-            "staat in `review/pdfcheck/README.md`, net als de scripts en bevindingen van de "
-            "eerdere rondes.")
+            "C herschreven. In een tweede ronde is alleen de formulering van die nieuwe tekst "
+            "opnieuw nagelopen; de controle van de getallen en van de opmaak is in die ronde niet "
+            "afgemaakt. De formuleringen die toen nog te ruim waren, zijn aangepast. De bouw die "
+            "je nu voor je hebt, bevat die laatste aanpassingen; of en hoe die bouw zelf nog is "
+            "nagelopen, staat in `review/pdfcheck/README.md`. In dezelfde map staan de "
+            "bevindingen van alle rondes en de scripts waarmee de getallen en de opmaak zijn "
+            "nagelopen.")
     return f"""## Bijlage C: vingerafdrukken en hoe deze pdf is gemaakt
 
-Het rapport, de code en de resultaten in deze pdf zijn die van git-commit `{commit}` op de branch `{branch}`. De controle-uitvoer in `review/numcheck/out_final/` en het bouwscript in `pdf/` zijn daarna toegevoegd, samen met deze pdf. Met de vingerafdrukken hieronder kun je nagaan of een bestand dat je voor je hebt hetzelfde is als het bestand waaruit deze pdf is gemaakt (`sha256sum <bestand>`; vergelijk de eerste 16 tekens).
+Het rapport, de code en de resultaten in deze pdf zijn die van git-commit `{commit}` op de branch `{branch}`. De controle-uitvoer in `review/numcheck/out_final/`, het bouwscript in `pdf/` en deze pdf zijn daarna toegevoegd, in latere commits op dezelfde branch. Met de vingerafdrukken hieronder kun je nagaan of een bestand dat je voor je hebt hetzelfde is als het bestand waaruit deze pdf is gemaakt (`sha256sum <bestand>`; vergelijk de eerste 16 tekens).
 
 {chr(10).join(rows)}
 

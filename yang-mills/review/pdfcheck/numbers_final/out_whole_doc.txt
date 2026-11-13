@@ -1,0 +1,23 @@
+h2 headings in the source: 12 | ordered-list items: 42 | repeated table headers: [(4, 4), (5, 4), (21, 5)]
+
+[pdfium] digit strings: source + generated additions 4749 occurrences (999 distinct); PDF 4749 occurrences (999 distinct)
+   different counts (source, pdf): {}
+   contents block = 'Inhoud' + the 12 section headings of the source, in order: True
+   text blocks of the source (paragraphs, list items, headings, table cells, code blocks, title page): 1811; found verbatim in the PDF text: 1808
+      not verbatim as extracted (found after removing the page footer / ignoring case): Eindrapportmetalleuitslagenenverificatie
+      not verbatim as extracted (found after removing the page footer / ignoring case): Ronde1.RegelR5koost*=2engafa·m=0.8041(123).Maardeeffectievemassasteegdaarvant=1naart=2(van0.7834(56)naar0.8041
+      not verbatim as extracted (found after removing the page footer / ignoring case): Achtanderezoekopdrachtenvondendieberichtennietterug:éénop11novemberenzevenop12november,waaronderzoekopdrachten
+   blocks not found after removing page footers and ignoring case: 0
+   characters (whitespace-free): source + additions 93136, PDF 93136; characters with different counts: {'O': (94, 95), 'C': (66, 67), 'T': (57, 61), 'M': (100, 101), 'P': (49, 51), 'a': (5316, 5312), 'e': (12368, 12362), 'm': (1881, 1880), 'D': (288, 289), 'F': (9, 10), 'E': (127, 133), 'I': (45, 50), 'p': (1151, 1149), 's': (3457, 3456), 'c': (907, 906), 'f': (989, 988), 'g': (2431, 2430), 'S': (88, 89), 'i': (4488, 4483), 'l': (2985, 2982), 'v': (1536, 1535), 'o': (4226, 4225), 'V': (43, 44), 'r': (4151, 4148), 'u': (1556, 1555), 't': (5756, 5752), 'L': (204, 207), 'n': (6322, 6319), 'd': (3394, 3393), 'N': (44, 47), 'U': (19, 20), 'A': (93, 97), 'G': (61, 62), 'R': (106, 109)}
+
+[pypdf] digit strings: source + generated additions 4749 occurrences (999 distinct); PDF 4749 occurrences (999 distinct)
+   different counts (source, pdf): {}
+   contents block = 'Inhoud' + the 12 section headings of the source, in order: True
+   text blocks of the source (paragraphs, list items, headings, table cells, code blocks, title page): 1811; found verbatim in the PDF text: 1808
+      not verbatim as extracted (found after removing the page footer / ignoring case): Eindrapportmetalleuitslagenenverificatie
+      not verbatim as extracted (found after removing the page footer / ignoring case): Ronde1.RegelR5koost*=2engafa·m=0.8041(123).Maardeeffectievemassasteegdaarvant=1naart=2(van0.7834(56)naar0.8041
+      not verbatim as extracted (found after removing the page footer / ignoring case): Achtanderezoekopdrachtenvondendieberichtennietterug:éénop11novemberenzevenop12november,waaronderzoekopdrachten
+   blocks not found after removing page footers and ignoring case: 0
+   characters (whitespace-free): source + additions 93136, PDF 93136; characters with different counts: {'O': (94, 95), 'C': (66, 67), 'T': (57, 61), 'M': (100, 101), 'P': (49, 51), 'a': (5316, 5312), 'e': (12368, 12362), 'm': (1881, 1880), 'D': (288, 289), 'F': (9, 10), 'E': (127, 133), 'I': (45, 50), 'p': (1151, 1149), 's': (3457, 3456), 'c': (907, 906), 'f': (989, 988), 'g': (2431, 2430), 'S': (88, 89), 'i': (4488, 4483), 'l': (2985, 2982), 'v': (1536, 1535), 'o': (4226, 4225), 'V': (43, 44), 'r': (4151, 4148), 'u': (1556, 1555), 't': (5756, 5752), 'L': (204, 207), 'n': (6322, 6319), 'd': (3394, 3393), 'N': (44, 47), 'U': (19, 20), 'A': (93, 97), 'G': (61, 62), 'R': (106, 109)}
+
+TOTAL whole-document problems: 0

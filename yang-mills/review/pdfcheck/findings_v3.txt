@@ -1,0 +1,269 @@
+Third review round, on build v3 (42 pages): number check, layout check with repair, and a
+check of the sentences changed since v2.
+
+====================================================================================================
+REVIEW: pdf-numbers-v3
+====================================================================================================
+
+SUMMARY
+ALL NUMBERS MATCH
+
+No number in REPORT_v3.pdf disagrees with its evidence; four non-number remarks are listed as findings (2 minor, 2 note). Nothing in the pages I read states a proof or a solution. REPORT_v3.pdf is byte-identical to the project's REPORT.pdf, and document_v3.md to pdf/build/document.md.
+
+Checked from the PDF text, with the v2 scripts copied to <qa>/numbers-v3/ and adapted (run_all.sh lists the commands; out_*.txt hold the output):
+1. Appendix B: 733 of 733 checks against results/<ens>.json and results/independent/<ens>.json pass, identically in four extractions. All 377 value(error) tokens are covered, and no digit lies outside the checked pieces. "geen plateau" (1) and "geen meting" (3) match the JSON flags (119 of 119 checks).
+2. Title page and verification section: 177 of 177 checks pass (pypdf and pdfium text), without using pdf/make_pdf.py.
+   - Row 2: 16 comparisons are 4 plaquettes and 12 Wilson loops, largest 1.42 sigma; the two other D=2 tests give 2.24 sigma; all bounds are 4.0.
+   - Row 8: 273 = 257 + 14 + 2, from the stored out_final/trace_tokens.txt (trace_tokens.py was not re-run).
+   - Paragraph above the table: all 13 independent files have comparison rows for plaquette, masses at t = 0 to 3, string tension at t = 1 and 2; 12 have the R5 ratio (none for d3_b6.0_L24). That is 219 rows, largest deviation 3.4e-10 sigma, and no row for t >= 4 or the consistency numbers.
+   - Rows 6, 7, 9, 10 were re-run read-only: output identical to the stored files; 124 = 21 + 103; the summary reproduces 12224 values.
+3. Report body: all 516 value(error) occurrences (274 distinct) of REPORT.md are in the PDF equally often, in five extractions. All 13 tables match (771 cells); all 42 tables of the assembled source match (1493 cells). After undoing the three declared edits the report part equals REPORT.md byte for byte.
+4. Appendix C: commit 34500c9, branch claude/sweet-hypatia-qxubnl, and 30 of 30 fingerprints match both the files on disk and the blobs in that commit.
+5. Contents: 12 of 12 page numbers equal the heading page, by font size, link target and outline; footers are right on 42 of 42 pages. Text layer: pdftotext (raw and -layout), pypdf, pdfplumber and pypdfium2 give the same 897 value(error) tokens (471 distinct) and 11338 digits.
+Also run: figures 26 of 26 and 5 of 5 pixel-identical; whole-PDF digit strings equal the source (4749).
+
+Not done: the full test suite was not re-run (only a live collection: 369 tests, 29 slow). The front-matter script cannot parse the pdfplumber and pdftotext texts because they interleave table columns; the digits in those extractions are identical. The project tree was not modified (git status unchanged; REPORT.pdf is untracked).
+
+
+[1] severity: note
+    where: whole PDF (counts of what matched)
+    claim: Every number checked agrees with its evidence file; there are 0 mismatches.
+    evidence: All files are in <qa>/numbers-v3/. Appendix B: out_b_layout.txt, out_b_plumber.txt, out_b_pypdf.txt, out_b_pdfium.txt each 733 passed, 0 failed (192 cells of the 5x3 tables, 172 effective-mass cells, 13 plaquettes, 60 stream entries, 25 t*, counts, tau, chi2, dof, pull, headings); out_b_flags_*.txt 119 passed each; out_b_complete.txt 0 unverified digit strings. out_b_raw.txt fails on the 13 tables only because pdftotext without -layout reads them column by column, same as in v2. Front matter: out_front_pypdf.txt and out_front_pdfium.txt 177 checks, 177 OK. Report body: out_tokens.txt 516 occurrences, 274 distinct, 0 problems, whole PDF 897 and 471 in five extractions; out_tables.txt 42 of 42 and 13 of 13 tables; out_allnums.txt 1010 of 1010 text blocks verbatim, surplus digits equal the two repeated table headers on pages 10 and 21; out_diff_report.txt 0 undeclared differences, 4 formulas with alt text equal to the TeX. out_toc.txt 12 of 12 entries, 42 of 42 footers. out_textlayer.txt 0 private-use characters, identical digits and tokens in five extractions. out_figures.txt 26 of 26 and 5 of 5. out_whole_doc.txt 4749 digit strings on both sides, 0 problems. out_cross_body_b.txt 152 cells of Tables 1 and 2 consistent with appendix B. out_rerun_evidence.txt and out_rerun_counts.txt: rows 6, 7, 9, 10 reproduced.
+    fix: none
+
+
+[2] severity: minor
+    where: title page, line "Datum 12 november 2026"
+    claim: The date is that of commit 34500c9 (report, code, results), but the PDF was built on 13 November 2026 with new wording, and the label does not say which date it is.
+    evidence: pdfinfo REPORT_v3.pdf: CreationDate Fri Nov 13 12:45:01 2026 UTC. git log: 34500c9 is dated 2026-11-12 00:53; the wording commit 42697be is dated 2026-11-13 12:45. pdf/make_pdf.py line 675 takes the date from the last commit touching the content paths. check_front_v3.py confirms the printed date equals the date of 34500c9, so the number is right under that definition; a reader will take it as the date of the document.
+    fix: In pdf/make_pdf.py title_page(): "<tr><td>Datum</td><td>{date_nl}</td></tr>" -> "<tr><td>Datum</td><td>rapport en resultaten: {date_nl}; deze pdf: {build date, e.g. 13 november 2026}</td></tr>"
+
+
+[3] severity: minor
+    where: appendix C (p. 42), last sentence: "of en hoe die bouw zelf nog is nagelopen, staat in review/pdfcheck/README.md"
+    claim: The file the PDF points to does not yet say anything about the second round or about the current build.
+    evidence: review/pdfcheck/README.md as read during this check: "De controle is gedaan op de eerste bouw van de pdf ("v1", 44 pagina's)"; its table lists findings_v1.txt, numbers/ and layout/ only. findings_v2.txt exists in the folder but is not mentioned. The other counts in that paragraph are supported: 44 pages (REPORT_v1.pdf), three reviews, no wrong number, one value in appendix B, ten places, nine layout errors (findings_v1.txt; 6 checks OK in out_front_pypdf.txt).
+    fix: No change in the PDF. Update review/pdfcheck/README.md: add a row for findings_v2.txt (second wording round) and a section on the current build stating that its numbers were re-checked from the PDF text with 0 mismatches, and what was not re-checked.
+
+
+[4] severity: note
+    where: verification section (p. 3), paragraph above the table: "Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan."
+    claim: Against the comparison rows the sentence is right, but for t = 4 to 6 it understates: the second analysis did compute those masses and they are identical.
+    evidence: results/independent/*.json, comparison_with_pipeline rows: 219 rows, keys only plaq, m0 to m3 and d12 for glueball and torelon, asNG1/asL1/asNG2/asL2, and the R5 ratio; none for t >= 4, chi2, hot/cold or tau. But glueball and torelon 'meff_all_t_gevp' in the same files hold all 68 values that appendix B prints at t = 4, 5, 6, with value and jackknife error equal to results/<ens>.json to 1e-8 (out_paragraph_extra.txt). The consistency numbers are indeed not reproduced: the second analysis has its own, different ones (e.g. d3_b6.0_L24 hot-cold pull 0.294 against 0.274 in the pipeline).
+    fix: Optional, the present text errs on the safe side: "Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan." -> "De effectieve massa's bij t = 4 tot en met 6 heeft de tweede analyse wel berekend, maar ze staan niet in haar vergelijking met de eerste; de consistentiegetallen in bijlage B zijn niet nagerekend."
+
+
+[5] severity: note
+    where: appendix C (p. 42): "Niet hersteld zijn enkele opmaakpunten: ... de bronregel van tabel 1 die op de volgende pagina valt"
+    claim: In this build the description no longer fits exactly: Table 1 itself is split over two pages.
+    evidence: pdf_tables.json (from pdf_tables.py): the 10-column Table 1 has its header and 11 rows on page 9; the header is repeated on page 10 with the last two rows (d4_b2.5_L16_combined, d4_b2.5_L20), directly followed by the source line "Herkomst: [P]; ...". All cells of both parts match REPORT.md (out_tables.txt). This is a layout matter outside the number check; reported for the layout review.
+    fix: Optional: "de bronregel van tabel 1 die op de volgende pagina valt" -> "tabel 1, waarvan de laatste twee regels en de bronregel op de volgende pagina vallen"
+
+====================================================================================================
+REVIEW: pdf-layout-v3
+====================================================================================================
+
+SUMMARY
+LAYOUT DEFECTS REMAIN: 6
+All six are minor or cosmetic: no text is clipped, broken, overlapping or missing. None can be fixed in pdf/style.css alone, and three are already declared in appendix C. Three defects of v3 were fixed in pdf/style.css (4 changed rules).
+
+Final build: /home/user/frisoj/yang-mills/REPORT.pdf, 42 pages, A4, sha256 1f839312b7d5f431. Only pdf/style.css changed; pdf/build/document.md is byte-identical to document_v3.md. The live PDF is therefore no longer the frozen v3; a copy of the new build is <qa>/layout3/REPORT_after_layout3.pdf.
+
+What I looked at: all 42 pages of v3 at 90 dpi, one by one; zooms of the four formulas (220 and 600 dpi), the verification table and the footer. After the rebuild, 30 pages are pixel-identical to v3. I viewed the 12 changed pages (2, 3, 4, 5, 7, 8, 9, 10, 11, 15, 24, 25): pages 2 and 15 from the final render, the other ten from scratch prints with the same CSS that are pixel-identical to the final render.
+
+Checks on the final build:
+- Text layer: 897 value(error) tokens (471 distinct) in both pdftotext and pypdf, the same multiset as REPORT_v3.pdf. No U+FFFD, no private-use characters.
+- Words against v3: 18 fewer, exactly the two table headers that are no longer repeated (verification table, Tabel 1).
+- Contents: 12 entries, right-aligned, every page number equals the page of its heading (2, 3, 6, 7, 8, 9, 15, 23, 25, 27, 28, 42; unchanged from v3).
+- Footer "pagina N van 42" correct on all 42 pages, legible (9.5 px), no overlap.
+- review/pdfcheck/layout/geom.py: 0 words and 0 of 31 images outside the type area, 0 overlapping word boxes. codecheck.py: 0 of 240 code tokens and 0 of 1692 decimal numbers broken. textcheck.py: every non-ASCII character occurs as often as in the HTML.
+- Fonts: Inter and DejaVu Sans Mono; only ∝ (8 times) from the fallback font.
+- Not done: the number-check scripts in numbers-v2/ were not run.
+
+Still imperfect, page by page:
+- p1: running footer on the title page.
+- p2 37 % empty; p5 51 % empty (end of the verification chapter; was 11 %).
+- p3-4: verification table now on two pages (rows 1-4, 5-12); its file column is 34 % wide and mostly empty.
+- p7: formulas complete, no overlap; spacing around ∫ and Σ is tight; formula 1 is scaled to 96 % to fit the text width.
+- p10: source note of Tabel 1 at the top, table whole on p9.
+- p11-13, p29-41: text inside the figures prints at about 3 to 5.5 pt.
+- p12 21 %, p22 18 %, p25 20 % empty (keep-together rules); p26 40 %, p27 17 %, p28 52 %, p29-41 30-34 % empty (by design).
+- p20-21: the 23-row table of §4.8 splits 6 + 17 rows with repeated header; not a defect.
+
+Files are in <qa>/layout3/: style_v3_layout.diff, style_before.css, final_checks.py, exp/ (try.py, pages.py, cmp_pages.py), renders r0/ (v3) and r3/ (final).
+
+
+[1] severity: major
+    where: v3 pages 3-5 (verification table); pdf/style.css rule '#wat-bevestigd-is + p + table td:nth-child(2)'
+    claim: FIXED. The verification table ran over three pages and left 22 % of page 3 empty, because row 4 missed the remaining space by 1.5 pt. It now takes two pages (rows 1-4 on p3, rows 5-12 on p4, header repeated once) and p3 is 5.5 % empty. Status words are legible and all file names are whole.
+    evidence: pdfplumber on v3: row 4 is 165.7 pt high (row tops 60.6 and 226.3 on p4), about 164 pt was free under row 3 on p3; last text on p3 at 627.7 pt of 794.7. Final build: last text on p3 at 753.0 pt, p4 at 774.0 pt; header x positions 45.8 / 65.8 / 154.3 / 379.1 pt, so the text column went from 40 % to 44 % of the width. 150 dpi zoom of final p4: the longest label word 'literatuurvergelijking' fits unbroken. Side effect: 'Wat niet bevestigd is' starts on p4 (items 1-2) and continues on p5 (items 3-8, break between items); p5 is now 51 % empty instead of 11 %.
+    fix: pdf/style.css: '#wat-bevestigd-is + p + table td:nth-child(2) { width: 21%; }' -> '{ width: 17%; }'
+
+
+[2] severity: minor
+    where: v3 pages 7-11 (end of §1.4, Tabel 1, text after Tabel 3); pdf/style.css rules 'h2' and 'p.formula'
+    claim: FIXED. Tabel 1 (13 rows) was split 11 + 2 rows over p9/p10. The 5-line paragraph ending §1.4 was split 3 + 2 lines over p7/p8, and p11 started with 3 loose lines above heading 3.3. Now the §1.4 paragraph is whole on p7, Tabel 1 is whole on p9, p10 ends with a complete paragraph and p11 starts with heading 3.3.
+    evidence: v3 (pdftotext, pdfplumber): two lines of the paragraph missed p7 by about 1 pt; Tabel 1 needed about 28 pt more on p9. Final build: last text on p7 and on p9 at 783.7 pt, 10 pt above the end of the type area at 793.7 pt. If a later build loses that margin, the table falls back to the 11 + 2 split of v3. The source note of Tabel 1 is now at the top of p10, which is what appendix C says. Pixel comparison: pages 12-14 and 16-23 are identical to v3; p15 only moved the heading of §4 up by 4.5 pt.
+    fix: pdf/style.css: 'p.formula { ... margin: 0.85em 0 0.95em 0; ...}' -> 'margin: 0.75em 0 0.85em 0;' and 'h2 { font-size: 15pt; margin: 2.1em 0 0.6em 0; ...}' -> 'margin: 1.8em 0 0.6em 0;'
+
+
+[3] severity: minor
+    where: v3 page 25, first line; pdf/style.css new rule after 'p:has(+ ul), p:has(+ ol)'
+    claim: FIXED. The closing line of §5.3, 'Dit rapport en deze repository zijn geen van deze vier.', stood alone at the top of p25 while its list of four items was on p24. Now item 4 and the closing line are together at the top of p25.
+    evidence: pdftotext -layout of v3 pages 24 and 25. Final p25 starts with '4. Toetsing volgens de regels ...' followed by the closing line; p24 is 6.5 % empty. The selector matches exactly one place in pdf/build/REPORT.html (regex for </ol><p>...</p><hr />). Fitting item 4 and the line on p24 would need 4.7 pt more than is there.
+    fix: pdf/style.css, added: 'ol + p:has(+ hr) { break-before: avoid; }'
+
+
+[4] severity: minor
+    where: final pages 3-4, verification table, column 'waar het staat'; pdf/make_pdf.py (rows of the verification table), pdf/style.css line with 'td:nth-child(4) code { white-space: nowrap; ...}'
+    claim: NOT FIXED. The columns are not balanced: the file column takes 34 % of the width and is mostly empty, the text column 44 %. The width is set by the longest path (41 characters), which is kept on one line. CSS alone cannot narrow it without breaking file names in the middle.
+    evidence: Header x positions in the final build: 154.3 (uitkomst), 379.1 (waar het staat), right edge 553.4 pt. Scratch test exp/alt.css with 'white-space: normal; overflow-wrap: normal; width: 24%' on those code elements: layout unchanged, Chromium does not break after '/'. Only 'overflow-wrap: anywhere' narrows the column, and that gives the mid-name breaks that were a defect in v1.
+    fix: Code change, not tested: in pdf/make_pdf.py write the paths of column 4 as raw HTML with a break opportunity after each slash (<code>review/<wbr>numcheck/<wbr>out_final/<wbr>check_tables.txt</code>). Then in pdf/style.css change '#wat-bevestigd-is + p + table td:nth-child(4) code { white-space: nowrap; font-size: 0.86em; }' to 'white-space: normal' and the column width from 30% to 24%. A path would then wrap only at a directory boundary. Or leave as is.
+
+
+[5] severity: minor
+    where: final page 10, first paragraph ('Herkomst: [P]; dezelfde getallen in [S §1a] ...')
+    claim: NOT FIXED. The source note of Tabel 1 is at the top of p10 while the table is on p9. Appendix C already declares this ('de bronregel van tabel 1 die op de volgende pagina valt').
+    evidence: Final p9 ends with the last row of Tabel 1 at 783.7 pt; the note needs three lines (40 pt) and 10 pt is free. Gluing the note to the table in CSS ('table + p { break-before: avoid }') would bring back the 11 + 2 split of the table.
+    fix: none
+
+
+[6] severity: minor
+    where: final page 1; pdf/print_pdf.js (footerTemplate)
+    claim: NOT FIXED. The running footer ('Yang–Mills en de massakloof · numeriek bewijsmateriaal, geen bewijs ... pagina 1 van 42') is also printed on the title page. Appendix C declares it. On all pages the footer is legible, correctly numbered and clear of the text.
+    evidence: 150 dpi zoom of the footer on p1; final_checks.py: 'pagina N van 42' correct on all 42 pages; geom.py: 0 overlapping word boxes. The footer comes from the Chromium print template and is not reachable from pdf/style.css.
+    fix: Needs a change in pdf/print_pdf.js (for example printing page 1 without header/footer and merging); not tested, and page numbering and bookmarks would have to be re-checked. Or leave it, since it is declared.
+
+
+[7] severity: minor
+    where: final pages 11-13 (figures 1-5) and 29-41 (two figures per analysis); analyze.py lines 227-299, summarize.py
+    claim: NOT FIXED. Text inside the figures is small in print: about 3.8 pt for legends and 5 to 5.5 pt for titles and axis numbers in appendix B, about 3 to 4 pt in figures 1-3. It is readable when zoomed. Appendix C declares it. In appendix B there is one analysis per page, the two figures are side by side and nothing is cut.
+    evidence: pdfplumber: the appendix B images are 832 px wide and printed 252 pt wide; analyze.py makes them 6.4 inch wide with legend fontsize 7 and title fontsize 9, so they are scaled by 0.55. Figures 1-3 are 1755 to 2275 px wide and printed 511 pt wide. Figures 4 and 5 on p13 are printed 429 pt wide (legend about 6.5 pt).
+    fix: none in CSS (side-by-side figures are already at full width). Larger fonts would mean regenerating the figures in analyze.py / summarize.py, which changes files under results/.
+
+
+[8] severity: minor
+    where: final pages 12, 22, 25
+    claim: NOT FIXED. Empty space at the bottom caused by keep-together rules: p12 21 %, p22 18 %, p25 20 %. Appendix C declares 'witruimte onderaan sommige pagina's'.
+    evidence: exp/pages.py on the final build. p12: Figuur 4 with its caption needs about 42 % of a page. p22: heading 5, heading 5.1, the 3-line introduction and the first two lines of its list need about 156 pt, and 130 pt is free. p25: the code block of §6.2 is kept in one piece.
+    fix: none (filling these would separate a heading or an introducing line from its list, or split the code block)
+
+
+[9] severity: note
+    where: final pages 2, 5, 26, 27, 28, 29-41
+    claim: Empty space by design: p2 37 %, p5 51 %, p26 40 %, p27 17 %, p28 52 %, p29-41 30 to 34 % each. The verification chapter, §0 and the appendices start on a new page, and appendix B has one analysis per page. Not counted as a defect.
+    evidence: exp/pages.py on the final build; an analysis block takes about 68 % of a page, so two never fit on one page.
+    fix: none
+
+
+[10] severity: note
+    where: final page 7, the four display formulas; pdf/make_pdf.py MATHTEXT_SUBS
+    claim: NOT FIXED, cosmetic. The formulas are complete: nothing is cut and nothing overlaps. Formula 1 fits the text width because it is scaled to 96 %. The spacing between the fraction, the integral sign and d⁴x, and around the sum sign, is tight.
+    evidence: 220 dpi crops of all four formulas and a 600 dpi crop of the integral: the glyphs do not touch. build/formula_1.svg is 529.87 pt wide against a text width of 510 pt; 'p.formula img { max-width: 100% }' scales it. The formula spans 44 to 548 pt, inside the type area of 42.5 to 553.4 pt. The formula images are unchanged from v3; only their margins changed.
+    fix: Optional code change in pdf/make_pdf.py, not tested: in MATHTEXT_SUBS use a wider space, '\\int\\, d^4x' -> '\\,\\int\\; d^4x'. Then check that formula 1 still fits the text width.
+
+====================================================================================================
+REVIEW: pdf-wording-delta-v3
+====================================================================================================
+
+SUMMARY
+HONEST: no changed sentence in v3 claims a proof, a solution or a shown mass gap, and none says materially more than its evidence. Four places are inaccurate, incomplete or not yet true (one understates what was done); exact Dutch replacements are in the findings.
+
+Checked (nothing edited; scratch in <qa>/diff3/):
+- Diff document_v2.md -> document_v3.md: 13 changed lines; plus title page (pdftotext p.1 of v2 and v3) and `git diff c7ec79a 42697be -- pdf/make_pdf.py`. All changed sentences are present in the text of REPORT_v3.pdf (check_changed_in_pdf.py plus grep on the layout text).
+- 16 findings of findings_v2.txt: 9 applied as proposed (2, 3, 5, 6, 7, 8, 11, 12, 13; 10 too, on the title page), 1 applied differently (1), 1 half applied (9), 1 not applied yet (4, belongs in README), 3 needed no change (14, 15, 16).
+- Row 2: review/report/t_rP.txt has 16 "[g]" lines (4 plaquettes + 12 Wilson loops), max 1.42; the two other 2D tests print 16 pulls, max 2.24; asserts in tests/test_engine.py and tests/test_observables.py use 4.0. Supported.
+- Row 4: COMPARISON.md section 9 has 40 flags: 17 re-binning, 12 on d3_b9.0_L24, 9 stream chi2 (all D = 4), 2 bootstrap-error mismatches of m_eff(3). Thresholds come "from the task" (independent_analysis.py line 1214). Supported; 2 flags are not accounted for in the sentence.
+- Row 5: .gitignore lists results/raw/; `git ls-files results/raw` is empty; report 6.1 item 15 and 6.2. Supported.
+- Row 8: stored trace_tokens.txt gives 273 / 2 / 14. A scratch copy of the script that skips review/pdfcheck/ reproduces the stored file byte for byte; 257 tokens are literal strings in a file. Supported.
+- Paragraph above the table: 219 comparison rows = plaquette, m_eff/E_eff at t = 0..3, m1-m2, a*sqrt(sigma) at t = 1, 2, R5 ratio (12 analyses). Fixed-t ratio equals the quotient of pipeline numbers to 2e-8 of the error. But the sentence about t = 4..6 and the consistency numbers is wrong in the cautious direction (finding 1).
+- Appendix B: one "geen plateau" cell and three "geen meting" cells, all d3_b6.0_L24; R5 value equals m_eff(t*) in all 25 plateau cases; run_all_production.sh lines 11-12 and 19 support "Zo was het opgezet".
+- Appendix C: v1 has 44 pages (pdfinfo); "no wrong number", "one value in appendix B", "ten places", "9 defects fixed", layout notes 13-16a all match findings_v1.txt; title-page footer and the Table 1 source note on the next page are still there in v3.
+
+Open conditions before delivery: review/pdfcheck/README.md still describes only v1 (appendix C points to it); REPORT.pdf is untracked and pdf/style.css has uncommitted changes.
+The project REPORT.pdf was rebuilt at 12:57 UTC during this review and no longer equals the frozen REPORT_v3.pdf; the wording of the changed sentences is the same in both.
+Not done: no visual render of the changed pages; rows 1, 6, 7, 9-12 were not re-checked because their text did not change.
+
+
+[1] severity: minor
+    where: PDF p. 3, paragraph above the verification table (document_v3.md line 15); pdf/make_pdf.py verification()
+    claim: The new sentence "Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan" is not accurate. The second analysis did compute the effective masses at t = 4 to 6, and they agree with the first; they are only missing from its stored comparison. It also computes its own consistency numbers, by a different method. The sentence understates, it does not overclaim.
+    evidence: results/independent/<ens>.json holds glueball.meff_all_t_gevp and torelon.meff_all_t_gevp for all t (independent_analysis.py line 673, computed from the raw data). My comparison with results/<ens>.json meff_table for t = 4..6: 68 values (exactly the 68 value cells of appendix B), largest difference 4.7e-9 of the error, jackknife errors equal to 3.3e-10 relative (diff3/cmp_meff_t4_6.py, out_cmp_meff_t4_6.txt). The 219 rows of comparison_with_pipeline stop at t = 3, so the stored comparison indeed does not cover them. Consistency numbers: COMPARISON.md section 6 and "Plaquette and autocorrelation" give the second analysis' own stream chi2, hot-cold pull and tau_int; e.g. d3_b6.0_L16 chi2 0.57 against 0.59 and hot-cold +0.40 against +0.39, d4_b2.5_L16x chi2 0.68 against 0.11 and hot-cold -0.74 against -0.30.
+    fix: Old: "Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan." -> New: "De effectieve massa's bij t = 4 tot en met 6 heeft de tweede analyse ook berekend, maar ze zitten niet in haar opgeslagen vergelijking met de eerste. De consistentiegetallen in bijlage B (χ² van de stromen, warm min koud, autocorrelatietijd) komen uit de eerste analyse; de tweede berekent zulke getallen op een eigen manier en komt daardoor niet op precies dezelfde waarden." Optional, only if diff3/cmp_meff_t4_6.py and its output are copied to review/pdfcheck/numbers/: replace the first new sentence by "De effectieve massa's bij t = 4 tot en met 6 heeft de tweede analyse ook berekend; ze zitten niet in haar opgeslagen vergelijking, maar zijn bij de controle van deze pdf apart vergeleken (68 waarden, grootste verschil 5·10⁻⁹ keer de statistische fout)."
+
+
+[2] severity: minor
+    where: PDF p. 42, appendix C, last paragraph (document_v3.md line 1088); pdf/make_pdf.py appendix_c(), variable `checked`
+    claim: Finding 1 of findings_v2.txt was applied with a different ending. The facts about round 1 are right. The sentence about round 2 leaves out that only the wording check of that round was completed, and the last clause says the scripts and findings are "in" README.md, while they are in the folder (and round 2 stored no scripts).
+    evidence: findings_v2.txt lines 1-3: "Only the review of the wording completed; the number check and the layout check of this round were cut off". review/pdfcheck/ holds findings_v1.txt, findings_v2.txt, numbers/ and layout/ (scripts of round 1 only). Round-1 facts verified: pdfinfo REPORT_v1.pdf gives 44 pages; findings_v1.txt says "No wrong number found", one R5 cell on d3_b6.0_L24, "in ten places", "fixed 9 defects in pdf/style.css", and layout notes 13, 14, 15, 16a as not fixed. Still present in REPORT_v3.pdf: footer "pagina 1 van 42" on the title page; Tabel 1 starts on p. 9 and its source note is on p. 10.
+    fix: Old: "In een tweede ronde is die nieuwe tekst opnieuw nagelopen; de formuleringen die toen nog te ruim waren, zijn aangepast. De bouw die je nu voor je hebt, bevat die laatste aanpassingen; of en hoe die bouw zelf nog is nagelopen, staat in `review/pdfcheck/README.md`, net als de scripts en bevindingen van de eerdere rondes." -> New: "In een tweede ronde is alleen de formulering van die nieuwe tekst opnieuw nagelopen; de controle van de getallen en van de opmaak is in die ronde niet afgemaakt. De formuleringen die toen nog te ruim waren, zijn aangepast. De bouw die je nu voor je hebt, bevat die laatste aanpassingen; of en hoe die bouw zelf nog is nagelopen, staat in `review/pdfcheck/README.md`. In dezelfde map staan de bevindingen van beide rondes en de scripts van de eerste."
+
+
+[3] severity: minor
+    where: /home/user/frisoj/yang-mills/review/pdfcheck/README.md (the file appendix C points to)
+    claim: Appendix C says that README.md tells whether and how the present build was checked. At the moment it does not: it describes only build v1, says nothing about v2 or v3, and still ends with the absolute sentence that findings_v2.txt [1] objected to. Finding 4 of findings_v2.txt (the warning about re-running trace_tokens.py) is not in it either. Until the README is updated, the pointer in the PDF leads nowhere.
+    evidence: README.md (32 lines, dated 12 Nov 15:40): "De controle is gedaan op de eerste bouw van de pdf ("v1", 44 pagina's)" and "Al deze punten zijn daarna in `pdf/make_pdf.py`, `pdf/style.css` en `pdf/print_pdf.js` verwerkt." No mention of findings_v2.txt. My scratch copy of trace_tokens.py that skips review/pdfcheck/ reproduces review/numcheck/out_final/trace_tokens.txt byte for byte (diff3/trace_tokens_excl_pdfcheck.py, trace_excl.txt), so the stored 257 / 14 / 2 is right.
+    fix: README.md, first paragraph, old: "De controle is gedaan op de eerste bouw van de pdf ("v1", 44 pagina's), door drie afzonderlijke controles" -> new: "De eerste en volledigste controle is gedaan op de eerste bouw van de pdf ("v1", 44 pagina's), door drie afzonderlijke controles". Last paragraph, old: "Al deze punten zijn daarna in `pdf/make_pdf.py`, `pdf/style.css` en `pdf/print_pdf.js` verwerkt." -> new: "Deze punten zijn daarna in `pdf/make_pdf.py`, `pdf/style.css` en `pdf/print_pdf.js` verwerkt, op vier opmaakpunten na: de kleine tekst in de figuren, witruimte onderaan sommige pagina's, de bronregel van tabel 1 die op de volgende pagina valt, en de voetregel op de titelpagina." Add a section: "## Latere bouwen\n\n- **v2 (42 pagina's).** Titelpagina, hoofdstuk "Verificatie" en de inleidingen van bijlage B en C zijn herschreven. Van de controle van v2 is alleen die van de formulering afgemaakt (`findings_v2.txt`): geen zin die een bewijs of een oplossing claimt, wel acht zinnen die iets meer zeiden dan de bewijsstukken. De controle van de getallen en van de opmaak is in die ronde afgebroken en heeft geen verslag opgeleverd.\n- **v3 (42 pagina's).** Verwerkt de bevindingen van `findings_v2.txt`. [hier invullen wat op v3 is nagelopen en met welke uitkomst: getallen, opmaak, de gewijzigde zinnen]\n\nLet op: `review/numcheck/trace_tokens.py` leest alle `review/*/*.txt`. Sinds `findings_v1.txt` hier staat, vindt dat script de 16 daar aangehaalde getallen letterlijk terug. De uitvoer in `review/numcheck/out_final/trace_tokens.txt` (257 / 14 / 2) is van vóór dit bestand en is de juiste; een kopie van het script die deze map overslaat, geeft precies die uitvoer."
+
+
+[4] severity: minor
+    where: PDF p. 42, appendix C, first paragraph (document_v3.md line 1054, unchanged since v2); pdf/make_pdf.py line 597
+    claim: Finding 9 of findings_v2.txt is half applied: the build-command comment now names matplotlib, but "zijn daarna toegevoegd, samen met deze pdf" is still not true. REPORT.pdf is not in git, and pdf/style.css has uncommitted changes.
+    evidence: `git status --short .` in yang-mills prints " M pdf/style.css" and "?? REPORT.pdf"; `git ls-files REPORT.pdf` and `git log -- REPORT.pdf` are empty. pdf/ and review/numcheck/out_final/ were added in c7ec79a and pdf/make_pdf.py changed again in 42697be, whose message says "The PDF itself follows after the final number and layout check". `git diff --stat 34500c9 HEAD -- .` shows only additions (40 files), so the commit statement for report, code and results still holds.
+    fix: Either commit REPORT.pdf and pdf/style.css together with the final build, or change old: "zijn daarna toegevoegd, samen met deze pdf." -> new: "zijn daarna toegevoegd, in latere commits op dezelfde branch."
+
+
+[5] severity: note
+    where: PDF p. 4, verification row 4, last sentence (document_v3.md line 22)
+    claim: The new description of the 40 flags is supported and no longer reads as 40 errors, but it accounts for 38 of them. The 2 flags about the bootstrap error of m_eff(3) fall under neither half of the sentence.
+    evidence: COMPARISON.md section 9: 17 re-binning + 12 on d3_b9.0_L24 (3 thermalisation cut, 5 time history, 4 first chunk) = 29 ("de meeste"), of which 25 are named explicitly in report 4.2-4.4 and 4 re-binning flags at β = 2,5 only in general terms; 9 "stream chi2 small" flags, all in D = 4 (d4_b2.4_L16 plaquette and glueball m2, d4_b2.5_L16_combined torelon m2), of which only the d4_b2.4_L16 plaquette appears in 4.9; 2 "pipeline_error_mismatch_bootstrap" for glueball m_eff(3) on d4_b2.3_L10 and d4_b2.4_L16. Report 4.9 says effective masses at t = 3 in D = 4 have errors of 7 to 23 % and are no measurements, which touches these two.
+    fix: Old: "die over de onderlinge consistentie van de stromen in vier dimensies komen alleen voor een deel aan bod (§4.9)." -> New: "de overige, over de onderlinge consistentie van de stromen en over de fout van de effectieve massa bij t = 3 (alle in vier dimensies), komen alleen voor een deel aan bod (§4.9)."
+
+
+[6] severity: note
+    where: PDF p. 3, verification row 2 (document_v3.md line 20)
+    claim: The numbers are right (16 comparisons, 1,4σ; 2,2σ in the two other tests; limit 4σ). "in de twee andere tests in hetzelfde bestand" is ambiguous: the output file also holds the eight Schwinger-Dyson tests, and the two tests sit in a different test file than the 16 comparisons. "nultest" is not explained anywhere.
+    evidence: review/report/t_rP.txt holds 14 tests: 6 + 2 Schwinger-Dyson, 4 x test_g_d2_exact_plaquette_and_wilson_loops (tests/test_engine.py), test_d2_torelon_energy_and_string_tension_exact and test_d2_plaquette_and_null_test (tests/test_observables.py). Largest pull in the last two: -2.24 (tau = 2 of the null test). "energie van de fluxbuis" matches report section 2.
+    fix: Old: "in de twee andere tests in hetzelfde bestand (energie van de fluxbuis en een nultest) is de grootste afwijking 2,2σ" -> New: "in de twee andere tests in twee dimensies in dezelfde uitvoer (de energie van de fluxbuis, en een grootheid die nul moet zijn) is de grootste afwijking 2,2σ"
+
+
+[7] severity: note
+    where: PDF p. 3, paragraph above the verification table, sentence defining the status words (document_v3.md line 15)
+    claim: The definition asked for in findings_v2.txt [7] is now there and says plainly that the words do not mean physical correctness. It covers a passed test and a number equal to the files, but not what "klopt" means in rows 3, 4 and 5, where two separate computations give the same result.
+    evidence: Row 3: two simulations agree to 10⁻¹². Row 4: second analysis against the first, 3,4·10⁻¹⁰. Row 5: regenerated data bit-identical to stored data. None of these is "het getal in de tekst is gelijk aan wat de bestanden opleveren".
+    fix: Old: "betekenen hier: de test is geslaagd, of het getal in de tekst is gelijk aan wat de bestanden opleveren." -> New: "betekenen hier: de test is geslaagd, twee aparte berekeningen geven hetzelfde, of het getal in de tekst is gelijk aan wat de bestanden opleveren."
+
+
+[8] severity: note
+    where: PDF p. 28, appendix B introduction (document_v3.md lines 655 and 659); pdf/make_pdf.py appendix_b()
+    claim: The three additions are supported. Three small wording points: "het maximum was een bovengrens" says the same thing twice; next to "geen meting" there is no number, so "het getal dat erbij staat" fits only "geen plateau"; and "[t* = 1]" is one example of a tag that also occurs as [t* = 2] and [t* = 3].
+    evidence: run_all_production.sh lines 11-12 ("fixed wall-clock budget (--maxtime), so the number of measurements is whatever fits") and line 19 ("nmeas cap"); report 6.2 Kanttekeningen. Appendix B has one "geen plateau; 1.69(10) bij t = 2 is alleen een bovengrens" cell and three bare "geen meting" cells, all in d3_b6.0_L24 (torelon.plateau false, upper_bound_only true in results/d3_b6.0_L24.json). Tags in appendix B: 17 x [t* = 1], 8 x [t* = 2], 1 x [t* = 3]; in all 25 plateau cases the R5 value equals meff_table[t*].
+    fix: Old: "Zo was het opgezet: het maximum was een bovengrens, geen doel (§6.2)." -> New: "Zo was het opgezet: het tijdsbudget bepaalde het aantal metingen; het ingestelde maximum was alleen een plafond (§6.2)." Old: "Staat er bij R5 "geen plateau" of "geen meting", dan vond de regel geen vlak stuk; het getal dat erbij staat is dan alleen een bovengrens en telt niet als meting (§3.2). [t* = 1] zegt bij welke t de regel de waarde heeft afgelezen." -> New: "Staat er bij R5 "geen plateau", dan vond de regel geen vlak stuk; het getal dat erbij staat is dan alleen een bovengrens en telt niet als meting. "Geen meting" staat bij de grootheden die uit zo'n waarde zouden volgen (§3.2). De toevoeging tussen rechte haken, bijvoorbeeld [t* = 1], zegt bij welke t de regel de waarde heeft afgelezen."
+
+
+[9] severity: note
+    where: PDF p. 4, verification row 5, new last sentence (document_v3.md line 23)
+    claim: Supported. It could mislead slightly: a reader may expect that a re-run gives the same data, while on another machine the number of measurements differs.
+    evidence: .gitignore: "results/raw/"; `git ls-files results/raw` is empty (the files exist only on disk); report 6.1 item 15 ("Ruwe data staan niet in git"); report 6.2: "op een andere machine krijg je dus andere aantallen en, binnen de fouten, andere getallen".
+    fix: Optional. Old: "wie ze wil controleren, moet de simulatie opnieuw draaien (§6.1, §6.2)." -> New: "wie ze wil controleren, moet de simulatie opnieuw draaien, en krijgt op een andere computer andere aantallen metingen (§6.1, §6.2)."
+
+
+[10] severity: note
+    where: findings_v2.txt, findings 1-16, against document_v3.md and REPORT_v3.pdf
+    claim: Status of each finding of the second wording review.
+    evidence: Applied with the proposed text: 2 (the alternative wording; make_pdf.py now parses the 16 pulls as max_2d_other), 3, 5 (plus "geldt dit alles niet"), 6, 7, 8, 10 (title page now "wat het wel en niet laat zien"), 11 (all four parts; the comma sentence reads "In de tabel staat lopende tekst" without "hieronder"), 12, 13 (both parts). Applied differently: 1 (ending rewritten to point to README.md; see the appendix C finding). Half applied: 9 (matplotlib added to the command comment; "samen met deze pdf" unchanged). Not applied yet: 4 (neither trace_tokens.py nor README.md changed; the stored evidence file was not regenerated, which is what matters). No change needed: 14, 15, 16. The text of 5 as proposed carried the inaccuracy reported in the first finding here.
+    fix: none beyond the findings above
+
+
+[11] severity: note
+    where: Changed statements that hold as written: row 2 numbers, row 3, row 4 first part, row 5, row 8, item 6, "Kort gezegd", fixed-t ratio sentence, build-command comment
+    claim: These changed or new statements are supported by the evidence they cite, and the terminology matches the report (stromen, fluxbuis, regel R5, controleverslag, blokken for bins as elsewhere in row 4).
+    evidence: Row 8: 273 tokens, 257 literal strings in a file (155 first found in results/summary.md, 70 in review/report, 29 in results/independent, 3 in run_round3_production.sh), 14 pool-only, 2 by hand (0.819243(47) and 0.50724(14) are in t_rP.txt). Of the 14: 3 quoted from a review report (REPORT.md line 291), 8 derived or check-round numbers (lines 331, 373, 393), 1 rounded test output, 2 pipeline values in another rounding, so "vooral afgeleide getallen en getallen die uit een controleverslag zijn overgenomen" fits. Fixed-t ratio: quotient of pipeline numbers equals the independent value to 2e-8 of the error; the correlated error is 0.90 to 1.03 times uncorrelated propagation; 7 of the 26 fixed-t ratio cells coincide with a pipeline R5 ratio including its error, so "de fout niet" is slightly stronger than needed. Item 6 matches report section 2 ("waardoor de opgegeven fout te klein is"). make_pdf.py imports matplotlib in render_formula.
+    fix: none
+
+
+[12] severity: note
+    where: /home/user/frisoj/yang-mills/REPORT.pdf against the frozen REPORT_v3.pdf; pdf/style.css
+    claim: The project PDF was rebuilt during this review and is no longer identical to the frozen copy that was assigned for checking. Only the layout differs as far as I checked; the changed sentences are worded the same in both.
+    evidence: cmp reports a difference; project REPORT.pdf has CreationDate 12:57:47 UTC against 12:45:01 for REPORT_v3.pdf; pdf/style.css was modified at 12:57:43 (`git diff pdf/style.css`: heading and formula margins, one break rule, a column width). Both have 42 pages. In v3 the last row of Tabel 1 and its source note are on p. 10; in the rebuild the table is whole on p. 9 and the note is at the top of p. 10, which is what appendix C describes. The checks of this round should be recorded against the build that is finally delivered.
+    fix: none

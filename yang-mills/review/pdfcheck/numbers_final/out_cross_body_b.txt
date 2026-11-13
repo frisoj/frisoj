@@ -1,0 +1,7 @@
+  d3_b6.0_L24            torelon R5         body 'geenplateau'                appendix B 'geenplateau;1.69(10)bijt=2isalleeneenbovengrens'
+  d3_b6.0_L24            a sqrt(sigma) R5   body 'geenmeting'                 appendix B 'geenmeting'
+  d3_b6.0_L24            ratio R5           body 'geenmeting'                 appendix B 'geenmeting'
+compared 152 cells of Tables 1 and 2 with appendix B: inconsistent 0
+decimals in appendix B versus report tables: more 0, fewer 46, same 81
+   examples with MORE digits in appendix B: []
+   examples with FEWER digits in appendix B: [('d3_b6.0_L16', 'glueball t2', '1.2035(259)', '1.203(26)'), ('d3_b6.0_L16', 'ratio t2', '4.740(104)', '4.74(10)'), ('d3_b6.0_L24', 'glueball R5', '1.1926(139)[1]', '1.193(14)[t*=1]'), ('d3_b6.0_L24', 'glueball t1', '1.1926(139)', '1.193(14)'), ('d3_b6.0_L24', 'glueball t2', '1.1819(449)', '1.182(45)'), ('d3_b6.0_L24', 'ratio t2', '4.421(213)', '4.42(21)')]

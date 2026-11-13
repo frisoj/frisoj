@@ -1,0 +1,22 @@
+p.29 d3_b6.0_L16            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.30 d3_b6.0_L24            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.31 d3_b9.0_L24            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.32 d3_b9.0_L24r           images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.33 d3_b9.0_L24_combined   images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.34 d3_b12.0_L32           images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.35 d4_b2.3_L10            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.36 d4_b2.4_L12            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.37 d4_b2.4_L16            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.38 d4_b2.5_L16            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.39 d4_b2.5_L16x           images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.40 d4_b2.5_L16_combined   images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+p.41 d4_b2.5_L20            images on page: 2; left = glueball_meff.png: True; right = torelon_meff.png: True; left x0 42 < right x0 301
+appendix B figures pixel-identical to the PNG files: 26 of 26
+PNG figures referenced in REPORT.md: 5; raster images on p. 6-27: 5
+   results/summary_scaling_d3.png                p.11  identical: True
+   results/summary_scaling_d4.png                p.11  identical: True
+   results/summary_volume.png                    p.12  identical: True
+   results/d3_b12.0_L32_glueball_meff.png        p.13  identical: True
+   results/d4_b2.5_L16_combined_glueball_meff.png p.13  identical: True
+report figures pixel-identical: 5 of 5
+TOTAL figure problems: 0

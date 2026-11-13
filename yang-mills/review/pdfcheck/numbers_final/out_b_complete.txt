@@ -1,0 +1,4 @@
+[pdf_layout.txt] blocks 13; blocks with a digit outside the five verified pieces (analysis names and § references in the role sentence excepted): 0
+[pdf_pypdf.txt] blocks 13; blocks with a digit outside the five verified pieces (analysis names and § references in the role sentence excepted): 0
+[pdf_pdfium.txt] blocks 13; blocks with a digit outside the five verified pieces (analysis names and § references in the role sentence excepted): 0
+TOTAL unverified digit strings in appendix B blocks: 0

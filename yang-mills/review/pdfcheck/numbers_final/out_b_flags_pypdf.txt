@@ -1,0 +1,29 @@
+d3_b6.0_L16            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 4.710(37)
+                       role: Vooraf vastgelegd rooster
+d3_b6.0_L24            plateau g/t = True /False st.ub = True  ratios.ub = True  | pdf: geen plateau x1, geen meting x3, m/√σ R5 cell = geen meting
+                       role: Volumecontrole van d3_b6.0_L16
+d3_b9.0_L24            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 5.003(78)
+                       role: Vooraf vastgelegd rooster; niet gerepliceerd (§4.4)
+d3_b9.0_L24r           plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 4.727(64)
+                       role: Herhaling van d3_b9.0_L24 met nieuwe seeds
+d3_b9.0_L24_combined   plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 4.829(25)
+                       role: Samengevoegde analyse van d3_b9.0_L24 en d3_b9.0_L24r; geen extra data
+d3_b12.0_L32           plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 4.788(42)
+                       role: Vooraf vastgelegd rooster
+d4_b2.3_L10            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 3.325(82)
+                       role: Vooraf vastgelegd rooster
+d4_b2.4_L12            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 3.790(58)
+                       role: Vooraf vastgelegd rooster
+d4_b2.4_L16            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 3.72(13)
+                       role: Volumecontrole van d4_b2.4_L12
+d4_b2.5_L16            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 3.96(11)
+                       role: Vooraf vastgelegd rooster
+d4_b2.5_L16x           plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 4.26(14)
+                       role: Meer statistiek voor d4_b2.5_L16 met nieuwe seeds
+d4_b2.5_L16_combined   plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 4.036(87)
+                       role: Samengevoegde analyse van d4_b2.5_L16 en d4_b2.5_L16x; geen extra data
+d4_b2.5_L20            plateau g/t = True /True  st.ub = False ratios.ub = False | pdf: geen plateau x0, geen meting x0, m/√σ R5 cell = 3.896(78)
+                       role: Volumecontrole van d4_b2.5_L16, met vooraf vastgelegd criterium (§4.5)
+
+totals in appendix B text: 'geen plateau' x1, 'geen meting' x3
+checks passed: 119  failed: 0

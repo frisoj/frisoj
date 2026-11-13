@@ -1,0 +1,32 @@
+[pdftotext raw    ] pages 42 | private-use chars 0 | U+FFFD 0 | ASCII digits 11342 | value(error) tokens 897 (471 distinct) | decimal numbers 1692 (653 distinct) | non-ASCII chars 1459 (32 distinct)
+[pdftotext -layout] pages 42 | private-use chars 0 | U+FFFD 0 | ASCII digits 11342 | value(error) tokens 897 (471 distinct) | decimal numbers 1692 (653 distinct) | non-ASCII chars 1459 (32 distinct)
+      all characters, whitespace-free: 93136 (reference 93126); characters with a different count: {'U+002D -': (290, 300)}
+[pypdf            ] pages 42 | private-use chars 0 | U+FFFD 0 | ASCII digits 11342 | value(error) tokens 897 (471 distinct) | decimal numbers 1692 (653 distinct) | non-ASCII chars 1459 (32 distinct)
+      non-ASCII characters differ from [pdftotext raw] (there, here): {'U+201D ”': (8, 0), 'U+02EE ˮ': (0, 8)}
+      all characters, whitespace-free: 93136 (reference 93126); characters with a different count: {'U+002D -': (290, 300), 'U+201D ”': (8, 0), 'U+02EE ˮ': (0, 8)}
+[pdfplumber       ] pages 42 | private-use chars 0 | U+FFFD 0 | ASCII digits 11342 | value(error) tokens 897 (471 distinct) | decimal numbers 1692 (653 distinct) | non-ASCII chars 1459 (32 distinct)
+      non-ASCII characters differ from [pdftotext raw] (there, here): {'U+201D ”': (8, 0), 'U+02EE ˮ': (0, 8)}
+      all characters, whitespace-free: 93136 (reference 93126); characters with a different count: {'U+002D -': (290, 300), 'U+201D ”': (8, 0), 'U+02EE ˮ': (0, 8)}
+[pypdfium2        ] pages 42 | private-use chars 0 | U+FFFD 0 | ASCII digits 11342 | value(error) tokens 897 (471 distinct) | decimal numbers 1692 (653 distinct) | non-ASCII chars 1467 (33 distinct)
+      non-ASCII characters differ from [pdftotext raw] (there, here): {'U+FFFE \ufffe': (0, 8)}
+      all characters, whitespace-free: 93136 (reference 93126); characters with a different count: {'U+FFFE \ufffe': (0, 8), 'U+002D -': (290, 292)}
+
+v1 pypdf     : private-use chars  18370 | ASCII digits    695 | value(error) tokens    2
+v1 pdfplumber: private-use chars  18370 | ASCII digits    695 | value(error) tokens    2
+v3 pypdf     : private-use chars      0 | ASCII digits  11342 | value(error) tokens  897
+v3 pdfplumber: private-use chars      0 | ASCII digits  11342 | value(error) tokens  897
+
+fonts in REPORT_v4.pdf (pdffonts): 42 font objects
+   DejaVuSans                 CID TrueType           embedded yes subset yes ToUnicode yes  x1
+   DejaVuSans-Bold            CID TrueType           embedded yes subset yes ToUnicode yes  x1
+   DejaVuSansMono             CID TrueType           embedded yes subset yes ToUnicode yes  x1
+   DejaVuSansMono-Bold        CID TrueType           embedded yes subset yes ToUnicode yes  x1
+   DejaVuSansMono-Oblique     CID TrueType           embedded yes subset yes ToUnicode yes  x1
+   Inter-Bold                 Type 3                 embedded yes subset yes ToUnicode yes  x12
+   Inter-BoldItalic           Type 3                 embedded yes subset yes ToUnicode yes  x2
+   Inter-Italic               Type 3                 embedded yes subset yes ToUnicode yes  x7
+   Inter-Regular              Type 3                 embedded yes subset yes ToUnicode yes  x9
+   Inter-SemiBold             Type 3                 embedded yes subset yes ToUnicode yes  x7
+fonts in REPORT_v1.pdf for comparison: {('Inter-Regular', 'Type 3'): 9, ('Inter-Bold', 'Type 3'): 11, ('DejaVuSansMono', 'CID TrueType'): 1, ('Inter-SemiBold', 'Type 3'): 6, ('Inter-Italic', 'Type 3'): 7, ('DejaVuSans', 'CID TrueType'): 1, ('DejaVuSansMono-Oblique', 'CID TrueType'): 1, ('Inter-BoldItalic', 'Type 3'): 2, ('DejaVuSans-Bold', 'CID TrueType'): 1, ('DejaVuSansMono-Bold', 'CID TrueType'): 1}
+
+TOTAL text-layer problems (private-use characters, or digits/tokens that differ between extractors): 0

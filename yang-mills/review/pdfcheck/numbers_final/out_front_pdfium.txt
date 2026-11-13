@@ -1,0 +1,221 @@
+OK       rounds: the three run scripts list exactly the 11 non-combined analyses: pdf ['d3_b12.0_L32', 'd3_b6.0_L16', 'd3_b6.0_L24', 'd3_b9.0_L24', 'd3_b9.0_L24r', 'd4_b2.3_L10', 'd4_b2.4_L12', 'd4_b2.4_L16', 'd4_b2.5_L16', 'd4_b2.5_L16x', 'd4_b2.5_L20']  evidence ['d3_b12.0_L32', 'd3_b6.0_L16', 'd3_b6.0_L24', 'd3_b9.0_L24', 'd3_b9.0_L24r', 'd4_b2.3_L10', 'd4_b2.4_L12', 'd4_b2.4_L16', 'd4_b2.5_L16', 'd4_b2.5_L16x', 'd4_b2.5_L20']
+OK       rounds: run scripts agree with summary.json: pdf {'d3_b6.0_L16': '1', 'd3_b6.0_L24': '2', 'd3_b9.0_L24': '1', 'd3_b9.0_L24r': '2', 'd3_b12.0_L32': '1', 'd4_b2.3_L10': '1', 'd4_b2.4_L12': '1', 'd4_b2.4_L16': '2', 'd4_b2.5_L16': '1', 'd4_b2.5_L16x': '2', 'd4_b2.5_L20': '3'}  evidence {'d3_b6.0_L16': '1', 'd3_b6.0_L24': '2', 'd3_b9.0_L24': '1', 'd3_b9.0_L24r': '2', 'd3_b12.0_L32': '1', 'd4_b2.3_L10': '1', 'd4_b2.4_L12': '1', 'd4_b2.4_L16': '2', 'd4_b2.5_L16': '1', 'd4_b2.5_L16x': '2', 'd4_b2.5_L20': '3'}
+
+================ TITLE PAGE (p. 1)
+OK       title: lattices = distinct (D, beta, shape) over the 13 result files: pdf 9  evidence 9
+OK       title: lattices, counted over the 11 non-combined files only: pdf 9  evidence 9
+OK       title: measurements = sum n_meas_total over the 11 non-combined result files: pdf 305656  evidence 305656
+OK       title: same sum from the per-stream n_meas: pdf 305656  evidence 305656
+OK       title: same sum from the independent files: pdf 305656  evidence 305656
+OK       title: streams (non-combined): pdf 44  evidence 44
+OK       title: all stream seeds distinct: pdf 44  evidence 44
+OK       title: all stream files distinct: pdf 44  evidence 44
+OK       d3_b9.0_L24_combined: streams = streams of its two parts (no extra data): pdf [(301, 6987), (302, 7034), (303, 6892), (304, 7082), (305, 9539), (306, 9700), (307, 9624), (308, 9583)]  evidence [(301, 6987), (302, 7034), (303, 6892), (304, 7082), (305, 9539), (306, 9700), (307, 9624), (308, 9583)]
+OK       d4_b2.5_L16_combined: streams = streams of its two parts (no extra data): pdf [(601, 1454), (602, 1443), (603, 1476), (604, 1458), (605, 1229), (606, 1219), (607, 1208), (608, 1215)]  evidence [(601, 1454), (602, 1443), (603, 1476), (604, 1458), (605, 1229), (606, 1219), (607, 1208), (608, 1215)]
+OK       title: git commit = last commit touching report, code and results: pdf '34500c9'  evidence '34500c9'
+OK       title: those paths are identical in that commit and in HEAD (git diff --stat empty): pdf ''  evidence ''
+OK       title: those paths have no uncommitted changes (git status --porcelain empty): pdf ''  evidence ''
+         (HEAD is now 42697be: yang-mills: wording corrections from the second review of the report PDF)
+OK       title: date = date of that commit: pdf (12, 'november', '2026')  evidence (12, 'november', '2026')
+OK       title: 'in 2, 3 en 4 dimensies' present: pdf True  evidence True
+OK       title: D of the production lattices = {3, 4}; D = 2 only in the tests: pdf [3, 4]  evidence [3, 4]
+OK       title: says not solved / no proof: pdf (True, True)  evidence (True, True)
+OK       title (v3): subtitle ends with 'wat het wel en niet laat zien' (no 'bewijst' on the title page): pdf (True, False)  evidence (True, False)
+OK       title (v3): 'correct' sentence: measurement outcomes recomputed and agree with stored data; not: solved: pdf True  evidence True
+OK       title (v3): 'door geen mens nagekeken' on the title page: pdf True  evidence True
+
+================ VERIFICATION, paragraph above the table (v3): what the second analysis recomputed
+OK       paragraph: plaquette, m_eff/E_eff at t = 0..3 (glueball and torelon), a sqrt(sigma) NG and Luescher at t = 1 and 2: a comparison row in each of the 13 files (13 x 13 = 169 rows): pdf ([], 169)  evidence ([], 169)
+OK       paragraph: the other comparison rows are the two differences m(1)-m(2) and the R5 ratio: pdf ['glue.gevp.d12', 'tor.gevp.d12']  evidence ['glue.gevp.d12', 'tor.gevp.d12']
+OK       paragraph: 'verhouding volgens regel R5': ratio rows at the pipeline's t* in the 12 files that have an R5 ratio, none for d3_b6.0_L24 (geen meting): pdf {'d3_b6.0_L16': ['ratio.gevp.Lx12', 'ratio.gevp.NGx12'], 'd3_b6.0_L24': [], 'd3_b9.0_L24': ['ratio.gevp.Lx22', 'ratio.gevp.NGx22'], 'd3_b9.0 ... [712 chars] ... 1'], 'd4_b2.5_L20': ['ratio.gevp.Lx12', 'ratio.gevp.NGx12']}  evidence {'d3_b6.0_L16': ['ratio.gevp.Lx12', 'ratio.gevp.NGx12'], 'd3_b6.0_L24': [], 'd3_b9.0_L24': ['ratio.gevp.Lx22', 'ratio.gevp.NGx22'], 'd3_b9.0 ... [712 chars] ... 1'], 'd4_b2.5_L20': ['ratio.gevp.Lx12', 'ratio.gevp.NGx12']}
+OK       paragraph: the 'pipeline' column of those rows equals the numbers in results/<ens>.json (plaquette, meff_table, string_tension.fixed_t, ratios): pdf True  evidence True
+OK       paragraph: total comparison rows in the 13 files (12 x 17 + 15), largest |dev_sigma| 3.40e-10: pdf (219, True)  evidence (219, True)
+OK       paragraph: 'm_eff bij t = 4 tot en met 6 niet': no comparison row for t >= 4: pdf []  evidence []
+OK       paragraph: 'consistentiegetallen niet': no comparison row for chi2 / hot-cold / tau_int: pdf []  evidence []
+OK       paragraph (extra): R5 flag, t*, value and error of glueball and torelon agree in the 'r5' block (13 x 2): pdf 26  evidence 26
+OK       paragraph: m/sqrt(sigma) at fixed t: value of the second analysis = quotient of the pipeline numbers (13 x 2): pdf 26  evidence 26
+OK       paragraph: 'de fout niet': results/<ens>.json has no fixed-t ratio (no key with fixed/t1/t2 under 'ratios'): pdf []  evidence []
+         NOTE (information): independent files carry m_eff at t = 4..6 of their own ('meff_all_t_gevp'): 70 values with a pipeline counterpart, 70 equal to 1e-6; they are not part of comparison_with_pipeline, so 'niet nagerekend' is the conservative statement
+
+================ VERIFICATION, row 1 (test suite)
+OK       row 1: passed (pytest_final_tree.txt): pdf 340  evidence 340
+OK       row 1: skipped (pytest_final_tree.txt): pdf 29  evidence 29
+OK       row 1: total = passed + skipped: pdf 369  evidence 369
+OK       row 1: pytest_final_tree.txt: exit=0, no 'failed', no 'error': pdf (True, False, False)  evidence (True, False, False)
+OK       row 1: progress characters in pytest_final_tree.txt (dots, s, other): pdf (340, 29, 0)  evidence (340, 29, 0)
+OK       row 1: slow group 0: passed == ids listed in slow_0.txt, exit=0, no 'failed', no 'skipped': pdf (7, True, False, False)  evidence (7, True, False, False)
+OK       row 1: slow group 1: passed == ids listed in slow_1.txt, exit=0, no 'failed', no 'skipped': pdf (8, True, False, False)  evidence (8, True, False, False)
+OK       row 1: slow group 2: passed == ids listed in slow_2.txt, exit=0, no 'failed', no 'skipped': pdf (7, True, False, False)  evidence (7, True, False, False)
+OK       row 1: slow group 3: passed == ids listed in slow_3.txt, exit=0, no 'failed', no 'skipped': pdf (7, True, False, False)  evidence (7, True, False, False)
+OK       row 1: slow tests passed (sum of the 4 groups): pdf 29  evidence 29
+OK       row 1: slow tests announced = skipped: pdf 29  evidence 29
+OK       row 1: the 4 groups together = slow_ids.txt, no duplicates: pdf (['tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D3_4x6x8_b5]', 'tests/test_adversarial.py::test_slow_schwinger_dyson ... [2389 chars] ... ow_strong_coupling_d4_beta125_pins_second_coefficient'], 29)  evidence (['tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D3_4x6x8_b5]', 'tests/test_adversarial.py::test_slow_schwinger_dyson ... [2389 chars] ... ow_strong_coupling_d4_beta125_pins_second_coefficient'], 29)
+OK       row 1: collect.txt total: pdf 369  evidence 369
+OK       row 1: live collection now: total: pdf 369  evidence 369
+OK       row 1: live collection now: slow-marked tests: pdf 29  evidence 29
+OK       row 1: live slow ids == slow_ids.txt: pdf ['tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D3_4x6x8_b5]', 'tests/test_adversarial.py::test_slow_schwinger_dyson_ ... [2383 chars] ... st_slow_strong_coupling_d4_beta125_pins_second_coefficient']  evidence ['tests/test_adversarial.py::test_slow_schwinger_dyson_high_statistics[D3_4x6x8_b5]', 'tests/test_adversarial.py::test_slow_schwinger_dyson_ ... [2383 chars] ... st_slow_strong_coupling_d4_beta125_pins_second_coefficient']
+OK       row 1: the slow outputs were committed once (added and last changed in the same commit): pdf '7c6ee858a000752f074385b1840a4f51f4be0bbf'  evidence '7c6ee858a000752f074385b1840a4f51f4be0bbf'
+         slow outputs committed in 7c6ee85 2026-11-12 00:37:42 +0000 yang-mills: number check of the report, news passages updated, check scripts added
+         final standard run committed in 34500c9 2026-11-12 00:53:12 +0000 yang-mills: final honesty review, D=4 figure without extrapolation intercepts
+OK       row 1: code files changed between that commit and HEAD (git diff --name-only, code paths + pytest.ini + requirements): pdf ['yang-mills/summarize.py']  evidence ['yang-mills/summarize.py']
+OK       row 1: no code change inside the commit that added the slow outputs (parent..commit): pdf ''  evidence ''
+         summarize.py: 6 hunks, in functions ['_ratio_panel', 'make_figures']
+OK       row 1: all changed lines of summarize.py lie in figure-drawing functions: pdf True  evidence True
+OK       row 1: test files of the slow tests that mention summarize: pdf []  evidence []
+OK       row 1: conftest.py mentions summarize: pdf False  evidence False
+         slow tests live in: ['tests/test_adversarial.py', 'tests/test_adversarial_analysis.py', 'tests/test_crosscheck.py', 'tests/test_engine.py']
+
+================ VERIFICATION, row 2 (exact results, Schwinger-Dyson)
+OK       row 2: number of D=2 comparisons ([g] lines in t_rP.txt): pdf 16  evidence 16
+OK       row 2: they are 4 beta x (plaquette + 3 Wilson loops): pdf (4, 4)  evidence (4, 4)
+OK       row 2: largest |deviation| of the 16 (1.42): pdf '1,4'  evidence '1,4'
+OK       row 2: bound 4 sigma: 'assert abs(dev) < 4.0' and 'assert abs(devw) < 4.0' in tests/test_engine.py: pdf (4, True, True)  evidence (4, True, True)
+OK       row 2: Schwinger-Dyson: distinct couplings in t_rP.txt: pdf 6  evidence 6
+OK       row 2: those couplings = the (D, beta) of the production analyses: pdf ['D3_b12.0', 'D3_b6.0', 'D3_b9.0', 'D4_b2.3', 'D4_b2.4', 'D4_b2.5']  evidence ['D3_b12.0', 'D3_b6.0', 'D3_b9.0', 'D4_b2.3', 'D4_b2.4', 'D4_b2.5']
+OK       row 2: Schwinger-Dyson lines (6 couplings x r1, r2): pdf 12  evidence 12
+OK       row 2: smallest SD deviation (-1.98): pdf '−2,0'  evidence '−2,0'
+OK       row 2: largest SD deviation (0.62): pdf '+0,6'  evidence '+0,6'
+OK       row 2: t_rP.txt: 14 passed, exit 0: pdf (True, True, False)  evidence (True, True, False)
+         SD production cases in tests/test_adversarial.py: [('D3_b6.0', '8, 8, 8'), ('D3_b9.0', '8, 8, 8'), ('D3_b12.0', '8, 8, 8'), ('D4_b2.3', '6, 6, 6, 6'), ('D4_b2.4', '6, 6, 6, 6'), ('D4_b2.5', '6, 6, 6, 6')]
+OK       row 2: 'kleine roosters': SD production tests run on 8^3 and 6^4: pdf ['6, 6, 6, 6', '8, 8, 8']  evidence ['6, 6, 6, 6', '8, 8, 8']
+         NOTE other pulls printed in t_rP.txt (D=2 torelon chain and null test; not among the 16): n = 16, range -2.24 .. +1.61
+         NOTE Schwinger-Dyson per-direction pulls in t_rP.txt: n = 42, range -1.95 .. +1.31 (the row quotes the all-direction values)
+OK       row 2 (v3): the 16 are 4 plaquettes and 12 Wilson loops: pdf (4, 12)  evidence (4, 12)
+OK       row 2 (v3): tests in t_rP.txt: 6 SD production + 2 SD teeth + 4 [g] + the other D=2 tests: pdf (14, 6, 2, 4, ['test_d2_torelon_energy_and_string_tension_exact', 'test_d2_plaquette_and_null_test'])  evidence (14, 6, 2, 4, ['test_d2_torelon_energy_and_string_tension_exact', 'test_d2_plaquette_and_null_test'])
+OK       row 2 (v3): 'twee andere tests': pdf 'twee'  evidence 'twee'
+OK       row 2 (v3): every 'pull' in t_rP.txt lies in those two tests: pdf [-2.24, -0.72, -0.47, -0.45, -0.37, -0.09, 0.25, 0.29, 0.34, 0.43, 0.84, 0.88, 0.98, 0.98, 1.41, 1.61]  evidence [-2.24, -0.72, -0.47, -0.45, -0.37, -0.09, 0.25, 0.29, 0.34, 0.43, 0.84, 0.88, 0.98, 0.98, 1.41, 1.61]
+         pulls: flux-tube energy test n = 7, max |pull| 1.61; null test n = 9, max |pull| 2.24
+OK       row 2 (v3): largest |deviation| in the two other tests (2.24): pdf '2,2'  evidence '2,2'
+OK       row 2 (v3): bound 4 sigma also in the two other tests (tests/test_observables.py: '< 4.0 *' / '< 4.0'; no other sigma multiple): pdf (True, True, True, True, ['4.0'])  evidence (True, True, True, True, ['4.0'])
+OK       row 2: REPORT.md §2 gives the same SD range: pdf True  evidence True
+
+================ VERIFICATION, row 3 (second simulation)
+OK       row 3: tolerance 1e-12 in tests/test_crosscheck.py (docstring and assert_same_observables): pdf (True, True)  evidence (True, True)
+OK       row 3: statistical cross-check in D = 2, 3, 4 (docstring): pdf True  evidence True
+
+================ VERIFICATION, row 4 (second analysis)
+OK       row 4: number of analyses (COMPARISON.md): pdf 13  evidence 13
+OK       row 4: number of analyses = result files present: pdf 13  evidence 13
+OK       row 4: largest deviation (COMPARISON.md): pdf 3.4e-10  evidence 3.4e-10
+OK       row 4: largest deviation from the 13 independent files (max_abs_dev_sigma = 3.3953e-10): pdf '3.4e-10'  evidence '3.4e-10'
+OK       row 4: same from the 219 individual comparison rows: pdf '3.4e-10'  evidence '3.4e-10'
+OK       row 4: flags (sum of the 'x N' in the summary line): pdf 40  evidence 40
+OK       row 4: flags (bullets in section 9 of COMPARISON.md): pdf 40  evidence 40
+OK       row 4: flags (sum of len(flags) in the 13 independent files): pdf 40  evidence 40
+         flags by kind: rebinning error change 17; other flags on the beta = 9 analyses 12; stream chi2 9 (analyses ['d4_b2.4_L16', 'd4_b2.5_L16_combined']); remaining 2
+OK       row 4 (v3): 'de meeste' = rebinning + beta-9 flags are more than half of the flags (29 of 40): pdf True  evidence True
+OK       row 4 (v3): the stream-consistency flags are all on D = 4 analyses: pdf [4]  evidence [4]
+OK       row 4 (v3): REPORT.md has sections 4.2, 4.3, 4.4 and 4.9: pdf [True, True, True, True]  evidence [True, True, True, True]
+
+================ VERIFICATION, row 5 (raw data regenerated)
+OK       row 5: lines with 'bit-identical' in the file: pdf 24  evidence 24
+OK       row 5: streams regenerated, all N of N with max diff 0: pdf 24  evidence 24
+OK       row 5: distinct seeds among them: pdf 24  evidence 24
+OK       row 5: streams of rounds 1 and 2 (result files; rounds from the run scripts): pdf 40  evidence 40
+OK       row 5: measurements regenerated (sum of N): pdf 4320  evidence 4320
+OK       row 5: measurements of rounds 1 and 2: pdf 296056  evidence 296056
+OK       row 5: percentage (1.4592 %): pdf '1,5'  evidence '1,5'
+OK       row 5: other streams of rounds 1 and 2: pdf 16  evidence 16
+OK       row 5: streams of round 3: pdf 4  evidence 4
+OK       row 5: every regenerated seed is a round-1/2 production seed with the same start: pdf True  evidence True
+OK       row 5: no round-3 seed among the regenerated streams: pdf []  evidence []
+OK       row 5: REPORT.md §2 says the same (24 of 40, 4320): pdf True  evidence True
+OK       row 5 (v3): raw data not in git: 'git ls-files results/raw' empty, .gitignore lists results/raw/, REPORT.md §6.1 says so: pdf ('', True, True)  evidence ('', True, True)
+OK       row 5: title-page total = rounds 1+2 plus round 3: pdf 305656  evidence 305656
+
+================ VERIFICATION, rows 6-9 (number check re-run on the final text)
+OK       row 6: cells (check_tables.txt): pdf 381  evidence 381
+OK       row 6: mismatches: pdf 0  evidence 0
+OK       row 6: no MISMATCH/UNPARSABLE line in check_tables.txt: pdf 0  evidence 0
+OK       row 6: 'definitieve tekst': REPORT.md, THEORY.md and results unchanged since the commit named on the title page: pdf ''  evidence ''
+OK       row 7: count (check4.txt): pdf 124  evidence 124
+OK       row 7: mismatches: pdf 0  evidence 0
+OK       row 7: literature rows flagged in check4.txt: pdf 0  evidence 0
+OK       row 7: no MISMATCH/UNPARSABLE/CHECK line in check4.txt: pdf 0  evidence 0
+         D=4 glueball pulls recomputed (t=1 and t=2, 24 values): max +3.907 (d4_b2.5_L16_combined, t=1, against 0.6857(28), )
+OK       row 7: largest D=4 glueball pull against a literature value: pdf '3,9'  evidence '3,9'
+OK       row 7: same from summary.json literature_comparison (t=1 rows): pdf '3,9'  evidence '3,9'
+OK       row 7: REPORT.md §0 and §4.8 say 3,9σ: pdf (True, True)  evidence (True, True)
+         largest pull at beta = 2.4: +2.07, at beta = 2.5: +3.91, at beta = 2.3: -0.65
+OK       row 8 (v3): 'voor de 257 en de 2' repeats the literal and by-hand counts: pdf ('257', '2')  evidence ('257', '2')
+OK       row 8: distinct tokens (trace_tokens.txt): pdf 273  evidence 273
+OK       row 8: by hand = untraced: pdf 2  evidence 2
+OK       row 8: pool-only: pdf 14  evidence 14
+OK       row 8: literal = distinct - pool-only - untraced: pdf 257  evidence 257
+OK       row 8: the three parts add up to the total: pdf 273  evidence 273
+OK       row 8: UNTRACED lines in the file: pdf 2  evidence 2
+OK       row 8: pool-only lines listed in the file: pdf 14  evidence 14
+OK       row 8: distinct value(error) tokens in the current REPORT.md (own count): pdf 273  evidence 273
+OK       row 8: by-hand token 0.819243(47) is in the test output t_rP.txt as [('0.819243', '4.7e-05')]: pdf True  evidence True
+OK       row 8: by-hand token 0.50724(14) is in the test output t_rP.txt as [('0.507239', '1.4e-04')]: pdf True  evidence True
+OK       row 9: sigma (check3.txt, computed 6.702): pdf '6,7'  evidence '6,7'
+OK       row 9: sigma (summary.json round3.t1.measured_minus_A.sigma = 6.7022): pdf '6,7'  evidence '6,7'
+OK       row 9: threshold (summary.json round3.criterion_sigma): pdf 3.0  evidence 3.0
+OK       row 9: threshold in run_round3_production.sh, fixed before the data ('more than 3 sigma'): pdf True  evidence True
+OK       row 9: sigma recomputed from results/d4_b2.5_L20.json and d4_b2.5_L16_combined.json (6.7022): pdf '6,7'  evidence '6,7'
+         own value: measured 0.726291 +- 0.012501, prediction A = 16/20 x 0.753054 = 0.602443 +- 0.013608, difference = +6.7022 sigma
+OK       row 9: verdict in summary.json: reading A excluded: pdf True  evidence True
+OK       row 9: no MISMATCH/UNPARSABLE in check2.txt / check3.txt: pdf 0  evidence 0
+OK       row 9: REPORT.md says 6,7σ for round 3: pdf True  evidence True
+         check2.txt: D=4 'const chi2 R5' = ('37.5', '37.526') ; D=3 R5 constant chi2 = ('11.7', '11.726')  p = ('0.003', '0.00284')
+
+================ VERIFICATION, rows 10-12 and the table as a whole
+OK       table: 12 numbered rows, 1..12 in order: pdf [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]  evidence [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+================ 'WAT NIET BEVESTIGD IS'
+OK       v3: heading 'In één zin' no longer in the PDF: pdf False  evidence False
+OK       niet bevestigd: 8 items, 1..8: pdf [1, 2, 3, 4, 5, 6, 7, 8]  evidence [1, 2, 3, 4, 5, 6, 7, 8]
+OK       item 4: 3,9σ = largest D=4 glueball pull (recomputed above): pdf '3,9'  evidence '3,9'
+OK       item 4: the pulls above 2σ are at beta 2.4 and 2.5 only (max at 2.3 is negative): pdf (True, True, True)  evidence (True, True, True)
+OK       item 6: percentages as in REPORT.md §4.7: pdf ('5', '10', '2', '4')  evidence ('5', '10', '2', '4')
+OK       item 6: percentages as in REPORT.md §6.1: pdf ('5', '10', '2', '4')  evidence ('5', '10', '2', '4')
+OK       item 6: that sentence of the report is in §4.7: pdf '4.7'  evidence '4.7'
+OK       item 6: 'De foutmarge van een R5-getal is te klein (§2)': §2 of REPORT.md says so: pdf True  evidence True
+OK       item 3: D=4 box sizes per beta (result files): two at 2.4 and 2.5, one at 2.3: pdf {2.3: 1, 2.4: 2, 2.5: 2}  evidence {2.3: 1, 2.4: 2, 2.5: 2}
+OK       item 3: m/sqrt(sigma) at t=1 rises with beta on the largest D=4 lattices (3.242, 3.718, 3.864): pdf True  evidence True
+
+================ APPENDIX B, introduction (p. 28)
+OK       B intro: analyses: pdf (13, 13)  evidence (13, 13)
+OK       B intro (v3): REPORT.md §6.2 says each stream has a time budget (--maxtime) so that the number of measurements depends on the speed: pdf True  evidence True
+OK       B intro: lattices: pdf 9  evidence 9
+OK       B intro: lattices measured twice: pdf [['d3_b9.0_L24', 'd3_b9.0_L24r'], ['d4_b2.5_L16', 'd4_b2.5_L16x']]  evidence [['d3_b9.0_L24', 'd3_b9.0_L24r'], ['d4_b2.5_L16', 'd4_b2.5_L16x']]
+OK       B intro: 13 = 9 lattices + 2 repeats + 2 combined: pdf 13  evidence 13
+OK       B intro: largest t printed: pdf 6  evidence 6
+OK       B intro: every one of the 40 streams of rounds 1 and 2 carries a 'maxtime' warning in its result file: pdf (40, {4})  evidence (40, {4})
+OK       B intro: smallest fraction of the configured maximum (8.32 %): pdf 8  evidence 8
+OK       B intro: largest fraction of the configured maximum (40.85 %): pdf 41  evidence 41
+OK       B intro: same range from stream counts and the caps in the run scripts: pdf (8, 41)  evidence (8, 41)
+         round 3 (d4_b2.5_L20): 0 maxtime warnings; streams [2400, 2400, 2400, 2400] of cap 2400
+OK       B intro: notation example is consistent: pdf ('0.7263(125)', '0,7263', '0,0125')  evidence ('0.7263(125)', '0,7263', '0,0125')
+OK       B intro: 0.7263(125) is a real result (d4_b2.5_L20, glueball t=1: 0.726291 +- 0.012501): pdf '0.7263(125)'  evidence '0.7263(125)'
+OK       B intro: example 'hier' = d3_b6.0_L16 glueball t=2 with a two-digit error (1.203460 +- 0.025879): pdf '1.203(26)'  evidence '1.203(26)'
+OK       B intro: example 'daar' = the same number with a three-digit error: pdf '1.2035(259)'  evidence '1.2035(259)'
+OK       B intro: 1.203(26) occurs in appendix B and not in the report body: pdf (True, 0)  evidence (True, 0)
+OK       B intro: 1.2035(259) occurs in the report body and not in appendix B: pdf (True, 0)  evidence (True, 0)
+OK       B intro: example with a point in the error: pdf ('1.1(1.4)', '1,1', '1,4')  evidence ('1.1(1.4)', '1,1', '1,4')
+OK       B intro: 1.1(1.4) occurs in appendix B: pdf True  evidence True
+         glueball err(t=2)/err(t=1) over the 13 analyses: 1.72 .. 3.37   (REPORT.md §4.7: '2 tot 3 keer groter')
+OK       B intro: err(t=2)/err(t=1) of the glueball rounds to 2 or 3 for all 13 analyses: pdf True  evidence True
+
+================ APPENDIX C (p. 42)
+OK       C: commit = commit on the title page: pdf '34500c9'  evidence '34500c9'
+OK       C: branch = current branch: pdf 'claude/sweet-hypatia-qxubnl'  evidence 'claude/sweet-hypatia-qxubnl'
+OK       C: that commit is an ancestor of the branch head: pdf 0  evidence 0
+OK       C: review/numcheck/out_final/ and pdf/ were added after that commit: pdf (True, '')  evidence (True, '')
+         REPORT.pdf in git: '' (status: '?? yang-mills/REPORT.pdf')
+OK       C: number of fingerprints printed (16 hex characters each): pdf (30, 30)  evidence (30, 30)
+OK       C: fingerprints equal sha256 of the files on disk: pdf 30  evidence 30
+OK       C: fingerprints equal sha256 of the files in commit 34500c9 (git show): pdf 30  evidence 30
+OK       C: 'vier formules': $$ blocks in REPORT.md: pdf 4  evidence 4
+OK       C: 'twee verwijzingen': references to the appendix in REPORT.md: pdf (1, 1)  evidence (1, 1)
+OK       C (v3): pages of the first build (REPORT_v1.pdf, pypdf): pdf 44  evidence 44
+OK       C (v3): 'geen fout getal': findings_v1.txt, number review: 'No wrong number found': pdf True  evidence True
+OK       C (v3): 'één waarde waar geen meting hoort': 732 of 733 appendix B checks, the one failure is the R5 ratio of d3_b6.0_L24: pdf (1, True, True)  evidence (1, True, True)
+OK       C (v3): 'tien plaatsen': findings_v1.txt, wording review: 'in ten places': pdf (10, True)  evidence (10, True)
+OK       C (v3): 'negen opmaakfouten': findings_v1.txt, layout review: 'fixed 9 defects': pdf (9, True)  evidence (9, True)
+OK       C (v3): 'drie' controls: pdf 3  evidence 3
+OK       C (v3): that value is 'geen meting' in this build (appendix B, d3_b6.0_L24) and 4.46(14) is nowhere in the PDF: pdf (False, True)  evidence (False, True)
+OK       C (v3): review/pdfcheck/findings_v2.txt exists (second round): pdf True  evidence True
+OK       C: 'drie afzonderlijke controles': REVIEW blocks in review/pdfcheck/findings_v1.txt: pdf 3  evidence 3
+
+front matter (pdf_pdfium.txt): 177 checks, 177 OK, 0 mismatches

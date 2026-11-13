@@ -1,0 +1,23 @@
+contents entries on p. 2: 12
+lines set at 14-16.5 pt (h2 headings) found: {'Inhoud': [2], 'Vooraf en leeswijzer': [2], 'Verificatie: wat “correct” in dit document betekent': [3], '0. In het kort': [6], '1. Het probleem en de juiste formules': [7], '2. Wat er gebouwd en getest is': [8], '3. Metingen': [9], '4. Controles op de metingen': [15], '5. Wat dit wel en niet bewijst': [23], '6. Beperkingen en reproduceren': [25], 'Bijlage A: herkomst van de getallen': [27], 'Bijlage B: de uitslagen per analyse': [28], 'Bijlage C: vingerafdrukken en hoe deze pdf is gemaakt': [42]}
+link annotations on p. 2: 12
+outline entries: 52 (top level 12)
+
+entry                                                      printed   heading      link   outline
+Vooraf en leeswijzer                                             2       [2]         2       [2]  OK
+Verificatie: wat “correct” in dit document betekent              3       [3]         3       [3]  OK
+0. In het kort                                                   6       [6]         6       [6]  OK
+1. Het probleem en de juiste formules                            7       [7]         7       [7]  OK
+2. Wat er gebouwd en getest is                                   8       [8]         8       [8]  OK
+3. Metingen                                                      9       [9]         9       [9]  OK
+4. Controles op de metingen                                     15      [15]        15      [15]  OK
+5. Wat dit wel en niet bewijst                                  23      [23]        23      [23]  OK
+6. Beperkingen en reproduceren                                  25      [25]        25      [25]  OK
+Bijlage A: herkomst van de getallen                             27      [27]        27      [27]  OK
+Bijlage B: de uitslagen per analyse                             28      [28]        28      [28]  OK
+Bijlage C: vingerafdrukken en hoe deze pdf is gemaakt           42      [42]        42      [42]  OK
+
+h2 headings in the document (other than 'Inhoud'): 12; all are contents entries: True; all contents entries are headings: True
+page numbers increase: True
+footer 'pagina N van 42' correct on 42 of 42 pages
+TOTAL contents problems: 0

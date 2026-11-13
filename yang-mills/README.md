@@ -20,6 +20,8 @@ betrouwbaarheid) in `literature.json`.
 | pad | wat |
 | --- | --- |
 | `REPORT.md` | eindrapport: wat er gemeten is, alle controles en spanningen, en wat het wel en niet bewijst |
+| `REPORT.pdf` | hetzelfde rapport als pdf, met een titelpagina, een hoofdstuk over wat wel en niet is bevestigd, en een bijlage met de uitslagen van alle dertien analyses; gemaakt met `pdf/make_pdf.py` |
+| `pdf/` | bouwscript van de pdf (`make_pdf.py`, opmaak in `style.css`, afdrukken met `print_pdf.js`); valt buiten de testsuite |
 | `ym/lattice.py` | motor: heatbath (Creutz / Kennedy–Pendleton) + overrelaxatie, plaquette, Wilson- en Polyakov-lussen |
 | `ym/exact.py` | exacte D=2-formules, sterke-koppelingsreeks, twee-lus-schaalformule |
 | `ym/observables.py` | APE-smearing, glueball- (0++) en torelon-operatoren per tijdplak |

@@ -1,0 +1,56 @@
+mode: layout
+analyses found in appendix B, in order: ['d3_b6.0_L16', 'd3_b6.0_L24', 'd3_b9.0_L24', 'd3_b9.0_L24r', 'd3_b9.0_L24_combined', 'd3_b12.0_L32', 'd4_b2.3_L10', 'd4_b2.4_L12', 'd4_b2.4_L16', 'd4_b2.5_L16', 'd4_b2.5_L16x', 'd4_b2.5_L16_combined', 'd4_b2.5_L20']
+  d3_b6.0_L16: JSON has finite m_eff at t = [7] (not printed; table stops at t = 6)
+  d3_b6.0_L16: 30 value(error) tokens in block
+  d3_b6.0_L24: 25 value(error) tokens in block
+  d3_b9.0_L24: JSON has finite m_eff at t = [7, 8, 9] (not printed; table stops at t = 6)
+  d3_b9.0_L24: 30 value(error) tokens in block
+  d3_b9.0_L24r: JSON has finite m_eff at t = [7, 8, 9, 11] (not printed; table stops at t = 6)
+  d3_b9.0_L24r: 30 value(error) tokens in block
+  d3_b9.0_L24_combined: JSON has finite m_eff at t = [7, 8, 9] (not printed; table stops at t = 6)
+  d3_b9.0_L24_combined: 30 value(error) tokens in block
+  d3_b12.0_L32: JSON has finite m_eff at t = [7, 8, 9, 10, 11, 12] (not printed; table stops at t = 6)
+  d3_b12.0_L32: 30 value(error) tokens in block
+  d4_b2.3_L10: 27 value(error) tokens in block
+  d4_b2.4_L12: JSON has finite m_eff at t = [7] (not printed; table stops at t = 6)
+  d4_b2.4_L12: 28 value(error) tokens in block
+  d4_b2.4_L16: JSON has finite m_eff at t = [7] (not printed; table stops at t = 6)
+  d4_b2.4_L16: 27 value(error) tokens in block
+  d4_b2.5_L16: JSON has finite m_eff at t = [7] (not printed; table stops at t = 6)
+  d4_b2.5_L16: 30 value(error) tokens in block
+  d4_b2.5_L16x: JSON has finite m_eff at t = [7] (not printed; table stops at t = 6)
+  d4_b2.5_L16x: 30 value(error) tokens in block
+  d4_b2.5_L16_combined: JSON has finite m_eff at t = [7] (not printed; table stops at t = 6)
+  d4_b2.5_L16_combined: 30 value(error) tokens in block
+  d4_b2.5_L20: JSON has finite m_eff at t = [7, 9] (not printed; table stops at t = 6)
+  d4_b2.5_L20: 30 value(error) tokens in block
+
+checks passed: 733  failed: 0
+     192  5x3 cell
+       3  5x3 cell (geen meting)
+       1  analyses present
+      13  binsize
+      13  chi2
+      13  dof
+      13  heading D
+      13  heading beta
+      13  heading lattice
+      13  heading round
+      13  hot-cold pull
+      13  independent counts == pipeline counts
+      26  independent ratio == pipeline quotient (central value)
+     172  meff cell
+       6  meff cell (dash)
+      13  meff rows present
+      11  meff rows with data at t>6 in JSON, not printed
+      13  n_bins
+      13  n_meas_total
+      13  n_meas_used
+      13  plaquette
+      26  plateau wording
+      60  stream seed/start/count
+      13  stream sum == total (JSON internal)
+      25  t_star
+       1  t_value
+      13  tau_int_max
+      13  torelon L

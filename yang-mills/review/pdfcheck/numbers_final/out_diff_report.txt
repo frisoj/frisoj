@@ -1,0 +1,11 @@
+document_v4.md: preamble 984 chars, verification 11576 chars, report body 80281 chars, appendices B+C 24029 chars
+edit 1: title lines dropped (title, subtitle, blank lines)             x1  (REPORT.md lines: 1-4)
+edit 2 (reference in the reading guide -> 'bijlage A') + edit 1 (the rule '---' under the title block dropped) x1  (REPORT.md lines: 9-11)
+edit 3: display formula -> image, alt text = the TeX source            x4  (REPORT.md lines: 50-54, 62-64, 74-76, 84-86)
+edit 2: reference to the appendix -> 'bijlage A'                       x1  (REPORT.md lines: 552)
+edit 2: appendix heading 'Bijlage' -> 'Bijlage A'                      x1  (REPORT.md lines: 595)
+trailing blank line                                                    x1  (REPORT.md lines: 618)
+lines of REPORT.md: 618, identical in the document: 594
+title lines of REPORT.md that are dropped: '# Yang–Mills en de massakloof: eindrapport\n\n**SU(2)-roostersimulaties in 2, 3 en 4 dimensies: wat er gemeten is, hoe het gecontroleerd is, en wat het wel en niet bewijst**\n\n'
+after undoing the three declared edits the report part equals REPORT.md byte for byte (from 'Datum:' on): True
+formulas replaced: 4 | undeclared differences: 0

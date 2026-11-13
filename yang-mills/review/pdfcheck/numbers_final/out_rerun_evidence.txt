@@ -1,0 +1,4 @@
+check_tables re-run output identical to stored out_final file: True | MISMATCH lines: 0
+check3 re-run output identical to stored out_final file: True | MISMATCH lines: 0
+row 10: top-level keys of build_summary() that differ from results/summary.json: ['figures', 'generated_utc']
+row 10: leaf values compared equal: 12224 | fresh has 'figures': False | stored figures: ['summary_scaling_d3.png', 'summary_scaling_d4.png', 'summary_volume.png']
