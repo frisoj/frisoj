@@ -169,9 +169,14 @@ def evidence():
     if not dev2 or not sd:
         raise SystemExit("make_pdf: exact-2D or Schwinger-Dyson lines not found in t_rP.txt")
     ev["n_2d"], ev["max_2d"] = len(dev2), max(abs(x) for x in dev2)
+    # the two other two-dimensional tests in the same file (flux-tube energy, null test)
+    pull2 = [float(x) for x in re.findall(r"pull ([+-]\d+\.\d+)", rp)]
+    if not pull2:
+        raise SystemExit("make_pdf: pulls of the other two-dimensional tests not found")
+    ev["max_2d_other"] = max(abs(x) for x in pull2)
     ev["sd_couplings"] = len({c for c, _ in sd})
     ev["sd_min"], ev["sd_max"] = min(float(z) for _, z in sd), max(float(z) for _, z in sd)
-    if ev["max_2d"] >= 4.0 or max(abs(ev["sd_min"]), abs(ev["sd_max"])) >= 4.0:
+    if max(ev["max_2d"], ev["max_2d_other"], abs(ev["sd_min"]), abs(ev["sd_max"])) >= 4.0:
         raise SystemExit("make_pdf: an exactness test lies beyond 4 sigma")
 
     # ---- row 4: independent re-analysis
@@ -285,7 +290,7 @@ def title_page(ev, commit, date_nl):
 <p class="kicker">Eindrapport met alle uitslagen en verificatie</p>
 <p class="doctitle">Yang–Mills en de massakloof</p>
 <p class="subtitle">SU(2)-roostersimulaties in 2, 3 en 4 dimensies: wat er gemeten is, hoe het
-gecontroleerd is, en wat het wel en niet bewijst</p>
+gecontroleerd is, en wat het wel en niet laat zien</p>
 <div class="statusbox">
 <p><strong>Het millenniumprobleem is met dit werk niet opgelost, en een massakloof is er niet mee
 aangetoond.</strong> Dit document bevat numerieke aanwijzingen (uitkomsten van berekeningen) voor
@@ -324,8 +329,10 @@ def verification(ev):
          "`review/numcheck/pytest_final_tree.txt`, `slow_out_0.txt` t/m `slow_out_3.txt`"),
         ("Exact bekende uitkomsten", ok("klopt binnen de fout"),
          "In twee dimensies, waar de uitkomst exact bekend is, geeft de simulatie die uitkomst "
-         f"terug binnen de statistische fout: {ev['n_2d']} vergelijkingen, grootste afwijking "
-         f"{nl(ev['max_2d'], 1)}σ (de grens was vooraf 4σ). Ze voldoet ook aan de "
+         f"terug binnen de statistische fout: {ev['n_2d']} vergelijkingen van plaquette en "
+         f"Wilson-lussen, grootste afwijking {nl(ev['max_2d'], 1)}σ; in de twee andere tests in "
+         "hetzelfde bestand (energie van de fluxbuis en een nultest) is de grootste afwijking "
+         f"{nl(ev['max_2d_other'], 1)}σ (de grens was vooraf 4σ). Ze voldoet ook aan de "
          "Schwinger–Dyson-identiteiten (vergelijkingen die bij een goed werkende simulatie "
          f"moeten gelden) bij de {ev['sd_couplings']} waarden van β waarbij is gemeten, getest op "
          f"kleine roosters: afwijkingen tussen {nls(ev['sd_min'], 1)}σ en "
@@ -335,17 +342,21 @@ def verification(ev):
          "Een tweede, apart geschreven simulatie geeft op dezelfde toestand van het rooster "
          "dezelfde basisgrootheden (plaquette, Wilson-lussen, Polyakov-lussen, actie) tot op "
          "10⁻¹², en beide simulaties geven statistisch dezelfde gemiddelden in 2, 3 en 4 "
-         "dimensies. Dit is gedaan op kleine testroosters. De productieruns en de glueballmassa's "
-         "zijn niet met de tweede simulatie nagerekend (§2).",
+         "dimensies. Dit is gedaan op kleine testroosters. De productieruns en de massa's van "
+         "het lichtste deeltje (de \"glueball\") zijn niet met de tweede simulatie nagerekend "
+         "(§2).",
          "`tests/test_crosscheck.py` (onderdeel van de testsuite)"),
         ("Tweede analyse", ok("klopt"),
-         f"Alle {ev['n_analyses']} analyses zijn opnieuw gerekend uit de ruwe data, met een "
+         f"Alle {ev['n_analyses']} analyses zijn opnieuw berekend uit de ruwe data, met een "
          "tweede programma dat geen code deelt met het eerste. Grootste afwijking van een "
          f"meetwaarde: {sci_nl(ev['max_dev'])} keer de statistische fout, dus afronding. Het "
          "tweede programma volgt dezelfde rekenregels en neemt de blokgrootte van het eerste "
          "over; het controleert dus het rekenwerk, niet de methode (§4.1). Het gaf daarnaast "
-         f"{ev['flags']} automatische signaleringen; de belangrijkste zijn besproken in §4.2 tot "
-         "en met §4.4.",
+         f"{ev['flags']} automatische signaleringen: plekken waar een getal een vooraf "
+         "ingestelde grens overschrijdt. Dat zijn aanleidingen om te kijken, geen vastgestelde "
+         "fouten. De meeste gaan over foutmarges bij grotere blokken en over het punt bij β = 9 "
+         "en zijn besproken in §4.2 tot en met §4.4; die over de onderlinge consistentie van de "
+         "stromen in vier dimensies komen alleen voor een deel aan bod (§4.9).",
          "`results/independent/COMPARISON.md`"),
         ("Herkomst van de ruwe data (steekproef)", ok("klopt (steekproef)"),
          f"Het begin van {ev['regen_streams']} van de {ev['streams_r12']} stromen van ronde 1 en "
@@ -353,7 +364,8 @@ def verification(ev):
          f"{ev['regen_meas']} metingen die zo opnieuw zijn gemaakt, zijn bit voor bit gelijk aan "
          f"de opgeslagen data. Dat is {nl(pct, 1)} % van de {ev['meas_r12']} metingen van ronde "
          f"1 en 2. De andere {rest} stromen en de {ev['streams_r3']} stromen van ronde 3 zijn "
-         "niet opnieuw gegenereerd (§2, §4.5).",
+         "niet opnieuw gegenereerd (§2, §4.5). De ruwe data zelf staan niet in git; wie ze wil "
+         "controleren, moet de simulatie opnieuw draaien (§6.1, §6.2).",
          "`review/report/stats_rerun_a3_hist.txt`"),
         ("Tabellen tegen de bestanden", ok("klopt"),
          "Elke cel van de tabellen in §0 en §3.2 en van de resultaattabel in `THEORY.md` is "
@@ -369,11 +381,13 @@ def verification(ev):
          "`review/numcheck/out_final/check4.txt`"),
         ("Getallen in de lopende tekst", done("teruggevonden"),
          f"Het rapport bevat {ev['tokens']} verschillende getallen met een fout erbij. "
-         f"{ev['tokens_literal']} daarvan staan letterlijk in een projectbestand; "
-         f"{ev['tokens_pool']} zijn alleen via een zwakkere getalsvergelijking met de "
-         f"resultaatbestanden gevonden; {ev['tokens_hand']} zijn met de hand opgezocht in de "
-         "testuitvoer. Teruggevonden betekent dat het getal een bron heeft, niet dat het opnieuw "
-         "is uitgerekend.",
+         f"{ev['tokens_literal']} daarvan staan letterlijk in een projectbestand; voor "
+         f"{ev['tokens_pool']} is alleen een los getal met ongeveer dezelfde waarde in een "
+         "resultaatbestand gevonden, en dat is geen sluitende herkomst (het zijn vooral "
+         "afgeleide getallen en getallen die uit een controleverslag zijn overgenomen); "
+         f"{ev['tokens_hand']} zijn met de hand opgezocht in de testuitvoer. Teruggevonden "
+         f"betekent voor de {ev['tokens_literal']} en de {ev['tokens_hand']} dat het getal een "
+         "aanwijsbare bron heeft, niet dat het opnieuw is uitgerekend.",
          "`review/numcheck/out_final/trace_tokens.txt`"),
         ("Rekenwerk van fits, volumevergelijkingen en ronde 3", done("nagerekend"),
          "De getallen van §3.4, §3.5 en §4.5 zijn opnieuw berekend uit de resultaatbestanden en "
@@ -411,7 +425,7 @@ Je vroeg om een pdf met alle uitslagen en de bevestiging dat het correct is. Die
 
 ### Wat bevestigd is
 
-De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn wat de opgeslagen meetdata opleveren, berekend met geteste code en met een tweede, apart geschreven analyse nagerekend. Voor de literatuurwaarden en een deel van de controlegetallen geldt dat niet (zie “Wat niet bevestigd is”). Elke regel hieronder noemt waar de uitkomst van de controle staat; de aantallen in de derde kolom zijn door het bouwscript uit die bestanden gelezen of uit `results/summary.json` berekend.
+De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn wat de opgeslagen meetdata opleveren, berekend met geteste code. De hoofdgetallen (plaquette, effectieve massa's bij t = 0 tot en met 3, snaarspanning bij t = 1 en 2, en de verhouding volgens regel R5) zijn met een tweede, apart geschreven analyse nagerekend. Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan. De verhouding m/√σ bij vaste t komt uit die tweede analyse: de waarde volgt ook uit de getallen van de eerste, de fout niet. Voor de literatuurwaarden en een deel van de controlegetallen geldt dit alles niet (zie “Wat niet bevestigd is”). Elke regel hieronder noemt waar de uitkomst van de controle staat; de aantallen in de derde kolom zijn door het bouwscript uit die bestanden gelezen of uit `results/summary.json` berekend. “Geslaagd”, “klopt” en “nagerekend” betekenen hier: de test is geslaagd, of het getal in de tekst is gelijk aan wat de bestanden opleveren. Het betekent niet dat de uitkomst natuurkundig juist is. In de tabel staat lopende tekst, met decimale komma's.
 
 {table}
 
@@ -422,13 +436,13 @@ De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zij
 3. **Dat de metingen een massakloof aantonen, in drie of in vier dimensies.** Dat op elk rooster een massa ongelijk aan nul is gemeten, is op een eindig rooster vanzelfsprekend en dus geen bewijsmateriaal. In drie dimensies blijft de massa in natuurlijke eenheden vrijwel gelijk als het rooster fijner wordt, maar de vooraf vastgelegde meting bij β = 9 kwam bij herhaling niet terug; die uitspraak berust dus op een keuze achteraf (§3.4, §4.4). In vier dimensies, het geval van het millenniumprobleem, is alleen uitgesloten dat de kloof evenredig met de doos meekrimpt, en dat alleen bij β = 2,4 en 2,5, telkens met maar twee doosgroottes. De massa in natuurlijke eenheden stijgt daar nog met β (een grotere β is een fijner rooster) in plaats van gelijk te blijven, en er is geen waarde voor roosterafstand nul (§3.5, §5.1).
 4. **Overeenstemming met gepubliceerde waarden.** In vier dimensies liggen onze glueballmassa's bij β = 2,4 en 2,5 tot {nl(ev['max_lit_pull_d4'], 1)}σ boven gepubliceerde roosterwaarden; dat verschil is niet verklaard (§4.8). De literatuurwaarden zelf zijn alleen in zoekresultaten gezien of door het AI-systeem uit het geheugen aangehaald, niet in de gepubliceerde artikelen nagekeken.
 5. **Andere gevallen dan het gesimuleerde.** Er is alleen de eenvoudigste groep, SU(2), gesimuleerd, met één roosteractie en voor één soort deeltje. Het probleem gaat over elke toegestane groep (§6.1).
-6. **Systematische fouten.** Alle foutmarges zijn statistisch. Hoeveel de massa's te hoog kunnen uitvallen door bijmenging van zwaardere toestanden, is niet beter begrensd dan ongeveer 5 tot 10 % in vier dimensies en 2 tot 4 % in drie (§4.7). De foutmarge van een R5-getal is bovendien te klein (§2).
+6. **Systematische fouten.** Alle foutmarges zijn statistisch. Hoeveel de massa's te hoog kunnen uitvallen door bijmenging van zwaardere toestanden, is niet beter begrensd dan ongeveer 5 tot 10 % in vier dimensies en 2 tot 4 % in drie (§4.7). De foutmarge van een getal volgens de vooraf vastgelegde regel R5 is bovendien te klein (§2).
 7. **Een deel van de controlegetallen.** Getallen met het label [C1] of [C2] komen uit verkennende scripts van de controleronde; die zijn niet allemaal opnieuw berekend (zie bijlage A).
 8. **De nieuwsberichten in §5.2.** Die zijn ongeverifieerd, en de zoekresultaten spreken elkaar tegen.
 
-### In één zin
+### Kort gezegd
 
-De getallen in dit document kloppen met de opgeslagen data en het rekenwerk is nagelopen; ze lossen het millenniumprobleem niet op en tonen geen massakloof aan. Wat ze wel zeggen, staat in §0 en §5.
+De meetuitkomsten in dit document kloppen met de opgeslagen data en het rekenwerk is nagelopen, door hetzelfde AI-systeem en door geen mens. Ze lossen het millenniumprobleem niet op en tonen geen massakloof aan. Wat ze wel zeggen, staat in §0 en §5.
 """
 
 
@@ -534,14 +548,15 @@ def appendix_b(ev):
         budget = (" De runs van ronde 1 en 2 zijn op een vast tijdsbudget gestopt, bij "
                   f"{100 * ev['maxtime_min']:.0f} tot {100 * ev['maxtime_max']:.0f} % van het "
                   "ingestelde maximum aantal metingen; de resultaatbestanden melden dat als "
-                  "waarschuwing.")
+                  "waarschuwing. Zo was het opgezet: het maximum was een bovengrens, geen doel "
+                  "(§6.2).")
     intro = f"""## Bijlage B: de uitslagen per analyse
 
 Deze bijlage geeft voor elk van de {len(S.TABLE_ORDER)} analyses de hoofduitkomsten: de waarde volgens de vooraf vastgelegde regel R5, de waarden bij vaste t = 1 en t = 2, de effectieve massa's bij t = 0 tot en met {T_MAX_APPENDIX}, de plaquette en de onderlinge consistentie van de stromen. Het zijn {len(S.TABLE_ORDER)} analyses van {ev['n_lattices']} roosters: op twee roosters is twee keer gemeten, en van elk van die paren is er ook een samengevoegde analyse.{budget} Alles wat de analyse verder heeft berekend, staat in `results/<ensemble>.json`.
 
 De getallen zijn door `pdf/make_pdf.py` rechtstreeks uit `results/<ensemble>.json` gezet; de verhouding m/√σ bij vaste t komt uit `results/independent/<ensemble>.json`. Notatie: `0.7263(125)` betekent 0,7263 ± 0,0125, alleen de statistische fout. Het aantal decimalen is zo gekozen dat de fout twee cijfers heeft; daardoor staan sommige getallen hier met een cijfer minder dan in de tabellen van het rapport (hier 1.203(26), daar 1.2035(259)); het is hetzelfde getal, anders afgerond. Een fout met een punt erin, zoals 1.1(1.4), betekent 1,1 ± 1,4.
 
-Hoe je dit leest: de effectieve massa hoort bij grotere t vlak te worden. Dat de waarden bij t = 1 en t = 2 binnen hun fout gelijk zijn, is daarvoor nodig maar bewijst het niet: de fout bij t = 2 is twee tot drie keer zo groot (§4.7). Bij grotere t groeit de fout snel; waarden waarvan de fout bijna zo groot is als de waarde zelf, zeggen niets meer. Alle massa's zijn schattingen die eerder te hoog dan te laag uitvallen (§3.1). Bij de consistentie van de stromen hoort χ² ongeveer gelijk te zijn aan het aantal vrijheidsgraden; een veel grotere waarde wijst op stromen die het onderling niet eens zijn. De analyses met "_combined" in de naam bevatten dezelfde data als de twee analyses die erin zijn samengevoegd.
+Hoe je dit leest: de effectieve massa hoort bij grotere t vlak te worden. Dat de waarden bij t = 1 en t = 2 binnen hun fout gelijk zijn, is daarvoor nodig maar bewijst het niet: de fout bij t = 2 is twee tot drie keer zo groot (§4.7). Bij grotere t groeit de fout snel; waarden waarvan de fout bijna zo groot is als de waarde zelf, zeggen niets meer. Alle massa's zijn schattingen die eerder te hoog dan te laag uitvallen (§3.1). Staat er bij R5 "geen plateau" of "geen meting", dan vond de regel geen vlak stuk; het getal dat erbij staat is dan alleen een bovengrens en telt niet als meting (§3.2). [t\\* = 1] zegt bij welke t de regel de waarde heeft afgelezen. Bij de consistentie van de stromen hoort χ² ongeveer gelijk te zijn aan het aantal vrijheidsgraden; een veel grotere waarde wijst op stromen die het onderling niet eens zijn. De analyses met "_combined" in de naam bevatten dezelfde data als de twee analyses die erin zijn samengevoegd.
 
 De figuren tonen per analyse de effectieve massa van de glueball (links) en de effectieve energie van de torelon (rechts) tegen de tijdsafstand t.
 """
@@ -560,11 +575,23 @@ def appendix_c(commit, branch):
                   ("results", "independent", "COMPARISON.md")):
         other.append(f"| `{'/'.join(parts)}` | `{h(*parts)}` |")
     checked = ""
-    if os.path.isfile(os.path.join(ROOT, "review", "pdfcheck", "README.md")):
-        checked = ("\n\nEen eerdere bouw van deze pdf is in drie afzonderlijke controles nagelopen: "
-                   "de getallen tegen de bestanden, elke pagina op opmaak, en de formulering van "
-                   "de nieuwe onderdelen. De fouten die daarbij zijn gevonden, zijn hersteld. De "
-                   "scripts en uitkomsten van die controles staan in `review/pdfcheck/`.")
+    have = lambda f: os.path.isfile(os.path.join(ROOT, "review", "pdfcheck", f))  # noqa: E731
+    if have("findings_v1.txt") and have("findings_v2.txt"):
+        checked = (
+            "\n\nEen eerdere bouw van deze pdf (44 pagina's) is in drie afzonderlijke controles "
+            "nagelopen, alle drie door hetzelfde AI-systeem: de getallen tegen de bestanden, elke "
+            "pagina op opmaak, en de formulering van de nieuwe onderdelen. Daarbij is geen fout "
+            "getal gevonden. Wel stond in bijlage B één waarde waar \"geen meting\" hoort, en "
+            "zeiden de nieuwe teksten op tien plaatsen meer dan de controlebestanden dragen. Die "
+            "punten en negen opmaakfouten zijn hersteld. Niet hersteld zijn enkele opmaakpunten: "
+            "de kleine tekst in de figuren, witruimte onderaan sommige pagina's, de bronregel van "
+            "tabel 1 die op de volgende pagina valt, en de voetregel op de titelpagina. Daarna "
+            "zijn de titelpagina, het hoofdstuk \"Verificatie\" en de inleidingen van bijlage B en "
+            "C herschreven. In een tweede ronde is die nieuwe tekst opnieuw nagelopen; de "
+            "formuleringen die toen nog te ruim waren, zijn aangepast. De bouw die je nu voor je "
+            "hebt, bevat die laatste aanpassingen; of en hoe die bouw zelf nog is nagelopen, "
+            "staat in `review/pdfcheck/README.md`, net als de scripts en bevindingen van de "
+            "eerdere rondes.")
     return f"""## Bijlage C: vingerafdrukken en hoe deze pdf is gemaakt
 
 Het rapport, de code en de resultaten in deze pdf zijn die van git-commit `{commit}` op de branch `{branch}`. De controle-uitvoer in `review/numcheck/out_final/` en het bouwscript in `pdf/` zijn daarna toegevoegd, samen met deze pdf. Met de vingerafdrukken hieronder kun je nagaan of een bestand dat je voor je hebt hetzelfde is als het bestand waaruit deze pdf is gemaakt (`sha256sum <bestand>`; vergelijk de eerste 16 tekens).
@@ -577,7 +604,7 @@ De pdf is gemaakt met:
 
 ```bash
 cd yang-mills
-python3 pdf/make_pdf.py        # schrijft REPORT.pdf; heeft pandoc, node met playwright en pypdf nodig
+python3 pdf/make_pdf.py        # schrijft REPORT.pdf; nodig: pandoc, node met playwright, matplotlib, pypdf
 ```
 
 Het script zet deze onderdelen achter elkaar: de titelpagina, het hoofdstuk "Verificatie", de volledige tekst van `REPORT.md`, en de bijlagen B en C. Aan de tekst van `REPORT.md` verandert het drie dingen: de titelregels vervallen omdat de pdf een eigen titelpagina heeft; de bijlage van het rapport heet hier "Bijlage A", ook in de twee verwijzingen ernaar; en de vier formules zijn als afbeelding gezet. Het script stopt met een foutmelding als een van de bestanden waaruit het aantallen leest ontbreekt of een afwijking meldt, of als `summarize.py` de opgeslagen samenvatting niet exact reproduceert. Het script zelf valt buiten de testsuite.{checked}

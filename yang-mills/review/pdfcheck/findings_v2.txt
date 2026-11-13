@@ -1,0 +1,137 @@
+Second review round, on build v2 (42 pages). Only the review of the wording completed; the
+number check and the layout check of this round were cut off by a usage limit and were run
+again later on the next build (see README.md).
+
+====================================================================================================
+REVIEW: pdf-honesty-v2
+====================================================================================================
+
+SUMMARY
+OVERCLAIMS: no sentence claims a proof, a solution or a shown mass gap, and the "not" now comes early and plainly (title box, first paragraph of "Verificatie", items 1-3); but eight sentences in the rewritten parts still say a little more than the evidence files show. The worst is appendix C ("De fouten die daarbij zijn gevonden, zijn hersteld").
+
+Checked (nothing edited; protected files untouched, `git status` shows only the untracked REPORT.pdf):
+- Text: pdftotext of REPORT_v2.pdf p. 1-5, 28, 42 against document_v2.md (all 209 sentences of the new parts are in the PDF text); renders of p. 1, 3, 4, 42; full diff of document_v1.md against document_v2.md.
+- Row 1 (git): slow_out_0..3 committed in 7c6ee85, pytest_final_tree.txt in 34500c9; `git diff 7c6ee85 HEAD` on ym, tests, analyze.py, summarize.py, independent_analysis.py, run_production.py changes only summarize.py, and only in _ratio_panel and make_figures (plot code). The 29 slow ids sit in four test files, none of which imports summarize. 340 + 29 = 369; 7+8+7+7 = 29. Supported.
+- Row 2: re-ran the 14 tests on the current tree (14 passed; all 78 number lines identical to review/report/t_rP.txt). 16 "[g]" comparisons, max 1.42 sigma; Schwinger-Dyson at six couplings on 8^3 and 6^4, -1.98 to +0.62 sigma; limit 4 sigma in the tests. But the same file holds 16 more two-dimensional comparisons with a largest deviation of 2.24 sigma.
+- Row 4: COMPARISON.md gives 13 ensembles, 3.4e-10, flags 4+2+17+9+3+5 = 40. 29 of the 40 concern re-binning and the beta = 9 run (report 4.2-4.4); the other 11 do not.
+- Row 5: 24 lines "bit-identical: N of N", 8 x 500 + 16 x 20 = 4320; 296056 measurements and 40 streams in rounds 1-2 recomputed from summary.json. Supported.
+- Rows 7, 9: re-imported check2/check4 (21 + 103 = 124, 0 mismatches); round 3 is 6.702 sigma against a 3.0 sigma criterion in summary.json; no MISMATCH in out_final. Supported.
+- Row 8: counts 273 / 257 / 14 / 2 match the stored trace_tokens.txt, but a re-run of trace_tokens.py on the current tree prints 0 / 0.
+- Appendix B: 8 to 41 % (0.083 to 0.409 over 40 streams), 13 analyses of 9 lattices, d3_b6.0_L24 now "geen meting". Appendix C: 30 of 30 fingerprints match.
+
+The 12 status words fit their evidence, except "teruggevonden" for the 14 weak matches of row 8 and the number 1,4 sigma in row 2.
+v1 honesty findings: 18 of 21 applied as proposed, 3 applied differently ([6] and [12] row 2: lattice sizes dropped, 2,2 sigma became 1,4 sigma; [11]: the sentence defining "klopt" was dropped and the "not" list still follows the table). Not fixed from the other two reviews: layout notes 13, 14, 15, 16a (still present in v2) and the caveat of numbers finding 3.
+Consistency: title page, verification item 3, section 0 and section 5.1 say the same about three dimensions (stable at fixed t, but the pre-registered beta = 9 point did not replicate, so post hoc) and four (only m proportional to 1/L excluded at beta = 2,4 and 2,5, two box sizes, no scaling).
+Scratch: <qa>/honesty2/ (t_rP_rerun.txt, tt/rerun_now.txt, tt/token_trace.json).
+
+
+[1] severity: major
+    where: PDF p. 42, appendix C, last paragraph; pdf/make_pdf.py appendix_c() (variable `checked`); also review/pdfcheck/README.md last paragraph
+    claim: "De fouten die daarbij zijn gevonden, zijn hersteld" is too absolute, and the paragraph does not say that the rewritten build had not been checked when it was written. Several v1 findings are still open in v2.
+    evidence: Still present in REPORT_v2.pdf: layout note 13 (Tabel 1 is on p. 9, its source note "Herkomst: [P]; dezelfde getallen in [S §1a]" is line 3 of p. 10); layout 16a (footer "pagina 1 van 42" on the title page); layout 14 and 15 (figure PNGs unchanged; p. 5 mostly empty). Honesty finding 11 only partly applied (definition of "klopt" dropped; "Wat niet bevestigd is" still after the table). Honesty finding 12 row 2 applied with a different number (see next finding). Numbers finding 3: its caveat that 12 of the 14 weak matches are coincidences is not in row 8. The task context states that nobody had checked build v2. review/pdfcheck/README.md says the same thing ("Al deze punten zijn daarna ... verwerkt").
+    fix: Old: "Een eerdere bouw van deze pdf is in drie afzonderlijke controles nagelopen: de getallen tegen de bestanden, elke pagina op opmaak, en de formulering van de nieuwe onderdelen. De fouten die daarbij zijn gevonden, zijn hersteld. De scripts en uitkomsten van die controles staan in `review/pdfcheck/`." -> New: "Een eerdere bouw van deze pdf (44 pagina's) is in drie afzonderlijke controles nagelopen, alle drie door hetzelfde AI-systeem: de getallen tegen de bestanden, elke pagina op opmaak, en de formulering van de nieuwe onderdelen. Daarbij is geen fout getal gevonden. Wel stond in bijlage B één waarde waar "geen meting" hoort, en zeiden de nieuwe teksten op tien plaatsen meer dan de controlebestanden dragen. Die punten en negen opmaakfouten zijn hersteld. Niet hersteld zijn enkele opmaakpunten: de kleine tekst in de figuren, witruimte onderaan sommige pagina's, de bronregel van tabel 1 die op de volgende pagina valt, en de voetregel op de titelpagina. Daarna zijn de titelpagina, het hoofdstuk "Verificatie" en de inleidingen van bijlage B en C herschreven, en is die nieuwe bouw in een tweede ronde nagelopen. De scripts en bevindingen van beide rondes staan in `review/pdfcheck/`." Use the last two sentences only if the findings of this round are stored there (for example as findings_v2.txt) and processed; otherwise write: "Daarna zijn de titelpagina, het hoofdstuk "Verificatie" en de inleidingen van bijlage B en C herschreven; die herschreven tekst is niet opnieuw nagelopen."
+
+
+[2] severity: minor
+    where: PDF p. 3, verification row 2; pdf/make_pdf.py evidence() (regex for `dev2`) and verification() row 2; review/report/t_rP.txt
+    claim: "16 vergelijkingen, grootste afwijking 1,4σ" is the maximum of a subset. The cited file contains 16 more comparisons with exactly known two-dimensional results, and their largest deviation is 2,24σ. The v1 review had proposed 2,2σ.
+    evidence: t_rP.txt: 16 lines "[g] D=2 ... dev = ...", max |dev| 1.42 (W(1,2) at beta 2.5). The same file: test_d2_torelon_energy_and_string_tension_exact prints 7 pulls (up to +1.61) and test_d2_plaquette_and_null_test prints 9 ("tau=2 C/C(0) = -0.00175 +- 0.00078 pull -2.24"). The build script only matches the "[g]" lines. My re-run on the current tree (honesty2/t_rP_rerun.txt): 14 passed, 355 deselected, numbers identical; regex count 16 dev + 16 pull = 32, max 2.24. All are below the 4σ limit asserted in the tests, so "klopt binnen de fout" still holds. The rest of the row is supported: six couplings, lattices 8^3 and 6^4 (tests/test_adversarial.py SD_PRODUCTION), -1.98 to +0.62.
+    fix: make_pdf.py evidence(): add `pull2 = [float(x) for x in re.findall(r"pull ([+-]\d+\.\d+)", rp)]`, then `ev["n_2d"] = len(dev2) + len(pull2)` and `ev["max_2d"] = max(abs(x) for x in dev2 + pull2)`. Text old: "geeft de simulatie die uitkomst terug binnen de statistische fout: 16 vergelijkingen, grootste afwijking 1,4σ (de grens was vooraf 4σ)." -> New: "geeft de simulatie die uitkomst terug binnen de statistische fout: 32 vergelijkingen in de testuitvoer, grootste afwijking 2,2σ (de grens was vooraf 4σ)." Alternative without code change: "... 16 vergelijkingen van plaquette en Wilson-lussen, grootste afwijking 1,4σ; in de twee andere tests in hetzelfde bestand (energie van de fluxbuis en een nultest) is de grootste afwijking 2,2σ (de grens was vooraf 4σ)."
+
+
+[3] severity: minor
+    where: PDF p. 4, verification row 8; pdf/make_pdf.py verification() row 8; review/numcheck/trace_tokens.py lines 45-47
+    claim: "Teruggevonden betekent dat het getal een bron heeft" is not established for the 14 numbers of the "zwakkere getalsvergelijking". The counts 273 / 257 / 14 / 2 themselves are right.
+    evidence: trace_tokens.py accepts a token when its value is near any float and its error near any float anywhere in the same JSON file, unpaired. The v1 numbers review (finding 3) found a paired origin for only 2 of the 14. My grep over the project (excluding review/pdfcheck and pdf/build) for 12 of the 14 strings: 10 occur only in REPORT.md and in trace_tokens.txt itself, among them 0.860(60), 1.17(11), 0.874(78), which the report says it quotes from a review report. The 257 hold: 254 are literal strings in computed output (results/summary.md, COMPARISON.md, results/logs, review/report/*.txt) and 3 in run_round3_production.sh.
+    fix: Old: "14 zijn alleen via een zwakkere getalsvergelijking met de resultaatbestanden gevonden; 2 zijn met de hand opgezocht in de testuitvoer. Teruggevonden betekent dat het getal een bron heeft, niet dat het opnieuw is uitgerekend." -> New: "voor 14 is alleen een los getal met ongeveer dezelfde waarde in een resultaatbestand gevonden, en dat is geen sluitende herkomst (het zijn vooral afgeleide getallen en getallen die uit een controleverslag zijn overgenomen); 2 zijn met de hand opgezocht in de testuitvoer. Teruggevonden betekent voor de 257 en de 2 dat het getal een aanwijsbare bron heeft, niet dat het opnieuw is uitgerekend."
+
+
+[4] severity: minor
+    where: review/numcheck/trace_tokens.py line 5 (glob 'review/*/*.txt'); review/pdfcheck/findings_v1.txt; verification row 8
+    claim: The evidence file of row 8 no longer reproduces. Re-running trace_tokens.py on the current tree reports 0 untraced and 0 weak matches, because the new file review/pdfcheck/findings_v1.txt quotes all 16 tokens and is read as a source.
+    evidence: Run from a scratch directory with PYTHONPATH=review/numcheck (output in honesty2/tt/rerun_now.txt): "distinct tokens: 273 untraced by literal/pool match: 0" and "pool-only ...: 0". token_trace.json lists review/pdfcheck/findings_v1.txt as the only file for all 16 tokens. The stored out_final/trace_tokens.txt (2 untraced, 14 pool-only) dates from before that file existed. If out_final is regenerated before a rebuild, row 8 would print 273 literal, 0 and 0, which is false.
+    fix: Do not regenerate review/numcheck/out_final/trace_tokens.txt as the script stands. Either exclude the pdf review from the sources in trace_tokens.py (after building `srcs`: `srcs = {k: v for k, v in srcs.items() if not k.startswith('review/pdfcheck/')}`), or add to review/pdfcheck/README.md: "Let op: `review/numcheck/trace_tokens.py` leest alle `review/*/*.txt`. Sinds `findings_v1.txt` hier staat, vindt dat script de 16 daar aangehaalde getallen letterlijk terug. De uitvoer in `review/numcheck/out_final/trace_tokens.txt` (257 / 14 / 2) is van vóór dit bestand en is de juiste."
+
+
+[5] severity: minor
+    where: PDF p. 3, first paragraph under "Wat bevestigd is"; pdf/make_pdf.py verification()
+    claim: "De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn ... berekend met geteste code en met een tweede, apart geschreven analyse nagerekend" is too broad for appendix B and for the ratio at fixed t.
+    evidence: results/independent/<ens>.json, comparison_with_pipeline.rows: 219 numbers in all (plaquette, effective masses at t = 0 to 3 and m1-m2 for glueball and torelon, a√σ at t = 1 and 2, the R5 ratio). Not in the comparison: the 68 effective masses at t = 4 to 6 printed in appendix B, and the χ², warm-minus-cold and autocorrelation numbers there. The ratio m/√σ at fixed t is produced only by independent_analysis.py, which no test file mentions; its value equals the quotient of the pipeline numbers (my check: largest difference 2e-8 of the error), but its correlated error has no second source (err_jack over uncorrelated propagation: 0.90 to 1.03).
+    fix: Old: "De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn wat de opgeslagen meetdata opleveren, berekend met geteste code en met een tweede, apart geschreven analyse nagerekend." -> New: "De meetuitkomsten in dit document (de tabellen in §0 en §3.2 en bijlage B) zijn wat de opgeslagen meetdata opleveren, berekend met geteste code. De hoofdgetallen (plaquette, effectieve massa's bij t = 0 tot en met 3, snaarspanning bij t = 1 en 2, en de verhouding volgens regel R5) zijn met een tweede, apart geschreven analyse nagerekend. Voor de effectieve massa's bij t = 4 tot en met 6 en de consistentiegetallen in bijlage B is dat niet gedaan. De verhouding m/√σ bij vaste t komt uit die tweede analyse: de waarde volgt ook uit de getallen van de eerste, de fout niet."
+
+
+[6] severity: minor
+    where: PDF p. 3, verification row 4, last sentence; pdf/make_pdf.py verification() row 4; results/independent/COMPARISON.md section 9
+    claim: "Het gaf daarnaast 40 automatische signaleringen; de belangrijkste zijn besproken in §4.2 tot en met §4.4" is a new, unreviewed judgement that holds for 29 of the 40. The word "signaleringen" is not explained, so a reader can take it for 40 errors.
+    evidence: COMPARISON.md section 9: 17 re-binning flags and 12 flags on d3_b9.0_L24 (thermalisation cut 3, time history 5, first chunk 4) are the subject of report 4.2, 4.3 and 4.4; 13 of the 17 re-binning flags are named there explicitly (β = 12, the β = 9 repeat, d4_b2.4_L12). The other 11 are of kinds not treated in 4.2-4.4: 9 "stream chi2 small" flags (d4_b2.4_L16 plaquette and glueball m2, d4_b2.5_L16_combined torelon m2; the d4_b2.4_L16 plaquette appears only in 4.9) and 2 bootstrap-error mismatches for m_eff(3). COMPARISON.md itself says: "a flag is a prompt to look, not a verdict".
+    fix: Old: "Het gaf daarnaast 40 automatische signaleringen; de belangrijkste zijn besproken in §4.2 tot en met §4.4." -> New: "Het gaf daarnaast 40 automatische signaleringen: plekken waar een getal een vooraf ingestelde grens overschrijdt. Dat zijn aanleidingen om te kijken, geen vastgestelde fouten. De meeste gaan over foutmarges bij grotere blokken en over het punt bij β = 9 en zijn besproken in §4.2 tot en met §4.4; die over de onderlinge consistentie van de stromen in vier dimensies komen alleen voor een deel aan bod (§4.9)."
+
+
+[7] severity: minor
+    where: PDF p. 3, paragraph above the verification table; pdf/make_pdf.py verification()
+    claim: The sentence that says what the status words mean, proposed in v1 honesty finding 11, was not adopted. Six rows carry a green "klopt" and nothing on these pages says that it means agreement with the files and not physical correctness.
+    evidence: document_v2.md line 15 ends with "... gelezen of uit `results/summary.json` berekend." The v1 proposal ended with "“Klopt” en “nagerekend” betekenen hier: ... Het betekent niet dat de uitkomst natuurkundig juist is." Only the title page says something similar ("of dat de natuurkundige conclusies vaststaan"). Render of p. 3 shows the green status words.
+    fix: Append to that paragraph: "“Geslaagd”, “klopt” en “nagerekend” betekenen hier: de test is geslaagd, of het getal in de tekst is gelijk aan wat de bestanden opleveren. Het betekent niet dat de uitkomst natuurkundig juist is."
+
+
+[8] severity: minor
+    where: PDF p. 5, "In één zin"; pdf/make_pdf.py verification()
+    claim: "De getallen in dit document kloppen met de opgeslagen data" brings back the broad wording that the opening paragraph and the title page narrowed to "de meetuitkomsten". The heading promises one sentence and gives two.
+    evidence: Items 4 and 7 of the same section exclude the literature values and part of the [C1]/[C2] numbers; row 8 has 14 numbers without a firm source. Opening paragraph and title page: "de meetuitkomsten in dit document zijn nagerekend".
+    fix: Old: "### In één zin" + "De getallen in dit document kloppen met de opgeslagen data en het rekenwerk is nagelopen; ze lossen het millenniumprobleem niet op en tonen geen massakloof aan. Wat ze wel zeggen, staat in §0 en §5." -> New: "### Kort gezegd" + "De meetuitkomsten in dit document kloppen met de opgeslagen data en het rekenwerk is nagelopen, door hetzelfde AI-systeem en door geen mens. Ze lossen het millenniumprobleem niet op en tonen geen massakloof aan. Wat ze wel zeggen, staat in §0 en §5."
+
+
+[9] severity: note
+    where: PDF p. 42, appendix C, first paragraph and the build command; pdf/make_pdf.py appendix_c()
+    claim: "... zijn daarna toegevoegd, samen met deze pdf" is not true yet: REPORT.pdf is untracked. The comment on the build command omits matplotlib.
+    evidence: `git status --short .` prints only "?? REPORT.pdf"; `git log --all -- REPORT.pdf` is empty. pdf/ and review/numcheck/out_final/ are in commit c7ec79a (15:42:39, after the build of 15:41:13). The make_pdf.py docstring lists matplotlib; render_formula imports it.
+    fix: Commit REPORT.pdf with the final build, or change old: "zijn daarna toegevoegd, samen met deze pdf." -> new: "zijn daarna toegevoegd, in een latere commit op dezelfde branch." Command comment old: "heeft pandoc, node met playwright en pypdf nodig" -> new: "heeft pandoc, node met playwright, matplotlib en pypdf nodig".
+
+
+[10] severity: note
+    where: PDF p. 1, subtitle; pdf/make_pdf.py title_page()
+    claim: The subtitle "wat het wel en niet bewijst" stands two lines above "Het bevat geen bewijs". It claims no proof, but "wat het wel bewijst" can be read as saying that something is proven.
+    evidence: Render of p. 1. The line is copied from the subtitle of REPORT.md; the section 5 heading uses the same words and cannot be changed here.
+    fix: Optional, title page only. Old: "wat er gemeten is, hoe het gecontroleerd is, en wat het wel en niet bewijst" -> New: "wat er gemeten is, hoe het gecontroleerd is, en wat het wel en niet laat zien".
+
+
+[11] severity: note
+    where: PDF p. 3-5, verification pages: wording for a non-physicist
+    claim: The Dutch is correct and the terms match the report (stromen, massakloof, rooster, doos, bins/blokken). Four small points remain: "glueballmassa's" is used before the term is explained in section 0; "R5-getal" is unexplained in item 6; "opnieuw gerekend" is unidiomatic; the table uses decimal commas although the reading guide on p. 2 says all numbers in tables have a decimal point.
+    evidence: Rows 3 and 7 and item 4 use "glueballmassa's"; the gloss ("het lichtste deeltje (de 'glueball')") first appears on p. 6. Item 6: "De foutmarge van een R5-getal". Row 4: "zijn opnieuw gerekend uit de ruwe data". Leeswijzer: "in tabellen geldt dat voor alle getallen"; the table has 1,4σ, 3,4·10⁻¹⁰, 1,5 %.
+    fix: Row 3 old: "De productieruns en de glueballmassa's zijn niet met de tweede simulatie nagerekend (§2)." -> new: "De productieruns en de massa's van het lichtste deeltje (de "glueball") zijn niet met de tweede simulatie nagerekend (§2)." Item 6 old: "De foutmarge van een R5-getal is bovendien te klein (§2)." -> new: "De foutmarge van een getal volgens de vooraf vastgelegde regel R5 is bovendien te klein (§2)." Row 4 old: "zijn opnieuw gerekend uit de ruwe data" -> new: "zijn opnieuw berekend uit de ruwe data". Add to the paragraph above the table: "In de tabel hieronder staat lopende tekst, met decimale komma's."
+
+
+[12] severity: note
+    where: PDF p. 3, verification row 5
+    claim: A reader who wants to check "correct" is not told on these pages that the raw data are not in the repository.
+    evidence: Report 6.1 item 15: "Ruwe data staan niet in git; ze zijn reproduceerbaar uit de seeds"; .gitignore lists results/raw/. Row 5 itself is supported (24 streams, 4320 measurements, 1,5 % of 296056, 16 + 4 streams not regenerated).
+    fix: Append to row 5: "De ruwe data zelf staan niet in git; wie ze wil controleren, moet de simulatie opnieuw draaien (§6.1, §6.2)."
+
+
+[13] severity: note
+    where: PDF p. 28, appendix B introduction; pdf/make_pdf.py appendix_b()
+    claim: The new statements are correct. Two things a reader meets in the tables are not explained: "geen meting" / "geen plateau ... bovengrens" and "[t* = 1]". The time-budget sentence does not say that this was the design.
+    evidence: From results/<ens>.json warnings: all 40 streams of rounds 1 and 2 stopped with reason maxtime at 0.083 to 0.409 of the cap, so "8 tot 41 %" is right; round 3 has no warning. 13 analyses = 9 lattices + 2 repeats + 2 combined (summary.json). d3_b6.0_L24 now shows "geen meting" in all three R5 cells. "twee tot drie keer zo groot (§4.7)" and "eerder te hoog dan te laag (§3.1)" match the report. Report 6.2 says each stream had a time budget.
+    fix: Add after "Hoe je dit leest: ...": "Staat er bij R5 "geen plateau" of "geen meting", dan vond de regel geen vlak stuk; het getal dat erbij staat is dan alleen een bovengrens en telt niet als meting (§3.2). [t* = 1] zegt bij welke t de regel de waarde heeft afgelezen." Optional, old: "de resultaatbestanden melden dat als waarschuwing." -> new: "de resultaatbestanden melden dat als waarschuwing. Zo was het opgezet: het maximum was een bovengrens, geen doel (§6.2)."
+
+
+[14] severity: note
+    where: New statements that hold as written: row 1, row 2 (other than the 1,4σ), row 5, row 9, item 2 of "Wat niet bevestigd is"
+    claim: These unreviewed statements are supported by the evidence.
+    evidence: Row 1: see summary (git diff 7c6ee85..HEAD touches only plot code in summarize.py; no slow test imports it; 340 + 29, 7+8+7+7). review/numcheck/pytest_default.txt (564 s) is the earlier standard run that report section 2 describes; pytest_final_tree.txt (560 s) is the run on the final tree, so "kort daarvoor" in row 1 and "daarna" in section 2 refer to two different standard runs and do not contradict. Row 2: six couplings, 8^3 and 6^4, limit 4σ in the asserts. Row 9: check2.txt and check3.txt contain no MISMATCH; summary.json round3.t1.measured_minus_A.sigma = 6.7022, criterion_sigma 3.0, reading_A_excluded true; the unasserted "2,1 tot 2,3σ" of report 3.5 is reproduced by my own calculation (2.08 and 2.35). Item 2: independent_analysis.py imports only numpy and scipy and reads the same raw files and the pipeline bin size; review/numcheck/*.py import only lib, check2 and ym.exact and read the same result JSONs.
+    fix: none
+
+
+[15] severity: note
+    where: review/pdfcheck/findings_v1.txt, review "pdf-honesty", findings 1-21, against document_v2.md
+    claim: Status of each v1 honesty finding.
+    evidence: Applied with the proposed text: 1 (now item 3), 2 (items 4, 5, 6), 3 (now item 2), 4, 5 (row 7), 7 (row 8), 8 (row 5, counts now parsed), 10, 13 (row 4, with a guard on max_dev), 14 (row 9, with a MISMATCH guard), 15 (rows 10-12; the commit hash was left out of the "where" cell of row 12, which is harmless), 16 (appendix B introduction and heading), 17 (title page; pdf/ and out_final now committed in c7ec79a), 18 ("stromen"; "reeks" survives only in "(meetreeksen)"), 19 (appendix C; the sentence about rows 2 and 3 was replaced by "Het script zelf valt buiten de testsuite", acceptable since t_rP.txt is now parsed), 20 (glosses). Fixed in code: 9 (no_ratio flag; cell reads "geen meting"). Applied differently: 6 (row 3 without the lattice sizes, still accurate); 12 (status words exactly as proposed, row 1 verbatim, row 2 with 1,4σ of 16 instead of 2,2σ and without the lattice sizes; see the row 2 finding); 11 (opening paragraph verbatim, but the definition of "klopt" was dropped and "Wat niet bevestigd is" still follows the table; the section runs over p. 3-5). 21 needed no change.
+    fix: none beyond the findings above
+
+
+[16] severity: note
+    where: PDF p. 1 (status box), p. 3-4 (opening paragraph, item 3, row 9), p. 6 (section 0), p. 23 (section 5.1)
+    claim: The four places say the same about three and four dimensions, and the order of the verification pages is right.
+    evidence: Title page: "redelijk in drie dimensies, zwak in vier" and "een massakloof is er niet mee aangetoond"; section 0 uses the same words. Item 3: in three dimensions m/√σ is nearly constant, but the pre-registered β = 9 point did not replicate, "een keuze achteraf"; this matches section 3.4 ("dit is dus een uitspraak achteraf") and 6.1 item 8. In four dimensions only m ∝ 1/L is excluded at β = 2,4 and 2,5 with two box sizes, the ratio still rises, no continuum value; this matches section 0 and 5.1 ("is er naast (a) niets"). Row 9 repeats that the three-dimensional pre-registered test failed. The "not" is in the second and third sentence of the section, before the table. Small wording difference only: title page and section 0 say "aanwijzingen", the page footer and the "Vooraf" box say "numeriek bewijsmateriaal".
+    fix: none
