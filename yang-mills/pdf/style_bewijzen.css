@@ -1,0 +1,84 @@
+/* Print stylesheet for BEWIJZEN.pdf (A4, Chromium). The @font-face rules for "STIX Text" are
+   added by make_bewijzen_pdf.py; formulas are vector images typeset in the STIX math fonts. */
+@page { size: A4; }
+html { font-size: 10.4pt; }
+body {
+  font-family: "STIX Text", "DejaVu Serif", "Liberation Serif", serif;
+  color: #1a1c20; line-height: 1.47; margin: 0; background: #fff;
+  text-align: justify; hyphens: auto;
+}
+p { margin: 0 0 0.62em 0; orphans: 3; widows: 3; }
+h1, h2, h3, h4 { font-weight: bold; line-height: 1.22; break-after: avoid; color: #111418; text-align: left; hyphens: manual; }
+h2 { font-size: 15.5pt; margin: 1.7em 0 0.6em 0; padding-bottom: 0.16em; border-bottom: 1.1px solid #b9bfc8; break-before: page; }
+h2:first-of-type { margin-top: 0; }
+h3 { font-size: 12.2pt; margin: 1.3em 0 0.45em 0; }
+h4 { font-size: 10.8pt; margin: 1.1em 0 0.4em 0; }
+hr { display: none; }
+a { color: #1f4f8f; text-decoration: none; }
+ul, ol { margin: 0 0 0.62em 0; padding-left: 1.5em; }
+li { margin-bottom: 0.28em; }
+li > p { margin-bottom: 0.28em; }
+strong { font-weight: bold; }
+code {
+  font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 0.8em;
+  background: #f1f3f6; padding: 0.03em 0.24em; border-radius: 2.5px; overflow-wrap: anywhere;
+}
+
+/* formulas */
+img.m { display: inline-block; margin: 0; }
+span.qed { font-family: "DejaVu Sans", sans-serif; font-size: 0.8em; margin-left: 0.3em; }
+img.m.rel { margin-left: 0.2em; }   /* a piece of a long formula that starts with a relation sign */
+div.display { margin: 0.7em 0 0.8em 0; text-align: center; break-inside: avoid; }
+span.formula { display: block; position: relative; text-align: center; margin: 0.55em 0 0.6em 0; break-inside: avoid; }
+div.display span.formula { margin: 0; }
+span.formula img.m { max-width: 100%; height: auto; }
+span.eqtag { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+table.aligned { width: auto; margin: 0 auto; border-collapse: collapse; font-size: inherit; }
+table.aligned td { border: 0; padding: 0.16em 0; background: none !important; vertical-align: baseline; }
+table.aligned td.al { text-align: right; }
+table.aligned td.ar { text-align: left; }
+p:has(+ div.display) { break-after: avoid; margin-bottom: 0.2em; }
+
+/* theorems, lemmas, propositions: the blockquotes of the source */
+blockquote {
+  margin: 0.8em 0 0.95em 0; padding: 0.6em 0.95em 0.55em 0.95em; background: #f5f2e9;
+  border-left: 3.2px solid #a9822c; border-radius: 0 4px 4px 0; break-inside: avoid-page;
+}
+blockquote p:last-child, blockquote ol:last-child, blockquote li:last-child { margin-bottom: 0; }
+blockquote ol { padding-left: 1.4em; }
+
+table {
+  border-collapse: collapse; width: 100%; margin: 0.5em 0 1em 0; font-size: 8.9pt;
+  line-height: 1.32; text-align: left; hyphens: manual;
+}
+p:has(+ table) { break-after: avoid; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+table:not(.aligned):not(.meta) { break-inside: avoid; }
+th {
+  text-align: left; font-weight: bold; background: #eceff3; border-bottom: 1px solid #aab1bb;
+  padding: 0.34em 0.5em; vertical-align: bottom;
+}
+td { padding: 0.3em 0.5em; border-bottom: 0.5px solid #d9dde3; vertical-align: top; }
+
+/* title page */
+.titlepage { height: 245mm; display: flex; flex-direction: column; justify-content: center; break-after: page; text-align: left; hyphens: manual; }
+.titlepage .kicker { font-size: 11pt; letter-spacing: 0.08em; text-transform: uppercase; color: #5a626e; margin-bottom: 1.1em; }
+.titlepage .doctitle { font-size: 31pt; font-weight: bold; margin: 0 0 0.35em 0; border: 0; break-before: auto; }
+.titlepage .subtitle { font-size: 13.5pt; color: #2f353d; max-width: 150mm; margin-bottom: 2.2em; line-height: 1.35; }
+.statusbox { border: 1.3px solid #a9822c; background: #faf5e8; border-radius: 5px; padding: 1em 1.2em; max-width: 160mm; margin-bottom: 2em; }
+.statusbox p { font-size: 11pt; margin-bottom: 0.55em; }
+.statusbox p:last-child { margin-bottom: 0; }
+table.meta { width: auto; font-size: 9.6pt; margin: 0; }
+table.meta td { border: 0; padding: 0.16em 1.4em 0.16em 0; background: none; }
+table.meta td:first-child { color: #5a626e; }
+
+/* contents */
+nav#TOC { break-after: page; text-align: left; hyphens: manual; }
+nav#TOC::before { content: "Inhoud"; display: block; font-size: 15.5pt; font-weight: bold; margin-bottom: 0.7em; padding-bottom: 0.16em; border-bottom: 1.1px solid #b9bfc8; }
+nav#TOC ul { list-style: none; padding-left: 0; margin: 0; }
+nav#TOC > ul > li { margin: 0.5em 0 0.2em 0; font-weight: bold; font-size: 10.6pt; }
+nav#TOC ul ul { padding-left: 1.3em; margin-top: 0.16em; }
+nav#TOC ul ul li { font-weight: normal; font-size: 9.8pt; margin: 0.1em 0; }
+nav#TOC a { color: #1a1c20; display: flex; justify-content: space-between; gap: 1.5em; }
+nav#TOC .pg { font-weight: normal; color: #3a4049; }
