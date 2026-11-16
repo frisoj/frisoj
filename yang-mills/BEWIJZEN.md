@@ -19,17 +19,17 @@ De Yang–Mills-theorie beschrijft de sterke kernkracht. Het millenniumprobleem 
 Op een **rooster** wordt ruimte en tijd in hokjes verdeeld, met afstand $a$ tussen naburige punten. Daar is de theorie wél sluitend gedefinieerd. Het echte probleem zit in de limiet $a \to 0$. Dit document bewijst wat er op het rooster te bewijzen valt:
 
 - **Stelling A.** Op elk eindig rooster, bij elke sterkte van de koppeling, is er precies één toestand van laagste energie en ligt de eerstvolgende toestand een eindig stuk hoger. De kloof is dus groter dan nul. De stelling zegt niets over hoe groot de kloof blijft als het rooster groeit of fijner wordt.
-- **Stelling B.** In twee dimensies (één ruimte- en één tijdrichting) is alles exact uit te rekenen: alle energieniveaus, de kloof, en de limiet $a \to 0$. Die limiet bestaat en heeft een kloof. Twee dimensies is wel een veel eenvoudiger wereld dan de onze.
+- **Stelling B.** In twee dimensies (één ruimte- en één tijdrichting) zijn alle energieniveaus en de kloof exact uit te rekenen, ook in de limiet $a \to 0$. De energieniveaus hebben in die limiet een eindige waarde, en de kloof blijft bestaan. Twee dimensies is wel een veel eenvoudiger wereld dan de onze.
 - **Stelling C.** Bij sterke koppeling (kleine $\beta$) is de kloof in elke dimensie, ook in drie en vier, groter dan een expliciet getal dat **niet** afhangt van de grootte van het rooster. De kloof verdwijnt daar dus niet als het volume naar oneindig gaat.
 
-Wat ontbreekt: de limiet $a \to 0$ in vier dimensies ligt bij $\beta \to \infty$. Stelling C werkt in vier dimensies alleen voor $\beta \lt 0{,}0556$. De simulaties in het rapport (`REPORT.md`) liggen bij $\beta$ tussen 2,2 en 2,5. Tussen "bewezen" en "nodig" zit dus het hele gebied waar het om gaat.
+Wat ontbreekt: de limiet $a \to 0$ in vier dimensies ligt bij $\beta \to \infty$. Stelling C werkt in vier dimensies alleen voor $\beta \lt 0{,}0556$. De simulaties in het rapport (`REPORT.md`) liggen in vier dimensies bij $\beta$ tussen 2,3 en 2,5. Tussen "bewezen" en "nodig" zit dus het hele gebied waar het om gaat.
 
 ### Overzicht
 
 | | geldt voor | uitspraak | wat het niet zegt |
 |---|---|---|---|
 | **Stelling A** | elke dimensie $D \geq 2$, elke $\beta \gt 0$, elk eindig rooster | positieve overdrachtsmatrix, uniek vacuüm, kloof $m \gt 0$ | geen ondergrens die standhoudt als het volume groeit |
-| **Stelling B** | $D = 2$, elke $\beta \gt 0$, elke omtrek | exact spectrum; kloof $m = L \ln\big(I_1(\beta)/I_2(\beta)\big)$; continuümlimiet met kloof $\tfrac38 g^2 \ell$ | niets over $D = 3$ of $D = 4$ |
+| **Stelling B** | $D = 2$, elke $\beta \gt 0$, elke omtrek | exact spectrum; kloof $m = L \ln\big(I_1(\beta)/I_2(\beta)\big)$; continuümlimiet van het spectrum, met kloof $\tfrac38 g^2 \ell$ | niets over $D = 3$ of $D = 4$ |
 | **Stelling C** | elke $D \geq 2$, $\beta \lt \beta_0(D)$, elk volume | kloof $m \geq \ln\big(1/(6(D-1)\tanh\beta)\big)$, uniform in het volume; limiet van oneindig volume bestaat | niets voor $\beta \geq \beta_0(D)$, dus niets over de continuümlimiet |
 | **Millenniumprobleem** | $D = 4$, continuüm ($\beta \to \infty$), oneindig volume | bestaan én kloof | **niet bewezen**, hier noch elders |
 
@@ -68,7 +68,7 @@ De plaquette $p$ **bevat** de vier links $(x,\mu)$, $(x+\hat\mu,\nu)$, $(x+\hat\
 - **(R1)** Elke link $(x,\mu)$ ligt in precies $2(D-1)$ plaquettes: voor elke richting $\nu \neq \mu$ de twee plaquettes in het $(\mu,\nu)$-vlak aan weerszijden van de link.
 - **(R2)** Voor twee links $\ell \neq k$ schrijven we $n_{\ell k}$ voor het aantal plaquettes dat beide bevat. Uit (R1) volgt $\sum_{k \neq \ell} n_{\ell k} = 3 \cdot 2(D-1) = 6(D-1)$: elke plaquette door $\ell$ bevat drie andere links.
 
-Twee links heten **buren** als $n_{\ell k} \geq 1$. De **linkafstand** $d(k, \ell)$ is het kleinste aantal stappen van buur naar buur waarmee je van $k$ naar $\ell$ komt (oneindig als dat niet kan), en $d(k, B) = \min_{\ell \in B} d(k,\ell)$ voor een verzameling links $B$.
+Twee links heten **buren** als $n_{\ell k} \geq 1$. De **linkafstand** $d(k, \ell)$ is het kleinste aantal stappen van buur naar buur waarmee je van $k$ naar $\ell$ komt (oneindig als dat niet kan). Voor verzamelingen links $A, B$ zetten we $d(k, B) = \min_{\ell \in B} d(k,\ell)$ en $d(A, B) = \min_{k \in A} d(k, B)$, met de afspraak dat het minimum over de lege verzameling $\infty$ is en dat $e^{-\theta \cdot \infty} = 0$.
 
 ### 1.3 De maat
 
@@ -134,7 +134,7 @@ We schrijven $\mathcal{H}_{\mathrm{inv}} = \mathsf{P}\mathcal{H}$ voor de ruimte
 > **Stelling A.** Zij $D \geq 2$, $\beta \gt 0$ en $\Lambda_s$ een eindig periodiek ruimtelijk rooster met alle afmetingen minstens 3. Dan geldt:
 >
 > 1. **(Overdrachtsmatrix.)** $\mathsf{T}$ is een compacte, zelfgeadjungeerde, positief semidefiniete operator op $\mathcal{H}$ met een continue, strikt positieve, symmetrische kern $\mathsf{T}(u,u')$, en voor elke $N \geq 3$ is $Z = \operatorname{Tr} \mathsf{T}^N$.
-> 2. **(Spectrum.)** $\mathsf{T} = \mathsf{P}\mathsf{T} = \mathsf{T}\mathsf{P}$, en op $\mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T}$ injectief. De eigenwaarden van $\mathsf{T}$ op $\mathcal{H}_{\mathrm{inv}}$ vormen een rij $\lambda_0 \geq \lambda_1 \geq \lambda_2 \geq \dots \gt 0$ met $\lambda_n \to 0$, met een orthonormale basis van continue, reële eigenfuncties $\psi_0, \psi_1, \dots$ van $\mathcal{H}_{\mathrm{inv}}$. Op het orthogonale complement van $\mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T} = 0$.
+> 2. **(Spectrum.)** $\mathsf{T} = \mathsf{P}\mathsf{T} = \mathsf{T}\mathsf{P}$, en op $\mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T}$ injectief. De eigenwaarden van $\mathsf{T}$ op $\mathcal{H}_{\mathrm{inv}}$ hebben eindige multipliciteit en vormen, elk zo vaak herhaald als zijn multipliciteit aangeeft, een rij $\lambda_0 \geq \lambda_1 \geq \lambda_2 \geq \dots \gt 0$ met $\lambda_n \to 0$; er is een orthonormale basis $\psi_0, \psi_1, \dots$ van $\mathcal{H}_{\mathrm{inv}}$ van continue, reële functies met $\mathsf{T}\psi_n = \lambda_n\psi_n$. Op het orthogonale complement van $\mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T} = 0$.
 > 3. **(Uniek vacuüm.)** De grootste eigenwaarde $\lambda_0$ is enkelvoudig, en de eigenfunctie $\Omega := \psi_0$ kan strikt positief worden gekozen: $\Omega(u) \gt 0$ voor alle $u$.
 > 4. **(Kloof.)** $\lambda_1 \lt \lambda_0$. Met $H := -\ln\big(\mathsf{T}\vert_{\mathcal{H}_{\mathrm{inv}}}\big)$ en $E_n := -\ln \lambda_n$ is $H$ een zelfgeadjungeerde operator met zuiver discreet spectrum $E_0 \lt E_1 \leq E_2 \leq \dots \to \infty$, en de **massakloof**
 >    $$m := E_1 - E_0 = \ln(\lambda_0/\lambda_1)$$
@@ -145,7 +145,7 @@ We schrijven $\mathcal{H}_{\mathrm{inv}} = \mathsf{P}\mathcal{H}$ voor de ruimte
 >    $$\mu\big(F(u^0) F(u^t)\big) - \mu\big(F(u^0)\big)^2 \ \longrightarrow\ C_F(t) := \sum_{n \geq 1} e^{-(E_n - E_0)\ t}\  \big\lvert \langle \psi_n, F\Omega \rangle \big\rvert^2 ,$$
 >    en $0 \leq C_F(t) \leq \lVert F \rVert_\infty^2\  e^{-m t}$. Voor $F = \psi_1/\Omega$ is $C_F(t) \geq e^{-mt}$.
 
-*In gewone taal.* Punt 1 zegt dat de kansverdeling van de simulatie precies overeenkomt met een kwantummechanisch systeem: de operator $\mathsf{T}$ schuift het systeem één tijdstap op. Punten 3 en 4 zeggen dat dat systeem één toestand van laagste energie heeft en dat de volgende toestand een eindig stuk $m$ hoger ligt. Punt 5 zegt dat $m$ precies de snelheid is waarmee correlaties in de tijdrichting uitdoven; dat is wat de simulaties meten. De stelling geeft geen getal voor $m$ en geen ondergrens die blijft gelden als het rooster groeit: de kloof kan in principe naar nul gaan als het volume naar oneindig gaat. Dat uitsluiten is het eigenlijke probleem.
+*In gewone taal.* Punt 1 zegt dat de kansverdeling van de simulatie precies overeenkomt met een kwantummechanisch systeem: de operator $\mathsf{T}$ schuift het systeem één tijdstap op. Punten 3 en 4 zeggen dat dat systeem één toestand van laagste energie heeft en dat de volgende toestand een eindig stuk $m$ hoger ligt. Punt 5 zegt dat $m$ de traagst mogelijke uitdoving van correlaties in de tijdrichting is: geen enkele correlatie dooft langzamer uit dan $e^{-mt}$, en er is een grootheid waarvoor dat tempo precies wordt gehaald. Een simulatie meet de uitdoving voor een gekozen grootheid $F$ en vindt daarmee het laagste niveau $E_n - E_0$ waarvoor $\langle\psi_n, F\Omega\rangle \neq 0$. Dat getal is minstens $m$, en het is alleen gelijk aan $m$ als de gekozen grootheid de toestand $\psi_1$ "ziet". De glueballmassa in het rapport is het laagste niveau in één kanaal; op de roosters waar de torelon lichter is (tabel 3 van `REPORT.md`) ligt $m$ dus onder de gemeten glueballmassa. De stelling geeft geen getal voor $m$ en geen ondergrens die blijft gelden als het rooster groeit: de kloof kan in principe naar nul gaan als het volume naar oneindig gaat. Dat uitsluiten is het eigenlijke probleem.
 
 ### 2.4 Bewijs
 
@@ -163,7 +163,9 @@ w(U) = \prod_{t \in \mathbb{Z}/N} e^{-V(u^t)}\; K\big( (u^t)^{g^t},\, u^{t+1} \b
 
 **Stap 2: eigenschappen van $\mathsf{P}$, $\mathsf{M}$, $\mathsf{K}$.**
 
-(a) *$\mathsf{P}$ is een orthogonale projectie.* Uit $(u^h)^g = u^{gh}$ en de translatie-invariantie van $dg$ volgt $(\mathsf{P}f)(u^h) = \int f(u^{gh})\ dg = (\mathsf{P}f)(u)$, en daarmee $\mathsf{P}^2 = \mathsf{P}$. Verder is, met de substitutie $u \mapsto u^{g^{-1}}$ (die $du$ behoudt) en de invariantie van $dg$ onder $g \mapsto g^{-1}$,
+(a) *$\mathsf{P}$ is goed gedefinieerd en begrensd.* Zij $f \in \mathcal{H}$. De functie $(u,g) \mapsto f(u^g)$ is meetbaar, en omdat $u \mapsto u^g$ de maat $du$ behoudt, is $\int\int \lvert f(u^g)\rvert^2\  du\  dg = \lVert f\rVert^2$ (S2). Voor bijna alle $u$ is $g \mapsto f(u^g)$ dus kwadratisch integreerbaar, zodat $(\mathsf{P}f)(u)$ bestaat, en met Cauchy–Schwarz is $\lvert(\mathsf{P}f)(u)\rvert^2 \leq \int \lvert f(u^g)\rvert^2\  dg$, dus $\lVert\mathsf{P}f\rVert \leq \lVert f\rVert$. Toegepast op het verschil van twee functies die bijna overal gelijk zijn, laat dit zien dat $\mathsf{P}f$ niet afhangt van de keuze van $f$ binnen zijn klasse. In de dubbele integralen hieronder is de integrand steeds integreerbaar, want $\int\int \lvert f_1(u)\rvert\  \lvert f_2(u^g)\rvert\  du\  dg \leq \lVert f_1\rVert\  \lVert f_2\rVert$; de volgorde van integratie mag dus worden verwisseld (S2).
+
+*$\mathsf{P}$ is een orthogonale projectie.* Uit $(u^h)^g = u^{gh}$ en de translatie-invariantie van $dg$ volgt $(\mathsf{P}f)(u^h) = \int f(u^{gh})\ dg = (\mathsf{P}f)(u)$, en daarmee $\mathsf{P}^2 = \mathsf{P}$. Verder is, met de substitutie $u \mapsto u^{g^{-1}}$ (die $du$ behoudt) en de invariantie van $dg$ onder $g \mapsto g^{-1}$,
 
 ```math
 \langle f_1, \mathsf{P} f_2 \rangle = \int\!\!\int \overline{f_1(u)}\, f_2(u^g)\, du\, dg = \int\!\!\int \overline{f_1(u^{g^{-1}})}\, f_2(u)\, du\, dg = \langle \mathsf{P} f_1, f_2 \rangle .
@@ -197,7 +199,7 @@ waarbij de reeks uniform convergeert omdat $\lvert A \rvert \leq 2\lvert E\rvert
 \langle f, \mathsf{K} f \rangle = \sum_{n=0}^{\infty} \frac{(\beta/2)^n}{n!} \sum_{I \in \mathcal{J}^n} \big\lvert \langle \Phi_I, f \rangle \big\rvert^2 \ \geq\ 0 . \tag{2.2}
 ```
 
-Dus $\mathsf{K} \geq 0$. Stel nu $\langle f, \mathsf{K} f\rangle = 0$. Omdat $\beta \gt 0$ zijn alle coëfficiënten in (2.2) strikt positief, dus $\langle \Phi_I, f \rangle = 0$ voor elk monoom $\Phi_I$. De lineaire combinaties van de monomen $\Phi_I$ vormen een algebra $\mathcal{A}$ van continue functies op $\mathcal{C}$ die de constanten bevat, punten scheidt (de matrixelementen zijn coördinaten op $\mathcal{C}$) en wegens (G2) gesloten is onder complexe conjugatie. Volgens de stelling van Stone–Weierstrass (S4) ligt $\mathcal{A}$ dicht in de continue functies met de supremumnorm, dus ook dicht in $\mathcal{H}$. Dus $f = 0$. Samengevat:
+Dus $\mathsf{K} \geq 0$. Stel nu $\langle f, \mathsf{K} f\rangle = 0$. Omdat $\beta \gt 0$ zijn alle coëfficiënten in (2.2) strikt positief, dus $\langle \Phi_I, f \rangle = 0$ voor elk monoom $\Phi_I$. De lineaire combinaties van de monomen $\Phi_I$ vormen een algebra $\mathcal{A}$ van continue functies op $\mathcal{C}$ die de constanten bevat, punten scheidt (de matrixelementen zijn coördinaten op $\mathcal{C}$) en wegens (G2) gesloten is onder complexe conjugatie. Volgens de stelling van Stone–Weierstrass (S4) ligt $\mathcal{A}$ dicht in de continue functies met de supremumnorm, dus (omdat de continue functies dicht liggen in $\mathcal{H}$, S1, en $\lVert\cdot\rVert \leq \lVert\cdot\rVert_\infty$) ook dicht in $\mathcal{H}$. Dus $f = 0$. Samengevat:
 
 ```math
 \mathsf{K} \geq 0, \qquad \langle f, \mathsf{K} f \rangle = 0 \ \Longrightarrow\ f = 0 . \tag{2.3}
@@ -259,9 +261,9 @@ Anderzijds is $\langle \lvert f\rvert, \mathsf{T}\lvert f\rvert\rangle \leq \lam
 
 Elke reële eigenfunctie bij $\lambda_0$ is dus overal strikt positief of overal strikt negatief. Stel dat de eigenruimte bij $\lambda_0$ dimensie minstens 2 heeft. Dan bevat zij twee reële eigenfuncties $f_1, f_2 \neq 0$ met $\langle f_1, f_2\rangle = 0$. Maar $f_1 f_2$ is overal strikt positief of overal strikt negatief, dus $\int f_1 f_2\  du \neq 0$: tegenspraak. Dus $\lambda_0$ is enkelvoudig, en $\Omega := \lvert f\rvert$ is de strikt positieve eigenfunctie. Dit bewijst punt 3.
 
-**Stap 7: de kloof (punt 4).** Uit punt 3 volgt $\lambda_1 \lt \lambda_0$, en uit punt 2 volgt $\lambda_1 \gt 0$. Dus $m = \ln(\lambda_0/\lambda_1) \in (0, \infty)$. Op $\mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T}$ diagonaal in de basis $(\psi_n)$ met eigenwaarden $\lambda_n \gt 0$, dus $H\psi_n := E_n \psi_n$ met $E_n = -\ln\lambda_n$ definieert een zelfgeadjungeerde operator met $\mathsf{T}\vert_{\mathcal{H}_{\mathrm{inv}}} = e^{-H}$; omdat $\lambda_n \to 0$ gaat $E_n \to \infty$.
+**Stap 7: de kloof (punt 4).** Uit punt 3 volgt $\lambda_1 \lt \lambda_0$, en uit punt 2 volgt $\lambda_1 \gt 0$. Dus $m = \ln(\lambda_0/\lambda_1) \in (0, \infty)$. Op $\mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T}$ diagonaal in de basis $(\psi_n)$ met eigenwaarden $\lambda_n \gt 0$, dus $H\psi_n := E_n \psi_n$ met $E_n = -\ln\lambda_n$, op het domein $\mathcal{D}(H) = \lbrace \sum_n a_n\psi_n : \sum_n E_n^2\  \lvert a_n\rvert^2 \lt \infty \rbrace$, definieert een zelfgeadjungeerde operator met $\mathsf{T}\vert_{\mathcal{H}_{\mathrm{inv}}} = e^{-H}$; omdat $\lambda_n \to 0$ gaat $E_n \to \infty$.
 
-**Stap 8: correlaties (punt 5).** Voor $1 \leq t \leq N-1$ zijn $F_1\mathsf{T}^t$ en $F_2\mathsf{T}^{N-t}$ Hilbert–Schmidt-operatoren met kernen $F_1(u)\ \mathsf{T}^{(t)}(u,u')$ en $F_2(u)\ \mathsf{T}^{(N-t)}(u,u')$, waarin $\mathsf{T}^{(t)}$ de $t$-voudig geïtereerde kern is. Het spoor van hun product is de integraal van het product van de kernen (S3), dus precies zoals in stap 4
+**Stap 8: correlaties (punt 5).** Voor $1 \leq t \leq N-1$ zijn $F_1\mathsf{T}^t$ en $F_2\mathsf{T}^{N-t}$ Hilbert–Schmidt-operatoren met de begrensde, meetbare (dus kwadratisch integreerbare, maar in het algemeen niet continue) kernen $F_1(u)\ \mathsf{T}^{(t)}(u,u')$ en $F_2(u)\ \mathsf{T}^{(N-t)}(u,u')$, waarin $\mathsf{T}^{(t)}$ de $t$-voudig geïtereerde kern is. Hun product is van spoorklasse, en het spoor is de integraal van het product van de kernen (S3, in de vorm voor kwadratisch integreerbare kernen), dus precies zoals in stap 4
 
 ```math
 \operatorname{Tr}\big(F_1 \mathsf{T}^t F_2 \mathsf{T}^{N-t}\big) = \int \prod_s du^s\; F_1(u^0)\, F_2(u^t) \prod_{s \in \mathbb{Z}/N} \mathsf{T}(u^s, u^{s+1}) = \int F_1(u^0)\, F_2(u^t)\, w(U)\, dU .
@@ -269,7 +271,7 @@ Elke reële eigenfunctie bij $\lambda_0$ is dus overal strikt positief of overal
 
 Delen door $Z = \operatorname{Tr}\mathsf{T}^N$ geeft de eerste formule.
 
-Voor de limiet rekenen we het spoor uit in de eigenbasis. Zij $(\psi_n)$ de eigenbasis van $\mathcal{H}_{\mathrm{inv}}$; de overige basisvectoren liggen in de kern van $\mathsf{T}$ en dragen niet bij. Dan is
+Voor de limiet rekenen we het spoor uit in de eigenbasis; het spoor hangt niet af van de gekozen orthonormale basis (S3). Zij $(\psi_n)$ de eigenbasis van $\mathcal{H}_{\mathrm{inv}}$; de overige basisvectoren liggen in de kern van $\mathsf{T}$ en dragen niet bij. Dan is
 
 ```math
 \frac{\operatorname{Tr}\big(F_1 \mathsf{T}^t F_2 \mathsf{T}^{N-t}\big)}{\lambda_0^N} = \sum_n \Big(\frac{\lambda_n}{\lambda_0}\Big)^{N-t} \frac{\langle \psi_n, F_1 \mathsf{T}^t F_2 \psi_n \rangle}{\lambda_0^t} = \frac{\langle \Omega, F_1 \mathsf{T}^t F_2\, \Omega\rangle}{\lambda_0^t} + r_N ,
@@ -291,7 +293,21 @@ Elke term is $\geq 0$, en $C_F(t) \leq e^{-mt} \sum_n \lvert a_n\rvert^2 \leq e^
 
 **Opmerking (reflectiepositiviteit).** De ongelijkheid (2.4) is de roostervorm van reflectiepositiviteit, één van de axioma's van Osterwalder en Schrader: zij maakt van de kansmaat $\mu$ een kwantumtheorie met een Hilbertruimte en een Hamiltoniaan $H$ waarvan het spectrum naar beneden begrensd is. Stelling A levert die structuur voor elk eindig rooster.
 
-**Opmerking (wat stelling A niet geeft).** De kloof $m$ in stelling A hangt af van $\beta$ en van het ruimtelijke rooster, en het bewijs geeft geen ondergrens die uniform is in het volume. Het argument in stap 6 gebruikt de constante $c = \min \mathsf{T}(u,u')$, en die gaat exponentieel snel naar nul als het aantal links groeit. Voor het millenniumprobleem is juist een ondergrens nodig die standhoudt bij oneindig volume én bij $a \to 0$.
+**Opmerking (wat stelling A niet geeft).** De kloof $m$ in stelling A hangt af van $\beta$ en van het ruimtelijke rooster, en het bewijs geeft geen ondergrens die uniform is in het volume. Stap 6 gebruikt alleen dát de kern strikt positief is. Wie het argument kwantitatief maakt, krijgt een ondergrens in termen van $c = \min \mathsf{T}(u,u')$ en $C = \max \mathsf{T}(u,u')$:
+
+```math
+\frac{\lambda_1}{\lambda_0} \ \leq\ 1 - \frac{c}{C}, \qquad \text{dus} \qquad m \ \geq\ -\ln\Big(1 - \frac{c}{C}\Big) \ \geq\ \frac{c}{C} . \tag{2.7}
+```
+
+*Bewijs van (2.7).* Zij $\psi$ een reële eigenfunctie bij een eigenwaarde $\lambda_n$ met $n \geq 1$, en $\varphi = \psi/\Omega$; dit is een continue functie. Zet $q(u,u') = \mathsf{T}(u,u')\ \Omega(u')/(\lambda_0\ \Omega(u))$. Dan is $q \gt 0$, $\int q(u,u')\ du' = 1$ en $\int q(u,u')\ \varphi(u')\ du' = (\lambda_n/\lambda_0)\ \varphi(u)$. Omdat $\lambda_0\ \Omega(u) = \int \mathsf{T}(u,u')\ \Omega(u')\ du' \leq C \int \Omega$, is $q(u,u') \geq \varepsilon\ \varrho(u')$ met $\varepsilon = c/C$ en de kansdichtheid $\varrho = \Omega/\int\Omega$. Voor alle $u_1, u_2$ is dan
+
+```math
+\frac{\lambda_n}{\lambda_0}\,\big(\varphi(u_1) - \varphi(u_2)\big) = \int \Big[ \big(q(u_1,u') - \varepsilon\varrho(u')\big) - \big(q(u_2,u') - \varepsilon\varrho(u')\big) \Big]\, \varphi(u')\, du' \ \leq\ (1-\varepsilon)\,\big(\max\varphi - \min\varphi\big),
+```
+
+want de twee functies tussen ronde haken zijn niet-negatief en hebben elk integraal $1 - \varepsilon$. Neem voor $u_1$ een maximum en voor $u_2$ een minimum van $\varphi$. Omdat $\psi \perp \Omega$ en $\psi \neq 0$ is $\varphi$ niet constant, dus $\max\varphi - \min\varphi \gt 0$ en $\lambda_n/\lambda_0 \leq 1 - \varepsilon$. $\square$
+
+Uit $\lvert V\rvert \leq \beta\ \lvert\mathcal{P}_s\rvert$ en $e^{-\beta\lvert E\rvert} \leq K \leq e^{\beta\lvert E\rvert}$, met $\lvert\mathcal{P}_s\rvert$ het aantal ruimtelijke plaquettes, volgt $c/C \geq e^{-2\beta(\lvert E\rvert + \lvert\mathcal{P}_s\rvert)}$. Dat geeft een expliciete ondergrens voor $m$, maar één die exponentieel klein is in het aantal links en dus niets zegt over oneindig volume. Voor het millenniumprobleem is juist een ondergrens nodig die standhoudt bij oneindig volume én bij $a \to 0$.
 
 ---
 
@@ -325,12 +341,13 @@ Verder is $I_\nu$ de gemodificeerde Besselfunctie van de eerste soort (bijlage, 
 >    $$E_j - E_0 = L\  \ln\frac{I_1(\beta)}{I_{2j+1}(\beta)},$$
 >    en de massakloof is
 >    $$m = E_{1/2} - E_0 = L\  \ln\frac{I_1(\beta)}{I_2(\beta)} \ \gt\ 0 .$$
-> 4. **(Toestandssom.)** $Z = \sum_{j} \big( \tfrac{2}{\beta} I_{2j+1}(\beta) \big)^{LN}$, met de som over $j = 0, \tfrac12, 1, \dots$
+>    In de nummering van stelling A is $\lambda_n = \Lambda_{n/2}$ en $\psi_n = \chi_{n/2} \circ h$ voor $n = 0, 1, 2, \dots$; de kloof $E_1 - E_0$ van stelling A is hier dus $E_{1/2} - E_0$.
+> 4. **(Toestandssom.)** Voor elk aantal tijdlagen $N \geq 3$ is $Z = \sum_{j} \big( \tfrac{2}{\beta} I_{2j+1}(\beta) \big)^{LN}$, met de som over $j = 0, \tfrac12, 1, \dots$
 > 5. **(Continuümlimiet.)** Houd de koppeling $g \gt 0$ en de fysische omtrek $\ell \gt 0$ vast, en zet $a = \ell/L$ en $\beta = 4/(g^2a^2)$. Dan geldt voor elke $j$
 >    $$\lim_{L\to\infty} \frac{E_j - E_0}{a} = \frac{g^2\ell}{2}\  j(j+1), \qquad \text{in het bijzonder} \qquad \lim_{L \to \infty} \frac{m}{a} = \frac{3}{8}\  g^2 \ell .$$
->    Is bovendien $\tau \gt 0$ en $N = N(L)$ een rij gehele getallen met $Na \to \tau$, dan convergeert $(\mathsf{T}/\Lambda_0)^N$, opgevat als operator op $L^2_{\mathrm{kl}}(G)$ via punt 1, in operatornorm naar $e^{-\tau H_{\mathrm{c}}}$, waarin $H_{\mathrm{c}}$ de operator is met $H_{\mathrm{c}}\chi_j = \tfrac{g^2\ell}{2}\  j(j+1)\  \chi_j$.
+>    Is bovendien $\tau \gt 0$ en $N = N(L) \geq 1$ een rij positieve gehele getallen met $Na \to \tau$, dan convergeert $(\mathsf{T}/\Lambda_0)^N$, opgevat als operator op $L^2_{\mathrm{kl}}(G)$ via punt 1, in operatornorm naar $e^{-\tau H_{\mathrm{c}}}$, waarin $H_{\mathrm{c}}$ de operator is met $H_{\mathrm{c}}\chi_j = \tfrac{g^2\ell}{2}\  j(j+1)\  \chi_j$.
 
-*In gewone taal.* In twee dimensies is de enige vrijheidsgraad die overblijft de holonomie: wat een deeltje "voelt" als het één keer de ring rondgaat. De toestanden zijn genummerd door $j$, en toestand $j$ is een buis van flux die om de ring gewikkeld is. De energie is evenredig met de lengte $L$ van de ring; de evenredigheidsconstante $\ln(I_1/I_2)$ voor $j = \tfrac12$ is precies de snaarspanning $a^2\sigma = -\ln u(\beta)$ uit het rapport. In de limiet $a \to 0$ blijft er een eindige kloof $\tfrac38 g^2\ell$ over. Voor twee dimensies is het probleem "bestaan en kloof" op een ring daarmee volledig opgelost. Maar let op de kanttekening in §3.4.
+*In gewone taal.* In twee dimensies is de enige vrijheidsgraad die overblijft de holonomie: wat een deeltje "voelt" als het één keer de ring rondgaat. De toestanden zijn genummerd door $j$, en toestand $j$ is een buis van flux die om de ring gewikkeld is. De energie is evenredig met de lengte $L$ van de ring; de evenredigheidsconstante $\ln(I_1/I_2)$ voor $j = \tfrac12$ is precies de snaarspanning $a^2\sigma = -\ln u(\beta)$ uit `THEORY.md` §5.6. In de limiet $a \to 0$ blijft er een eindige kloof $\tfrac38 g^2\ell$ over. Voor twee dimensies is daarmee op een ring bewezen dat het spectrum en de tijdsevolutie van de ijkinvariante toestanden een continuümlimiet hebben, en dat die limiet een kloof heeft. Dat is minder dan wat het millenniumprobleem onder "bestaan" verstaat: de continuümlimiet van álle verwachtingswaarden (Wilson-lussen) en de axioma's, waaronder draai-invariantie, worden hier niet bewezen; voor twee dimensies staat dat in de literatuur (Driver 1989; Gross, King en Sengupta 1989; zie hoofdstuk 7). Let ook op de kanttekening in §3.4.
 
 ### 3.3 Bewijs
 
@@ -346,7 +363,11 @@ Dus
 (\mathsf{P} f)(u) = \int dg_1 \int \prod_{i=2}^{L} dg_i\ \tilde f\big( g_1 w_1 g_2^{-1}, \dots, g_1 w_{L-1} g_L^{-1},\ g_1 h g_1^{-1} \big) = \int dg_1 \int \prod_{i=1}^{L-1} dw_i'\ \tilde f\big( w', g_1 h g_1^{-1} \big) =: \phi_f(h),
 ```
 
-waarbij bij vaste $g_1$ de substitutie $w_i' = g_1 w_i g_{i+1}^{-1}$ in de variabele $g_{i+1}$ is gebruikt (G3). De functie $\phi_f$ hangt alleen van $h$ af en is een klassefunctie: $\phi_f(s h s^{-1}) = \phi_f(h)$ volgt uit de substitutie $g_1 \mapsto g_1 s^{-1}$. Dus $\mathsf{P}f = \phi_f \circ h$. Omgekeerd: is $\phi$ een klassefunctie, dan is $f = \phi \circ h$ ijkinvariant, want $h(u^g) = g_1 h(u) g_1^{-1}$; dus $\mathsf{P}f = f$. Omdat $h$ één van de nieuwe coördinaten is, is $\int \lvert\phi(h(u))\rvert^2\  du = \int_G \lvert\phi(h)\rvert^2\  dh$. Dit bewijst punt 1.
+waarbij bij vaste $g_1$ de substitutie $w_i' = g_1 w_i g_{i+1}^{-1}$ in de variabele $g_{i+1}$ is gebruikt (G3). De functie $\phi_f$ hangt alleen van $h$ af en is een klassefunctie: $\phi_f(s h s^{-1}) = \phi_f(h)$ volgt uit de substitutie $g_1 \mapsto g_1 s^{-1}$. Dus $\mathsf{P}f = \phi_f \circ h$.
+
+*Over nulverzamelingen.* Voor continue $f$ zijn alle integralen hierboven integralen van continue functies. Voor algemene $f \in \mathcal{H}$ lezen we ze als volgt. De afbeelding $(w', g_1, h) \mapsto (w', g_1 h g_1^{-1})$ voert de productmaat $dw'\ dg_1\ dh$ over in $dw'\ dh$, want voor vaste $g_1$ behoudt $h \mapsto g_1 h g_1^{-1}$ de Haar-maat (G3). Dus $F(w', g_1, h) := \tilde f(w', g_1 h g_1^{-1})$ is een goed gedefinieerd element van $L^2(G^{L-1}\times G\times G)$ met $\lVert F\rVert = \lVert f\rVert$, onafhankelijk van de gekozen representant van $f$. Volgens (S2) bestaat $\phi_f(h) = \int\int F\ dw'\ dg_1$ voor alle $h$ buiten de nulverzameling $\mathcal{N} = \lbrace h : \int\int \lvert F(w',g_1,h)\rvert\ dw'\ dg_1 = \infty\rbrace$, is $\phi_f$ meetbaar, en is $\lVert\phi_f\rVert_{L^2(G)} \leq \lVert f\rVert$ (Cauchy–Schwarz). De substitutie $g_1 \mapsto g_1 s^{-1}$ laat zien dat $\mathcal{N}$ invariant is onder conjugatie en dat $\phi_f(shs^{-1}) = \phi_f(h)$ voor $h \notin \mathcal{N}$ en alle $s$. Met $\phi_f := 0$ op $\mathcal{N}$ is $\phi_f$ dus een klassefunctie in $L^2_{\mathrm{kl}}(G)$, en $(\mathsf{P}f)(u) = \phi_f(h(u))$ voor bijna alle $u$.
+
+Omgekeerd: is $\phi$ een klassefunctie, dan is $f = \phi \circ h$ ijkinvariant, want $h(u^g) = g_1 h(u) g_1^{-1}$; dus $\mathsf{P}f = f$. Omdat $h$ één van de nieuwe coördinaten is, is $\int \lvert\phi(h(u))\rvert^2\  du = \int_G \lvert\phi(h)\rvert^2\  dh$. Dit bewijst punt 1.
 
 **Punt 2.** Zij $f = \chi_j \circ h$. Omdat $f \in \mathcal{H}_{\mathrm{inv}}$ is $\mathsf{T}f = \mathsf{K}\mathsf{P}f = \mathsf{K}f$, dus
 
@@ -400,7 +421,7 @@ Uit de machtreeks volgt $r(x) \to 0$ voor $x \downarrow 0$. Stel dat $r(x_1) \ge
 
 Uit lemma B.1 en punt 2 volgt $\Lambda_0 \gt \Lambda_{1/2} \gt \Lambda_1 \gt \dots \gt 0$. Volgens punt 1 zijn de $\chi_j \circ h$ een basis van $\mathcal{H}_{\mathrm{inv}}$, dus dit zijn alle eigenwaarden van $\mathsf{T}$ op $\mathcal{H}_{\mathrm{inv}}$, elk enkelvoudig. Met $E_j = -\ln\Lambda_j$ volgen de formules van punt 3. (Dit is in overeenstemming met stelling A: de eigenfunctie $\chi_0 \circ h = 1$ bij de grootste eigenwaarde is strikt positief.)
 
-**Punt 4.** $Z = \operatorname{Tr}\mathsf{T}^N = \sum_j \Lambda_j^N$ volgens stelling A, punt 1 en 2.
+**Punt 4.** Volgens stelling A, punt 1, is $Z = \operatorname{Tr}\mathsf{T}^N$ voor $N \geq 3$. Het spoor mag in elke orthonormale basis worden uitgerekend (S3). Neem de basis die bestaat uit de $\chi_j \circ h$ (punt 1) en een orthonormale basis van $\mathcal{H}_{\mathrm{inv}}^\perp$, waarop $\mathsf{T} = 0$ (stelling A, punt 2). Met punt 2 volgt $Z = \sum_j \Lambda_j^N$.
 
 **Punt 5.** Voor vaste $\nu$ en $x \to \infty$ geldt (S6)
 
@@ -416,13 +437,13 @@ Met $\nu = 2j+1$ is $\nu^2 - 1 = 4j(j+1)$. Met $L = \ell/a$ en $\beta = 4/(g^2a^
 
 Voor $j = \tfrac12$ is dit $\tfrac38 g^2\ell$.
 
-Voor de convergentie van operatoren: in de basis $(\chi_j)$ zijn zowel $(\mathsf{T}/\Lambda_0)^N$ als $e^{-\tau H_{\mathrm{c}}}$ diagonaal, met eigenwaarden $q_j(L) := (\Lambda_j/\Lambda_0)^N = \exp\big(-Na \cdot (E_j - E_0)/a\big)$ en $q_j := \exp\big(-\tau \tfrac{g^2\ell}{2} j(j+1)\big)$. Het voorgaande geeft $q_j(L) \to q_j$ voor elke vaste $j$. De operatornorm van het verschil is $\sup_j \lvert q_j(L) - q_j\rvert$. Zij $\varepsilon \gt 0$ en kies $J$ met $q_J \lt \varepsilon$. Beide rijen zijn dalend in $j$ (lemma B.1), dus voor $j \geq J$ is $\lvert q_j(L) - q_j\rvert \leq \max(q_J(L), q_J)$, en dat is kleiner dan $2\varepsilon$ zodra $L$ zo groot is dat $\lvert q_J(L) - q_J\rvert \lt \varepsilon$. Voor de eindig veel $j \lt J$ geldt gewone convergentie. Dus $\sup_j\lvert q_j(L) - q_j\rvert \to 0$. $\blacksquare$
+Voor de convergentie van operatoren: in de basis $(\chi_j)$ zijn zowel $(\mathsf{T}/\Lambda_0)^N$ als $e^{-\tau H_{\mathrm{c}}}$ diagonaal, met eigenwaarden $q_j(L) := (\Lambda_j/\Lambda_0)^N = \exp\big(-Na \cdot (E_j - E_0)/a\big)$ en $q_j := \exp\big(-\tau \tfrac{g^2\ell}{2} j(j+1)\big)$. Het voorgaande geeft $q_j(L) \to q_j$ voor elke vaste $j$. De operatornorm van het verschil is $\sup_j \lvert q_j(L) - q_j\rvert$. Zij $\varepsilon \gt 0$ en kies $J$ met $q_J \lt \varepsilon$. Beide rijen zijn dalend in $j$: $(q_j(L))_j$ wegens lemma B.1 en $N \geq 1$, en $(q_j)_j$ omdat $j(j+1)$ stijgt met $j$. Dus voor $j \geq J$ is $\lvert q_j(L) - q_j\rvert \leq \max(q_J(L), q_J)$, en dat is kleiner dan $2\varepsilon$ zodra $L$ zo groot is dat $\lvert q_J(L) - q_J\rvert \lt \varepsilon$. Voor de eindig veel $j \lt J$ geldt gewone convergentie. Dus $\sup_j\lvert q_j(L) - q_j\rvert \to 0$. $\blacksquare$
 
 ### 3.4 Kanttekeningen
 
-**Verband met de snaarspanning.** In de notatie van het rapport is $u(\beta) = I_2(\beta)/I_1(\beta)$ en is de snaarspanning in twee dimensies $a^2\sigma = -\ln u(\beta)$. Stelling B zegt dus $m = L\  a^2\sigma$ in roostereenheden: de lichtste toestand is één fluxbuis rond de ring, met energie snaarspanning maal lengte. Dat is de toestand die in het rapport "torelon" heet. In het continuüm is $\sigma = \tfrac38 g^2$.
+**Verband met de snaarspanning.** In de notatie van `THEORY.md` §5.6 en `ym/exact.py` is $u(\beta) = I_2(\beta)/I_1(\beta)$ en is de snaarspanning in twee dimensies $a^2\sigma = -\ln u(\beta)$ (uit de oppervlaktewet $\langle\tfrac12\operatorname{Tr}W\rangle = u^{A}$ voor een Wilson-lus $W$ met oppervlak $A$, die in dit document niet wordt bewezen). Stelling B geeft dus $m = L\  a^2\sigma$ in roostereenheden: de lichtste toestand is één fluxbuis rond de ring, met energie snaarspanning maal lengte. Dat is de toestand die in het rapport "torelon" heet. In het continuüm is $\sigma = \tfrac38 g^2$.
 
-**Waarom dit het millenniumprobleem niet raakt.** De kloof $\tfrac38 g^2\ell$ is evenredig met de omtrek $\ell$ en gaat naar oneindig als $\ell \to \infty$. In oneindig volume blijft alleen het vacuüm over: er zijn in twee dimensies geen lokale vrijheidsgraden, geen gluonen en geen glueballs. De moeilijkheden van vier dimensies (oneindig veel gekoppelde vrijheidsgraden op alle lengteschalen, een koppeling die met de schaal meeloopt) komen in twee dimensies eenvoudig niet voor. Stelling B is een volledig antwoord op een veel makkelijkere vraag.
+**Waarom dit het millenniumprobleem niet raakt.** De kloof $\tfrac38 g^2\ell$ is evenredig met de omtrek $\ell$ en gaat naar oneindig als $\ell \to \infty$. In die limiet schuiven alle aangeslagen toestanden naar oneindige energie en blijft van het spectrum alleen het vacuüm over. Precies: bij vaste $\beta$ is, in de basis van punt 1, de norm van $\mathsf{T}/\Lambda_0$ min de projectie op $\Omega$ gelijk aan $\sup_{j \gt 0} \big(I_{2j+1}(\beta)/I_1(\beta)\big)^{L} = \big(I_2(\beta)/I_1(\beta)\big)^{L}$, en dat gaat naar nul voor $L \to \infty$ (lemma B.1); in het continuüm is de overeenkomstige norm $e^{-\frac38 g^2 \ell \tau}$, en die gaat naar nul voor $\ell \to \infty$. Er zijn in twee dimensies geen lokale vrijheidsgraden, geen gluonen en geen glueballs. Leeg is de theorie daarmee niet: Wilson-lussen houden een niet-triviale verwachtingswaarde (de oppervlaktewet met $\sigma = \tfrac38 g^2$), maar er zijn geen deeltjes. De moeilijkheden van vier dimensies (oneindig veel gekoppelde vrijheidsgraden op alle lengteschalen, een koppeling die met de schaal meeloopt) komen in twee dimensies eenvoudig niet voor. Stelling B beantwoordt een veel makkelijkere vraag, en ook die alleen voor het spectrum en de tijdsevolutie op een ring.
 
 ---
 
@@ -451,23 +472,23 @@ zodat $\alpha(\beta, D) \lt 1$ precies als $\beta \lt \beta_0(D)$. Voor een begr
 >    De constanten $C_\theta$ en $\theta$ hangen niet af van het rooster.
 > 2. **(Kloof uniform in het volume.)** Voor elk ruimtelijk rooster $\Lambda_s$ met alle afmetingen minstens 3 voldoet de massakloof $m$ van stelling A aan
 >    $$m \ \geq\ \ln\frac{1}{\alpha(\beta, D)} = -\ln\big( 6(D-1)\tanh\beta \big) \ \gt\ 0 .$$
-> 3. **(Oneindig volume.)** Zij $f$ een begrensde meetbare functie van eindig veel linkvariabelen van het oneindige rooster $\mathbb{Z}^D$, en $\mu_L$ de maat op het periodieke rooster $(\mathbb{Z}/L)^D$. Dan bestaat $\langle f\rangle := \lim_{L\to\infty}\mu_L(f)$, en de ongelijkheid van punt 1 geldt ook voor $\langle\cdot\rangle$, met $d$ de linkafstand in $\mathbb{Z}^D$.
+> 3. **(Oneindig volume.)** Zij $f$ een begrensde meetbare functie van eindig veel linkvariabelen van het oneindige rooster $\mathbb{Z}^D$. Voor $L$ zo groot dat de projectie $\mathbb{Z}^D \to (\mathbb{Z}/L)^D$ injectief is op de eindpunten van die links, vatten we $f$ via die projectie op als functie op het periodieke rooster $(\mathbb{Z}/L)^D$, met maat $\mu_L$. Dan bestaat $\langle f\rangle := \lim_{L\to\infty}\mu_L(f)$, en voor functies $f, g$ van eindig veel links met disjuncte dragers $A, B$ geldt de ongelijkheid van punt 1 ook voor $\langle\cdot\rangle$, met $d$ de linkafstand in $\mathbb{Z}^D$.
 
 *In gewone taal.* Punt 2 is de kern: voor $\beta$ onder de grens $\beta_0(D)$ is de kloof minstens $\ln(1/\alpha)$, hoe groot het rooster ook is. Punt 3 zegt dat de theorie in oneindig volume dan bestaat, en punt 1 dat correlaties daar exponentieel uitdoven. Enkele waarden van de ondergrens:
 
 | $D$ | $\beta_0(D)$ | $\beta$ | $\alpha(\beta,D)$ | ondergrens $\ln(1/\alpha)$ |
 |---|---|---|---|---|
 | 2 | 0,1682 | 0,05 | 0,2998 | 1,2048 |
-| 2 | | 0,10 | 0,5980 | 0,5142 |
-| 2 | | 0,15 | 0,8933 | 0,1128 |
-| 3 | 0,0835 | 0,02 | 0,2400 | 1,4273 |
-| 3 | | 0,05 | 0,5995 | 0,5117 |
-| 3 | | 0,08 | 0,9580 | 0,0430 |
+| 2 |  | 0,10 | 0,5980 | 0,5141 |
+| 2 |  | 0,15 | 0,8933 | 0,1128 |
+| 3 | 0,0835 | 0,02 | 0,2400 | 1,4272 |
+| 3 |  | 0,05 | 0,5995 | 0,5116 |
+| 3 |  | 0,08 | 0,9580 | 0,0429 |
 | 4 | 0,0556 | 0,01 | 0,1800 | 1,7148 |
-| 4 | | 0,03 | 0,5398 | 0,6165 |
-| 4 | | 0,05 | 0,8993 | 0,1062 |
+| 4 |  | 0,03 | 0,5398 | 0,6164 |
+| 4 |  | 0,05 | 0,8993 | 0,1061 |
 
-De ondergrens is niet scherp. De werkelijke kloof is in dit gebied veel groter (voor $D = 4$ bij $\beta = 0{,}03$ in de orde van 20 in roostereenheden, volgens de leidende term van de sterke-koppelingsreeks in `THEORY.md` §5.6), en de werkelijke kloof gaat niet naar nul bij $\beta_0(D)$: daar houdt alleen deze bewijsmethode op.
+De ondergrens in de laatste kolom is naar beneden afgerond. Zij is niet scherp. Volgens de leidende term van de sterke-koppelingsreeks (`THEORY.md` §5.6; geen bewezen uitspraak) is de werkelijke kloof in dit gebied veel groter: voor $D = 4$ bij $\beta = 0{,}03$ ongeveer $-4\ln u(\beta) \approx 19{,}6$ voor de glueball in groot volume, en ongeveer $-3\ln u(\beta) \approx 14{,}7$ op een rooster waarvan de kleinste ruimtelijke afmeting 3 is (daar is de lichtste toestand een fluxlus rond die richting); hierin is $u(\beta) = I_2(\beta)/I_1(\beta)$. Er is ook geen reden om te denken dat de werkelijke kloof bij $\beta_0(D)$ naar nul gaat. In $D = 2$ volgt uit stelling B dat dat niet gebeurt. Voor $D \geq 3$ bewijst dit document het niet, maar $\beta_0(D)$ is alleen de plaats waar de afschatting van lemma C.5 ophoudt: numeriek is de werkelijke afhankelijkheidscoëfficiënt van SU(2) bij kleine $\beta$ ongeveer $4\beta/(3\pi) \approx 0{,}42\ \beta$ in plaats van $\tanh\beta$, zodat de som over de buren bij $\beta_0(D)$ ongeveer $0{,}43$ is en pas bij ongeveer $2{,}4\ \beta_0(D)$ de waarde 1 bereikt (hoofdstuk 6).
 
 ### 4.2 Algemeen kader: één link opnieuw trekken
 
@@ -479,15 +500,17 @@ De lemma's van deze paragraaf gelden voor elk eindig systeem van de volgende vor
 \rho_\ell(V \mid U) = \frac{p(U^{\ell\to V})}{\int p(U^{\ell\to V'})\, dV'}, \qquad (\Pi_\ell f)(U) = \int f(U^{\ell\to V})\, \rho_\ell(V \mid U)\, dV .
 ```
 
+Hier en verder betekent "meetbaar" steeds Borel-meetbaar. Omdat $p$ continu en strikt positief is op de compacte ruimte $X$, is $z_\ell(U) := \int p(U^{\ell\to V'})\  dV' \geq \min p \gt 0$ en is $(U, V) \mapsto \rho_\ell(V \mid U)$ continu. Voor een begrensde meetbare $f$ is $(U,V) \mapsto f(U^{\ell\to V})\ \rho_\ell(V\mid U)$ dan begrensd en meetbaar op $X \times G$, dus is $(\Pi_\ell f)(U)$ voor elke $U$ gedefinieerd en is $\Pi_\ell f$ volgens (S2) weer een begrensde meetbare functie. De operatoren $\Pi_\ell$ kunnen dus herhaald worden toegepast.
+
 $\rho_\ell(\cdot \mid U)$ hangt niet af van $U_\ell$ en is een kansdichtheid op $G$. De operator $\Pi_\ell$ is wat een simulatie doet bij een warmtebadstap op link $\ell$: de link wordt opnieuw getrokken uit zijn voorwaardelijke verdeling. Direct uit de definitie volgt:
 
-- **(K1)** $\Pi_\ell f$ hangt niet af van $U_\ell$; $\Pi_\ell 1 = 1$; $\inf f \leq \Pi_\ell f \leq \sup f$.
-- **(K2)** $\pi(\Pi_\ell f) = \pi(f)$. *Bewijs:* de noemer $z_\ell(U) = \int p(U^{\ell\to V'})\ dV'$ hangt niet af van $U_\ell$, en $\int p(U)\  dU_\ell = z_\ell(U)$. Integreer in $\pi(\Pi_\ell f) = \int p(U) \int f(U^{\ell\to V})\  p(U^{\ell\to V})\  z_\ell(U)^{-1}\  dV\  dU$ eerst over $U_\ell$; dat geeft $\int\int f(U^{\ell\to V})\  p(U^{\ell\to V})\  dV \prod_{k\neq\ell} dU_k = \pi(f)$.
+- **(K1)** $\Pi_\ell f$ is begrensd en meetbaar en hangt niet af van $U_\ell$; $\Pi_\ell 1 = 1$; $\inf f \leq \Pi_\ell f \leq \sup f$.
+- **(K2)** $\pi(\Pi_\ell f) = \pi(f)$. *Bewijs:* de noemer $z_\ell(U)$ hangt niet af van $U_\ell$, en $\int p(U)\  dU_\ell = z_\ell(U)$. Integreer in $\pi(\Pi_\ell f) = \int p(U) \int f(U^{\ell\to V})\  p(U^{\ell\to V})\  z_\ell(U)^{-1}\  dV\  dU$ eerst over $U_\ell$; dat geeft $\int\int f(U^{\ell\to V})\  p(U^{\ell\to V})\  dV \prod_{k\neq\ell} dU_k = \pi(f)$.
 
 De **totale-variatieafstand** tussen twee kansmaten $\nu, \nu'$ is $d_{\mathrm{TV}}(\nu,\nu') = \sup_S \lvert\nu(S) - \nu'(S)\rvert$, met het supremum over meetbare verzamelingen. Twee feiten:
 
-- **(TV1)** Hebben $\nu, \nu'$ dichtheden $q, q'$, dan is $d_{\mathrm{TV}}(\nu,\nu') = \tfrac12\int\lvert q - q'\rvert$.
-- **(TV2)** Voor begrensde meetbare $F$ is $\lvert\nu(F) - \nu'(F)\rvert \leq \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$. *Bewijs:* met $c = \tfrac12(\sup F + \inf F)$ is $\lvert F - c\rvert \leq \tfrac12\operatorname{osc}(F)$ en $\nu(F) - \nu'(F) = \int (F - c)(q - q')$, dus $\lvert\nu(F) - \nu'(F)\rvert \leq \tfrac12\operatorname{osc}(F)\int\lvert q - q'\rvert$.
+- **(TV1)** Hebben $\nu, \nu'$ dichtheden $q, q'$ ten opzichte van dezelfde maat $\varsigma$, dan is $d_{\mathrm{TV}}(\nu,\nu') = \tfrac12\int\lvert q - q'\rvert\  d\varsigma$. *Bewijs:* voor elke meetbare $S$ is $\nu(S) - \nu'(S) = \int_S (q - q')\  d\varsigma \leq \int (q - q')^+\  d\varsigma$, met gelijkheid voor $S = \lbrace q \gt q' \rbrace$; evenzo is $\nu'(S) - \nu(S) \leq \int (q - q')^-\  d\varsigma$. Hierin zijn $(\cdot)^+$ en $(\cdot)^-$ het positieve en het negatieve deel. Omdat $\int (q - q')\  d\varsigma = 0$ is $\int (q-q')^+\  d\varsigma = \int (q-q')^-\  d\varsigma = \tfrac12 \int \lvert q - q'\rvert\  d\varsigma$.
+- **(TV2)** Hebben $\nu, \nu'$ dichtheden $q, q'$ als in (TV1), dan geldt voor begrensde meetbare $F$: $\lvert\nu(F) - \nu'(F)\rvert \leq \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$. *Bewijs:* met $c = \tfrac12(\sup F + \inf F)$ is $\lvert F - c\rvert \leq \tfrac12\operatorname{osc}(F)$ en $\nu(F) - \nu'(F) = \int (F - c)(q - q')\  d\varsigma$, dus $\lvert\nu(F) - \nu'(F)\rvert \leq \tfrac12\operatorname{osc}(F)\int\lvert q - q'\rvert\  d\varsigma = \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$ volgens (TV1). (In dit document is $\varsigma$ steeds de Haar-maat op $G$.)
 
 De **afhankelijkheidscoëfficiënten** (naar Dobrushin) zijn, voor $\ell \neq k$,
 
@@ -533,7 +556,7 @@ In de eerste term verschillen $U^{\ell\to V}$ en $(U')^{\ell\to V}$ alleen op li
 
 > **Lemma C.3 (gewogen krimp).** Zij $w = (w_k)_{k\in R}$ met $w_k \geq 0$ en $\lambda \in [0, 1]$ zo dat
 > $$\sum_{k \in R} c_{\ell k}\  w_k \ \leq\ \lambda\  w_\ell \qquad \text{voor alle } \ell \in R, \tag{4.1}$$
-> en zet $W(f) = \sum_k w_k\  \delta_k(f)$. Dan geldt:
+> en zet $W(f) = \sum_k w_k\  \delta_k(f)$. Dan geldt voor elke begrensde meetbare $f$:
 >
 > (a) $W(\Pi_\ell f) \leq W(f) - (1-\lambda)\  w_\ell\  \delta_\ell(f)$ voor elke $\ell$.
 >
@@ -549,7 +572,7 @@ W(\Pi_\ell f) = \sum_{k\neq\ell} w_k\, \delta_k(\Pi_\ell f) \ \leq\ \sum_{k \neq
 
 (b) Tel (a) op over $i = 1, \dots, n$: $(1-\lambda)\sum_{i=1}^n w_{\ell_i}\delta_{\ell_i}(f_{i-1}) \leq W(f_0) - W(f_n) \leq W(f)$, en laat $n \to \infty$.
 
-(c) Voor een vector $x = (x_k)_{k \in R}$ met $x_k \geq 0$ definieer de lineaire afbeelding $\mathsf{A}_i$ door $(\mathsf{A}_i x)_{\ell_i} = 0$ en $(\mathsf{A}_i x)_k = x_k + c_{\ell_i k}\  x_{\ell_i}$ voor $k \neq \ell_i$. Lemma C.2 zegt $\delta(f_i) \leq \mathsf{A}_i\  \delta(f_{i-1})$ componentsgewijs, waarin $\delta(f)$ de vector $(\delta_k(f))_k$ is. Omdat $\mathsf{A}_i$ niet-negatieve coëfficiënten heeft, volgt $\delta(\mathcal{S}f) \leq \mathsf{A}_n \cdots \mathsf{A}_1\  \delta(f)$. Het is dus voldoende te bewijzen dat $w \cdot (\mathsf{A}_n \cdots \mathsf{A}_1 e_j) \leq \lambda\  w_j$ voor elke eenheidsvector $e_j$, $j \in R$; hierin is $w \cdot x = \sum_k w_k x_k$.
+(c) Zet $f_0 = f$ en $f_i = \Pi_{\ell_i} f_{i-1}$ voor $i = 1, \dots, n$, zodat $\mathcal{S}f = f_n$. Voor een vector $x = (x_k)_{k \in R}$ met $x_k \geq 0$ definieer de lineaire afbeelding $\mathsf{A}_i$ door $(\mathsf{A}_i x)_{\ell_i} = 0$ en $(\mathsf{A}_i x)_k = x_k + c_{\ell_i k}\  x_{\ell_i}$ voor $k \neq \ell_i$. Lemma C.2 zegt $\delta(f_i) \leq \mathsf{A}_i\  \delta(f_{i-1})$ componentsgewijs, waarin $\delta(f)$ de vector $(\delta_k(f))_k$ is. Omdat $\mathsf{A}_i$ niet-negatieve coëfficiënten heeft, volgt $\delta(\mathcal{S}f) \leq \mathsf{A}_n \cdots \mathsf{A}_1\  \delta(f)$. Het is dus voldoende te bewijzen dat $w \cdot (\mathsf{A}_n \cdots \mathsf{A}_1 e_j) \leq \lambda\  w_j$ voor elke eenheidsvector $e_j$, $j \in R$; hierin is $w \cdot x = \sum_k w_k x_k$.
 
 Zij $i_0$ de index met $\ell_{i_0} = j$, en $x^{(0)} = e_j$, $x^{(i)} = \mathsf{A}_i x^{(i-1)}$. Voor $i \lt i_0$ is $\ell_i \neq j$ en dus $(x^{(i-1)})_{\ell_i} = 0$, zodat $\mathsf{A}_i$ niets verandert: $x^{(i)} = e_j$. Voor $i = i_0$ is $x^{(i_0)} = (c_{jk})_{k\in R}$, dus $w \cdot x^{(i_0)} = \sum_k c_{jk} w_k \leq \lambda w_j$ volgens (4.1). Voor $i \gt i_0$ geeft dezelfde berekening als in (a)
 
@@ -618,7 +641,7 @@ Dit is de bewering. $\square$
 
 ### 4.5 Bewijs van stelling C
 
-**Punt 1.** Zet $R = \mathcal{L}\setminus B$; dan is $A \subset R$ en is $f$ een functie op $G^R$ met $\delta_k(f) = 0$ voor $k \notin A$. Met de ontbinding van §4.3 is $\mu(fg) = \int \mu_B(d\omega)\  g(\omega)\  \mu^\omega(f)$ en $\mu(f) = \int\mu_B(d\omega')\  \mu^{\omega'}(f)$. Voor elke constante $c$ is dus
+**Punt 1.** Is $B$ leeg, dan is $g$ constant, dus $\mu(fg) = \mu(f)\mu(g)$ en $\operatorname{osc}(g) = 0$. Is $A$ leeg, dan is $f$ constant en zijn alle $\delta_k(f) = 0$. In beide gevallen zijn alle drie de leden nul. Zij dus $A$ en $B$ niet leeg. Zet $R = \mathcal{L}\setminus B$; dan is $A \subset R$ en is $f$ een functie op $G^R$ met $\delta_k(f) = 0$ voor $k \notin A$. Met de ontbinding van §4.3 is $\mu(fg) = \int \mu_B(d\omega)\  g(\omega)\  \mu^\omega(f)$ en $\mu(f) = \int\mu_B(d\omega')\  \mu^{\omega'}(f)$. Voor elke constante $c$ is dus
 
 ```math
 \mu(fg) - \mu(f)\mu(g) = \int \mu_B(d\omega)\, \big( g(\omega) - c \big) \Big[ \mu^\omega(f) - \int \mu_B(d\omega')\, \mu^{\omega'}(f) \Big] .
@@ -628,13 +651,13 @@ De term tussen rechte haken is in absolute waarde hoogstens $\sup_{\omega,\omega
 
 **Punt 2.** Zij $\Lambda_s$ een ruimtelijk rooster, $N \geq 3$, en gebruik de notatie van hoofdstuk 2. Geef elke link een tijdcoördinaat: een ruimtelijke link in tijdlaag $s$ krijgt $s$, een tijdlink van laag $s$ naar laag $s+1$ krijgt $s + \tfrac12$. De links van een ruimtelijke plaquette hebben dezelfde tijdcoördinaat; die van een tijdplaquette hebben $s$, $s + \tfrac12$, $s + \tfrac12$ en $s+1$. Twee buren verschillen dus hoogstens 1 in tijdcoördinaat (gemeten langs de cirkel $\mathbb{Z}/N$). Zij $A$ de verzameling ruimtelijke links in tijdlaag 0 en $B$ die in tijdlaag $t$, met $1 \leq t \leq N/2$. Dan is $d(A, B) \geq t$.
 
-Zij $F : \mathcal{C} \to \mathbb{R}$ continu. Punt 1 met $f = F(u^0)$ en $g = F(u^t)$ geeft, voor elke $N \geq 2t$ en elke $\theta$ met $0 \lt \theta \lt \ln(1/\alpha)$,
+Zij $F : \mathcal{C} \to \mathbb{R}$ continu. Punt 1 met $f = F(u^0)$ en $g = F(u^t)$ geeft, voor elke $N \geq \max(3, 2t)$ en elke $\theta$ met $0 \lt \theta \lt \ln(1/\alpha)$,
 
 ```math
 \Big\lvert \mu\big(F(u^0)F(u^t)\big) - \mu\big(F(u^0)\big)\,\mu\big(F(u^t)\big) \Big\rvert \ \leq\ C_\theta\ \frac{\operatorname{osc}(F)}{2}\ \Delta(F)\ e^{-\theta t} ,
 ```
 
-met een rechterlid dat niet van $N$ afhangt. Wegens de translatie-invariantie in de tijd is $\mu(F(u^t)) = \mu(F(u^0))$. Laat $N \to \infty$: volgens stelling A, punt 5, convergeert het linkerlid naar $C_F(t) = \sum_{n\geq1} (\lambda_n/\lambda_0)^t \lvert\langle\psi_n, F\Omega\rangle\rvert^2$. Alle termen zijn $\geq 0$, dus
+met een rechterlid dat niet van $N$ afhangt. De verschuiving $(x, s) \mapsto (x, s+1)$ in de tijd beeldt links op links en plaquettes op plaquettes af en laat dus $w$ en $dU$ invariant; daarom is $\mu(F(u^t)) = \mu(F(u^0))$. Laat $N \to \infty$: volgens stelling A, punt 5, convergeert het linkerlid naar $C_F(t) = \sum_{n\geq1} (\lambda_n/\lambda_0)^t \lvert\langle\psi_n, F\Omega\rangle\rvert^2$. Alle termen zijn $\geq 0$, dus
 
 ```math
 \Big(\frac{\lambda_1}{\lambda_0}\Big)^{t}\, \big\lvert\langle\psi_1, F\Omega\rangle\big\rvert^2 \ \leq\ C_\theta\ \frac{\operatorname{osc}(F)}{2}\ \Delta(F)\ e^{-\theta t} \qquad \text{voor alle } t \geq 1 .
@@ -650,11 +673,15 @@ Pas §4.3 toe op het periodieke rooster met $R = R_r$ en $B$ het complement. De 
 \big\lvert \mu_L(f) - \mu_{L'}(f) \big\rvert \ \leq\ \sup_{\omega,\omega'} \big\lvert\mu^\omega(f) - \mu^{\omega'}(f)\big\rvert \ \leq\ C_\theta\, \Delta(f)\, e^{-\theta(r + 1 - r_0)} .
 ```
 
-Het rechterlid gaat naar nul als $r \to \infty$, dus $(\mu_L(f))_L$ is een Cauchy-rij en de limiet $\langle f\rangle$ bestaat. Voor functies $f, g$ van eindig veel links met disjuncte dragers $A, B$ geldt de ongelijkheid van punt 1 voor elke voldoende grote $L$ (dan is de linkafstand tussen $A$ en $B$ in het periodieke rooster gelijk aan die in $\mathbb{Z}^D$), met een rechterlid dat niet van $L$ afhangt. De limiet $L \to \infty$ van $\mu_L(fg)$, $\mu_L(f)$ en $\mu_L(g)$ geeft de ongelijkheid voor $\langle\cdot\rangle$. $\blacksquare$
+Het rechterlid gaat naar nul als $r \to \infty$, dus $(\mu_L(f))_L$ is een Cauchy-rij en de limiet $\langle f\rangle$ bestaat.
+
+Zij ten slotte $f$ en $g$ functies van eindig veel links met disjuncte, niet-lege dragers $A$ en $B$, beide binnen $R_{r_0}$. Zij $n = \max_{k \in A} d(k, B)$ met $d$ de linkafstand in $\mathbb{Z}^D$, zet $r = r_0 + n$ en neem $L \geq 2r + 3$. Schrijf $d_L$ voor de linkafstand in het periodieke rooster. We tonen aan dat $d_L(k, B) = d(k, B)$ voor elke $k \in A$. Een pad van buren in $\mathbb{Z}^D$ geeft na projectie een pad van buren in het periodieke rooster, dus $d_L(k,B) \leq d(k,B) \leq n$. Omgekeerd: zij $k = k_0, k_1, \dots, k_j$ een pad van buren in het periodieke rooster van $k \in A$ naar een link van $B$, met $j \leq n$. We tillen het stap voor stap op naar $\mathbb{Z}^D$. Is $k_i$ het beeld van een link $\tilde k_i$ met $\varrho(\tilde k_i) \leq r_0 + i \leq r$ (voor $i = 0$ is dat $k$ zelf), dan raakt de plaquette die $k_i$ en $k_{i+1}$ bevat de verzameling $R_r$. Volgens de eerste alinea is zij het beeld van precies één plaquette van $\mathbb{Z}^D$ met hoekpunten in $Q_{r+1}$, en die bevat $\tilde k_i$. De link $\tilde k_{i+1}$ van die plaquette boven $k_{i+1}$ is een buur van $\tilde k_i$ met $\varrho(\tilde k_{i+1}) \leq r_0 + i + 1$. De laatste link $\tilde k_j$ ligt dus in $R_r$ en heeft hetzelfde beeld als een link van $B \subset R_{r_0}$; omdat de projectie injectief is op $Q_{r+1}$, is $\tilde k_j$ die link. Dus $d(k,B) \leq j$, en daarmee $d(k,B) \leq d_L(k,B)$.
+
+Voor elke $L \geq 2r+3$ geldt dus de ongelijkheid van punt 1 voor $\mu_L$ met in het rechterlid de afstanden $d(k,B)$ van $\mathbb{Z}^D$; dat rechterlid hangt niet van $L$ af. De limiet $L \to \infty$ van $\mu_L(fg)$, $\mu_L(f)$ en $\mu_L(g)$ geeft de ongelijkheid voor $\langle\cdot\rangle$. $\blacksquare$
 
 ### 4.6 Opmerkingen
 
-**Hoe ver dit reikt.** Het bewijs gebruikt van de groep alleen dat $\operatorname{Tr}$ reëel is met $\lvert\operatorname{Tr}\rvert \leq 2$ en dat de Haar-maat bestaat. Het werkt daarom met dezelfde vorm voor andere compacte ijkgroepen, met een aangepaste constante. Het werkt niet voor grote $\beta$: zodra $\alpha(\beta,D) \geq 1$ is er geen krimp meer in lemma C.3, en geen enkele verfijning van dit argument kan dat herstellen voor $\beta \to \infty$, omdat de linkvariabelen daar werkelijk sterk van hun buren afhangen.
+**Hoe ver dit reikt.** De paragrafen 4.2 tot en met 4.4 en de punten 1 en 3 gebruiken van de groep alleen dat $\operatorname{Tr}$ reëel is met $\lvert\operatorname{Tr}\rvert \leq 2$ en dat de Haar-maat bestaat; punt 2 gebruikt bovendien stelling A. Het bewijs werkt daarom met dezelfde vorm voor andere compacte ijkgroepen waarvoor stelling A geldt, met een aangepaste constante. Het werkt niet voor grote $\beta$: zodra $\alpha(\beta,D) \geq 1$ levert lemma C.5 de voorwaarde (4.1) niet meer. Een scherpere afschatting van de coëfficiënten verschuift die grens (numeriek tot ongeveer $2{,}4\ \beta_0(D)$), maar niet naar $\beta \to \infty$: numeriek nadert de werkelijke coëfficiënt $c_{\ell k}$ tussen twee buren daar de waarde 1, zodat de som over de $6(D-1)$ buren groter dan 1 wordt. Dat is een uitspraak over deze methode, niet over de kloof: in $D = 2$ is de kloof volgens stelling B voor elke $\beta$ uniform in het volume, hoewel de linkvariabelen ook daar bij grote $\beta$ sterk van hun buren afhangen.
 
 **Toets aan stelling B.** In $D = 2$ geeft stelling B de exacte kloof $m = L\ln(I_1(\beta)/I_2(\beta))$ met $L \geq 3$, en stelling C de ondergrens $\ln(1/(6\tanh\beta))$ voor $\beta \lt 0{,}1682$. Bij $\beta = 0{,}1$ en $L = 3$ is de exacte kloof $3 \times 3{,}689 = 11{,}07$ en de ondergrens $0{,}514$. De ondergrens klopt en is ruim.
 
@@ -684,7 +711,7 @@ De officiële probleemstelling (Jaffe en Witten, 2000) vraagt: bewijs dat voor e
 | kloof groter dan nul | stelling A | elk eindig rooster, elke $\beta$ | ja, maar zonder ondergrens |
 | kloof uniform in het volume | stelling C | alleen $\beta \lt \beta_0(D)$ | **nee** |
 | oneindig volume bestaat | stelling C | alleen $\beta \lt \beta_0(D)$ | **nee** |
-| continuümlimiet bestaat | stelling B | alleen $D = 2$ | **nee** |
+| continuümlimiet van spectrum en tijdsevolutie bestaat | stelling B | alleen $D = 2$ | **nee** |
 | kloof in het continuüm | stelling B | alleen $D = 2$ | **nee** |
 | axioma's in het continuüm, alle groepen | geen | | **nee** |
 
@@ -692,15 +719,15 @@ De vier regels met "nee" zijn samen het millenniumprobleem. Geen daarvan wordt i
 
 ### 5.3 Waar de methoden ophouden
 
-**De afstand tussen "bewezen" en "nodig".** Stelling C geldt in vier dimensies voor $\beta \lt 0{,}0556$. De simulaties van het rapport liggen bij $\beta = 2{,}2$ tot $2{,}5$; de continuümlimiet ligt bij $\beta \to \infty$. In het gebied van stelling C is de correlatielengte (de afstand waarover de velden elkaar voelen, $1/m$) een kleine fractie van één roosterafstand. Voor de continuümlimiet moet de correlatielengte in roostereenheden juist naar oneindig gaan: volgens de formule in §5.1 verdubbelt zij telkens als $\beta$ met ongeveer $0{,}26$ toeneemt. Een bewijs moet de correlaties beheersen over al die schalen tegelijk.
+**De afstand tussen "bewezen" en "nodig".** Stelling C geldt in vier dimensies voor $\beta \lt 0{,}0556$. De simulaties van het rapport liggen in vier dimensies bij $\beta = 2{,}3$ tot $2{,}5$; de continuümlimiet ligt bij $\beta \to \infty$. In het gebied van stelling C is de correlatielengte (de afstand waarover de velden elkaar voelen, $1/m$) volgens de sterke-koppelingsreeks een kleine fractie van één roosterafstand. (Stelling C zelf geeft alleen $1/m \leq 1/\ln(1/\alpha)$; dat is minder dan één roosterafstand voor $\alpha \lt 1/e$, in vier dimensies voor $\beta \lt 0{,}0204$.) Voor de continuümlimiet moet de correlatielengte in roostereenheden juist naar oneindig gaan: volgens de formule in §5.1 verdubbelt zij telkens als $\beta$ met ongeveer $0{,}26$ toeneemt. Een bewijs moet de correlaties beheersen over al die schalen tegelijk.
 
-**Waarom stelling C daar niet komt.** Het bewijs van stelling C berust op zwakke afhankelijkheid: de verdeling van één link verandert weinig als één buur verandert, en de som van die invloeden over alle buren is kleiner dan 1. Voor grote $\beta$ is dat eenvoudig niet waar: de afhankelijkheidscoëfficiënt tussen twee buren nadert dan 1, en de som nadert $6(D-1)$. De methode heeft dus geen "betere constante" nodig; haar uitgangspunt vervalt.
+**Waarom stelling C daar niet komt.** Het bewijs van stelling C berust op zwakke afhankelijkheid: de verdeling van één link verandert weinig als één buur verandert, en de som van die invloeden over alle buren is kleiner dan 1. Voor grote $\beta$ is dat niet waar: numeriek nadert de afhankelijkheidscoëfficiënt tussen twee buren dan 1, en de som nadert $6(D-1)$. Een betere constante helpt de methode dus niet; haar uitgangspunt vervalt. (Dat zegt iets over de methode, niet over de kloof: zie de opmerking in §4.6 over twee dimensies.)
 
-**Waarom een algemeen argument niet kan volstaan.** Het bewijs van stelling C gebruikt van de groep alleen dat het spoor begrensd is. Het werkt daarom letterlijk ook voor de ijkgroep U(1), de roosterversie van het elektromagnetisme. Maar voor U(1) in vier dimensies is bewezen dat de theorie zich bij zwakke koppeling anders gedraagt dan bij sterke koppeling: er is dan geen opsluiting (Guth 1980; Fröhlich en Spencer 1982). Een bewijs van de kloof voor SU(2) bij alle $\beta$ moet dus iets gebruiken wat SU(2) van U(1) onderscheidt. Stelling C doet dat niet, en kan daarom nooit tot alle $\beta$ worden opgerekt.
+**Waarom een algemeen argument niet kan volstaan.** De punten 1 en 3 van stelling C gebruiken van de groep alleen dat de actie per plaquette begrensd is; punt 2 gebruikt daarnaast stelling A. Met $\tfrac12\operatorname{Tr}$ vervangen door het reële deel (gewicht $\exp(\beta\sum_p \mathrm{Re}\  U_p)$) gaat alles ook door voor de ijkgroep U(1), de roosterversie van het elektromagnetisme, met dezelfde constanten. In stap 3 van het bewijs van stelling A moeten dan naast $u_e$ ook $\overline{u_e}$ als voortbrengers worden genomen, omdat (G2) voor U(1) niet geldt. Maar voor U(1) in vier dimensies is bewezen dat de theorie zich bij zwakke koppeling anders gedraagt dan bij sterke koppeling: er is dan geen opsluiting (Guth 1980; Fröhlich en Spencer 1982), en Fröhlich en Spencer beschrijven die fase als masseloos, de fase van het vrije foton. In een masseloze fase vallen de correlaties niet exponentieel af en is er geen kloof die uniform is in het volume. Een bewijs van de kloof voor SU(2) bij alle $\beta$ in vier dimensies moet dus iets gebruiken wat SU(2) van U(1) onderscheidt. Stelling C doet dat niet; daarom is niet te verwachten dat zij in vier dimensies tot alle $\beta$ kan worden opgerekt. (Het ontbreken van opsluiting alleen is hiervoor niet genoeg: voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling evenmin opsluiting, maar daar vallen de correlaties wel exponentieel af.)
 
-**Waarom stelling A niet helpt.** Stelling A geldt voor elke $\beta$, maar het bewijs gebruikt alleen dat de kern van $\mathsf{T}$ op een compacte ruimte strikt positief is. De ondergrens van die kern gaat exponentieel naar nul met het aantal links, en daarmee elke ondergrens voor de kloof die uit dit argument te halen is. Stelling A sluit niet uit dat de kloof naar nul gaat bij groeiend volume. Ook dat is geen detail: hetzelfde bewijs geldt voor U(1).
+**Waarom stelling A niet helpt.** Stelling A geldt voor elke $\beta$, maar het bewijs gebruikt alleen dat de kern van $\mathsf{T}$ op een compacte ruimte strikt positief is. De enige ondergrens voor de kloof die dat argument oplevert, via (2.7), is exponentieel klein in het aantal links. Stelling A sluit dus niet uit dat de kloof naar nul gaat bij groeiend volume. Ook dat is geen detail: hetzelfde bewijs geldt, met de genoemde aanpassing in stap 3, voor U(1).
 
-**Waarom stelling B niet helpt.** In twee dimensies zijn de plaquettes onafhankelijk van elkaar en blijft alleen de holonomie over. In drie en vier dimensies zijn de plaquettes rond elk kubusje aan elkaar gekoppeld; daardoor zijn er lokale vrijheidsgraden die zich voortplanten, en is er geen exacte oplossing bekend.
+**Waarom stelling B niet helpt.** In twee dimensies zijn de plaquettes onafhankelijk van elkaar (in oneindig volume of met open rand; op een periodiek rooster op één globale nevenvoorwaarde na) en blijft alleen de holonomie over. In drie en vier dimensies zijn de plaquettes rond elk kubusje aan elkaar gekoppeld; daardoor zijn er lokale vrijheidsgraden die zich voortplanten, en is er geen exacte oplossing bekend.
 
 ### 5.4 Wat er wel zou moeten gebeuren
 
@@ -708,7 +735,7 @@ Een bewijs langs het rooster heeft een methode nodig die de theorie schaal voor 
 
 ### 5.5 Verhouding tot de simulaties
 
-Stelling A zegt dat het getal dat de simulaties in het rapport schatten, de kloof $m$ van de overdrachtsmatrix op het gesimuleerde rooster, bestaat en groter dan nul is. De simulaties schatten dat getal bij $\beta = 2{,}2$ tot $2{,}5$ (vier dimensies) en vinden waarden die verenigbaar zijn met een kloof die bij groeiend volume niet verdwijnt. Dat is numeriek bewijsmateriaal voor eindig veel roosters; het is geen bewijs, en het zegt niets over $\beta \to \infty$. De stellingen van dit document veranderen daar niets aan: zij gelden óf voor elk afzonderlijk eindig rooster (A), óf in twee dimensies (B), óf ver weg van het gebied van de simulaties (C).
+Stelling A zegt dat de kloof $m$ van de overdrachtsmatrix op het gesimuleerde rooster bestaat en groter dan nul is, en dat elk niveau dat de simulaties uit een correlator van ruimtelijke grootheden schatten (de glueballmassa, de torelon-energie) minstens $m$ is. De simulaties schatten zulke niveaus bij $\beta = 2{,}3$ tot $2{,}5$ (vier dimensies) en vinden op elk rooster een waarde groter dan nul. De lezing dat die waarde alleen een gevolg is van de eindige doos (evenredig met $1/L$) is bij $\beta = 2{,}4$ en $2{,}5$ uitgesloten; dat de waarde niet meer van het volume afhangt, is niet aangetoond (`REPORT.md`, §0). Dat is numeriek bewijsmateriaal voor eindig veel roosters; het is geen bewijs, en het zegt niets over $\beta \to \infty$. De stellingen van dit document veranderen daar niets aan: zij gelden óf voor elk afzonderlijk eindig rooster (A), óf in twee dimensies (B), óf ver weg van het gebied van de simulaties (C).
 
 ---
 
@@ -759,9 +786,9 @@ De volledige lijst met de numerieke literatuur staat in `THEORY.md` §9 en `lite
 
 De bewijzen in dit document gebruiken de volgende resultaten uit de standaardleerboeken zonder bewijs.
 
-- **(S1) Haar-maat.** Op een compacte groep bestaat precies één kansmaat die invariant is onder links- en rechtsvermenigvuldiging; zij is ook invariant onder $g \mapsto g^{-1}$ en geeft elke niet-lege open verzameling positieve maat.
-- **(S2) Stelling van Fubini.** Voor begrensde meetbare functies op een product van kansruimten mag de volgorde van integratie worden verwisseld.
-- **(S3) Integraaloperatoren.** Zij $X$ een compacte metrische ruimte met een eindige maat en $k$ een continue functie op $X \times X$. De operator $(\mathsf{A}f)(x) = \int k(x,y) f(y)\  dy$ op $L^2(X)$ is een Hilbert–Schmidt-operator en dus compact, en $\mathsf{A}f$ is continu voor elke $f \in L^2(X)$. Het product van twee zulke operatoren heeft als kern $\int k_1(x,z)\  k_2(z,y)\  dz$, en $\operatorname{Tr}(\mathsf{A}_1\mathsf{A}_2) = \int\int k_1(x,y)\  k_2(y,x)\  dx\  dy$. Een compacte zelfgeadjungeerde operator heeft een orthonormale basis van eigenvectoren met reële eigenwaarden die alleen in 0 kunnen ophopen; is hij positief semidefiniet, dan is zijn norm de grootste eigenwaarde. Voor een Hilbert–Schmidt-operator is $\sum_n \lambda_n^2 \lt \infty$.
-- **(S4) Stelling van Stone–Weierstrass.** Een algebra van continue complexe functies op een compacte ruimte die de constanten bevat, punten scheidt en gesloten is onder complexe conjugatie, ligt dicht in de ruimte van alle continue functies met de supremumnorm.
+- **(S1) Haar-maat.** Op een compacte groep bestaat precies één kansmaat die invariant is onder links- en rechtsvermenigvuldiging; zij is ook invariant onder $g \mapsto g^{-1}$ en geeft elke niet-lege open verzameling positieve maat. Met "maat" is steeds een Borel-maat bedoeld. Op een compacte metrische ruimte met een eindige Borel-maat liggen de continue functies dicht in $L^2$, en $L^2$ is separabel.
+- **(S2) Stelling van Fubini–Tonelli.** Zij $F$ een meetbare functie op een product van kansruimten. Is $F \geq 0$, of is $\int\int \lvert F\rvert \lt \infty$, dan mag de volgorde van integratie worden verwisseld; in het tweede geval bestaat de binnenste integraal voor bijna alle waarden van de buitenste variabele en is zij een integreerbare functie daarvan. Dit geldt in het bijzonder voor begrensde meetbare functies en, omdat op een kansruimte $L^2 \subset L^1$, voor functies in $L^2$.
+- **(S3) Integraaloperatoren.** Zij $X$ een compacte metrische ruimte met een eindige maat en $k$ een continue functie op $X \times X$. De operator $(\mathsf{A}f)(x) = \int k(x,y) f(y)\  dy$ op $L^2(X)$ is een Hilbert–Schmidt-operator en dus compact, en $\mathsf{A}f$ is continu voor elke $f \in L^2(X)$. Het product van twee zulke operatoren heeft als kern $\int k_1(x,z)\  k_2(z,y)\  dz$, en $\operatorname{Tr}(\mathsf{A}_1\mathsf{A}_2) = \int\int k_1(x,y)\  k_2(y,x)\  dx\  dy$. Algemener: is $k$ kwadratisch integreerbaar op $X \times X$ (bijvoorbeeld begrensd en meetbaar), dan is $\mathsf{A}$ een Hilbert–Schmidt-operator, en dezelfde twee formules gelden. Hierin is $\operatorname{Tr}\mathsf{B} = \sum_n \langle e_n, \mathsf{B} e_n\rangle$ voor een orthonormale basis $(e_n)$; voor een product $\mathsf{B} = \mathsf{A}_1\mathsf{A}_2$ van twee Hilbert–Schmidt-operatoren (een operator van spoorklasse) convergeert deze som absoluut en hangt zij niet af van de gekozen basis. Een compacte zelfgeadjungeerde operator heeft een orthonormale basis van eigenvectoren met reële eigenwaarden die alleen in 0 kunnen ophopen; is hij positief semidefiniet, dan is zijn norm de grootste eigenwaarde. Voor een Hilbert–Schmidt-operator is $\sum_n \lambda_n^2 \lt \infty$.
+- **(S4) Stelling van Stone–Weierstrass.** Een algebra van continue complexe functies op een compacte Hausdorff-ruimte die de constanten bevat, punten scheidt en gesloten is onder complexe conjugatie, ligt dicht in de ruimte van alle continue functies met de supremumnorm.
 - **(S5) Representaties van SU(2).** De feiten van §3.1: de irreducibele representaties $D^j$, hun karakters, de integratieformule voor klassefuncties, de volledigheid van de karakters in $L^2_{\mathrm{kl}}(G)$ (stelling van Peter–Weyl), en het lemma van Schur.
-- **(S6) Gemodificeerde Besselfuncties.** Voor gehele $n \geq 0$ en $x \gt 0$: de machtreeks $I_n(x) = \sum_{k\geq0} (x/2)^{2k+n}/(k!\ (k+n)!)$; de integraalvoorstelling $I_n(x) = \frac1\pi\int_0^\pi e^{x\cos\theta}\cos(n\theta)\  d\theta$; de recurrentie $I_{n-1}(x) - I_{n+1}(x) = \frac{2n}{x} I_n(x)$; de afgeleiden $I_n' = I_{n+1} + \frac{n}{x}I_n = I_{n-1} - \frac{n}{x} I_n$; en voor vaste $n$ de asymptotiek $I_n(x) = \frac{e^x}{\sqrt{2\pi x}}\big[1 - \frac{4n^2-1}{8x} + O(x^{-2})\big]$ voor $x \to \infty$. (NIST Digital Library of Mathematical Functions, §10.25, §10.29, §10.32 en §10.40.)
+- **(S6) Gemodificeerde Besselfuncties.** Voor gehele $n \geq 0$ en $x \gt 0$: de machtreeks $I_n(x) = \sum_{k\geq0} (x/2)^{2k+n}/(k!\ (k+n)!)$; de integraalvoorstelling $I_n(x) = \frac1\pi\int_0^\pi e^{x\cos\theta}\cos(n\theta)\  d\theta$; de afgeleide $I_n' = I_{n+1} + \frac{n}{x}I_n$; voor $n \geq 1$ bovendien de recurrentie $I_{n-1}(x) - I_{n+1}(x) = \frac{2n}{x} I_n(x)$ en $I_n' = I_{n-1} - \frac{n}{x} I_n$; en voor vaste $n$ de asymptotiek $I_n(x) = \frac{e^x}{\sqrt{2\pi x}}\big[1 - \frac{4n^2-1}{8x} + O(x^{-2})\big]$ voor $x \to \infty$. (NIST Digital Library of Mathematical Functions, §10.25, §10.29, §10.32 en §10.40.)
