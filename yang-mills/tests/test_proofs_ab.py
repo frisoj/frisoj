@@ -11,11 +11,25 @@ What is checked, and how (section and formula numbers refer to BEWIJZEN.md):
   to the subgroup and the normalised counting measure as Haar measure.  The SU(2)-specific steps
   (positivity of the kernel K, the invariances of step 2, the factorisation (2.1) of the weight)
   are tested on random SU(2) configurations (``test_A3_*``, ``test_A4_*``, ``test_A5_*``).
+  The remark with formula (2.7), the multiplicities of point 2 and the plain-language statement
+  of section 2.3 about the level a given observable decays with are tested in the Z2
+  laboratories, including the 3 x 3 spatial lattice restricted to the gauge orbits
+  (``test_A_remark_2_7_*``, ``test_A_point_2_*``, ``test_A_point_5_*``).
 * Stelling B (section 3).  Bessel-function identities by quadrature (``test_B1``, ``test_B4``,
   ``test_B5``), the Schur step and the eigenvalue equation by quadrature over SU(2) and by Monte
   Carlo (``test_B2``, ``test_B3_*``), the continuum limit (``test_B5``, ``test_B6``), consistency
   with the independent formulas in ``ym/exact.py`` (``test_B7``) and with the simulation engine
-  ``ym/lattice.py`` (``test_B8``).
+  ``ym/lattice.py`` (``test_B8``).  The dictionary lambda_n = Lambda_(n/2) of point 3, point 4
+  for N >= 3 and the norm statement of section 3.4 are tested on a discretisation of the SU(2)
+  transfer operator of a ring of three links that uses no characters and no Bessel functions
+  (``test_B_point_3_*``), point 4 also straight from the definition of Z
+  (``test_B_point_4_*``) and with the engine on a torus where the sum over j matters.
+
+A check that is an inequality is only as strong as the inequality is sharp in the case tested.
+Where the document's bound is far from sharp in a laboratory this is said at the assertion, and
+where possible a case in which the bound is attained is included.  The mutation checks in
+``review/proofs/r2_test_ab_mutations.py`` perturb the formulas under test and confirm that the
+tests then fail.
 
 Conventions of the laboratories.  A function on a finite configuration space C is a vector
 indexed by C; the Hilbert space is L^2(C, du) with du the normalised counting measure, so the
@@ -29,8 +43,10 @@ All random numbers come from fixed seeds.
 """
 from __future__ import annotations
 
+import functools
 import itertools
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -40,6 +56,7 @@ from ym import exact, stats
 from ym import lattice as ymlat
 
 EPS = float(np.finfo(float).eps)
+DOC = Path(__file__).resolve().parents[1] / "BEWIJZEN.md"
 
 
 # =============================================================================================
@@ -354,7 +371,13 @@ def test_A1_z2_large_N_limit_and_bounds_on_C_F(sshape, beta):
     remainder bound |r_N| <= |F1| |F2| sum_{n>=1} (lambda_n/lambda_0)^(N-t); the limit (2.6);
     mu(F(u^0)F(u^t)) - mu(F(u^0))^2 -> C_F(t) = sum_{n>=1} (lambda_n/lambda_0)^t |<psi_n, F Omega>|^2
     for a real, non-invariant F; 0 <= C_F(t) <= |F|_inf^2 exp(-m t); and C_F(t) >= exp(-m t) for
-    F = psi_1 / Omega."""
+    F = psi_1 / Omega.
+
+    The two upper bounds are inequalities; for the random F they are far from sharp (|r_N| is
+    between 1e-4 and 0.1 times its bound, C_F between 0.003 and 0.08 times its bound), so a
+    bound that is too small by such a factor would not be noticed there.  On the D = 2 rings
+    both bounds are ATTAINED by F = psi_1 / Omega (the sign of the holonomy), which is asserted:
+    there the test fails for any smaller bound."""
     lab = Z2Lab(sshape, beta)
     nC = lab.nC
     lam, vec = np.linalg.eigh(lab.T)
@@ -398,6 +421,14 @@ def test_A1_z2_large_N_limit_and_bounds_on_C_F(sshape, beta):
         assert CF1 >= math.exp(-m * t) * (1 - 1e-10)
         lhs1 = corr(F1, F1, t, N) - corr(F1, np.ones(nC), t, N) ** 2
         assert abs(lhs1 - CF1) < 1e-10 * np.abs(F1).max() ** 2
+        if len(sshape) == 1:
+            # D = 2 ring: H_inv is spanned by 1 and the sign of the holonomy, Omega = 1, and
+            # F1 = psi_1/Omega = +-1.  Both bounds hold with EQUALITY (rounding 1e-12).
+            assert abs(np.abs(F1).max() - 1.0) < 1e-12 and np.abs(lam[2:]).max() < 1e-12 * lam[0]
+            assert abs(CF1 / math.exp(-m * t) - 1.0) < 1e-10
+            for Ns in (t + 1, t + 3):
+                rN = np.trace((F1[:, None] * tpow(t)) @ (F1[:, None] * tpow(Ns - t))) - vac(F1, F1, t)
+                assert abs(rN / np.sum(r[1:] ** (Ns - t)) - 1.0) < 1e-10
 
 
 def _gf2_kernel(columns):

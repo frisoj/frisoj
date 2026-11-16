@@ -1,0 +1,481 @@
+Reports on BEWIJZEN.md, round 2 (16 November 2026).
+
+Two passes by the same AI system that wrote the document: a line-by-line check of every passage that
+was new or changed after round 1 ("referee:delta", against commit 131fa9c), and the completion of
+tests/test_proofs_c.py ("tests:C-finish"). No mathematician has reviewed the document. The findings
+were processed afterwards (see README.md in this folder).
+
+====================================================================================================
+REPORT OF referee:delta
+====================================================================================================
+verdict: correct_with_minor_issues
+
+SUMMARY
+I checked every new or changed mathematical passage of /home/user/frisoj/yang-mills/BEWIJZEN.md (git diff 1c67fe1..HEAD) line by line and found no fatal or major error. The three theorems as now stated are proved by the text, and the document still nowhere claims to solve the Millennium problem.
+
+Three minor points need a text change:
+- **§5.3, "Waarom stelling A niet helpt"** overstates (2.7). It says the only bound from that argument is exponentially small in the number of links. In D = 2 the true c/C tends to 1 as L grows (c/C = 0.895 at beta = 1, L = 3, against the explicit estimate e^{-6} = 0.0025). Only the explicit estimate c/C >= exp(-2 beta(|E|+|P_s|)) is exponentially small.
+- **§4.5, point 3:** the new lifting paragraph cites the first paragraph for "image of exactly one plaquette of Z^D with corners in Q_{r+1}". The first paragraph only says the corners lie in the image of Q_{r+1}, which at L = 2r+3 holds for every plaquette. The conclusion is true (brute-force check at L = 2r+3 passes); one sentence repairs it.
+- **§5.3, the Z_2 remark** is a literature fact with no source and no status marker, unlike the U(1) facts next to it.
+
+The remaining eight findings are cosmetic:
+- **F4:** §5.2 says "De vier regels met nee" under a table with five such rows (already in the draft).
+- **F5:** the new "finite multiplicity" clause in Stelling A point 2 is not stated in (S3) or step 5.
+- **F6:** "only if F sees psi_1" in the plain-language paragraph of §2.3 is imprecise when E_1 is degenerate.
+- **F7:** the proof of (2.7) says "psi ⊥ Omega" without a reason.
+- **F8:** Stelling C point 3 omits "real", skips the empty-support case, and uses B for two different sets.
+- **F9:** symbol reuse (\varrho/\rho, C, theta).
+- **F10:** two "numeriek" claims in §4.6 and §5.3 have no pointer to chapter 6.
+- **F11:** the §0 table says "elk eindig rooster" where the theorems need all sizes >= 3.
+
+Everything else in items (1) to (9) of the task checks out, including the cross-references (2.7), (S2), "de eerste alinea", hoofdstuk 7, THEORY.md §5.6, tabel 3 and §0 of REPORT.md, and ym/exact.py.
+
+Literature attributions were not checked beyond two web lookups:
+- [Fröhlich–Spencer 1982](https://link.springer.com/article/10.1007/BF01208273): the abstract does say "deconfining transition to a massless (QED) phase", so the document's wording is supported. Whether their theorem covers the Wilson form of the U(1) action, rather than only the Villain form, I could not confirm.
+- [Forsström 2022](https://link.springer.com/10.1007/s00220-022-04391-0) ([arXiv](https://arxiv.org/pdf/2104.03752)): exists as cited in the proposed fix for F3.
+
+My scripts, each under 25 s and deterministic:
+- /home/user/frisoj/yang-mills/review/proofs/ref_d_doeblin_27.py
+- /home/user/frisoj/yang-mills/review/proofs/ref_d_lifting.py
+- /home/user/frisoj/yang-mills/review/proofs/ref_d_numbers.py
+
+I did not edit BEWIJZEN.md or commit anything. `git status` shows tests/test_proofs_c.py as modified; that is not my change.
+
+--- finding F1 | severity: minor | confidence: high
+LOCATION: §5.3, paragraph "Waarom stelling A niet helpt" (and the closing sentences of the remark "wat stelling A niet geeft" in §2.4)
+CLAIM: "De enige ondergrens voor de kloof die dat argument oplevert, via (2.7), is exponentieel klein in het aantal links."
+PROBLEM: As a statement about (2.7) this is false in D = 2 and unproved in the document for D >= 3. What is exponentially small is the explicit estimate c/C >= exp(-2 beta(|E|+|P_s|)), not c/C itself. In D = 2 the kernel is T(u,u') = sum_j Lambda_j chi_j(h(u)) chi_j(h(u')) (checked against a direct Monte Carlo evaluation of int K(u^g,u') dg, deviation 0.06 sigma), so |T/Lambda_0 - 1| <= sum_{j>0} (2j+1)^2 (I_{2j+1}/I_1)^L -> 0 and c/C -> 1 as L grows. Numerically: beta = 1, L = 3 gives c/C = 0.895 against e^{-6} = 0.0025; beta = 1, L = 12 gives 1 - c/C = 3e-7 against e^{-24}. So in D = 2, (2.7) with the true c, C improves with the volume. The sentence in §2.4 ("een expliciete ondergrens ... exponentieel klein") is correct as written. For D >= 3 with even sizes the claim can be made true by a short argument of my own, not in the document: for the +-1-valued configuration u* with all spatial plaquettes equal to -1, T_0(u*,u*) = T_0(1,1) and V(u*) = -V(1) = beta|P_s|, so c/C <= exp(-2 beta|P_s|).
+PROPOSED FIX: In §5.3 vervangen door: "De expliciete ondergrens voor de kloof die dat argument oplevert, namelijk (2.7) met de afschatting $c/C \geq e^{-2\beta(\lvert E\rvert + \lvert\mathcal{P}_s\rvert)}$, is exponentieel klein in het aantal links."
+
+Desgewenst in §2.4 na "... en dus niets zegt over oneindig volume." toevoegen: "De afschatting van $c/C$ is grof. In $D = 2$ is $\mathsf{T}(u,u') = \sum_j \Lambda_j\, \chi_j(h(u))\, \chi_j(h(u'))$ (beide leden zijn continue kernen van dezelfde operator, stelling B; de reeks convergeert uniform omdat $\lvert\chi_j\rvert \leq 2j+1$), zodat $c/C \to 1$ voor $L \to \infty$ bij vaste $\beta$. Voor $D \geq 3$ is $c/C$ zelf wel exponentieel klein, in elk geval als alle afmetingen even zijn: voor de configuratie $u^\ast_{(x,i)} = (-1)^{x_1 + \dots + x_{i-1}}\cdot 1$ zijn alle ruimtelijke plaquettes $-1$, dus $V(u^\ast) = \beta\lvert\mathcal{P}_s\rvert = -V(1)$, en omdat $\pm1$ met alles verwisselt is $T_0(u^\ast,u^\ast) = T_0(1,1)$; dus $c/C \leq \mathsf{T}(u^\ast,u^\ast)/\mathsf{T}(1,1) = e^{-2\beta\lvert\mathcal{P}_s\rvert}$."
+
+--- finding F2 | severity: minor | confidence: high
+LOCATION: §4.5, Punt 3, first paragraph, as cited by the new lifting paragraph ("Volgens de eerste alinea is zij het beeld van precies één plaquette van Z^D met hoekpunten in Q_{r+1}")
+CLAIM: First paragraph: every plaquette of the periodic lattice containing a link of R_r has all its corners in the image of Q_{r+1}; "dus" the plaquettes touching R_r and their links are the same as in Z^D. The lifting paragraph then uses that such a plaquette is the image of exactly one plaquette of Z^D with corners in Q_{r+1}.
+PROBLEM: The inference as written does not hold at the smallest allowed size L = 2r+3. There the image of Q_{r+1} is the whole torus, so every periodic plaquette has its corners in that image, including wrap-around plaquettes that are not images of plaquettes inside Q_{r+1}. The conclusion is nevertheless true, for a different reason: for (x,mu) in R_r the corners of a plaquette through its image are the images of x, x+mu, x±nu, x+mu±nu, and these four points lie in Q_{r+1} and form a plaquette of Z^D. The new lifting argument rests on exactly this stronger form, so it should be stated. Brute force at L = 2r+3 (D = 2: r = 1,2,3; D = 3: r = 1,2) confirms the stronger form, and all other inferences of the lifting argument are correct (see verified steps).
+PROPOSED FIX: De eerste alinea van punt 3 vanaf "Zij $L \geq 2r+3$" vervangen door: "Zij $L \geq 2r + 3$. Dan is de projectie $\mathbb{Z}^D \to (\mathbb{Z}/L)^D$ injectief op $Q_{r+1}$. Zij $(x,\mu) \in R_r$, dus $x, x+\hat\mu \in Q_r$. Een plaquette van het periodieke rooster die het beeld van $(x,\mu)$ bevat, ligt voor een richting $\nu \neq \mu$ aan één van beide zijden van die link; haar hoekpunten zijn de beelden van $x$, $x+\hat\mu$, $x \pm \hat\nu$ en $x + \hat\mu \pm \hat\nu$ (met één keuze van het teken). Die vier punten liggen in $Q_{r+1}$ en zijn de hoekpunten van een plaquette van $\mathbb{Z}^D$. Elke plaquette van het periodieke rooster die een link van $R_r$ bevat, is dus het beeld van een plaquette van $\mathbb{Z}^D$ met hoekpunten in $Q_{r+1}$, wegens de injectiviteit van precies één, en haar vier links zijn de beelden van de vier links van die plaquette. De plaquettes die $R_r$ raken, en de links daarin, zijn dus voor elke $L \geq 2r+3$ dezelfde als in $\mathbb{Z}^D$."
+
+--- finding F3 | severity: minor | confidence: medium
+LOCATION: §5.3, paragraph "Waarom een algemeen argument niet kan volstaan", last parenthesis (Z_2)
+CLAIM: "voor de ijkgroep Z_2 in vier dimensies is er bij zwakke koppeling evenmin opsluiting, maar daar vallen de correlaties wel exponentieel af."
+PROBLEM: The statement is correct as far as I know, but it is a literature fact given without a source and without a status marker. The U(1) facts in the same paragraph have sources (Guth; Fröhlich–Spencer), and §7 uses a ✔/○ convention for every attribution. The task asks that each statement be recognisably proved, numerical or expectation; this one is none of those in the text. I confirmed by web search that Forsström's paper exists with the data below; the Marra–Miracle-Solé reference is from memory only.
+PROPOSED FIX: In §5.3: "(Het ontbreken van opsluiting alleen is hiervoor niet genoeg: voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling evenmin opsluiting, maar daar vallen de correlaties volgens de literatuur wel exponentieel af (Forsström 2022; zie hoofdstuk 7). Dit document bewijst dat niet.)"
+
+In §7 onder "Het open probleem" toevoegen: "- ✔ M. P. Forsström, "Decay of correlations in finite Abelian lattice gauge theories", Commun. Math. Phys. 393 (2022) 1311–1346 (exponentieel verval van correlaties voor eindige abelse ijkgroepen in vier dimensies bij zwakke koppeling); ○ R. Marra, S. Miracle-Solé, "On the statistical mechanics of the gauge invariant Ising model", Commun. Math. Phys. 67 (1979) 233–240 (omtrekwet voor $\mathbb{Z}_2$ bij zwakke koppeling)."
+
+--- finding F4 | severity: cosmetic | confidence: high
+LOCATION: §5.2, sentence under the table
+CLAIM: "De vier regels met \"nee\" zijn samen het millenniumprobleem."
+PROBLEM: The table has five rows with **nee**: uniform gap, infinite volume, continuum limit, gap in the continuum, axioms. The miscount was already in the draft (commit 1c67fe1) and was not caught in round 1.
+PROPOSED FIX: "De vijf regels met \"nee\" zijn samen het millenniumprobleem. Geen daarvan wordt in dit document bewezen."
+
+--- finding F5 | severity: cosmetic | confidence: high
+LOCATION: §2.3, Stelling A punt 2 (new clause "hebben eindige multipliciteit"), with step 5 and (S3)
+CLAIM: The eigenvalues of T on H_inv have finite multiplicity.
+PROBLEM: The revision added this clause to the statement, but step 5 never mentions multiplicity and (S3) only says the eigenvalues "alleen in 0 kunnen ophopen". The fact is standard for compact operators and is implied if "ophopen" is read for the eigenvalue list with repetitions, but it is not stated among the standard results the proof may use.
+PROPOSED FIX: In (S3) de zin over de spectraalstelling vervangen door: "Een compacte zelfgeadjungeerde operator heeft een orthonormale basis van eigenvectoren met reële eigenwaarden; elke eigenwaarde ongelijk aan 0 heeft eindige multipliciteit, en de eigenwaarden kunnen alleen in 0 ophopen; is hij positief semidefiniet, dan is zijn norm de grootste eigenwaarde." In stap 5 na "met limiet 0" toevoegen: "en elk van eindige multipliciteit (S3)".
+
+--- finding F6 | severity: cosmetic | confidence: high
+LOCATION: §2.3, "In gewone taal" under Stelling A (new text)
+CLAIM: "Dat getal is minstens m, en het is alleen gelijk aan m als de gekozen grootheid de toestand psi_1 \"ziet\"."
+PROBLEM: With the multiplicity convention now made explicit in point 2, lambda_1 may be degenerate, and psi_1 is then an arbitrary basis vector of the eigenspace. A quantity F can have overlap with psi_2 (E_2 = E_1) and none with psi_1, and its level is still m. This is not exotic: on a symmetric spatial lattice the torelon states winding in different directions are degenerate, which is exactly the case the paragraph goes on to discuss.
+PROPOSED FIX: "Dat getal is minstens $m$, en het is alleen gelijk aan $m$ als de gekozen grootheid een toestand met energie $E_1$ \"ziet\" (dat wil zeggen: $\langle\psi_n, F\Omega\rangle \neq 0$ voor een $n \geq 1$ met $E_n = E_1$)."
+
+--- finding F7 | severity: cosmetic | confidence: high
+LOCATION: §2.4, Bewijs van (2.7), last sentence
+CLAIM: "Omdat psi ⊥ Omega en psi ≠ 0 is phi niet constant"
+PROBLEM: The orthogonality is used without a reason. It holds because lambda_n <= lambda_1 < lambda_0 (points 3 and 4) and eigenfunctions of a self-adjoint operator for different eigenvalues are orthogonal; for a degenerate lambda_n this covers every eigenfunction in the eigenspace. Also not said: -ln(1 - c/C) is finite because c < C, which follows from lambda_1 > 0. No sign condition on lambda_n is needed for the inequality itself (confirmed on non-positive-semidefinite kernels).
+PROPOSED FIX: "Omdat $\lambda_n \leq \lambda_1 \lt \lambda_0$ (punt 4) en eigenfuncties van de zelfgeadjungeerde operator $\mathsf{T}$ bij verschillende eigenwaarden loodrecht op elkaar staan, is $\psi \perp \Omega$. Omdat bovendien $\psi \neq 0$ is $\varphi$ niet constant (uit $\psi = \kappa\Omega$ zou $\kappa = \langle\Omega,\psi\rangle = 0$ volgen), dus $\max\varphi - \min\varphi \gt 0$ en $\lambda_n/\lambda_0 \leq 1 - \varepsilon$. In het bijzonder is $c \lt C$, want $\lambda_1 \gt 0$. $\square$"
+
+--- finding F8 | severity: cosmetic | confidence: high
+LOCATION: §4.1, Stelling C punt 3 (statement) and §4.5, Punt 3, second and third paragraphs
+CLAIM: Statement: for functions f, g of finitely many links with disjoint supports A, B the inequality of point 1 holds for <.>. Proof: "disjuncte, niet-lege dragers A en B"; the second paragraph uses B for the complement of R_r.
+PROBLEM: (a) Point 1 needs real functions (osc is only defined for real g); the statement of point 3 says only "begrensde meetbare functie". (b) The statement allows empty supports, while the proof treats only non-empty ones and does not mention the trivial case. (c) Within the proof of point 3, B first denotes the complement of R_r and two paragraphs later the support of g ("B ⊂ R_{r_0}"). Otherwise the statement of point 3 is exactly what is proved.
+PROPOSED FIX: Stelling, punt 3: "... en voor reële functies $f, g$ van eindig veel links met disjuncte dragers $A, B$ geldt de ongelijkheid van punt 1 ook voor $\langle\cdot\rangle$, met $d$ de linkafstand in $\mathbb{Z}^D$."
+
+Bewijs, tweede alinea: "Pas §4.3 toe op het periodieke rooster met $R = R_r$ en als vastgehouden links het complement $B_r = \mathcal{L}\setminus R_r$" (en verder $B_r$ in plaats van $B$ in die alinea).
+
+Bewijs, derde alinea, eerste zin: "Zij ten slotte $f$ en $g$ reële functies van eindig veel links met disjuncte dragers $A$ en $B$, beide binnen $R_{r_0}$. Is $A$ of $B$ leeg, dan is de ongelijkheid triviaal, zoals in punt 1. Zij dus $A$ en $B$ niet leeg."
+
+--- finding F9 | severity: cosmetic | confidence: high
+LOCATION: Notation: §2.4 remark (\varrho, C), §4.5 punt 3 (\varrho(k)), §4.2 (\varsigma, \rho_\ell), §1.2 (\theta)
+CLAIM: Symbols introduced by the revision do not clash with existing ones.
+PROBLEM: No logical clash: every use is local and defined where it is used. Four readability points remain. (a) \varrho is a probability density in §2.4 and the position of a link in §4.5; in chapter 4, \varrho(k) also sits next to the conditional density \rho_\ell, which looks almost the same in print. (b) \varsigma appears only in (TV1)/(TV2) and is distinct from the string tension \sigma of §3; no change needed. (c) C = max T in the remark of §2.4 reuses the letter of the closed loop C in step 5 of the same section. (d) §1.2 now writes e^{-\theta·∞} = 0 before \theta is introduced (Stelling C), and \theta is the class angle in §3.
+PROPOSED FIX: (a) In §4.5 $\varrho(k)$ overal vervangen door $\lVert k\rVert$: "Voor een link $k$ van $\mathbb{Z}^D$ zij $\lVert k\rVert$ het maximum van de coördinaten (in absolute waarde) van zijn twee eindpunten, en voor $r \geq 1$ zij $R_r$ de verzameling links met $\lVert k\rVert \leq r$". (c) In stap 5 de lus $\gamma$ noemen: "Kies een gesloten lus $\gamma$ in $\Lambda_s$ ... langs $\gamma$". (d) In §1.2: "... met de afspraak dat het minimum over de lege verzameling $\infty$ is en dat $e^{-\theta\cdot\infty} = 0$ voor elke $\theta \gt 0$."
+
+--- finding F10 | severity: cosmetic | confidence: high
+LOCATION: §4.6 "Hoe ver dit reikt" and §5.3 "Waarom stelling C daar niet komt" (the "numeriek" claims); cross-reference "(hoofdstuk 6)" in §4.1
+CLAIM: "numeriek tot ongeveer 2,4 beta_0(D)" and "numeriek nadert de werkelijke coëfficiënt c_{lk} ... de waarde 1".
+PROBLEM: The numbers are right (see numeric checks) and correctly labelled as numerical, but only §4.1 points to chapter 6; §4.6 and §5.3 make the same numerical claims without a pointer. Chapter 6 is a placeholder, which I was told to ignore. Once it is filled it must contain these items, or the three "numeriek" statements have no source: the small-beta slope 4/(3 pi); the sums 0.427 / 0.425 / 0.425 at beta_0(D) for D = 2, 3, 4; the crossing at 2.36 beta_0(D); and c_{lk} -> 1 for large beta.
+PROPOSED FIX: In §4.6: "(numeriek tot ongeveer $2{,}4\ \beta_0(D)$, zie hoofdstuk 6)" en "numeriek (hoofdstuk 6) nadert de werkelijke coëfficiënt $c_{\ell k}$ tussen twee buren daar de waarde 1". In §5.3: "numeriek (hoofdstuk 6) nadert de afhankelijkheidscoëfficiënt tussen twee buren dan 1".
+
+--- finding F11 | severity: cosmetic | confidence: high
+LOCATION: §0, overview table, rows Stelling A and Stelling B
+CLAIM: Stelling A holds for "elk eindig rooster"; Stelling B for "elke omtrek".
+PROBLEM: The theorems as stated require all lattice sizes to be at least 3 (Stelling A: spatial sizes >= 3 and N >= 3; Stelling B: L >= 3). The table drops that condition. Already in the draft; otherwise the summary and both tables in §0 match the theorems as now stated, including the changed wording for Stelling B.
+PROPOSED FIX: In de tabel van §0: "elke dimensie $D \geq 2$, elke $\beta \gt 0$, elk eindig rooster met alle afmetingen minstens 3" en "$D = 2$, elke $\beta \gt 0$, elke omtrek $L \geq 3$".
+
+STEPS RE-DERIVED AND FOUND CORRECT
+- (1) §2.4 step 2(a): (u,g) -> f(u^g) is Borel for a Borel representative; Tonelli gives the double integral of |f(u^g)|^2 equal to ||f||^2; hence Pf exists a.e., ||Pf|| <= ||f|| by Cauchy–Schwarz, and Pf is independent of the representative. The integrability bound ||f_1|| ||f_2|| covers the interchanges in the projection proof and in step 2(c). (Pf)(u^h) = (Pf)(u) holds exactly on the gauge-invariant full-measure set where Pf is defined.
+- (2) (2.7): q > 0, int q du' = 1, q phi = (lambda_n/lambda_0) phi; minorisation q >= (c/C) rho from lambda_0 Omega(u) <= C int Omega; the oscillation inequality (both bracketed functions are non-negative with integral 1 - eps); phi is non-constant because psi ⊥ Omega and psi ≠ 0; degenerate eigenvalues are covered since every lambda_n with n >= 1 is below lambda_0; no sign condition on lambda_n is needed; -ln(1-x) >= x on [0,1); c >= exp(-beta(|E|+|P_s|)) and C <= exp(beta(|E|+|P_s|)), so c/C >= exp(-2 beta(|E|+|P_s|)).
+- (3) Step 8 with (S3): everything used is stated in (S3): bounded measurable kernels give Hilbert–Schmidt operators; the product-kernel and trace formulas for L^2 kernels; absolute convergence and basis independence of the trace of a product of two Hilbert–Schmidt operators; sum of lambda_n^2 finite. mu(F(u^0)) = Tr(F T^N)/Tr T^N is the case F_2 = 1 of the first formula. Separability of L^2 is now in (S1).
+- (4) Stelling A point 2 (multiplicity convention; real continuous orthonormal eigenbasis of H_inv) and step 7 (H on the maximal domain {sum E_n^2 |a_n|^2 finite} is self-adjoint with T restricted to H_inv equal to e^{-H}) are correct; see F5 for the unstated finite-multiplicity fact.
+- (5a) §3.3 "Over nulverzamelingen": the map (w',g_1,h) -> (w', g_1 h g_1^{-1}) pushes the product measure to dw' dh, so F is a well-defined L^2 element with ||F|| = ||f||; Fubini gives phi_f off a null set N with ||phi_f|| <= ||f||; N is conjugation-invariant and phi_f is an exact class function after setting it to 0 on N; int |f(u^g)| dg equals the double integral of |F(.,.,h(u))| for every u, so (Pf)(u) = phi_f(h(u)) whenever h(u) is outside N, i.e. almost everywhere.
+- (5b) §3.2 point 3 dictionary (lambda_n = Lambda_{n/2}, psi_n = chi_{n/2} o h) is consistent with the strict ordering from Lemma B.1. Point 4 (Z = sum_j Lambda_j^N for N >= 3) follows from Tr T^N in the basis chi_j o h plus a basis of the complement. Point 5 monotonicity: both sequences decrease in j, so |q_j(L) - q_j| <= max(q_J(L), q_J) < 2 eps for j >= J.
+- (5c) §3.4: the norm of T/Lambda_0 minus the projection on Omega equals (I_2/I_1)^L and tends to 0; the continuum counterpart is exp(-(3/8) g^2 l tau); sigma = (3/8) g^2 follows from (3.3). The area law is marked as not proved in the first paragraph of §3.4.
+- (6) §4.2: the measurability paragraph (z_l >= min p > 0, rho_l continuous, Pi_l f bounded Borel by Fubini); (K1); the proof of (TV1) (equality at S = {q > q'}, positive and negative parts each equal to half the L^1 distance); (TV2), with densities with respect to Haar measure in both places where it is used (Lemma C.2 and (4.2)); Lemma C.3 statement and the first line of (c), checked through to the end of the proof of (c).
+- (7a) §4.5 point 1: in both empty-set cases all three members vanish under the conventions of §1.2; the definition of d(A,B) in §1.2 agrees with all its uses (Stelling C point 1, C.6 weights, the boundary set of B, points 2 and 3).
+- (7b) §4.5 point 2: N >= max(3, 2t) is exactly what is needed (lattice size and t <= N/2); d(A,B) >= t by the time-coordinate argument; the time shift is a lattice automorphism, so mu(F(u^t)) = mu(F(u^0)); the limit N -> infinity and the t-th-root argument are correct.
+- (7c) §4.5 point 3: neighbours differ by at most 1 in varrho; injectivity on Q_{r+1} iff L >= 2r+3; d_L(k, complement of R_r) >= r+1-varrho(k); the Cauchy estimate. Lifting argument: the projected path gives d_L <= d <= n; the induction runs over i = 0..j-1 with varrho <= r_0+i <= r_0+n-1 < r; the last link has varrho <= r_0+j <= r and equals the link of B by injectivity; r = r_0+n suffices. The statement of point 3 in §4.1 is what is proved (see F2, F8).
+- (8a) §4.1 paragraph after the table, §4.6 and §5.3: the numbers are correct; statements based on the strong-coupling series are marked as not proved, and the Dobrushin-coefficient statements as numerical. The U(1) remark is correct: with weight exp(beta sum Re U_p) the oscillation bound in Lemma C.5 is the same 4 beta n_{lk}, and in step 3 of Stelling A the expansion of K involves both u_e and its conjugate, so the algebra is conjugation-closed.
+- (8b) §5.5 is consistent with Stelling A point 5 and with REPORT.md §0 (1/L reading excluded at beta = 2.4 and 2.5; volume independence not shown). Tabel 3 of REPORT.md lists the torelon as lightest state on six of nine lattices, as §2.3 uses.
+- (9) Appendix: (S1) (Haar measure, Borel convention, density of continuous functions, separability), (S2) (Fubini–Tonelli in the form used in step 2(a), §3.3 and §4.2), (S3), (S4) (compact Hausdorff), (S6) (formulas agree with DLMF 10.25.2, 10.29.1–2, 10.32.3, 10.40.1; the n >= 1 restriction matches the uses in Lemma B.1 and (3.1)).
+- Cross-references: (2.7), (S2), "de eerste alinea", hoofdstuk 7, §3.4, §4.6, THEORY.md §5.5 and §5.6, ym/exact.py (u(beta) = I_2/I_1), REPORT.md §0 and tabel 3 all exist and say what is attributed to them.
+
+NUMERICAL CHECKS
+- ref_d_doeblin_27.py, part A: 4000 random weighted symmetric positive kernels (one third positive semidefinite, 7466 negative eigenvalues among those tested): row sums of q equal 1 to 2e-13; the eigen-relation for phi holds to 1e-13; min(q - eps*rho) = 9e-7 >= 0; max over n >= 1 of lambda_n/lambda_0 - (1 - c/C) = -0.032 <= 0; -ln(1-x) - x >= 0 on a grid of [0,1).
+- ref_d_doeblin_27.py, part B (SU(2), D = 2): kernel series against Monte Carlo of int K(u^g,u') dg at L = 3, beta = 1: 1.44488 vs 1.44502 ± 0.00223 (0.06 sigma). For beta in {0.5, 1, 3} and L in {3, 4, 6, 8, 12}: lambda_1/lambda_0 = (I_2/I_1)^L <= 1 - c/C in all 15 cases, and c/C >= exp(-2 beta L) in all 15 cases. True c/C tends to 1 with L (beta = 1: 0.895, 0.974, 0.998, 0.99991, 0.9999997), while exp(-2 beta L) falls from 2.5e-3 to 3.8e-11.
+- ref_a_doeblin_bound.py (round 1, rerun): 20000 random matrices, max of |lambda_2|/lambda_0 - (1 - min T/max T) = -2.7e-5 <= 0.
+- ref_d_lifting.py: D = 2 (r = 1, 2, 3) and D = 3 (r = 1, 2) at L = 2r+3: every periodic plaquette touching R_r is the image of exactly one plaquette in Q_{r+1}; the projection is injective on links in Q_{r+1} (and not at L = 2r+2); min over k of d_L(k, R_r^c) - (r+1-varrho(k)) = 0. Lifting: 300 pairs (A,B) in D = 2 and 60 in D = 3 inside R_1, with r = r_0+n and L = 2r+3..2r+6: d_L(k,B) = d(k,B) always. At L = 2r_0+1 = 3 the equality fails for 51 (D = 2) and 24 (D = 3) pairs, so a quantitative choice of L is needed.
+- ref_d_numbers.py: beta_0(2,3,4) = 0.168236, 0.083527, 0.055613 (document values rounded down). All nine rows of the §4.1 table: alpha rounded to nearest, ln(1/alpha) rounded down, all consistent. -4 ln u(0.03) = 19.572 and -3 ln u(0.03) = 14.679; 4/(3 pi) = 0.4244; artanh(1/(18e)) = 0.02044; 11 ln 2/(3 pi^2) = 0.2575; 3 ln(I_1/I_2)(0.1) = 11.068.
+- ref_d_numbers.py: sup over j > 0 of (I_{2j+1}/I_1)^L equals (I_2/I_1)^L for beta in {0.5, 2, 10} and L in {3, 6}; the continuum supremum equals exp(-(3/8) g^2 l tau); sup_j |q_j(L) - q_j| = 2.8e-3, 1.7e-4, 1.1e-5, 6.8e-7 for L = 8, 32, 128, 512, with both sequences monotone in j.
+- ref_c2_su2_dobrushin.py (round 1, rerun): true SU(2) coefficient at beta_0(D) gives neighbour sums 0.4274, 0.4252, 0.4248 for D = 2, 3, 4 (document: "ongeveer 0,43"); the sum reaches 1 at 2.36 beta_0(D) in all three dimensions (document: "ongeveer 2,4"); the coefficient tends to 1 for large beta; no violation of c <= tanh(beta) for SU(2) or for U(1) with weight exp(beta sum Re U_p).
+
+====================================================================================================
+REPORT OF tests:C-finish
+====================================================================================================
+file: /home/user/frisoj/yang-mills/tests/test_proofs_c.py
+default run: 151 passed, 9 skipped in 23.49s   (wall: real 0m23.850s; command: python3 -m pytest tests/test_proofs_c.py -q, run from /home/user/frisoj/yang-mills)
+slow run: 160 passed in 95.70s (0:01:35)   (wall: real 1m36.057s; command: python3 -m pytest tests/test_proofs_c.py -q --runslow; the three 4x5-torus cases take 17-25 s each, everything else under 4 s)
+full suite: 541 passed, 43 skipped in 479.39s (0:07:59)   (python3 -m pytest -q; this run collected the file one test before its final state: test_c7_degenerate_cases_of_point_1 was added afterwards and passes in the two file-level runs above, so the suite now collects 585 tests and should give 542 passed, 43 skipped; I did not repeat the 8-minute run)
+
+NOTES
+Both runs are clean and no test fails against the document. All 44 original failures were bugs in the tests, assertions beyond what the document claims, rounding/tolerance problems, or text that changed after the tests were written (table rounded down, 19,6 / 14,7). Every claim of section 4 that I could put into the Z2 laboratory or into quadrature holds; the only findings are the two cosmetic rounding remarks.
+
+The file now has 64 test functions and 160 cases (151 default, 9 slow), all with docstrings naming the claim and with fixed seeds.
+
+Things to know when reading the result:
+- Extra assertions remain in passing tests. They are true laboratory facts used to validate the code and are labelled as not claimed by the document: d(A,B) = t for time layers, c_lk = tanh(2 beta)/2 for Z2, lambda_0 = cosh(beta)^L and lambda_1 = sinh(beta)^L on rings, m within 1% of 3 ln coth(beta) on the 3x3 spatial torus, m > 3.5 ln coth(beta) on 4x5, and the SU(2) maximum being the antipodal pair for D >= 3.
+- The bounds of Propositie C.6 and points 1 to 3 are loose in the laboratory (ratios 0.04, 0.02, gap/bound >= 5.5, 1e-40). The mutation script shows exactly which wrong versions would and would not be caught; the proof steps themselves (Lemmas C.1 to C.4, (4.2), the telescoping identity) are tested at or near equality.
+- The lifting claim of point 3 was confirmed in 13 cases and its proof steps were followed literally; the threshold L >= 2r+3 is sufficient but far from sharp.
+- Numbers that section 6 could quote are printed with -s (pytest tests/test_proofs_c.py -q -s).
+- The untracked files review/proofs/ref_d_doeblin_27.py, ref_d_lifting.py and ref_d_numbers.py are not mine (they appeared during this session, presumably from a parallel agent); I did not touch them.
+
+Files:
+- /home/user/frisoj/yang-mills/tests/test_proofs_c.py (modified, uncommitted, 3112 lines)
+- /home/user/frisoj/yang-mills/review/proofs/r2_test_c_mutations.py (new, untracked)
+
+DISCREPANCIES WITH THE DOCUMENT
+- [cosmetic] BEWIJZEN.md section 4.1, paragraph after the table (line 491): 'zodat de som over de buren bij $\beta_0(D)$ ongeveer $0{,}43$ is': Only a rounding remark, no error of substance. The computed sum 6(D-1) c(beta_0(D)) is 0.4274, 0.4252, 0.4248 for D = 2, 3, 4 and tends to 4/(3 pi) = 0.4244 for large D. For D = 4, the dimension the document cares about, it rounds to 0,42, not 0,43. 'Ongeveer' covers it; the test accepts the printed value within 0.01 and says so in its docstring. Possible wording: "zodat de som over de buren bij $\beta_0(D)$ ongeveer $0{,}43$ is ($0{,}427$, $0{,}425$ en $0{,}425$ voor $D = 2, 3, 4$) en pas bij ongeveer $2{,}4\ \beta_0(D)$ de waarde 1 bereikt (hoofdstuk 6)." EVIDENCE: test_c3_numbers_quoted_in_sections_4_1_and_4_6 (run with -s): 'sum of the true coefficients over the 6(D-1) neighbours at beta_0(D), D=2,3,4: 0.4274, 0.4252, 0.4248'; for D >= 3 the coefficient is L_1(beta)/I_1(beta), confirmed by a four-parameter search to 1e-9. Same values as round 1 (ref_c2_su2_dobrushin.py). The other two numbers are exact to the printed digits: slope 0.4244 -> 0,42; root 2.365, 2.356, 2.356 beta_0 -> 2,4.
+- [cosmetic] BEWIJZEN.md section 5.3, 'De afstand tussen bewezen en nodig' (line 722): 'volgens de formule in §5.1 verdubbelt zij telkens als $\beta$ met ongeveer $0{,}26$ toeneemt': 0,26 is the large-beta value 11 ln 2/(3 pi^2) = 0.2575 of the exponential factor alone. With the power prefactor of the formula in 5.1 the increase is 0.275 at the beta of the simulations, which rounds to 0,27 or 0,28. Round 1 already noted this without calling it an error and the text was left as it is; the test accepts it within 0.02. Possible wording: "volgens de formule in §5.1 verdubbelt zij voor grote $\beta$ telkens als $\beta$ met ongeveer $0{,}26$ toeneemt (rond $\beta = 2{,}4$ is dat ongeveer $0{,}27$)." EVIDENCE: test_c9_section_5_3_doubling_of_the_correlation_length (run with -s): 'beta=2.3: 0.2752, beta=2.4: 0.2745, beta=2.5: 0.2738, beta=5.0: 0.2656, beta=20.0: 0.2595, beta=1000.0: 0.2576; limit 0.2575'.
+
+CHANGES MADE TO THE TEST FILE
+- BUG IN TEST (11 AttributeErrors): lemma_c3_check / lemma_c4_check had been refactored to take a list of (w, lambda) pairs and a tuple of alphas, but four callers still passed (w, lam, f, rng); callers updated (C5 tests).
+- BUG IN TEST (8 ValueErrors): np.prod over a list of arrays of different broadcast shapes in c7_cases, c10_functions and the slow 3x4 test; replaced by link_product(). Dead/garbled line computing gB in test_c7_covariance_identity_of_the_proof removed.
+- BUG IN TEST (3 ZeroDivisionErrors, C6): the 'extremal indicator' could be built from omega = omega' (or from two boundary conditions giving the same measure) and was then identically zero; omega' now differs from omega on a frozen link that has a free neighbour, and the ratio is only formed when rhs > 0 (the inequality itself is still asserted for every f).
+- BUG IN TEST (test_c6_decomposition_of_section_4_3, 0.0198 <= 1e-12): mu^omega was indexed with omega in the order B is listed, but the array has its axes in increasing link order; fixed with argsort(B).
+- BUG IN TEST (su2_tv, C3): the orthonormal frame built by Gram-Schmidt broke down when b was nearly parallel to b'-b (exactly the worst case b = -b'); su2_tv now uses only the invariants c0 = b.e0, c1 = |b - c0 e0|, |b'-b|. Gauss-Legendre nodes are cached (worst-case search 0.8 s -> 0.1 s per beta).
+- ASSERTED MORE THAN CLAIMED (test_c2_cube_embedding_of_point_3): 'd(k,B) == r+1-rho(k)' removed; the claim d(k,B) >= r+1-rho(k) is asserted, the number of links where it is an equality is recorded (8/12, 24/40, ...).
+- ASSERTED MORE THAN CLAIMED (test_c8_gap_d3_spatial_torus_3x3): the author's 'six-fold degenerate lambda_1' is false (degeneracy 2, six levels within 1%); now only recorded.
+- ROUNDING (same test): 'lambda_min > 0' cannot be decided by eigvalsh (true value ~ sinh(beta)^18 = 1e-31..1e-20, rounding 1e-16). Replaced by lambda_min >= -1e-13 lambda_0 plus a structural check of injectivity: T|H_inv = M diag(Kd) M^T with Kd > 0 and M M^{-1} = 1 to 1e-12 (new helper z2_hinv_factors). Not a weakening of the claim.
+- TOLERANCE (test_c8_gap_d2_rings[5], 4.1e-8 <= 1e-9): the relative error of lambda_1 from a dense eigenvalue routine is eps*lambda_0/lambda_1 = eps*coth(beta)^L (7e-8 at L = 5, beta = 0.02); tolerance set to 1e-12 + 20 eps coth(beta)^L with that justification. Same kind of fix in the 2x2x2 validation (tolerance relative to ||T|| = 219).
+- BUG IN TEST (test_c5_general_framework_on_other_systems): for a disconnected Ising graph the Perron vector has exact zeros that came back as 1e-16 and passed 'min > 0'; they are now set to 0 (weights 0 are allowed in Lemma C.3) and (4.1) is still verified.
+- DOCUMENT CHANGED (C9): table rows now require alpha rounded to nearest and the lower bound rounded DOWN (floor at four decimals, printed <= exact), plus a test that the sentence 'naar beneden afgerond' is present; beta_0 values must be on the safe side.
+- DOCUMENT CHANGED (C9): test_c9_remark_gap_of_order_20 REPLACED by test_c9_remark_leading_strong_coupling_gap (19,6 and 14,7 parsed from the text); the old test looked for the deleted phrase 'in de orde van 20'.
+- NEW C9 tests: 0,0204 (alpha < 1/e in D = 4) and 0,26 (doubling of the correlation length), both parsed from section 5.3.
+- NEW C3 test test_c3_numbers_quoted_in_sections_4_1_and_4_6 (0,42 beta, 0,43, 2,4 beta_0(D), all parsed from the document); the worst-case test now runs at beta = 0.02, beta_0(D), 2.4 beta_0(D), 1 and is tied to the reduced family used for those numbers.
+- NEW C1 test test_c1_fact_tv1_and_its_proof ((TV1) now has a proof in the document).
+- NEW C2 test test_c2_lifting_argument_of_point_3 (the extended proof of point 3: d_L(k,B) = d(k,B) for L >= 2r+3), with helpers zd_neighbours, zd_link_distance, torus_shortest_path.
+- NEW C6 test test_c6_decay_rate_of_proposition_c6_on_a_tree, added after the mutation checks showed that neither the Z2 nor the Ising-graph test can tell e^{-theta d} from e^{-3 theta d}.
+- NEW C7 test test_c7_degenerate_cases_of_point_1; NEW C10 test test_c10_point_1_for_the_infinite_volume_state.
+- VACUOUS COMPARISON FIXED (test_c10_infinite_volume_limit_d2): |mu_L f - mu_L' f| evaluated as a float difference was exactly 0.0, so the test compared 0 <= rhs; the finite-volume corrections are now computed term by term without cancellation (1e-59..1e-38) and the test asserts that the left side is resolved.
+- SLOW TESTS: test_c7_c6_on_the_3x4_torus failed on the author's own sanity check 'max distance >= 3' (it is 2 on the 3x4 torus); corrected. test_c8_gap_d3_larger_spatial_tori renamed test_c8_gap_d3_larger_spatial_torus and parametrised over beta; the 5x5 spatial torus was REMOVED (2^25-dimensional Lanczos, estimated well over 10 minutes).
+- Module docstring: conventions, how sharp each group of tests is, run times.
+- New script /home/user/frisoj/yang-mills/review/proofs/r2_test_c_mutations.py (51 mutants, about 25 s). BEWIJZEN.md was not edited; nothing was committed.
+
+MUTATION CHECKS
+- Script: python3 review/proofs/r2_test_c_mutations.py -> '51 mutants, 0 not as expected' (43 killed, 8 survive as predicted). Mutations are applied to an in-memory copy of the test source; the file on disk is untouched.
+- KILLED Lemma C.1 with tanh(osc/4.2); identity with (sa+b)^2; (TV2) with 0.9 osc(F) d_TV.
+- KILLED layer distance claimed >= t+1; d(k,B) claimed >= r+2-rho(k); lifting claimed already for L >= 2 r0+3.
+- SURVIVES lifting claimed for L >= 2r+1 (r = r0+n-1): the threshold 2r+3 of the document is sufficient but not sharp, so the test cannot detect this.
+- KILLED SU(2) coefficient claimed <= 0.4 tanh(beta); slope 1/2 instead of 4/(3 pi); 5(D-1) instead of 6(D-1) neighbours.
+- KILLED alpha = 5(D-1) tanh(beta); Lemma C.5 with tanh(0.95 beta n_lk) (Z2 is within 0.25% of the bound at beta = 0.05); Dobrushin coefficients computed a factor 2 too small.
+- KILLED Lemma C.2 with 0.95 c_lk; C.3(a) with (1 - 0.9 lambda); C.3(b) with (1 - 0.5 lambda); C.3(c) with 0.95 lambda; matrix statement with 0.95 lambda; Lemma C.4 with alpha^(n+1); (4.2) with 0.9 delta_l(h).
+- Propositie C.6: KILLED with C_theta/100; SURVIVES with C_theta/10 (largest lhs/rhs is 0.04 in the Z2 laboratory). On Ising graphs C_theta/10 is KILLED (ratio 0.17).
+- Propositie C.6 decay rate: SURVIVES e^{-3 theta d(k,B)} both in the Z2 test and on Ising graphs; on the new tree test e^{-2 theta d} is KILLED and e^{-1.5 theta d} SURVIVES. So the exponent is tested to within a factor 2, not better.
+- Point 1: KILLED with osc(g)/200, SURVIVES with osc(g)/20 (largest |cov|/bound is 0.02).
+- Point 2: closed form (L+1) ln coth(beta) KILLED; bound 6 ln(1/alpha) KILLED; bound 3 ln(1/alpha) SURVIVES (the laboratory gap is at least 5.5 times the bound, as section 4.6 itself says).
+- Point 3: e^{-50 theta (r+1-r0)} SURVIVES (left side ~ tanh(beta)^45: consistency check only); infinite-volume covariance with C_theta/200 KILLED.
+- C9 formulas, all KILLED: table rounded to nearest instead of down; (6D-4)/(6D-7); u = I_1/I_0; 12e instead of 18e; I_0/I_1 in the Stelling B gap.
+- DOCUMENT DRIFT, all 12 KILLED (one printed number of BEWIJZEN.md changed in memory): 0,5141 -> 0,5142; 1,4272 -> 1,4273 (the round-1 error); alpha 0,8993 -> 0,8994; 19,6 -> 19,7; 14,7 -> 14,6; 0,0204 -> 0,0205; 0,26 -> 0,27; 0,42 beta -> 0,43 beta; 0,43 -> 0,45; 2,4 -> 2,5; beta_0(4) 0,0556 -> 0,0557; 11,07 -> 11,08.
+
+NOT TESTED
+- Stelling C points 1, 2, 3 and Propositie C.6 for the group SU(2) itself: only the Z2 laboratory (the SU(2) weight on the centre) and general finite systems are enumerated. For SU(2) only Lemma C.5 (the one-link coefficient) is checked, by quadrature.
+- Lemma C.5 for SU(2) is a numerical maximisation (grid + Nelder-Mead over a family that is complete up to rotations), not a certified supremum; only n_lk = 1 occurs (extents >= 3).
+- Exact transfer-matrix gap in D = 4 (smallest spatial torus 3^3 has 81 links) and point 3 in D >= 3: not feasible by exact enumeration.
+- The decay RATE in Propositie C.6 / point 1 is tested only to within a factor 2 in the exponent (tree test); the constants C_theta and osc(g)/2 only to within factors of about 6 to 50. In the Z2 laboratory these bounds are far from sharp, so a moderately wrong constant in the document would not be detected. The lemmas of 4.2 that make up the proof are tested at equality.
+- Point 3, finite-volume part: in D = 2 the left side is of order tanh(beta)^45 or smaller, so that test is a consistency check only.
+- The limits N -> infinity and t -> infinity in the proof of point 2: checked at finite N (up to 40) and t (up to 80) only.
+- Measurability, Fubini and (S2) statements of 4.2/4.3; continuous groups in the framework (all framework tests use finite state spaces).
+- The 5x5 spatial torus in D = 3 (removed from the slow tests for run time); the largest spatial tori tested are 4x4 (default) and 4x5 (slow).
+- Literature statements of 5.3 (U(1) and Z2 in four dimensions, Osterwalder-Seiler) and the THEORY.md origin of -4 ln u / -3 ln u as leading strong-coupling terms: only the arithmetic is checked.
+- Section 6 of the document (placeholder), to which 4.1 refers for the SU(2) numbers 0,42 / 0,43 / 2,4.
+
+TESTS
+- test_c1_lemma_c1_random_tilts
+    checks: Lemma C.1 (4.2): d_TV(nu,nu') <= tanh(osc(phi)/4)
+    method: 33600 random finite probability vectors and tilts (sizes 2..200, scales 1e-3..40, four shapes incl. zero-weight atoms and two-valued phi), seed 101
+    result: pass; max d_TV/tanh(osc/4) = 1.000000; tolerance 1e-14
+- test_c1_lemma_c1_sup_over_events_and_tv1
+    checks: Lemma C.1 with d_TV literally as sup over events; (TV1)
+    method: brute force over all 2^n events, n <= 10, 600 random cases
+    result: pass; |sup_S - (1/2) sum|q-q'|| <= 1e-14
+- test_c1_fact_tv1_and_its_proof
+    checks: (TV1) and each step of its new proof: nu(S)-nu'(S) <= int (q-q')^+, equality at S={q>q'}, int(q-q')^+ = int(q-q')^- = (1/2) int|q-q'|, d_TV <= 1
+    method: 240 random density pairs w.r.t. a random non-uniform reference measure on n <= 10 points, all 2^n events (NEW test)
+    result: pass; all identities to 1e-14
+- test_c1_two_point_case_attains_equality
+    checks: Lemma C.1 equality case and the formula (s^2-1)a(1-a)/(s^2 a+1-a) of the proof
+    method: two-point space, osc from 1e-6 to 30, a = 1/(1+s) and 1400 random a
+    result: pass; equality to 1e-13
+- test_c1_algebraic_identities_of_the_proof
+    checks: s^2 a + b - (s+1)^2 ab = s^2 a(1-b) + b(1-a) - 2sab = (sa-b)^2 and the equivalence with <= (s-1)/(s+1)
+    method: exact rational arithmetic (300 cases) and floating point (20000 cases)
+    result: pass; exact equality in Fractions
+- test_c1_monotonicity_step_of_the_proof
+    checks: first display of the proof of Lemma C.1: nu'(S) <= s^2 a/(s^2 a + 1 - a)
+    method: 1200 random (nu, phi, S)
+    result: pass; tolerance 1e-14
+- test_c1_fact_tv2
+    checks: (TV2): |nu(F)-nu'(F)| <= osc(F) d_TV
+    method: 2000 random (nu, nu', F), sizes 2..30
+    result: pass; attained on two-point spaces (ratio 1.0)
+- test_c2_plaquettes_r1_r2
+    checks: section 1.2: four distinct links per plaquette, (R1), (R2), n_lk in {0,1}
+    method: brute force on 13 tori: L = 3, 4, 5 in D = 2, 3, 4 plus (3,4), (5,3), (3,5,4), (3,4,5,3)
+    result: pass (13 cases); exactly 6(D-1) neighbours per link
+- test_c2_time_coordinate_and_layer_distance
+    checks: 4.5 point 2: time coordinates of plaquette links, neighbours differ by <= 1, d(A,B) >= t for 1 <= t <= N/2
+    method: breadth-first search on 22 lattices (spatial (3,), (4,), (3,3), (3,4), (3,3,3); N = 3..10)
+    result: pass; d(A,B) = t exactly in every case (laboratory fact, labelled as not claimed)
+- test_c2_cube_embedding_of_point_3
+    checks: 4.5 point 3: neighbours differ <= 1 in rho; projection injective on Q_{r+1} for L >= 2r+3; plaquettes touching R_r identical to those of Z^D; d(k,B) >= r+1-rho(k)
+    method: brute force and BFS, (D,r) = (2,1),(2,2),(2,3),(3,1),(3,2),(4,1), L = 2r+3, 2r+4, 2r+6
+    result: pass (6 cases); the bound is an equality for 8/12, 24/40, 48/84, 48/54, 240/300, 208/216 links only (recorded, no longer asserted)
+- test_c2_lifting_argument_of_point_3
+    checks: 4.5 point 3, new lifting argument: d_L(k,B) = d(k,B) for k in A when L >= 2r+3, r = r0 + max_k d(k,B); and every step of the lift
+    method: BFS on Z^D itself and on tori L = 2r+3..2r+5; 13 cases (random and extremal A, B in R_{r0}; D = 2, 3, 4; n up to 7); shortest torus path lifted link by link exactly as in the proof (NEW test)
+    result: pass (13 cases); recorded: threshold not sharp (e.g. n = 6: threshold 21, equality from L = 12), d_L < d does occur on up to 3 smaller tori
+- test_c3_conditional_density_of_one_su2_link
+    checks: Lemma C.5 set-up for SU(2): density ~ exp(beta b.v), |b| <= 2(D-1), |b-b'| <= 2 (attained), phi in [-2 beta, 2 beta], non-neighbours do not enter
+    method: random SU(2) configurations on 3^D tori, D = 2, 3, 4, explicit 2x2 matrices
+    result: pass; identities to 1e-12
+- test_c3_quadrature_on_s3_is_validated
+    checks: validation of the S^3 quadrature used for Lemma C.5
+    method: normalisation 2 I_1(a)/a; three independent evaluations of the distance; closed form L_1/I_1 for antipodal b
+    result: pass; adapted rule vs 1-d rule 1e-12; plain 3-d rule differs by 1.3e-5 (kink)
+- test_c3_su2_dependency_coefficient_random_configurations
+    checks: Lemma C.5 for SU(2): c_lk <= tanh(beta)
+    method: 4200 random staple configurations, D = 2, 3, 4, seven beta 0.01..3, quadrature
+    result: pass; max d_TV/tanh(beta) from 0.4244 (beta = 0.01) to 0.82 (beta = 3)
+- test_c3_su2_dependency_coefficient_worst_case
+    checks: Lemma C.5 for SU(2), sup over all admissible (b,b')
+    method: grid + Nelder-Mead in the complete 4-parameter family at beta = 0.02, beta_0(D), 2.4 beta_0(D), 1; compared with the reduced family su2_sup_tv
+    result: pass (D = 2, 3, 4); sup = 0.4245..0.5268 tanh(beta); D >= 3: equals L_1/I_1 to 1e-9; D = 2: 0.071234 at beta_0(2)
+- test_c3_numbers_quoted_in_sections_4_1_and_4_6
+    checks: 4.1/4.6: true SU(2) coefficient ~ 4 beta/(3 pi) = 0,42 beta; sum over neighbours at beta_0(D) ~ 0,43; reaches 1 at ~ 2,4 beta_0(D) (three numbers parsed from BEWIJZEN.md)
+    method: su2_sup_tv (quadrature / Struve-Bessel) times 6(D-1); brentq for the root (NEW test)
+    result: pass; slope 0.4244; sums 0.4274, 0.4252, 0.4248 (D = 2, 3, 4; accepted within 0.01 of the printed 0,43); sum = 1 at beta = 0.3978, 0.1968, 0.1310 = 2.365, 2.356, 2.356 beta_0
+- test_c3_su2_coefficient_tends_to_one_for_large_beta
+    checks: 5.3 / 4.6: the coefficient between two neighbours approaches 1 for large beta
+    method: explicit admissible pairs, quadrature, beta = 0.5..50
+    result: pass; D >= 3: 0.9750 (beta = 5), 0.99976 (10); D = 2: 0.9311, 0.9936; 1.000000 at 50; always <= tanh(beta)
+- test_c4_dobrushin_coefficients_z2_3x3
+    checks: Lemma C.5 for Z2, 3x3 torus: c_lk <= tanh(beta n_lk), zero for non-neighbours, row sums <= 6 tanh(beta)
+    method: exact enumeration of 2^18 configurations, beta = 0.05, 0.10, 0.15, 0.5, 2
+    result: pass (5 cases); max row sum / alpha = 0.9975, 0.9902, 0.9783, 0.8240, 0.5183
+- test_c4_local_enumeration_agrees_with_brute_force
+    checks: consistency of two computations of the exact Z2 coefficients
+    method: 2^18 enumeration vs enumeration of the 6 neighbours
+    result: pass; 1e-14
+- test_c4_dobrushin_coefficients_z2_d3_d4
+    checks: Lemma C.5 for Z2 in D = 3, 4: c_lk <= tanh(beta n_lk), row sums <= 6(D-1) tanh(beta)
+    method: exact enumeration of the 12 / 18 neighbours on tori (3,3,3), (4,3,5), (3,3,3,3)
+    result: pass (3 cases)
+- test_c4_dobrushin_coefficients_with_frozen_links
+    checks: Lemma C.5 with frozen links B and boundary conditions omega
+    method: five sets B on the 3x3 torus, all or 12 random omega, beta = 0.10, 0.6, exact enumeration
+    result: pass (5 cases)
+- test_c4_dobrushin_coefficients_d3_frozen
+    checks: Lemma C.5 in D = 3 with frozen complement, incl. zero for non-neighbours
+    method: R = 12 links of a cube and 20 links of a 2x2x3 box of the 3^3 torus, random omega, exact enumeration
+    result: pass
+- test_c4_tanh_concavity_step
+    checks: last step of the proof of Lemma C.5: tanh(nx) <= n tanh(x); row-sum bound with (R2)
+    method: grid of x and n = 0..11; tori in D = 2, 3, 4
+    result: pass
+- test_c5_k1_k2_z2
+    checks: (K1), (K2) for the heat-bath operators
+    method: exact operators on the 3x3 torus and on a frozen system, random and local functions
+    result: pass; 1e-12
+- test_c5_lemma_c2_z2_torus
+    checks: Lemma C.2 for all 18 x 17 pairs (l,k)
+    method: exact Pi_l and exact c_lk, beta = 0.10 and 0.6, random and local functions
+    result: pass (2 cases); max lhs/rhs = 1.000000
+- test_c5_lemma_c2_is_sharp_for_functions_of_one_link
+    checks: Lemma C.2 is an equality for indicators of one link
+    method: exact, Z2 3x3
+    result: pass; equality to 1e-14
+- test_c5_lemma_c3_and_c4_z2_torus_unit_weights
+    checks: Lemma C.3 (a),(b),(c) with w = 1 (lambda = exact alpha_pi and lambda = 6 tanh beta), hypothesis (4.1), the matrix statement of the proof, Lemma C.4 for n = 0..6
+    method: exact heat-bath operators on the 3x3 torus, beta = 0.05, 0.10, 0.15
+    result: pass (3 cases); C.3(c) ratio 0.468, 0.474, 0.483; C.4 ratio 0.5000
+- test_c5_lemma_c3_exponential_weights_of_proposition_c6
+    checks: Lemma C.3 with w_k = exp(-theta d(k,B)), lambda = alpha e^theta; step 1 of the proof of C.6
+    method: four frozen sets on the 3x3 torus, beta = 0.05 and 0.15, five theta
+    result: pass (4 cases)
+- test_c5_lemmas_d3_frozen_system
+    checks: Lemmas C.2, C.3 (both weights), C.4 in D = 3
+    method: 12 links of a cube of the 3^3 torus, random omega, beta = 0.02, 0.05, 0.08
+    result: pass
+- test_c5_general_framework_on_other_systems
+    checks: section 4.2 for arbitrary finite systems: Lemmas C.2, C.3, C.4
+    method: dense random densities (2 and 3 states), Ising on random graphs, 3-state Potts ring; w = 1 and w = Perron vector of c (with exact zeros where c is reducible)
+    result: pass (3 cases); max ratios C.2 / C.3(c) / C.4 = 1.0000 / 1.0000 / 0.67, 0.83, 0.79
+- test_c5_osc_le_Delta_and_mean_deviation
+    checks: proof of Lemma C.4: osc(h) <= Delta(h), |h - pi(h)| <= osc(h)
+    method: exact, Z2 3x3
+    result: pass
+- test_c6_decomposition_of_section_4_3
+    checks: 4.3: mu(F) = int mu_B(d omega) mu^omega(F(., omega))
+    method: exact on the 3x3 torus for seven sets B
+    result: pass; 1e-12 (was failing: index-order bug in the test)
+- test_c6_step_2_of_the_proof
+    checks: C.6 step 2: Pi^omega_l = Pi^omega'_l off the boundary, (4.2) on it
+    method: exact operators, three sets B, beta = 0.10 and 0.9
+    result: pass (3 cases); max ratio 0.4734, 0.4734, 0.9468
+- test_c6_step_3_telescoping_sum
+    checks: C.6 step 3: telescoping identity, convergence, only boundary links contribute, final chain of inequalities
+    method: exact, B = plaquette, beta = 0.15, 12 rounds
+    result: pass
+- test_c6_proposition_c6_on_the_3x3_torus
+    checks: Propositie C.6
+    method: seven frozen sets, exact sup over ALL omega, omega', 177 (B,f) pairs, five theta, beta = 0.05, 0.10, 0.15
+    result: pass (3 cases); max lhs/rhs = 0.0346, 0.0395, 0.0156
+- test_c6_argument_of_proposition_c6_on_ising_graphs
+    checks: the argument of C.6 in the general framework with the exact alpha_omega
+    method: Ising models on random graphs (10 spins, 2 frozen), 112 systems
+    result: pass; max lhs/rhs = 0.169
+- test_c6_decay_rate_of_proposition_c6_on_a_tree
+    checks: C.6 on a system where the decay rate matters: Ising on a binary tree of depth 3 with frozen leaves; control that the rate cannot be doubled
+    method: exact enumeration (15 spins), J = 0.002, 0.01, 0.05, five theta (NEW test)
+    result: pass; root: lhs/rhs = 1.4e-4, 5.2e-4, 1.5e-3; with e^{-2 theta d} the inequality would be violated by factors 480 and 15.7 (J = 0.002, 0.01)
+- test_c7_covariance_identity_of_the_proof
+    checks: 4.5 point 1: the covariance identity with arbitrary constant c
+    method: exact, 18 choices of (A,B,f,g), c = 0, mid-range, 3.7
+    result: pass; 1e-12
+- test_c7_covariance_bound_on_the_3x3_torus
+    checks: Stelling C point 1, both inequalities
+    method: exact covariances over 2^18 configurations, 18 (A,B,f,g), five theta, beta = 0.05, 0.10, 0.15
+    result: pass (3 cases); max |cov| / first bound = 0.0173, 0.0197, 0.0078
+- test_c7_degenerate_cases_of_point_1
+    checks: 4.5 point 1, A or B empty, with the conventions of 1.2
+    method: exact (NEW test)
+    result: pass; all members zero
+- test_c7_covariance_bound_all_indicator_functions
+    checks: Stelling C point 1, exhaustively for {0,1}-valued f, g on the links of one plaquette
+    method: 16 x 16 and 4 x 64 pairs, three beta, two theta
+    result: pass
+- test_c7_c6_on_the_3x4_torus [slow]
+    checks: Stelling C point 1 and Propositie C.6 on the 3x4 torus
+    method: exact over 2^24 configurations, beta = 0.10, 0.15
+    result: pass (was failing on the author's own wrong sanity check max distance >= 3; the true value is 2)
+- test_c8_gap_d2_rings
+    checks: Stelling C point 2 in D = 2; closed form m = L ln coth(beta); T = PT = TP, T >= 0
+    method: literal dense T = MKPM of section 2.2 for Z2, L = 3, 4, 5, five beta < beta_0(2)
+    result: pass (3 cases); L = 3: m = 11.7365, 8.9897, 6.9177, 5.7137, 5.3794 against bounds 2.1204, 1.2048, 0.5142, 0.1128, 0.0014
+- test_c8_transfer_matrix_reproduces_the_measure_on_the_3x3_torus
+    checks: Z = Tr T^N and the correlation formula (link used in the proof of point 2)
+    method: enumeration of 2^18 configurations vs transfer matrix
+    result: pass; 1e-12
+- test_c8_transfer_matrix_code_validated_on_2x2x2
+    checks: code validation of the D = 3 transfer matrix (M, K, P all non-trivial)
+    method: 2^24 brute force vs dense T, matrix-free T and character-basis T
+    result: pass; eigenvalues agree to 1e-13 ||T||
+- test_c8_gap_d3_spatial_torus_3x3
+    checks: Stelling C point 2 in D = 3 (2^18 states): m >= ln(1/(12 tanh beta)); T >= 0, injective on H_inv, lambda_0 simple
+    method: dense 1024 x 1024 matrix on the gauge-invariant sector; injectivity from T = M diag(Kd) M^T with Kd > 0, M invertible
+    result: pass (4 cases); m = 11.73645, 8.98940, 7.58227, 7.45419 against 1.42725, 0.51166, 0.04295, 0.00032; lambda_1 has degeneracy 2
+- test_c8_d3_operator_agrees_with_the_definition_of_section_2_2
+    checks: the matrix-free operator is T = MKPM of 2.2
+    method: kernel evaluated literally over 2^9 gauge transformations; T = TP = PT; matrix elements
+    result: pass; 1e-12
+- test_c8_point_2_inequality_at_finite_N_d2
+    checks: 4.5 point 2: the displayed inequality for N >= max(3, 2t), and the limit statement with F = psi_1/Omega
+    method: 3 x N torus, all 256 indicator functions plus 40 random F, t = 1..6
+    result: pass; max |cov| / bound = 7e-5
+- test_c8_point_2_inequality_d3
+    checks: 4.5 point 2 in D = 3 at finite N and with F = psi_1/Omega (Omega > 0, <psi_1, F Omega> = 1)
+    method: 3 x 3 x N, transfer matrix on H_inv, t up to 80
+    result: pass; max |cov| / bound = 8.2e-6
+- test_c8_gap_d3_volume_dependence
+    checks: Stelling C point 2, uniformity in the volume (D = 3)
+    method: sector decomposition, spatial tori 3x3 (cross-checked), 3x4, 4x4
+    result: pass; 3x4: 11.73645, 8.98940, 7.58227; 4x4: 15.64862, 11.98620, 10.11102
+- test_c8_gap_d3_larger_spatial_torus [slow]
+    checks: Stelling C point 2 on the 4x5 spatial torus (D = 3)
+    method: four sectors of dimension 2^20, Lanczos, beta = 0.02, 0.05, 0.08
+    result: pass (3 cases); m = 11.98620 at beta = 0.05 (bound 0.51166); m > 3.5 ln coth(beta) in all three
+- test_c8_gap_d3_full_space_lanczos [slow]
+    checks: Stelling C point 2 on the full 2^18-dimensional space
+    method: T = MKPM as LinearOperator (tensor-product K, site-by-site gauge projection), scipy eigsh
+    result: pass (4 cases); m = 11.736452, 8.989405, 7.582275, 7.454191; agrees with the sector matrix to 1e-6
+- test_c9_table_4_1_is_found_in_the_document
+    checks: the table of 4.1 is parsed from BEWIJZEN.md (nine rows)
+    method: regex on the document
+    result: pass
+- test_c9_table_4_1_row
+    checks: table of 4.1: alpha to nearest, lower bound rounded DOWN, beta < beta_0(D), beta_0(D)
+    method: numbers parsed from the document vs math.tanh / math.log
+    result: pass (9 rows); e.g. exact 0.51415120 -> 0,5141; 1.42724968 -> 1,4272
+- test_c9_table_4_1_rounding_convention_is_stated
+    checks: 4.1: the sentence that the last column is rounded down
+    method: string in the document (NEW test)
+    result: pass
+- test_c9_beta0_values_and_closed_form
+    checks: beta_0(D) = artanh(1/(6(D-1))) = (1/2) ln((6D-5)/(6D-7)); printed 0,1682, 0,0835, 0,0556 (sections 0, 4.1, 4.6, 5.3), each on the safe side
+    method: math functions, D = 2..11; strings in the document
+    result: pass; 1e-15
+- test_c9_remark_toets_aan_stelling_b
+    checks: 4.6: 3 x 3,689 = 11,07 and 0,514
+    method: scipy Bessel functions; strings in the document
+    result: pass; 3.689296, 11.0679, 0.51415
+- test_c9_remark_leading_strong_coupling_gap
+    checks: 4.1: -4 ln u(0.03) = 19,6 and -3 ln u(0.03) = 14,7, u = I_2/I_1 (parsed)
+    method: scipy Bessel functions, cross-checked with the series of u (replaces the obsolete 'order of 20' test)
+    result: pass; 19.5716 and 14.6787
+- test_c9_section_5_3_correlation_length_bound
+    checks: 5.3: 1/ln(1/alpha) < 1 iff alpha < 1/e, in D = 4 for beta < 0,0204 (parsed)
+    method: artanh(1/(18 e)) (NEW test)
+    result: pass; threshold 0.020441; printed value on the safe side
+- test_c9_section_5_3_doubling_of_the_correlation_length
+    checks: 5.3: the correlation length doubles when beta increases by about 0,26 (parsed)
+    method: formula of 5.1, bisection (NEW test)
+    result: pass; limit 11 ln 2/(3 pi^2) = 0.2575; with the prefactor 0.2752, 0.2745, 0.2738 at beta = 2.3, 2.4, 2.5 (accepted within 0.02)
+- test_c10_character_expansion_validated_by_enumeration
+    checks: validation of the exact formula used for point 3 (D = 2)
+    method: character expansion vs enumeration of 2^18 configurations
+    result: pass; 1e-12
+- test_c10_character_expansion_validated_on_3x4 [slow]
+    checks: the same on the 3x4 and 4x3 tori
+    method: enumeration of 2^24 configurations
+    result: pass; 1e-12
+- test_c10_infinite_volume_limit_d2
+    checks: Stelling C point 3: |mu_L(f) - mu_L'(f)| <= C_theta Delta(f) e^{-theta(r+1-r0)} for L, L' >= 2r+3; the limit exists
+    method: exact character expansion on (Z/L)^2, L = 3..40, corrections evaluated without cancellation, five functions of the 12 links of R_1
+    result: pass (3 cases); left side 2.7e-59, 8.6e-46, 6.0e-38 (beta = 0.05, 0.10, 0.15); lhs/rhs <= 3.9e-40: a consistency check, not a sharp test
+- test_c10_point_1_for_the_infinite_volume_state
+    checks: Stelling C point 3, last sentence: the inequality of point 1 for the infinite-volume state with Z^D distances
+    method: exact infinite-volume expectations (Z2, D = 2), BFS on Z^2, 14 (A,B,f,g), three beta, five theta (NEW test)
+    result: pass; max |<fg>-<f><g>| / bound = 0.0099
+
