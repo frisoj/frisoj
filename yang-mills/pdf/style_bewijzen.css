@@ -27,16 +27,19 @@ code {
 /* formulas */
 img.m { display: inline-block; margin: 0; }
 span.qed { font-family: "DejaVu Sans", sans-serif; font-size: 0.8em; margin-left: 0.3em; }
-img.m.rel { margin-left: 0.2em; }   /* a piece of a long formula that starts with a relation sign */
+img.m.rel { margin-left: 0.22em; }  /* a piece of a long formula that starts with a relation sign */
+span.nb { white-space: nowrap; }    /* a formula with the bracket or punctuation mark next to it */
 div.display { margin: 0.7em 0 0.8em 0; text-align: center; break-inside: avoid; }
 span.formula { display: block; position: relative; text-align: center; margin: 0.55em 0 0.6em 0; break-inside: avoid; }
 div.display span.formula { margin: 0; }
 span.formula img.m { max-width: 100%; height: auto; }
-span.eqtag { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+/* the tag stays inside the box of its formula: a taller box, or one moved with a transform, is
+   cut in two when the formula is the last thing on a page */
+span.eqtag { position: absolute; right: 0; top: 50%; margin-top: -0.5em; line-height: 1; }
 table.aligned { width: auto; margin: 0 auto; border-collapse: collapse; font-size: inherit; }
 table.aligned td { border: 0; padding: 0.16em 0; background: none !important; vertical-align: baseline; }
 table.aligned td.al { text-align: right; }
-table.aligned td.ar { text-align: left; }
+table.aligned td.ar { text-align: left; padding-left: 0.2em; }
 p:has(+ div.display) { break-after: avoid; margin-bottom: 0.2em; }
 
 /* theorems, lemmas, propositions: the blockquotes of the source */
@@ -45,6 +48,7 @@ blockquote {
   border-left: 3.2px solid #a9822c; border-radius: 0 4px 4px 0; break-inside: avoid-page;
 }
 blockquote p:last-child, blockquote ol:last-child, blockquote li:last-child { margin-bottom: 0; }
+p:has(+ blockquote) { break-after: avoid; }   /* "We hebben nodig:" stays with the lemma it announces */
 blockquote ol { padding-left: 1.4em; }
 
 table {
@@ -60,11 +64,13 @@ th {
   padding: 0.34em 0.5em; vertical-align: bottom;
 }
 td { padding: 0.3em 0.5em; border-bottom: 0.5px solid #d9dde3; vertical-align: top; }
+td code, th code { white-space: nowrap; }
+.titel { hyphens: manual; }   /* titles in the literature list: not Dutch, so no Dutch hyphenation */
 
 /* title page */
 .titlepage { height: 245mm; display: flex; flex-direction: column; justify-content: center; break-after: page; text-align: left; hyphens: manual; }
 .titlepage .kicker { font-size: 11pt; letter-spacing: 0.08em; text-transform: uppercase; color: #5a626e; margin-bottom: 1.1em; }
-.titlepage .doctitle { font-size: 31pt; font-weight: bold; margin: 0 0 0.35em 0; border: 0; break-before: auto; }
+.titlepage .doctitle { font-size: 24pt; line-height: 1.18; font-weight: bold; margin: 0 0 0.35em 0; border: 0; break-before: auto; }
 .titlepage .subtitle { font-size: 13.5pt; color: #2f353d; max-width: 150mm; margin-bottom: 2.2em; line-height: 1.35; }
 .statusbox { border: 1.3px solid #a9822c; background: #faf5e8; border-radius: 5px; padding: 1em 1.2em; max-width: 160mm; margin-bottom: 2em; }
 .statusbox p { font-size: 11pt; margin-bottom: 0.55em; }

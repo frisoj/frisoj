@@ -33,7 +33,7 @@ TEXT_WIDTH_PT = (210 - 2 * SIDE_MM) / 25.4 * 72
 INK = "#1a1c20"
 MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus",
           "september", "oktober", "november", "december"]
-FOOTER = "Yang–Mills en de massakloof · drie stellingen met bewijs · geen bewijs van het millenniumprobleem"
+FOOTER = "Yang–Mills op het rooster · drie stellingen met bewijs · geen bewijs van het millenniumprobleem"
 
 
 def git(*args):
@@ -69,11 +69,31 @@ def _matrix(m):
             % (a, c, b, d))
 
 
+# symbols after which TeX puts a thin space before an operator name (ln, Tr, a sum sign)
+_ORD = set("""alpha beta gamma delta epsilon varepsilon zeta eta theta kappa lambda mu nu xi pi rho
+    varrho sigma varsigma tau phi varphi chi psi omega Gamma Delta Theta Lambda Pi Sigma Phi Psi
+    Omega ell infty prime rangle partial emptyset""".split())
+_OPERATOR = (r"\\(?:operatorname|ln|exp|tanh|sinh|cosh|sin|cos|sup|inf|max|min|lim|det|sum|prod|int)"
+             r"(?![a-zA-Z])")
+_SCRIPT = r"(\{(?:[^{}]|\{[^{}]*\})*\}|\\[a-zA-Z]+|[a-zA-Z0-9])"      # what follows a _ or ^
+
+
+def _thin_space(m):
+    before = m.group(1)
+    if before.startswith("\\") and before[1:] not in _ORD:
+        return m.group(0)
+    return before + "\\," + m.group(2)
+
+
 def to_mathtext(tex, display):
     """Translate the LaTeX used in BEWIJZEN.md into what matplotlib's mathtext accepts."""
     s = " ".join(tex.split())
     s = re.sub(r"\\begin\{pmatrix\}(.*?)\\end\{pmatrix\}", _matrix, s)
     s = _SIZED.sub(_sized, s)
+    # := and =: are one relation sign each (mathtext sets ": =" with a gap in the middle)
+    s = s.replace(":=", "\\coloneq ").replace("=:", "\\eqcolon ")
+    # a dagger or star as a bare superscript gets the spaces of a binary operator: brace it
+    s = re.sub(r"([_^])\s*\\(dagger|ast)(?![a-zA-Z])", r"\1{\\\2}", s)
     for a, b in (("\\lvert", "|"), ("\\rvert", "|"), ("\\vert", "|"), ("\\lVert", "\\|"),
                  ("\\rVert", "\\|"), ("\\lbrace", "\\{"), ("\\rbrace", "\\}"),
                  ("\\lt", "<"), ("\\gt", ">"), ("\\ast", "*"),
@@ -85,8 +105,23 @@ def to_mathtext(tex, display):
     s = re.sub(r"\\(hat|bar|tilde)\s*(\\[a-zA-Z]+|[a-zA-Z])", r"\\\1{\2}", s)
     s = re.sub(r"\\text\{([^{}]*)\}",
                lambda m: "\\mathrm{" + m.group(1).replace(" ", "\\ ") + "}", s)
-    # a prime is a superscript of the symbol before it (mathtext would set it as a loose mark)
-    s = re.sub(r"(\\[a-zA-Z]+|[a-zA-Z0-9}])'", r"\1^{\\prime}", s)
+    # \mathsf is upright in LaTeX; mathtext slants it unless it is told not to
+    s = re.sub(r"\\mathsf\{([^{}]*)\}", r"\\mathrm{\\mathsf{\1}}", s)
+    # a prime: mathtext sets u' with a tiny mark far from the letter, as a superscript too; the
+    # full-size prime sits where it should.  A subscript (u'_e, I_n') is pulled back under it.
+    s = re.sub(r"'\s*_\s*" + _SCRIPT, r"\\prime\\hspace{-0.26}_\1", s)
+    s = re.sub(r"_\s*" + _SCRIPT + r"\s*'", r"\\prime\\hspace{-0.26}_\1", s)
+    s = s.replace("'", "\\prime ")
+    # a thin space between a symbol and the operator name after it (mathtext sets "Lln", "2Tr")
+    s = re.sub(r"(\\[a-zA-Z]+|[A-Za-z0-9})\]])\s*(" + _OPERATOR + ")", _thin_space, s)
+    # no space between an operator name and a sized bracket: "Tr[", "exp(" (mathtext only leaves
+    # the space out before a plain bracket)
+    s = re.sub(r"(\\(?:operatorname\{[^{}]*\}|(?:ln|exp|tanh|sinh|cosh|sin|cos|det)(?![a-zA-Z])))"
+               r"\s*(?=\\left)", r"\1\\!", s)
+    # a sign after a comma or a named relation is a sign, not an operation: without braces
+    # mathtext puts the space of a binary operator after it ("\geq -\ln" became "≥ − ln")
+    s = re.sub(r"(\\(?:coloneq|eqcolon|leq|geq|neq|approx|equiv|to|mapsto|in)(?![a-zA-Z])|,)"
+               r"((?:\s|\\ |\\,)*)([-+])", r"\1\2{\3}", s)
     if display:
         s = s.replace("\\frac", "\\dfrac")
     else:
@@ -99,6 +134,39 @@ def to_mathtext(tex, display):
 # typesetting one formula
 # ==============================================================================================
 _CACHE = {}
+
+
+def ink_extent(parser, src, prop):
+    """Where the ink of a typeset formula is, in points: (left, right, top, bottom).
+
+    left and right are measured from the left edge of the formula, top and bottom upwards from
+    its baseline.  mathtext itself reports the size rounded up to whole points and without the
+    overhang of slanted letters: an image cut to that size clips an italic f or j at its edge
+    and has up to a point of air elsewhere.
+    This reads matplotlib internals (written for matplotlib 3.11).
+    """
+    try:
+        from matplotlib import _mathtext
+        from matplotlib.ft2font import LoadFlags
+        big = prop.copy()
+        big.set_size(100.0)             # the svg backend lays a formula out at 100 pt and scales it
+        k = prop.get_size_in_points() / 100.0
+        fontset = parser._font_type_mapping[prop.get_math_fontfamily()](big, LoadFlags.NO_HINTING)
+        box = parser._parser.parse(src, fontset, 100.0, 72)
+        out = _mathtext.ship(box)
+        xs, ys = [], []
+        for ox, oy, info in out.glyphs:            # oy runs downwards from the top of the box
+            xs += [ox + info.metrics.xmin, ox + info.metrics.xmax]
+            ys += [box.height - oy + info.metrics.ymin, box.height - oy + info.metrics.ymax]
+        for x, y, w, h in out.rects:               # fraction bars, overlines, root signs
+            xs += [x, x + w]
+            ys += [box.height - y - h, box.height - y]
+    except (ImportError, AttributeError, KeyError, TypeError) as exc:
+        raise SystemExit("make_bewijzen_pdf: cannot measure a formula with this matplotlib "
+                         "(%s); ink_extent needs to be adapted" % exc)
+    if not xs:                                     # nothing visible: keep the box of mathtext
+        return 0.0, k * box.width, k * box.height, -k * box.depth
+    return k * min(xs), k * max(xs), k * max(ys), k * min(ys)
 
 
 def typeset(tex, display):
@@ -117,21 +185,24 @@ def typeset(tex, display):
     prop = FontProperties(size=FONT_PT, math_fontfamily="stix")
     parser = typeset.parser = getattr(typeset, "parser", None) or MathTextParser("path")
     try:
-        width, height, depth, _, _ = parser.parse(src, dpi=72, prop=prop)
+        parser.parse(src, dpi=72, prop=prop)
     except Exception as exc:
         raise SystemExit("make_bewijzen_pdf: cannot typeset the formula\n  %s\nas mathtext\n  %s\n%s"
                          % (tex, src, exc))
-    pad, side = 1.2, 0.6                        # room for accents and for italic overhang
-    w, h = width + 2 * side, height + 2 * pad
+    # the image is cut to the ink, with a hair of room around it
+    left, right, top, bottom = ink_extent(parser, src, prop)
+    side, pad = 0.35, 0.5
+    w, h = (right - left) + 2 * side, (top - bottom) + 2 * pad
+    below = pad - bottom                         # from the lower edge of the image up to the baseline
     name = "m_" + hashlib.sha256(repr(key).encode("utf-8")).hexdigest()[:20] + ".svg"
     path = os.path.join(BUILD, name)
     with matplotlib.rc_context({"svg.fonttype": "path", "svg.hashsalt": name}):
         fig = Figure(figsize=(w / 72.0, h / 72.0))
         FigureCanvasSVG(fig)
-        fig.text(side / w, (depth + pad) / h, src, fontproperties=prop, color=INK)
+        fig.text((side - left) / w, below / h, src, fontproperties=prop, color=INK)
         fig.savefig(path, format="svg", transparent=True, dpi=72,
                     metadata={"Date": None, "Creator": None})
-    _CACHE[key] = (path, w, h, depth + pad)
+    _CACHE[key] = (path, w, h, below)
     return _CACHE[key]
 
 
@@ -272,7 +343,38 @@ def insert_math(page, store):
     page = re.sub(r"ZZMATH[DEI]\d{5}ZZ", repl, page)
     if "ZZMATH" in page:
         raise SystemExit("make_bewijzen_pdf: a formula token was not replaced")
-    return page, counts, wide
+    # a formula and the bracket, punctuation mark or hyphen next to it stay on one line
+    page = re.sub(r'([(\[]*)(<img class="m[^>]*>)([)\],.;:!?-]*)',
+                  lambda m: m.group(0) if not (m.group(1) or m.group(3))
+                  else '<span class="nb">%s</span>' % m.group(0), page)
+    # a file name in running text may break after a slash or an underscore
+    page = re.sub(r"<code>([^<]*)</code>",
+                  lambda m: "<code>%s</code>" % re.sub(r"([/_])(?=.)", r"\1<wbr>", m.group(1)), page)
+    return protect_titles(page), counts, wide
+
+
+def protect_titles(page):
+    """Titles in the literature list are English or German: keep the Dutch hyphenation off them.
+
+    An entry of that list is a list item with one of the marks of chapter 7; a title is what
+    stands between double quotes or in italics.
+    """
+    def entry(m):
+        if "\u2714" not in m.group(0) and "\u25cb" not in m.group(0) and "\u25ef" not in m.group(0):
+            return m.group(0)
+        out, inside = [], False
+        for part in re.split(r"(<[^>]+>)", m.group(0)):
+            if part.startswith("<"):
+                out.append('<em class="titel">' if part == "<em>" else part)
+                continue
+            for i, piece in enumerate(part.split('"')):
+                if i:
+                    out.append('"</span>' if inside else '<span class="titel">"')
+                    inside = not inside
+                out.append(piece)
+        return m.group(0) if inside else "".join(out)      # unbalanced quotes: leave it alone
+
+    return re.sub(r"<li>(?:(?!<li>).)*?</li>", entry, page, flags=re.S)
 
 
 TEMPLATE = """<!DOCTYPE html>
@@ -318,10 +420,10 @@ def font_css():
 def title_page(commit, date_nl):
     return """
 <div class="titlepage">
-<div class="kicker">Yang–Mills en de massakloof</div>
-<h1 class="doctitle">Drie stellingen met volledig bewijs</h1>
-<div class="subtitle">Wat er over de massakloof van de SU(2)-roostertheorie werkelijk bewezen kan
-worden, en welke stap naar het millenniumprobleem ontbreekt</div>
+<div class="kicker">Yang–Mills op het rooster</div>
+<h1 class="doctitle">Drie bekende stellingen over de massakloof, met uitgeschreven bewijs</h1>
+<div class="subtitle">Wat er met betrekkelijk eenvoudige middelen over de massakloof van de
+SU(2)-roostertheorie te bewijzen valt, en welke stappen naar het millenniumprobleem ontbreken</div>
 <div class="statusbox">
 <p><strong>Dit document bevat geen bewijs van het millenniumprobleem.</strong> Het probleem
 “Yang–Mills: bestaan en massakloof” is open. De drie stellingen in dit document zijn bekende
@@ -411,7 +513,7 @@ def main():
     subprocess.run([
         "pandoc", paths["doc"], "-f", "gfm", "-t", "html5", "--standalone",
         "--columns=10000", "--toc", "--toc-depth=3", "--template", paths["tpl"],
-        "--metadata", "pagetitle=Yang–Mills en de massakloof: drie stellingen met volledig bewijs",
+        "--metadata", "pagetitle=Yang–Mills op het rooster: drie bekende stellingen over de massakloof, met uitgeschreven bewijs",
         "--include-in-header", paths["head"], "--include-before-body", paths["title"],
         "-o", paths["html0"]], check=True, cwd=ROOT)
     with io.open(paths["html0"], encoding="utf-8") as fh:

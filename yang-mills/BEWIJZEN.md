@@ -171,7 +171,13 @@ We schrijven $\mathcal{H}_{\mathrm{inv}} = \mathsf{P}\mathcal{H}$ voor de ruimte
 u^t_e\; v^t_{x+\hat\imath}\; (u^{t+1}_e)^{-1}\; (v^t_x)^{-1} .
 ```
 
-Omdat het spoor cyclisch is, is het spoor hiervan gelijk aan $\operatorname{Tr}\big[ (v^t_x)^{-1} u^t_e\  v^t_{x+\hat\imath}\  (u^{t+1}_e)^{-1} \big] = \operatorname{Tr}\big[ ((u^t)^{g^t})_e\  (u^{t+1}_e)^{-1} \big]$ met de ijktransformatie $g^t_x := (v^t_x)^{-1}$. Dus
+Omdat het spoor cyclisch is, is het spoor hiervan gelijk aan
+
+```math
+\operatorname{Tr}\big[ (v^t_x)^{-1} u^t_e\, v^t_{x+\hat\imath}\, (u^{t+1}_e)^{-1} \big] = \operatorname{Tr}\big[ ((u^t)^{g^t})_e\, (u^{t+1}_e)^{-1} \big]
+```
+
+met de ijktransformatie $g^t_x := (v^t_x)^{-1}$. Dus
 
 ```math
 w(U) = \prod_{t \in \mathbb{Z}/N} e^{-V(u^t)}\; K\big( (u^t)^{g^t},\, u^{t+1} \big), \qquad g^t = (v^t)^{-1}. \tag{2.1}
@@ -179,7 +185,7 @@ w(U) = \prod_{t \in \mathbb{Z}/N} e^{-V(u^t)}\; K\big( (u^t)^{g^t},\, u^{t+1} \b
 
 **Stap 2: eigenschappen van $\mathsf{P}$, $\mathsf{M}$, $\mathsf{K}$.**
 
-(a) *$\mathsf{P}$ is goed gedefinieerd en begrensd.* Zij $f \in \mathcal{H}$. De functie $(u,g) \mapsto f(u^g)$ is meetbaar, en omdat $u \mapsto u^g$ de maat $du$ behoudt, is $\int\int \lvert f(u^g)\rvert^2\  du\  dg = \lVert f\rVert^2$ (S2). Voor bijna alle $u$ is $g \mapsto f(u^g)$ dus kwadratisch integreerbaar, zodat $(\mathsf{P}f)(u)$ bestaat, en met Cauchy–Schwarz is $\lvert(\mathsf{P}f)(u)\rvert^2 \leq \int \lvert f(u^g)\rvert^2\  dg$, dus $\lVert\mathsf{P}f\rVert \leq \lVert f\rVert$. Toegepast op het verschil van twee functies die bijna overal gelijk zijn, laat dit zien dat $\mathsf{P}f$ niet afhangt van de keuze van $f$ binnen zijn klasse. In de dubbele integralen hieronder is de integrand steeds integreerbaar, want $\int\int \lvert f_1(u)\rvert\  \lvert f_2(u^g)\rvert\  du\  dg \leq \lVert f_1\rVert\  \lVert f_2\rVert$; de volgorde van integratie mag dus worden verwisseld (S2).
+(a) *$\mathsf{P}$ is goed gedefinieerd en begrensd.* Zij $f \in \mathcal{H}$. De functie $(u,g) \mapsto f(u^g)$ is meetbaar, en omdat $u \mapsto u^g$ de maat $du$ behoudt, is $\int\int \lvert f(u^g)\rvert^2\  du\  dg = \lVert f\rVert^2$ (S2). Voor bijna alle $u$ is $g \mapsto f(u^g)$ dus kwadratisch integreerbaar, zodat $(\mathsf{P}f)(u)$ bestaat, en met Cauchy–Schwarz is $\lvert(\mathsf{P}f)(u)\rvert^2 \leq \int \lvert f(u^g)\rvert^2\  dg$, dus $\lVert\mathsf{P}f\rVert \leq \lVert f\rVert$. Toegepast op het verschil van twee functies die bijna overal gelijk zijn, laat dit zien dat $\mathsf{P}f$ niet afhangt van de keuze van $f$ binnen zijn klasse. In de dubbele integralen hieronder is de integrand steeds integreerbaar, want $$\int\int \lvert f_1(u)\rvert\  \lvert f_2(u^g)\rvert\  du\  dg \ \leq\ \lVert f_1\rVert\  \lVert f_2\rVert ;$$ de volgorde van integratie mag dus worden verwisseld (S2).
 
 *$\mathsf{P}$ is een orthogonale projectie.* Uit $(u^h)^g = u^{gh}$ en de translatie-invariantie van $dg$ volgt $(\mathsf{P}f)(u^h) = \int f(u^{gh})\ dg = (\mathsf{P}f)(u)$, en daarmee $\mathsf{P}^2 = \mathsf{P}$. Verder is, met de substitutie $u \mapsto u^{g^{-1}}$ (die $du$ behoudt) en de invariantie van $dg$ onder $g \mapsto g^{-1}$,
 
@@ -191,7 +197,13 @@ Dus $\mathsf{P} = \mathsf{P}^\ast = \mathsf{P}^2$.
 
 (b) *$\mathsf{M}$ is begrensd, zelfgeadjungeerd, omkeerbaar, en verwisselt met $\mathsf{P}$.* De functie $e^{-V/2}$ is continu, reëel en strikt positief op de compacte ruimte $\mathcal{C}$, dus begrensd en van nul weg begrensd. Onder een ijktransformatie gaat een ruimtelijke plaquettevariabele $u_p$ met beginpunt $x$ over in $g_x u_p g_x^{-1}$, dus $V(u^g) = V(u)$ wegens (G1), en daarom $\mathsf{M}\mathsf{P} = \mathsf{P}\mathsf{M}$.
 
-(c) *$K$ is reëel, symmetrisch en ijkinvariant.* Wegens (G1) is $\operatorname{Tr}(u_e (u'_e)^{-1})$ reëel en gelijk aan $\operatorname{Tr}\big((u_e (u'_e)^{-1})^{-1}\big) = \operatorname{Tr}(u'_e u_e^{-1})$, dus $K(u,u') = K(u',u) \gt 0$. Verder is $(u^g)_e\  (((u')^g)_e)^{-1} = g_x\  u_e (u'_e)^{-1}\  g_x^{-1}$, dus $K(u^g, (u')^g) = K(u, u')$. Hieruit volgt $\mathsf{K}\mathsf{P} = \mathsf{P}\mathsf{K}$:
+(c) *$K$ is reëel, symmetrisch en ijkinvariant.* Wegens (G1) is $\operatorname{Tr}(u_e (u'_e)^{-1})$ reëel en gelijk aan $\operatorname{Tr}\big((u_e (u'_e)^{-1})^{-1}\big) = \operatorname{Tr}(u'_e u_e^{-1})$, dus $K(u,u') = K(u',u) \gt 0$. Verder is
+
+```math
+(u^g)_e\, (((u')^g)_e)^{-1} = g_x\, u_e (u'_e)^{-1}\, g_x^{-1},
+```
+
+dus $K(u^g, (u')^g) = K(u, u')$. Hieruit volgt $\mathsf{K}\mathsf{P} = \mathsf{P}\mathsf{K}$:
 
 ```math
 (\mathsf{K}\mathsf{P} f)(u) = \int\!\!\int K(u,u')\, f((u')^g)\, du'\, dg = \int\!\!\int K(u, (u')^{g^{-1}})\, f(u')\, du'\, dg = \int\!\!\int K(u^g, u')\, f(u')\, du'\, dg = (\mathsf{P}\mathsf{K} f)(u).
@@ -203,7 +215,7 @@ Dus $\mathsf{P} = \mathsf{P}^\ast = \mathsf{P}^2$.
 A(u,u') := \sum_{e \in E} \operatorname{Tr}\big(u_e (u'_e)^{-1}\big) = \sum_{i \in \mathcal{J}} \varphi_i(u)\, \overline{\varphi_i(u')} .
 ```
 
-Voor een rijtje $I = (i_1, \dots, i_n) \in \mathcal{J}^n$ zij $\Phi_I = \varphi_{i_1} \cdots \varphi_{i_n}$ (en $\Phi_\emptyset = 1$ voor $n = 0$). Dan is $A(u,u')^n = \sum_{I \in \mathcal{J}^n} \Phi_I(u)\  \overline{\Phi_I(u')}$ en
+Voor een rijtje $I = (i_1, \dots, i_n) \in \mathcal{J}^n$ zij $\Phi_I = \varphi_{i_1} \cdots \varphi_{i_n}$ (en $\Phi_\emptyset = 1$ voor $n = 0$). Dan is $$A(u,u')^n = \sum_{I \in \mathcal{J}^n} \Phi_I(u)\  \overline{\Phi_I(u')}$$ en
 
 ```math
 K(u,u') = e^{\frac{\beta}{2} A(u,u')} = \sum_{n=0}^{\infty} \frac{(\beta/2)^n}{n!} \sum_{I \in \mathcal{J}^n} \Phi_I(u)\, \overline{\Phi_I(u')} ,
@@ -415,7 +427,7 @@ Rest de berekening van $c_j$. Met $k(a) = e^{\frac{\beta}{2}\operatorname{Tr} a}
 c_j = \frac{2}{\pi}\int_0^\pi e^{\beta\cos\theta}\, \sin\big((2j+1)\theta\big)\, \sin\theta\ d\theta = \frac{1}{\pi}\int_0^\pi e^{\beta\cos\theta} \big[ \cos(2j\theta) - \cos((2j+2)\theta) \big]\, d\theta = I_{2j}(\beta) - I_{2j+2}(\beta) ,
 ```
 
-volgens de integraalvoorstelling $I_n(\beta) = \frac{1}{\pi}\int_0^\pi e^{\beta\cos\theta}\cos(n\theta)\ d\theta$ voor gehele $n$ (S6). De recurrentie $I_{\nu-1}(\beta) - I_{\nu+1}(\beta) = \frac{2\nu}{\beta} I_\nu(\beta)$ met $\nu = 2j+1 = d_j$ geeft
+volgens de integraalvoorstelling $$I_n(\beta) = \frac{1}{\pi}\int_0^\pi e^{\beta\cos\theta}\cos(n\theta)\ d\theta$$ voor gehele $n$ (S6). De recurrentie $I_{\nu-1}(\beta) - I_{\nu+1}(\beta) = \frac{2\nu}{\beta} I_\nu(\beta)$ met $\nu = 2j+1 = d_j$ geeft
 
 ```math
 c_j = \frac{2\, d_j}{\beta}\, I_{2j+1}(\beta), \qquad \frac{c_j}{d_j} = \frac{2}{\beta}\, I_{2j+1}(\beta) . \tag{3.1}
@@ -521,12 +533,12 @@ Hier en verder betekent "meetbaar" steeds Borel-meetbaar. Omdat $p$ continu en s
 $\rho_\ell(\cdot \mid U)$ hangt niet af van $U_\ell$ en is een kansdichtheid op $G$. De operator $\Pi_\ell$ is wat een simulatie doet bij een warmtebadstap op link $\ell$: de link wordt opnieuw getrokken uit zijn voorwaardelijke verdeling. Direct uit de definitie volgt:
 
 - **(K1)** $\Pi_\ell f$ is begrensd en meetbaar en hangt niet af van $U_\ell$; $\Pi_\ell 1 = 1$; $\inf f \leq \Pi_\ell f \leq \sup f$.
-- **(K2)** $\pi(\Pi_\ell f) = \pi(f)$. *Bewijs:* de noemer $z_\ell(U)$ hangt niet af van $U_\ell$, en $\int p(U)\  dU_\ell = z_\ell(U)$. Integreer in $\pi(\Pi_\ell f) = \int p(U) \int f(U^{\ell\to V})\  p(U^{\ell\to V})\  z_\ell(U)^{-1}\  dV\  dU$ eerst over $U_\ell$; dat geeft $\int\int f(U^{\ell\to V})\  p(U^{\ell\to V})\  dV \prod_{k\neq\ell} dU_k = \pi(f)$.
+- **(K2)** $\pi(\Pi_\ell f) = \pi(f)$. *Bewijs:* de noemer $z_\ell(U)$ hangt niet af van $U_\ell$, en $\int p(U)\  dU_\ell = z_\ell(U)$. Integreer in $$\pi(\Pi_\ell f) = \int p(U) \int f(U^{\ell\to V})\  p(U^{\ell\to V})\  z_\ell(U)^{-1}\  dV\  dU$$ eerst over $U_\ell$; dat geeft $\int\int f(U^{\ell\to V})\  p(U^{\ell\to V})\  dV \prod_{k\neq\ell} dU_k = \pi(f)$.
 
 De **totale-variatieafstand** tussen twee kansmaten $\nu, \nu'$ is $d_{\mathrm{TV}}(\nu,\nu') = \sup_S \lvert\nu(S) - \nu'(S)\rvert$, met het supremum over meetbare verzamelingen. Twee feiten:
 
 - **(TV1)** Hebben $\nu, \nu'$ dichtheden $q, q'$ ten opzichte van dezelfde maat $\varsigma$, dan is $d_{\mathrm{TV}}(\nu,\nu') = \tfrac12\int\lvert q - q'\rvert\  d\varsigma$. *Bewijs:* voor elke meetbare $S$ is $\nu(S) - \nu'(S) = \int_S (q - q')\  d\varsigma \leq \int (q - q')^+\  d\varsigma$, met gelijkheid voor $S = \lbrace q \gt q' \rbrace$; evenzo is $\nu'(S) - \nu(S) \leq \int (q - q')^-\  d\varsigma$. Hierin zijn $(\cdot)^+$ en $(\cdot)^-$ het positieve en het negatieve deel. Omdat $\int (q - q')\  d\varsigma = 0$ is $\int (q-q')^+\  d\varsigma = \int (q-q')^-\  d\varsigma = \tfrac12 \int \lvert q - q'\rvert\  d\varsigma$.
-- **(TV2)** Hebben $\nu, \nu'$ dichtheden $q, q'$ als in (TV1), dan geldt voor begrensde meetbare $F$: $\lvert\nu(F) - \nu'(F)\rvert \leq \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$. *Bewijs:* met $c = \tfrac12(\sup F + \inf F)$ is $\lvert F - c\rvert \leq \tfrac12\operatorname{osc}(F)$ en $\nu(F) - \nu'(F) = \int (F - c)(q - q')\  d\varsigma$, dus $\lvert\nu(F) - \nu'(F)\rvert \leq \tfrac12\operatorname{osc}(F)\int\lvert q - q'\rvert\  d\varsigma = \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$ volgens (TV1). (In dit document is $\varsigma$ steeds de Haar-maat op $G$.)
+- **(TV2)** Hebben $\nu, \nu'$ dichtheden $q, q'$ als in (TV1), dan geldt voor begrensde meetbare $F$: $$\lvert\nu(F) - \nu'(F)\rvert \ \leq\ \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu') .$$ *Bewijs:* met $c = \tfrac12(\sup F + \inf F)$ is $\lvert F - c\rvert \leq \tfrac12\operatorname{osc}(F)$ en $\nu(F) - \nu'(F) = \int (F - c)(q - q')\  d\varsigma$, dus $$\lvert\nu(F) - \nu'(F)\rvert \ \leq\ \tfrac12\operatorname{osc}(F)\int\lvert q - q'\rvert\  d\varsigma = \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$$ volgens (TV1). (In dit document is $\varsigma$ steeds de Haar-maat op $G$.)
 
 De **afhankelijkheidscoëfficiënten** (naar Dobrushin) zijn, voor $\ell \neq k$,
 
@@ -763,12 +775,12 @@ Alles in dit hoofdstuk is gedaan door hetzelfde AI-systeem dat de bewijzen heeft
 
 ### 6.1 Leesrondes
 
-| ronde | wat is nagelopen | uitkomst |
+| ronde (2026) | wat is nagelopen | uitkomst |
 |---|---|---|
-| 1 (15 november 2026) | vier afzonderlijke lezers, elk één deel regel voor regel: stelling A; stelling B; de lemma's van stelling C; de uitspraak en het bewijs van stelling C | geen foute stap in de bewijzen van de drie stellingen; wel ontbrekende tussenstappen, te zwak geformuleerde hulpresultaten, één onjuiste toelichting, één verkeerd afgerond getal en te sterke formuleringen: 32 punten (6, 9, 5 en 12), door de lezers alle als klein of cosmetisch aangemerkt, alle verwerkt |
-| 2 (16 november 2026) | één lezer voor alle passages die na ronde 1 nieuw of gewijzigd waren | geen ernstige fout; 11 punten (3 kleine, 8 cosmetische), alle verwerkt |
-| literatuur (16 november 2026) | hoofdstuk 7, de bijlage en de uitspraken over de literatuur in hoofdstuk 3, 4 en 5 | alle 23 verwijzingen die hoofdstuk 7 op dat moment bevatte, zijn met titel en vindplaats teruggevonden in zoekresultaten (geen artikel is geopend); 8 punten over te ruime of onnauwkeurige toeschrijvingen, alle verwerkt. Op aanwijzing van deze ronde zijn daarna 9 verwijzingen toegevoegd; hoofdstuk 7 telt er nu 32, waarvan 4 (met ○) niet zijn teruggevonden |
-| 3 (20 november 2026) | één lezer voor de hele tekst: formulering, samenhang, verwijzingen, getallen en taal; niet opnieuw de wiskunde | geen zin die een oplossing van het millenniumprobleem claimt en geen wiskundige fout opgemerkt; 27 punten, waarvan 4 belangrijke: dit hoofdstuk zei op enkele plaatsen meer dan er gedaan was, en een tabel in §5.2 kon worden gelezen alsof de kloof in de continuümlimiet bewezen was. Alle verwerkt |
+| 1 (15 nov.) | vier afzonderlijke lezers, elk één deel regel voor regel: stelling A; stelling B; de lemma's van stelling C; de uitspraak en het bewijs van stelling C | geen foute stap in de bewijzen van de drie stellingen; wel ontbrekende tussenstappen, te zwak geformuleerde hulpresultaten, één onjuiste toelichting, één verkeerd afgerond getal en te sterke formuleringen: 32 punten (6, 9, 5 en 12), door de lezers alle als klein of cosmetisch aangemerkt, alle verwerkt |
+| 2 (16 nov.) | één lezer voor alle passages die na ronde 1 nieuw of gewijzigd waren | geen ernstige fout; 11 punten (3 kleine, 8 cosmetische), alle verwerkt |
+| literatuur (16 nov.) | hoofdstuk 7, de bijlage en de uitspraken over de literatuur in hoofdstuk 3, 4 en 5 | alle 23 verwijzingen die hoofdstuk 7 op dat moment bevatte, zijn met titel en vindplaats teruggevonden in zoekresultaten (geen artikel is geopend); 8 punten over te ruime of onnauwkeurige toeschrijvingen, alle verwerkt. Op aanwijzing van deze ronde zijn daarna 9 verwijzingen toegevoegd; hoofdstuk 7 telt er nu 32, waarvan 4 (met ○) niet zijn teruggevonden |
+| 3 (20 nov.) | één lezer voor de hele tekst: formulering, samenhang, verwijzingen, getallen en taal; niet opnieuw de wiskunde | geen zin die een oplossing van het millenniumprobleem claimt en geen wiskundige fout opgemerkt; 27 punten, waarvan 4 belangrijke: dit hoofdstuk zei op enkele plaatsen meer dan er gedaan was, en een tabel in §5.2 kon worden gelezen alsof de kloof in de continuümlimiet bewezen was. Alle verwerkt |
 
 De belangrijkste correcties uit deze rondes:
 
@@ -780,7 +792,7 @@ De belangrijkste correcties uit deze rondes:
 - De simulaties in vier dimensies liggen bij $\beta = 2{,}3$ tot $2{,}5$, niet $2{,}2$ tot $2{,}5$.
 - De uitspraken over U(1) in §5.3 gingen verder dan wat wij uit de literatuur konden bevestigen; zij zijn teruggebracht tot wat bevestigd is, en de rest staat er als verwachting.
 
-De volledige rapporten staan in `review/proofs/findings_round1.txt` en `review/proofs/findings_round2.txt`; de rekenscripts van de lezers in `review/proofs/`.
+De volledige rapporten staan in `review/proofs/findings_round1.txt`, `review/proofs/findings_round2.txt` en `review/proofs/findings_round3.txt`; de rekenscripts van de lezers in `review/proofs/`.
 
 ### 6.2 Numerieke toetsen
 
@@ -840,7 +852,7 @@ Wat is getoetst, met enkele uitkomsten:
 - **Maattheorie.** Uitspraken over meetbaarheid, nulverzamelingen en het verwisselen van integralen laten zich niet numeriek toetsen; zij zijn alleen gelezen.
 - **De beoordeling van de toetsen voor stelling A en B.** Een aparte ronde die dit toetsbestand kritisch moest nalopen, is twee keer afgebroken door een gebruikslimiet. Zij heeft negen toetsen toegevoegd maar geen verslag opgeleverd. De toetsen slagen en de tien verstoringen hierboven worden alle opgemerkt; een volledige tweede blik op dit bestand ontbreekt.
 - **De literatuur.** Geen van de aangehaalde artikelen kon worden geopend (hoofdstuk 7). Wat er over hun inhoud staat, berust op titels, samenvattingen in zoekresultaten en het geheugen van het AI-systeem.
-- **De opmaak van de pdf.** De formules in `BEWIJZEN.pdf` zijn gezet met een eenvoudig zetprogramma (dat van `matplotlib`); `pdf/make_bewijzen_pdf.py` vertaalt de notatie daarvoor. Het bronbestand `BEWIJZEN.md` is leidend.
+- **De opmaak van de pdf.** De formules in `BEWIJZEN.pdf` zijn gezet met een eenvoudig zetprogramma (dat van `matplotlib`); `pdf/make_bewijzen_pdf.py` vertaalt de notatie daarvoor. Een aparte ronde heeft op 20 november alle pagina's van een proefdruk bekeken en de zetfouten die zij vond in dat script hersteld. Zij heeft de ongeveer 1500 formules niet teken voor teken met de bron vergeleken, en na de laatste aanpassingen niet alle pagina's opnieuw bekeken. Het bronbestand `BEWIJZEN.md` is leidend.
 
 ---
 
@@ -897,4 +909,4 @@ De bewijzen in dit document gebruiken de volgende resultaten uit de standaardlee
 - **(S3) Integraaloperatoren.** Zij $X$ een compacte metrische ruimte met een eindige maat en $k$ een continue functie op $X \times X$. De operator $(\mathsf{A}f)(x) = \int k(x,y) f(y)\  dy$ op $L^2(X)$ is een Hilbert–Schmidt-operator en dus compact, en $\mathsf{A}f$ is continu voor elke $f \in L^2(X)$. Het product van twee zulke operatoren heeft als kern $\int k_1(x,z)\  k_2(z,y)\  dz$, en $\operatorname{Tr}(\mathsf{A}_1\mathsf{A}_2) = \int\int k_1(x,y)\  k_2(y,x)\  dx\  dy$. Algemener: is $k$ kwadratisch integreerbaar op $X \times X$ (bijvoorbeeld begrensd en meetbaar), dan is $\mathsf{A}$ een Hilbert–Schmidt-operator, en dezelfde twee formules gelden. Hierin is $\operatorname{Tr}\mathsf{B} = \sum_n \langle e_n, \mathsf{B} e_n\rangle$ voor een orthonormale basis $(e_n)$; voor een product $\mathsf{B} = \mathsf{A}_1\mathsf{A}_2$ van twee Hilbert–Schmidt-operatoren (een operator van spoorklasse) convergeert deze som absoluut en hangt zij niet af van de gekozen basis. Een compacte zelfgeadjungeerde operator heeft een orthonormale basis van eigenvectoren met reële eigenwaarden; elke eigenwaarde ongelijk aan 0 heeft eindige multipliciteit, en de eigenwaarden kunnen alleen in 0 ophopen; is hij positief semidefiniet, dan is zijn norm de grootste eigenwaarde. Voor een Hilbert–Schmidt-operator is $\sum_n \lambda_n^2 \lt \infty$.
 - **(S4) Stelling van Stone–Weierstrass.** Een algebra van continue complexe functies op een compacte Hausdorff-ruimte die de constanten bevat, punten scheidt en gesloten is onder complexe conjugatie, ligt dicht in de ruimte van alle continue functies met de supremumnorm.
 - **(S5) Representaties van SU(2).** De feiten van §3.1: de irreducibele representaties $D^j$, hun karakters, de integratieformule voor klassefuncties, de volledigheid van de karakters in $L^2_{\mathrm{kl}}(G)$ (stelling van Peter–Weyl), en het lemma van Schur.
-- **(S6) Gemodificeerde Besselfuncties.** Voor gehele $n \geq 0$ en $x \gt 0$: de machtreeks $I_n(x) = \sum_{k\geq0} (x/2)^{2k+n}/(k!\ (k+n)!)$; de integraalvoorstelling $I_n(x) = \frac1\pi\int_0^\pi e^{x\cos\theta}\cos(n\theta)\  d\theta$; de afgeleide $I_n' = I_{n+1} + \frac{n}{x}I_n$; voor $n \geq 1$ bovendien de recurrentie $I_{n-1}(x) - I_{n+1}(x) = \frac{2n}{x} I_n(x)$ en $I_n' = I_{n-1} - \frac{n}{x} I_n$; en voor vaste $n$ de asymptotiek $I_n(x) = \frac{e^x}{\sqrt{2\pi x}}\big[1 - \frac{4n^2-1}{8x} + O(x^{-2})\big]$ voor $x \to \infty$. (NIST Digital Library of Mathematical Functions, §10.25, §10.29, §10.32 en §10.40.)
+- **(S6) Gemodificeerde Besselfuncties.** Voor gehele $n \geq 0$ en $x \gt 0$: $$I_n(x) = \sum_{k\geq0} \frac{(x/2)^{2k+n}}{k!\ (k+n)!} = \frac1\pi\int_0^\pi e^{x\cos\theta}\cos(n\theta)\  d\theta$$ (de machtreeks en de integraalvoorstelling); de afgeleide $I_n' = I_{n+1} + \frac{n}{x}I_n$; voor $n \geq 1$ bovendien de recurrentie $I_{n-1}(x) - I_{n+1}(x) = \frac{2n}{x} I_n(x)$ en $I_n' = I_{n-1} - \frac{n}{x} I_n$; en voor vaste $n$ de asymptotiek $I_n(x) = \frac{e^x}{\sqrt{2\pi x}}\big[1 - \frac{4n^2-1}{8x} + O(x^{-2})\big]$ voor $x \to \infty$. (NIST Digital Library of Mathematical Functions, §10.25, §10.29, §10.32 en §10.40.)
