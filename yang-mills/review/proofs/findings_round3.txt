@@ -1,0 +1,321 @@
+Report on BEWIJZEN.md, round 3 (20 November 2026).
+
+One pass by the same AI system that wrote the document: a review of the whole text for framing,
+internal consistency, cross-references, numbers and language (not the mathematics). It refers to
+the text of commit bcb67a2. No mathematician has reviewed the document. All findings were processed
+afterwards (see README.md in this folder); the renaming proposed at the end of finding F22 was not
+carried out (section 1.5 of the document lists the letters with more than one meaning instead).
+
+====================================================================================================
+REPORT OF text-review
+====================================================================================================
+
+SUMMARY
+Text review of /home/user/frisoj/yang-mills/BEWIJZEN.md (878 lines, read in full; not edited). No sentence claims that the Millennium problem is solved or partly solved, and the disclaimers (opening, section 0 table, 3.4, 5, 6, 7) are explicit. No fatal finding. I noticed no mathematical error while reading; the only logical slip is a 'dus' in the prose of 5.1.
+
+The weak spot is section 6, which in several places says more than was done:
+- It says the review rounds 'did not know each other's work'. The reports show they did (F02).
+- It says every number in chapter 4 and 5.3 is read from the document by the tests, so that a changed number makes a test fail. On a scratch copy I changed 0,427 to 0,437 in 4.1 and all 225 tests still passed (F03).
+- It says every checkable step was recomputed. Section 6.3 itself lists steps that were not (F04).
+- It says the 8 surviving mutations were 'predicted beforehand' and are all listed under the limitations. Two are not listed, and the report shows at least two survivors were found by running the script (F05).
+- 'All 23 references' is stale: section 7 now has 32 entries, 4 marked as not found (F06).
+- The 3x3x3 partition-function check is described as enumeration of all configurations. It was an independent sum over 2^29 closed surfaces (F07).
+
+One table is a framing risk: the last column of the 5.2 table is headed 'voor D = 4, beta -> oneindig' and answers 'ja' for 'kloof groter dan nul' (F01).
+
+Everything else I checked holds:
+- Tests: the default run gives 225 passed, 14 skipped (74+5 of 79 and 151+9 of 160); with --runslow 239 passed. The mutation scripts give 43 of 51 and 10 of 10.
+- Numbers: every figure I sampled from 4.1, 4.6, 5.3 and 6.2 reproduces, including all those named in the task.
+- Counts: 32 = 6+9+5+12 findings in round 1, 11 in round 2, 8 literature points.
+- Cross-references and citations: all section numbers, tags, labels, lemma numbers and author-year citations resolve. The one exception is BEWIJZEN.pdf, which does not exist in the repository yet.
+- Markup: 58 fenced math blocks closed, dollar signs balanced, tables consistent, no placeholders.
+
+The remaining findings are minor: a few sentences in the title, opening, section 0 and chapter 5 that imply more than the theorems give; notation clashes (Lambda, ell, a, w, lambda, g); and Dutch grammar and readability, with paste-ready replacements.
+
+During my session `git status` started showing pdf/make_bewijzen_pdf.py and pdf/style_bewijzen.css as modified. I did not touch them; I wrote only to the scratchpad.
+
+--- finding F01 | severity: major | category: overclaim
+LOCATION: §5.2, table (lines 707-718), last column and the sentence under the table
+QUOTE: | vereiste | geleverd door | onder welke voorwaarde | voor $D = 4$, $\beta \to \infty$ | ... | kloof groter dan nul | stelling A | elk eindig rooster, elke $\beta$ | ja, maar zonder ondergrens | ... De vijf regels met "nee" zijn samen het millenniumprobleem.
+PROBLEM: The column header names the continuum limit and three cells answer 'ja'. Read literally, the row says: gap greater than zero, for D = 4 and beta -> infinity: yes. Stelling A gives this only for each finite beta on each finite lattice and says nothing about the limit. This is the one place where a skimming reader can take away 'gap > 0 in the 4D continuum limit: proved'. The condition column also drops the hypotheses 'afmetingen minstens 3' and beta > 0. The closing sentence equates the five 'nee' rows with the Millennium problem; they are the requirements along the lattice route and omit non-triviality.
+PROPOSED FIX: Vervang de kop en de eerste drie regels van de tabel door:
+
+| vereiste | geleverd door | onder welke voorwaarde | geldt het in $D = 4$ bij grote $\beta$? |
+|---|---|---|---|
+| theorie op een eindig rooster bestaat | §1.3 | altijd | ja, maar dat is niet de vraag |
+| Hilbertruimte en Hamiltoniaan (reflectiepositiviteit) | stelling A | elk eindig rooster met afmetingen minstens 3, elke $\beta \gt 0$ | ja, voor elke eindige $\beta$ op elk eindig rooster; niets over de limiet $\beta \to \infty$ |
+| kloof groter dan nul | stelling A | elk eindig rooster met afmetingen minstens 3, elke $\beta \gt 0$ | ja, voor elke eindige $\beta$ op elk eindig rooster, maar zonder ondergrens; niets over oneindig volume of over de limiet $\beta \to \infty$ |
+
+(De vijf regels met **nee** blijven zoals ze zijn.) Vervang de zin onder de tabel door:
+
+De vijf regels met "nee" zijn, langs de weg van het rooster en samen met de eis dat de limiet niet triviaal is, het millenniumprobleem. Geen daarvan wordt in dit document bewezen.
+
+--- finding F02 | severity: major | category: overclaim
+LOCATION: §6, first paragraph (line 744)
+QUOTE: Alles in dit hoofdstuk is gedaan door hetzelfde AI-systeem dat de bewijzen heeft geschreven, in afzonderlijke rondes die elkaars werk niet kenden.
+PROBLEM: The reports contradict 'die elkaars werk niet kenden'. Round 1, referee A: 'The five ref_a_*.py scripts left by the earlier round were read line by line ... reran them'. Round 2 (referee:delta) worked from the git diff after round 1, reran round-1 scripts and cites round-1 findings. The literature report writes 'Neither round 1 nor this check could confirm ...'. The tests:C-finish pass completed a test file written by an earlier session. Only the four readers of round 1 were separate from each other. The sentence overstates the independence of the checks. The word 'lezers' in 6.1 and 6.2 can also be read as human readers.
+PROPOSED FIX: Alles in dit hoofdstuk is gedaan door hetzelfde AI-systeem dat de bewijzen heeft geschreven, in afzonderlijke sessies. Met "lezer" is hieronder steeds zo'n sessie bedoeld, geen mens. De vier lezers van ronde 1 werkten los van elkaar, elk aan een eigen deel. Latere rondes kenden de rapporten en de rekenscripts van eerdere rondes en bouwden daarop voort. De rondes zijn dus niet onafhankelijk van elkaar of van de schrijver. Geen wiskundige heeft dit document gelezen. Een controle door een AI-systeem is geen vervanging voor de beoordeling door vakgenoten; er kunnen fouten zijn blijven staan.
+
+--- finding F03 | severity: major | category: factual_error
+LOCATION: §6.2, last bullet under 'Stelling C' (line 807)
+QUOTE: Elk getal in hoofdstuk 4 en in de alinea's van §5.3 over stelling C wordt door de toetsen uit dit document zelf gelezen en nagerekend; verandert een getal in de tekst, dan faalt de toets.
+PROBLEM: False as a universal statement. On a scratch copy (tests/, ym/, pytest.ini, BEWIJZEN.md) I changed the first '0{,}427' in §4.1 to '0{,}437' and ran both proof test files: 225 passed, 14 skipped, no failure. Changing the first '0{,}425' to '0{,}525' also passed the C9 and C3 number tests. The three per-dimension sums in §4.1 were added after the tests were written; the tests compute 0.4274, 0.4252, 0.4248 but do not read them from the text. The formula '6(D-1)' in §5.3 ('de som nadert') is not read either. Numbers that are caught: the table, 0,42 beta, 0,43, 2,4, 19,6, 14,7, 0,0204, 0,26, 0,27, 3,689, 11,07, 0,514, 0,1682, 0,0556.
+PROPOSED FIX: - De tabel van §4.1 en de meeste andere getallen in hoofdstuk 4 en in de alinea's van §5.3 over stelling C worden door de toetsen uit dit document zelf gelezen en nagerekend; verandert zo'n getal in de tekst, dan faalt de toets. Dat geldt niet voor elk getal: de drie sommen 0,427, 0,425 en 0,425 in §4.1 worden wel nagerekend (0,4274, 0,4252 en 0,4248) maar niet uit de tekst gelezen.
+
+--- finding F04 | severity: major | category: overclaim
+LOCATION: §6.2, first sentence (line 768); opening paragraph 'Niet nieuw' (line 7)
+QUOTE: Elke stap van de bewijzen die zich laat narekenen, is nagerekend. ... en dat de stappen ook numeriek zijn nagerekend (hoofdstuk 6).
+PROBLEM: A universal claim that the chapter itself contradicts. Per §6.3 and the round-2 report ('NOT TESTED'): Propositie C.6 and points 1-3 of Stelling C were checked only on Z2 models and other finite systems, not for SU(2); point 2 was not computed in D = 4; point 3 only in D = 2 as a consistency check; lemma C.5 for SU(2) is an uncertified numerical maximisation. Several of these could in principle be checked numerically (for example by Monte Carlo) and were not.
+PROPOSED FIX: §6.2, eerste zin: "De stappen van de bewijzen zijn, waar dat lukte, numeriek nagerekend; voor stelling C grotendeels op eenvoudiger modellen dan SU(2). Wat daarbij ontbreekt, staat in §6.3. Twee soorten "laboratorium" komen steeds terug:"
+
+Openingsalinea, laatste zin: "Wat dit document toevoegt, is dat de bewijzen in één notatie stap voor stap zijn uitgeschreven, met alleen de standaardresultaten uit de bijlage als voorkennis, en dat veel stappen ook numeriek zijn nagerekend, voor stelling C grotendeels op eenvoudiger modellen dan SU(2) (hoofdstuk 6)."
+
+--- finding F05 | severity: minor | category: overclaim
+LOCATION: §6.2, paragraph 'Hebben de toetsen onderscheidend vermogen?' (line 809) and §6.3
+QUOTE: Voor stelling C: 43 van de 51; de 8 die niet worden opgemerkt, zijn vooraf als zodanig voorspeld en staan hieronder bij de beperkingen.
+PROBLEM: The counts are right: I reran both scripts and got 51 mutants, 43 killed, 8 survive, and 10 of 10 for A and B. Two parts of the sentence are not. (a) 'vooraf ... voorspeld' is not supported: the round-2 report says a tree test was 'added after the mutation checks showed that neither the Z2 nor the Ising-graph test can tell e^{-theta d} from e^{-3 theta d}', so at least those survivors were found by running the script; the script merely labels them 'expected survives'. (b) Not all 8 are in §6.3. Missing are 'point 2 with 3 ln(1/alpha)' (a bound three times stronger would not be detected) and 'lifting claimed for L >= 2r+1'. §6.3 also does not say that point 2 was never computed in D = 4 and point 3 never in D >= 3, which the round-2 report lists under NOT TESTED.
+PROPOSED FIX: Vervang de zin door: "Voor stelling C: 43 van de 51. De 8 verstoringen die niet worden opgemerkt, maken alle een grens strenger die in de laboratoria ruim is: de constante en de uitdovingssnelheid van propositie C.6 (vier gevallen), de constante van punt 1, de ondergrens van punt 2, de schatting van punt 3 en de drempel $L \geq 2r+3$ in het bewijs van punt 3. Zij staan hieronder bij de beperkingen."
+
+Voeg aan §6.3 toe: "- **De ondergrens van punt 2 en de drempel van punt 3.** In de laboratoria is de exacte kloof minstens 5,5 keer zo groot als de ondergrens $\ln(1/\alpha)$; een ondergrens die drie keer zo groot zou zijn, zouden de toetsen niet als fout herkennen. Punt 2 is alleen in twee en drie dimensies uitgeteld, niet in vier (het kleinste ruimtelijke rooster heeft daar 81 links), en punt 3 alleen in twee dimensies. De drempel $L \geq 2r+3$ in het bewijs van punt 3 is voldoende maar niet scherp; een iets te lage drempel zouden de toetsen niet opmerken."
+
+--- finding F06 | severity: minor | category: inconsistency
+LOCATION: §6.1, table row 'literatuur' (line 752) versus chapter 7
+QUOTE: alle 23 verwijzingen bestaan met de genoemde vindplaats; 8 punten over te ruime of onnauwkeurige toeschrijvingen, alle verwerkt
+PROBLEM: The literature report did check 23 entries and has 8 findings (5 minor, 3 cosmetic). But chapter 7 now has 32 distinct references: 9 were added afterwards on the suggestion of that report (Jentzsch, Drouffe-Zuber, Hetrick-Hosotani, Rajeev, Dimock, Ashtekar et al., L. Gross 1979, Chatterjee 2020, Chatterjee 2021). Four of them carry the mark for 'niet teruggevonden' (Jentzsch, Drouffe-Zuber, Rajeev, Dimock), and Chatterjee 2020 carries it for volume and pages. A reader who counts chapter 7 finds 32, some explicitly not found, against 'alle 23 ... bestaan'. 'Bestaan met de genoemde vindplaats' also rests on search-result snippets only.
+PROPOSED FIX: alle 23 verwijzingen die hoofdstuk 7 op dat moment bevatte, zijn met titel en vindplaats teruggevonden in zoekresultaten (geen artikel is geopend); 8 punten over te ruime of onnauwkeurige toeschrijvingen, alle verwerkt. Op aanwijzing van deze ronde zijn daarna 9 verwijzingen toegevoegd; hoofdstuk 7 telt er nu 32, waarvan 4 (met ○) niet zijn teruggevonden
+
+--- finding F07 | severity: minor | category: factual_error
+LOCATION: §6.2, 'Stelling A', first bullet (line 782)
+QUOTE: $Z = \operatorname{Tr}\mathsf{T}^N$ tegen het uittellen van alle configuraties, voor $\mathbb{Z}_2$ in twee en drie dimensies: gelijk tot op afronding (relatief verschil hoogstens $3\cdot10^{-15}$). Bijvoorbeeld op het $3\times3\times3$-rooster bij $\beta = 0{,}4$: 603,4901773970 langs beide wegen.
+PROBLEM: The number is right: rerunning review/proofs/ref_a_r2_z2_3x3.py gives 603.4901773970 on both sides, relative difference 3.2e-15. The method is described wrongly. The 3x3x3 lattice has 2^81 configurations and was not enumerated; the independent value is the exact sum over the 2^29 closed plaquette surfaces. In the test file, full enumeration in D = 3 is done only on the 2x2x2 lattice, which violates the hypothesis 'afmetingen minstens 3' (the test docstring says so). The 3x3x3 test is a slow test at beta = 0.5; the quoted beta = 0,4 example comes from the reader script, which is not named.
+PROPOSED FIX: - $Z = \operatorname{Tr}\mathsf{T}^N$ voor $\mathbb{Z}_2$: in twee dimensies tegen het uittellen van alle configuraties; in drie dimensies op het $2\times2\times2$-rooster eveneens tegen uittellen (dat rooster valt buiten de voorwaarde "afmetingen minstens 3", maar deze formule gebruikt die voorwaarde niet) en op het $3\times3\times3$-rooster tegen een onafhankelijke exacte som over alle $2^{29}$ gesloten oppervlakken van plaquettes (de $2^{81}$ configuraties zelf zijn niet uit te tellen). Steeds gelijk tot op afronding (relatief verschil ongeveer $3\cdot10^{-15}$). Bijvoorbeeld op het $3\times3\times3$-rooster bij $\beta = 0{,}4$: 603,4901773970 langs beide wegen (`review/proofs/ref_a_r2_z2_3x3.py`; de toets in `tests/test_proofs_ab.py` doet hetzelfde bij $\beta = 0{,}5$ en hoort bij de trage toetsen).
+
+--- finding F08 | severity: minor | category: overclaim
+LOCATION: §6.1, table rows for round 1 and round 2 (lines 750-751)
+QUOTE: geen foute stap in de drie stellingen; 32 kleine punten (6, 9, 5 en 12), alle verwerkt ... geen fout; 11 kleine punten, alle verwerkt
+PROBLEM: The counts match the reports (6+9+5+12 = 32; 11), and all verdicts are 'correct_with_minor_issues'. But the short outcomes are rosier than the reports. Round 1 found steps asserted without proof (C2-01 'as written this step is a gap'; B-1 'omitted routine steps'; C1-1 'asserted, not proved'), appendix results too weak for their use (A-1, A-2, B-2), a false statement in a remark (A-3) and a wrong table digit. Round 2 found 'no fatal or major error', with 3 minor and 8 cosmetic points; one minor point is an overstated sentence, another a proof step citing something the cited paragraph did not say. 'Geen fout' is stronger than 'no fatal or major error'. The chapter also does not mention that 44 tests failed when the Stelling C test file was completed; the report attributes all 44 to the tests, not to the theorems.
+PROPOSED FIX: Ronde 1, uitkomst: "geen foute stap in de bewijzen van de drie stellingen; wel ontbrekende tussenstappen, te zwak geformuleerde hulpresultaten, één onjuiste toelichting, één verkeerd afgerond getal en te sterke formuleringen: 32 punten (6, 9, 5 en 12), door de lezers alle als klein of cosmetisch aangemerkt, alle verwerkt"
+
+Ronde 2, uitkomst: "geen ernstige fout; 11 punten (3 kleine, 8 cosmetische), alle verwerkt"
+
+Toevoegen na de tabel van §6.2: "Bij het afmaken van `tests/test_proofs_c.py` in ronde 2 faalden aanvankelijk 44 toetsen. Volgens het verslag lag dat in alle gevallen aan de toetsen (fouten in de toetscode, beweringen die verder gingen dan de tekst, te krappe toleranties, tekst die na het schrijven van de toets was gewijzigd) en niet aan de stellingen; de toetsen zijn daarop aangepast."
+
+--- finding F09 | severity: minor | category: overclaim
+LOCATION: §6.2, intro bullet 'Eindige groepen' (line 770) and 'Stelling C' bullets (lines 804-806)
+QUOTE: Het bewijs van stelling C gebruikt van de groep alleen $\lvert\operatorname{Tr}\rvert \leq 2$ ... Voor SU(2) is de werkelijke coëfficiënt bij kleine $\beta$ gelijk aan $0{,}4244\ \beta$ ... Propositie C.6 en punt 1 van stelling C op het $3\times3$-rooster: nooit geschonden ... tegen de ondergrenzen 2,1204, 1,2048 en 0,5141
+PROBLEM: Four small points; the numbers themselves check out (0.0395 and 0.0197 in the round-2 report round to 0,04 and 0,02; slope 0.4244; gaps recomputed). (a) §4.6 says correctly that point 2 also uses Stelling A, so 'gebruikt van de groep alleen |Tr| <= 2' contradicts it. (b) 'gelijk aan 0,4244 beta' states a numerical, uncertified maximisation as an identity (§6.3 says it is not a certified supremum). (c) The bullet on Propositie C.6 and point 1 does not say that the 3x3 lattice is the Z2 model in two dimensions; a reader will assume SU(2). (d) 2,1204 is rounded to nearest (exact value 2.1203969), while the table and 0,5141 are rounded down; as a lower bound it should be 2,1203.
+PROPOSED FIX: (a) "De paragrafen 4.2 tot en met 4.4 en de punten 1 en 3 van stelling C gebruiken van de groep alleen $\lvert\operatorname{Tr}\rvert \leq 2$; punt 2 gebruikt ook stelling A, die voor een eindige groep een uitspraak over gewone matrices is. Alle uitspraken van hoofdstuk 4 moeten daar dus met dezelfde constanten gelden."
+(b) "Voor SU(2) is de numeriek gevonden coëfficiënt bij kleine $\beta$ ongeveer $0{,}4244\ \beta$, dat is $4\beta/(3\pi)$;"
+(c) "Propositie C.6 en punt 1 van stelling C voor het $\mathbb{Z}_2$-model op het $3\times3$-rooster in twee dimensies: nooit geschonden; ..."
+(d) "tegen de ondergrenzen 2,1203, 1,2048 en 0,5141"
+
+--- finding F10 | severity: minor | category: overclaim
+LOCATION: Opening paragraph 'Wat dit document is' (line 3) and §0 (line 19)
+QUOTE: Samen laten ze zien wat er over de massakloof werkelijk te bewijzen valt. ... Dit document bewijst wat er op het rooster te bewijzen valt:
+PROBLEM: Both sentences claim exhaustiveness: that these three theorems are what can be proved about the mass gap, or on the lattice. That is more than the theorems give and contradicts the document itself (§5.4 on Bałaban, §7 on Shen-Zhu-Zhu and Chatterjee; THEORY.md §6). 'Werkelijk' adds an authority the text does not have.
+PROPOSED FIX: Regel 3: "Samen laten ze zien wat er met betrekkelijk eenvoudige middelen over de massakloof op het rooster te bewijzen valt, en waar die middelen ophouden."
+
+Regel 19: "Dit document bewijst drie dingen die op het rooster wél te bewijzen zijn:"
+
+--- finding F11 | severity: minor | category: overclaim
+LOCATION: Title (line 1)
+QUOTE: # Yang–Mills en de massakloof: drie stellingen met volledig bewijs
+PROBLEM: Read quickly (in a file list, a pdf title or a link), 'Yang–Mills en de massakloof ... met volledig bewijs' can be taken as a full proof of the Yang–Mills mass gap. 'Volledig' also claims completeness for proofs that no mathematician has checked (§6 says errors may remain). The disclaimers directly below are clear, but the title travels without them.
+PROPOSED FIX: # Yang–Mills op het rooster: drie bekende stellingen over de massakloof, met uitgeschreven bewijs
+
+(Als de titel elders wordt aangehaald, bijvoorbeeld in `README.md` of in het pdf-script, daar meenemen.)
+
+--- finding F12 | severity: minor | category: overclaim
+LOCATION: §0, table row 'Stelling B', column 'wat het niet zegt' (line 32), and the Stelling B bullet (line 22)
+QUOTE: | **Stelling B** | ... | exact spectrum; kloof $m = L \ln\big(I_1(\beta)/I_2(\beta)\big)$; continuümlimiet van het spectrum, met kloof $\tfrac38 g^2 \ell$ | niets over $D = 3$ of $D = 4$ |
+PROBLEM: The formulas match Stelling B. But the summary gives only 'niets over D = 3 of D = 4' as the limitation. The limitation the document itself stresses in §3.2, §3.4 and §6.1 (round 1 removed 'volledig opgelost') is missing here: even in D = 2 only the spectrum and the time evolution on a ring of fixed circumference have a proven continuum limit, not the theory in the sense of the Millennium problem. A reader of the summary alone can conclude that 'existence and gap' is done for D = 2.
+PROPOSED FIX: Tabelcel: "niets over $D = 3$ of $D = 4$; ook in $D = 2$ geen constructie van de continuümtheorie (alleen het spectrum en de tijdsevolutie op een ring van vaste omtrek)"
+
+Opsommingspunt: "- **Stelling B.** In twee dimensies (één ruimte- en één tijdrichting, de ruimte een ring van vaste omtrek) zijn alle energieniveaus en de kloof exact uit te rekenen, ook in de limiet $a \to 0$. De energieniveaus hebben in die limiet een eindige waarde, en de kloof blijft bestaan. Dat is minder dan een constructie van de continuümtheorie, en twee dimensies is een veel eenvoudiger wereld dan de onze."
+
+--- finding F13 | severity: minor | category: notation
+LOCATION: §0 'In gewone taal' and 'Overzicht' (lines 17-36)
+QUOTE: Bij sterke koppeling (kleine $\beta$) ... kloof $m = L \ln\big(I_1(\beta)/I_2(\beta)\big)$; continuümlimiet van het spectrum, met kloof $\tfrac38 g^2 \ell$ ... positieve overdrachtsmatrix
+PROBLEM: Section 0 is meant for a non-mathematician but uses symbols and terms that are defined only later: beta (first defined in §1.3), g and the circumference ell (Stelling B, point 5), I_1 and I_2 (Bessel functions, §3.1), L, and 'overdrachtsmatrix' (§2.2). 'Eindige sprong' and 'een eindig stuk hoger' (lines 17 and 21) use 'eindig' in the physicist's sense of 'not zero'; a lay reader reads 'not infinite'.
+PROPOSED FIX: Na de eerste twee zinnen van de tweede alinea invoegen: "De sterkte van de koppeling wordt op het rooster ingesteld met een getal $\beta$: een kleine $\beta$ betekent sterke koppeling, een grote $\beta$ zwakke koppeling. In vier dimensies hoort bij een fijner rooster een grotere $\beta$."
+
+Onder de tabel toevoegen: "Hierin is $D$ het aantal dimensies, $L$ het aantal roosterpunten rond de ring, $g$ de koppeling en $\ell$ de omtrek van de ring in fysische eenheden; $I_1$ en $I_2$ zijn Besselfuncties (hoofdstuk 3). De overdrachtsmatrix is de operator die het systeem één tijdstap opschuift (hoofdstuk 2)."
+
+Regel 17: "... tussen de lege ruimte (het vacuüm) en de eerstvolgende toestand zit een sprong in energie die groter is dan nul."
+Regel 21: "... is er precies één toestand van laagste energie en ligt de eerstvolgende toestand strikt hoger. De kloof is dus groter dan nul."
+
+--- finding F14 | severity: minor | category: overclaim
+LOCATION: §2.3, 'In gewone taal' (line 148), last sentences
+QUOTE: op de roosters waar de torelon lichter is (tabel 3 van `REPORT.md`) ligt $m$ dus onder de gemeten glueballmassa. ... de kloof kan in principe naar nul gaan als het volume naar oneindig gaat. Dat uitsluiten is het eigenlijke probleem.
+PROBLEM: (a) 'Dat uitsluiten is het eigenlijke probleem' reduces the Millennium problem to a volume-uniform bound. That is what Stelling C delivers at strong coupling; the actual problem also needs the bound to survive a -> 0, plus existence and the axioms. It contradicts §5 in tone. (b) 'ligt m dus onder' draws a proved-sounding conclusion from measured, statistical values; table 3 exists and says the torelon is lightest on six of nine lattices.
+PROPOSED FIX: "... op de roosters waar volgens de metingen de torelon lichter is (tabel 3 van `REPORT.md`) ligt $m$ dus onder de gemeten glueballmassa. De stelling geeft geen getal voor $m$ en geen ondergrens die blijft gelden als het rooster groeit: de kloof kan in principe naar nul gaan als het volume naar oneindig gaat. Dat uitsluiten, op een manier die ook standhoudt als het rooster fijner wordt ($a \to 0$), is een wezenlijk deel van het eigenlijke probleem (hoofdstuk 5)."
+
+--- finding F15 | severity: minor | category: overclaim
+LOCATION: §2.4, 'Opmerking (reflectiepositiviteit)' (line 294)
+QUOTE: De ongelijkheid (2.4) is de roostervorm van reflectiepositiviteit, één van de axioma's van Osterwalder en Schrader ... Stelling A levert die structuur voor elk eindig rooster.
+PROBLEM: A reader can take this as 'one of the Millennium axioms has been established'. The axioms concern the continuum theory; what is proved is the lattice analogue on a finite lattice. One sentence removes the ambiguity.
+PROPOSED FIX: Toevoegen aan het eind van de opmerking: "Voor het millenniumprobleem is dat niet genoeg: de axioma's gaan over de continuümtheorie, en die wordt hier niet geconstrueerd."
+
+--- finding F16 | severity: minor | category: overclaim
+LOCATION: §4.1, 'In gewone taal' (line 477)
+QUOTE: Punt 3 zegt dat de theorie in oneindig volume dan bestaat, en punt 1 dat correlaties daar exponentieel uitdoven.
+PROBLEM: 'De theorie ... bestaat' echoes the 'existence' of the Millennium problem. Point 3 proves that expectation values of bounded functions of finitely many links of the lattice theory, at fixed lattice spacing and for beta < beta_0(D), have an infinite-volume limit, and that the bound of point 1 holds in that limit.
+PROPOSED FIX: "Punt 3 zegt dat de verwachtingswaarden van de roostertheorie (bij vaste roosterafstand) dan een limiet van oneindig volume hebben, en dat correlaties ook in die limiet exponentieel uitdoven, zoals in punt 1."
+
+--- finding F17 | severity: minor | category: language
+LOCATION: §5.1, items 1 and 3 (lines 698-702)
+QUOTE: De limiet $a \to 0$ (dus $\beta \to \infty$) en het oneindige volume van de correlatiefuncties bestaan, en de limiet is niet triviaal. ... In roostereenheden moet de kloof dus naar nul gaan, maar niet sneller dan deze formule.
+PROBLEM: (a) Item 1 is ungrammatical and unclear ('het oneindige volume van de correlatiefuncties bestaan'). (b) In item 3 the 'dus' does not follow: a lower bound m >= c * a Lambda_L does not force m to zero. That the gap must vanish in lattice units comes from the need for a continuum limit; THEORY.md §5.5 says it that way. (c) The official statement calls the gap Delta; elsewhere it is m, and Delta(f) is the total oscillation of chapter 4. (d) In Lambda_L the index L means 'lattice', while L elsewhere is the lattice size.
+PROPOSED FIX: Punt 1: "De correlatiefuncties hebben een limiet voor $a \to 0$ (dus $\beta \to \infty$) en voor oneindig volume, en die limiet is niet triviaal."
+
+Punt 3, slot: "Hierin is $m(\beta)$ de kloof in roostereenheden en is $a\Lambda_L$ de schaal van asymptotische vrijheid (de index $L$ staat voor "lattice", niet voor de roostergrootte). In roostereenheden moet de kloof naar nul gaan (anders is er geen continuümlimiet), maar niet sneller dan deze formule."
+
+Eerste zin van §5.1: "... en dat die theorie een massakloof heeft (in de officiële tekst $\Delta \gt 0$ genoemd; in dit document $m$)."
+
+--- finding F18 | severity: minor | category: language
+LOCATION: §5.3, paragraph 'Waarom een algemeen argument niet kan volstaan' (line 726)
+QUOTE: **Waarom een algemeen argument niet kan volstaan.** ... die geldt voor U(1) in vier dimensies bij zwakke koppeling niet. (Of propositie C.6 precies de voorwaarde van Chatterjee levert, is hier niet uitgeschreven.) (Het ontbreken van opsluiting alleen is hiervoor niet genoeg: ...
+PROBLEM: (a) The heading states an impossibility; after the literature round the body offers only an expectation ('als die verwachting juist is', 'niet te verwachten'). (b) The Chatterjee argument stops before its conclusion, so the reader must work out what follows. (c) Two parenthetical sentences follow each other, and 'hiervoor' refers back several sentences. (d) As written the paragraph looks self-contradictory: decay implies the area law if the centre is non-trivial, yet for Z2 (non-trivial centre) there is no confinement but correlations do decay. The difference (decay under arbitrary boundary conditions versus decay of correlations in one state) is not stated. (e) For the lay reader of chapter 5, 'Wilson-lus', 'opsluiting', 'oppervlaktewet' and 'centrum' are not explained here.
+PROPOSED FIX: Kop: "**Waarom van een algemeen argument weinig te verwachten is.**"
+
+Na de eerste zin invoegen: "(Begrippen: een Wilson-lus is het spoor van het product van de linkvariabelen langs een gesloten kromme. Opsluiting betekent dat de verwachtingswaarde daarvan exponentieel daalt met het omsloten oppervlak, de oppervlaktewet; daalt zij alleen met de omtrek, dan is er geen opsluiting. Het centrum van een groep bestaat uit de elementen die met alle andere verwisselen; voor SU(2) is dat $\lbrace +1, -1\rbrace$.)"
+
+Vervang het slot vanaf "Voor de methode van hoofdstuk 4 is er bovendien" door: "Voor de methode van hoofdstuk 4 is er bovendien een argument dat op bewezen uitspraken uit de literatuur steunt. Propositie C.6 zegt dat de invloed van willekeurige randvoorwaarden exponentieel uitdooft. Volgens Chatterjee (2021) volgt uit zulk verval, voor een ijkgroep met niet-triviaal centrum, de oppervlaktewet. Voor U(1) in vier dimensies geldt de oppervlaktewet bij zwakke koppeling niet. Dus kan de voorwaarde (4.1), waaruit propositie C.6 volgt, daar niet gelden, en kan de methode van hoofdstuk 4 voor U(1) niet tot alle $\beta$ reiken. Of propositie C.6 precies de voorwaarde van Chatterjee levert, is hier niet uitgeschreven.
+
+Het ontbreken van opsluiting is op zichzelf nog geen bewijs dat er geen kloof is. Voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling volgens de literatuur evenmin opsluiting, maar vallen de correlaties daar wel exponentieel af (Forsström 2022; zie hoofdstuk 7). Dat is niet in strijd met het resultaat van Chatterjee: dat gaat over verval onder willekeurige randvoorwaarden, niet over het verval van correlaties in één toestand. Dit document bewijst geen van deze uitspraken."
+
+(De voorlaatste zin is mijn lezing en moet door de auteur aan de bron worden getoetst.)
+
+--- finding F19 | severity: minor | category: unsupported_claim
+LOCATION: §4.6 'Verband met clusterontwikkelingen' (line 688), §5.3 (line 726), §7 (lines 853 and 862)
+QUOTE: Chatterjee (2021) bewijst dat exponentieel verval onder willekeurige randvoorwaarden, zoals in propositie C.6, de oppervlaktewet impliceert als het centrum van de groep niet triviaal is ... voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling evenmin opsluiting
+PROBLEM: (a) The round-2 literature report, working from the abstract only, gives the hypothesis as 'compact connected group with non-trivial center', and its proposed text had 'samenhangende compacte groep'. The document dropped 'samenhangend' in all three places. I could not check the paper and do not know whether connectedness is required, but with the non-connected group Z2 in the same paragraph the omission matters. (b) 'Evenmin opsluiting' for Z2 is stated as fact in §5.3, while §7 says the perimeter-law content of Marra and Miracle-Solé is 'uit het geheugen' and the literature report says it is 'Not confirmed'.
+PROPOSED FIX: §4.6 en §7: "... de oppervlaktewet impliceert voor een compacte groep met niet-triviaal centrum (volgens de samenvatting van het artikel, die wij als "samenhangende compacte groep" hebben gelezen; de precieze voorwaarde is niet in het artikel zelf nagegaan)"
+
+§5.3: "voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling evenmin opsluiting (uit het geheugen aangehaald, niet bevestigd; zie hoofdstuk 7)"
+
+--- finding F20 | severity: minor | category: language
+LOCATION: §5.3, 'Waarom stelling A niet helpt' (line 728)
+QUOTE: Ook dat is geen detail: hetzelfde bewijs geldt, met de genoemde aanpassing in stap 3, voor U(1).
+PROBLEM: The sentence leaves its point implicit, and a lay reader cannot see why it matters that the proof also covers U(1). The intended point: for U(1) in four dimensions a volume-uniform gap is not expected at weak coupling, so an argument that also works for U(1) cannot give one. The preceding paragraph labels that an expectation, not a theorem.
+PROPOSED FIX: "Dat ligt niet aan een onhandig bewijs: hetzelfde bewijs geldt, met de genoemde aanpassing in stap 3, ook voor U(1), en daar is de verwachting juist dat de kloof in vier dimensies bij zwakke koppeling wél naar nul gaat als het volume groeit."
+
+--- finding F21 | severity: minor | category: overclaim
+LOCATION: §5.4 (line 734)
+QUOTE: Een bewijs langs het rooster heeft een methode nodig die de theorie schaal voor schaal volgt ... De stap van "beheerste korte afstanden" naar "een kloof op lange afstanden" is precies het open deel van het probleem
+PROBLEM: (a) 'Heeft ... nodig' presents an expectation about what a future proof must look like as a necessity. (b) 'Precies het open deel' understates what is open. The sentence before says convergence of expectation values does not follow from Bałaban's bounds, so the existence part is open too. A reader can conclude that existence is essentially settled and only the gap remains, which is the framing the document must avoid. (c) 'Het verst gevorderde gepubliceerde werk' is a judgment about literature the author could not open; THEORY.md §6.2 also lists Magnen, Rivasseau and Sénéor (1993).
+PROPOSED FIX: "Een bewijs langs het rooster heeft naar verwachting een methode nodig die de theorie schaal voor schaal volgt van de roosterafstand tot de correlatielengte, en die op elke schaal de effectieve koppeling beheerst: een rigoureuze renormalisatiegroep. Het verst gevorderde gepubliceerde werk in die richting dat wij kennen (Bałaban, 1984–1989; zie ook `THEORY.md` §6.2) bewijst ultraviolette stabiliteit: ... Dat is een resultaat over de korte afstanden; convergentie van verwachtingswaarden volgt er niet uit, en over de lange afstanden, waar de kloof zit, zegt het niets. Zowel het bestaan van de limiet als de stap van "beheerste korte afstanden" naar "een kloof op lange afstanden" is open, en dit document draagt aan geen van beide iets bij."
+
+--- finding F22 | severity: minor | category: notation
+LOCATION: Whole document: notation; minimal fix as a new §1.5
+QUOTE: $\Lambda = \Lambda_s \times \mathbb{Z}/N$ ... $\Lambda_j = \Big( \frac{2}{\beta}\  I_{2j+1}(\beta) \Big)^{L}$ ... $a\Lambda_L(\beta)$; $\ell \in \mathcal{L}$ ... fysische omtrek $\ell \gt 0$; Substitueer $a_i = u_i\  (u_i')^{-1}$ ... $a = \ell/L$; $w(U)$ ... $w = (w_k)_{k\in R}$; $\lambda \in [0, 1]$
+PROBLEM: Every symbol is defined before or at first use, apart from section 0 (F13) and the small items in F26. Several letters carry unrelated meanings, sometimes within one chapter. The ones that can really confuse:
+- Lambda: the lattice (Lambda, Lambda_s), the eigenvalues Lambda_j of chapter 3 (Lambda_0 beside Lambda_s), and the scale Lambda_L in §5.1, whose index L is not the lattice size.
+- ell: a link in §1.2 and chapter 4, the physical circumference in Stelling B, the summary and §6.2.
+- a: the lattice spacing, but a_i are group elements in the proof of Stelling B point 2, in the same chapter where point 5 uses a = ell/L; also a matrix entry in §1.1 and a = nu(S) in lemma C.1.
+- w: the weight w(U) of §1.3 (used in §4.3) and the weights w_k of lemma C.3 and Propositie C.6, both in chapter 4; also w_i in §3.3.
+- lambda: the eigenvalues lambda_n and the contraction factor of lemma C.3, both used in §4.4-4.5.
+- g: group element, gauge transformation, coupling, and a function in Stelling C.
+- mu and nu: lattice directions and measures.
+- Delta: total oscillation and the Clay mass gap.
+- pi: a probability measure in §4.2, next to 4beta/(3pi).
+- u(beta) = I_2/I_1 versus configurations u.
+Renaming would touch the tests that parse the text; a short note is the minimal fix.
+PROPOSED FIX: Nieuwe paragraaf aan het eind van hoofdstuk 1:
+
+### 1.5 Letters met meer dan één betekenis
+
+Enkele letters hebben in dit document meer dan één betekenis; uit de context blijkt steeds welke bedoeld is.
+
+- $\Lambda$ is het rooster en $\Lambda_s$ het ruimtelijke rooster; $\Lambda_j$ met $j = 0, \tfrac12, 1, \dots$ zijn in hoofdstuk 3 de eigenwaarden van $\mathsf{T}$; $\Lambda_L$ is in §5.1 de schaal van asymptotische vrijheid (de index $L$ staat daar voor "lattice", niet voor de roostergrootte).
+- $\ell$ is een link, behalve waar het over stelling B gaat (samenvatting, hoofdstuk 3, §6.2): daar is $\ell$ de fysische omtrek van de ring.
+- $a$ is de roosterafstand; in §1.1 en binnen enkele bewijzen staat $a$ (of $a_i$, $a_n$) voor een matrixelement, een groepselement of een coëfficiënt.
+- $g$ is een groepselement of een ijktransformatie; in §1.4, in punt 5 van stelling B en in hoofdstuk 5 is $g$ de koppeling; in stelling C is $g$ ook een functie van de links.
+- $\mu$ en $\nu$ zijn richtingen van het rooster; $\mu(\cdot)$ is ook de kansmaat van §1.3, $\nu$ en $\nu'$ zijn in §4.2 kansmaten, en $I_\nu$ is een Besselfunctie.
+- $w(U)$ is het gewicht van §1.3; in §3.3 zijn $w_i$ deelproducten van links en in hoofdstuk 4 zijn $w_k$ de gewichten van lemma C.3.
+- $\lambda_n$ zijn de eigenwaarden van $\mathsf{T}$; $\lambda$ zonder index is in hoofdstuk 4 de krimpfactor van lemma C.3.
+- $u$ is een groepselement of een ruimtelijke configuratie; $u(\beta) = I_2(\beta)/I_1(\beta)$ is de notatie van `THEORY.md` voor een verhouding van Besselfuncties.
+- $\theta$ is in hoofdstuk 3 een hoek en in §1.2 en hoofdstuk 4 de uitdovingssnelheid.
+- $\Delta(f)$ is de totale schommeling van hoofdstuk 4; $\Delta$ zonder argument is in §5.1 de massakloof in de notatie van de officiële probleemstelling.
+- $\pi$ is in §4.2 een kansmaat en elders het getal $3{,}14\ldots$
+
+Daarnaast, als kleine ingreep in §3.3 (bewijs van punt 2): schrijf $y_i$ in plaats van $a_i$ en $y$ in plaats van $a$ ("Substitueer $y_i = u_i\  (u_i')^{-1}$ ...", $A_j := \int k(y)\, D^j(y^{-1})\, dy$), zodat $a$ in hoofdstuk 3 alleen de roosterafstand is.
+
+--- finding F23 | severity: minor | category: cross_reference
+LOCATION: §6.3, last bullet (line 821)
+QUOTE: De formules in `BEWIJZEN.pdf` zijn gezet met een eenvoudig zetprogramma (dat van `matplotlib`); `pdf/make_bewijzen_pdf.py` vertaalt de notatie daarvoor.
+PROBLEM: `BEWIJZEN.pdf` does not exist in the repository (only REPORT.pdf; pdf/build/bewijzen/ holds intermediate HTML and SVG files). README.md lists it as well. `pdf/make_bewijzen_pdf.py` does exist; it showed as modified in the working tree during my session, not by me, so the pdf is presumably still being built. Every other file and section reference in the document resolves.
+PROPOSED FIX: Bouw en commit de pdf voordat het document wordt vrijgegeven, of schrijf tot die tijd: "- **De opmaak van de pdf.** De pdf-versie wordt gemaakt met `pdf/make_bewijzen_pdf.py`, dat de formules zet met een eenvoudig zetprogramma (dat van `matplotlib`) en de notatie daarvoor vertaalt. Het bronbestand `BEWIJZEN.md` is leidend."
+
+--- finding F24 | severity: minor | category: language
+LOCATION: §1.2 (line 66), §0 (line 19), §4.5 punt 3 (line 668), §4.6 (line 684), §6.2 (line 787)
+QUOTE: Op een **rooster** wordt ruimte en tijd in hokjes verdeeld ... Omdat alle $L_\mu \geq 3$ zijn die vier verschillend, en geldt: ... met hoekpunten in $Q_{r+1}$, wegens de injectiviteit van precies één, en haar vier links ... werkt daarom met dezelfde vorm ... dooft de plaquettecorrelatie uit met 3,797 terwijl $m = 2{,}574$
+PROBLEM: Dutch grammar and readability; I found no spelling errors.
+- Line 19: plural subject with a singular verb.
+- Line 66: a missing comma and verb make the sentence ambiguous.
+- Line 668: the clause 'wegens de injectiviteit van precies één' hangs loose and is hard to parse.
+- Line 684: 'met dezelfde vorm' should be 'in dezelfde vorm'.
+- Line 787: 'een grootheid dooft uit met 3,797' has no unit or meaning for a lay reader; it is the decay rate per time step, and the example is the three-dimensional Z2 laboratory.
+PROPOSED FIX: Regel 19: "Op een **rooster** worden ruimte en tijd in hokjes verdeeld, met afstand $a$ tussen naburige punten."
+
+Regel 66: "Omdat alle $L_\mu \geq 3$ zijn, zijn die vier links verschillend. Verder geldt:"
+
+Regel 668: "Elke plaquette van het periodieke rooster die een link van $R_r$ bevat, is dus het beeld van een plaquette van $\mathbb{Z}^D$ met hoekpunten in $Q_{r+1}$, en wegens de injectiviteit van precies één zulke plaquette; haar vier links zijn de beelden van de vier links van die plaquette."
+
+Regel 684: "Het bewijs werkt daarom in dezelfde vorm voor andere compacte ijkgroepen waarvoor stelling A geldt, met een aangepaste constante."
+
+Regel 787: "- Dat de correlatie van een grootheid uitdooft met het tempo van het laagste niveau dat die grootheid "ziet", en dat dit tempo boven $m$ kan liggen: in het $\mathbb{Z}_2$-laboratorium in drie dimensies, met een ruimtelijk $3\times3$-rooster bij $\beta = 0{,}4$, dooft de plaquettecorrelatie uit als $e^{-3{,}797\ t}$, terwijl $m = 2{,}574$ (`review/proofs/ref_a_r2_z2_3x3.py`)."
+
+--- finding F25 | severity: cosmetic | category: language
+LOCATION: §2.3, 'In gewone taal' (line 148), middle sentences
+QUOTE: Dat getal is minstens $m$, en het is alleen gelijk aan $m$ als de gekozen grootheid een toestand met energie $E_1$ "ziet" (dat wil zeggen: $\langle\psi_n, F\Omega\rangle \neq 0$ voor een $n \geq 1$ met $E_n = E_1$).
+PROBLEM: A paragraph labelled 'In gewone taal' contains two inner-product conditions; a non-mathematician cannot read past them. The content is correct.
+PROPOSED FIX: "Een simulatie meet de uitdoving voor één gekozen grootheid en vindt daarmee het laagste energieniveau dat die grootheid "ziet". Dat niveau ligt op of boven $m$; het is alleen gelijk aan $m$ als de grootheid een toestand met de laagste aangeslagen energie $E_1$ ziet. (In formules: het gemeten niveau is de kleinste $E_n - E_0$ met $\langle\psi_n, F\Omega\rangle \neq 0$.)"
+
+--- finding F26 | severity: cosmetic | category: cross_reference
+LOCATION: §5.1 (line 696), §2.4 (line 294), §3.4 (line 444), §4.2 (line 523); equation tags (2.6) and (4.2)
+QUOTE: axioma's minstens zo sterk als die van Wightman of Osterwalder–Schrader ... $\langle\tfrac12\operatorname{Tr}W\rangle = u^{A}$ ... $\nu'(S) = \nu(e^\varphi 1_S)/\nu(e^\varphi)$
+PROBLEM: Small loose ends.
+- The Wightman and Osterwalder–Schrader axioms are named in the running text, but chapter 7 has no entry for them; THEORY.md §3 and §9 do.
+- The tags (2.6) and (4.2) are defined but never cited by number.
+- Line 444 uses angle brackets for an expectation value before that notation is introduced (Stelling C point 3); the document's own notation is mu(.).
+- The indicator 1_S and the complement S^c in lemma C.1 are used without a word of definition.
+PROPOSED FIX: §5.1: "... die voldoet aan axioma's minstens zo sterk als die van Wightman of Osterwalder–Schrader (uitgelegd in `THEORY.md` §3; vindplaatsen in `THEORY.md` §9), ..."
+
+§3.4: "(uit de oppervlaktewet $\mu\big(\tfrac12\operatorname{Tr}W\big) = u^{A}$ voor een Wilson-lus $W$ met oppervlak $A$, die in dit document niet wordt bewezen)"
+
+Lemma C.1: "... en $\nu'$ de kansmaat met $\nu'(S) = \nu(e^\varphi 1_S)/\nu(e^\varphi)$, waarin $1_S$ de indicatorfunctie van $S$ is." In het bewijs: "... (met $S^c$ het complement van $S$)".
+
+De labels (2.6) en (4.2) kunnen blijven staan.
+
+--- finding F27 | severity: cosmetic | category: inconsistency
+LOCATION: §0 (lines 21, 23, 33) and §5.2 (lines 710-711) versus the theorem statements
+QUOTE: Op elk eindig rooster, bij elke sterkte van de koppeling ... groter dan een expliciet getal ... | **Stelling C** | elke $D \geq 2$, $\beta \lt \beta_0(D)$ | ... | stelling A | elk eindig rooster, elke $\beta$ |
+PROBLEM: Formulas and numbers in §0 and §5.2 match the theorems (m = L ln(I_1/I_2); 3/8 g^2 ell; ln(1/(6(D-1) tanh beta)); beta_0 = 0,1682, 0,0835, 0,0556). Three hypotheses are abbreviated. The §0 bullet and the §5.2 table say 'elk eindig rooster', where Stelling A needs all sizes at least 3 and beta > 0 (the §0 table has it right). Stelling C needs 0 < beta < beta_0(D). The theorem gives m >= ln(1/alpha), 'at least', not 'groter dan'.
+PROPOSED FIX: Regel 21: "- **Stelling A.** Op elk eindig rooster (met in elke richting minstens drie punten), bij elke sterkte van de koppeling, ..."
+
+Regel 23: "... is de kloof in elke dimensie, ook in drie en vier, minstens zo groot als een expliciet getal dat **niet** afhangt van de grootte van het rooster."
+
+Regel 33, kolom "geldt voor": "elke $D \geq 2$, $0 \lt \beta \lt \beta_0(D)$, elk rooster met alle afmetingen minstens 3"
+
+§5.2: zie de tabelregels in F01.
+
+CHECKED AND FOUND IN ORDER
+- Framing: no sentence in the title block, section 0, the 'In gewone taal' paragraphs, sections 5-7 or the tables states that the Millennium problem is solved or partly solved. The explicit disclaimers are present and consistent with REPORT.md section 0 and THEORY.md section 1, including the pointer to the note on recent reports in THEORY.md §1.
+- Tests: `python3 -m pytest tests/test_proofs_ab.py tests/test_proofs_c.py -q` gives 225 passed, 14 skipped (76 s). Per file: 74 passed + 5 skipped of 79, and 151 + 9 of 160. With --runslow: 239 passed (322 s). The table in §6.2 is correct.
+- Mutation scripts rerun: review/proofs/r2_test_c_mutations.py gives 51 mutants, 43 killed, 8 survive; review/proofs/r3_test_ab_mutations.py gives 10 mutants, 10 killed.
+- §6.1 counts against the reports: round 1 has 6 + 9 + 5 + 12 = 32 findings, all four verdicts 'correct_with_minor_issues'; round 2 has 11 findings (3 minor, 8 cosmetic); the literature report covers 23 entries and has 8 findings. The dates 15 and 16 November 2026 match the report headers. 'Negen toetsen toegevoegd' matches git history (27 to 36 test functions in tests/test_proofs_ab.py).
+- The seven 'belangrijkste correcties' in §6.1 each correspond to a finding in the reports (A-3, A-4, B-7, C2-01, the table digit 1,4273, C2-08, C2-07 and the literature finding on U(1)) and are reflected in the current text.
+- Table of §4.1 recomputed: all nine rows, with alpha rounded to nearest and the bound rounded down; beta_0(2,3,4) = 0.16824, 0.08353, 0.05561 and the closed form (1/2) ln((6D-5)/(6D-7)).
+- Other numbers in chapters 4 and 5 recomputed: -4 ln u(0.03) = 19.57 and -3 ln u(0.03) = 14.68; 3 x 3.6893 = 11.068 and bound 0.51415 at beta = 0.1; alpha = 1/e in D = 4 at beta = 0.02044; doubling step 0.2575 asymptotically (0.2745 at beta = 2.4 per the round-2 report).
+- §6.2 numbers for Stelling A and B: 603.4901773970 on both sides (relative difference 3.2e-15) and decay rate 3.797 against m = 2.574, by rerunning review/proofs/ref_a_r2_z2_3x3.py; continuum limit 0.38024, 0.37547, 0.375005, 0.375000 for L = 3, 10, 100, 1000; operator-norm differences 4.6e-4, 4.6e-6, 4.6e-8; plaquette 0.820307 and loop correlator 0.132953 on the 4x4 lattice at beta = 8 from the formulas of Stelling A and B; u(8) = 0.819249, which is 29 standard deviations from 0.820276(35).
+- §6.2 numbers for Stelling C: 33 600 cases with maximum ratio 1.000000; ratios 0,04 and 0,02 (0.0395 and 0.0197 in the round-2 report); 0,9975; slope 0,4244; sums 0,427 / 0,425 / 0,425; 2,36 to 2,37 times beta_0 (2.365, 2.356, 2.356); 0,975 and 0,99976; Z2 gaps 11,7365 / 8,9897 / 6,9177 in D = 2 and 11,7365 / 8,9894 / 7,5823 in D = 3, recomputed with the test helpers; the gap on the 3x4 spatial lattice equals the 3x3 gap and on 4x4 it is larger, so 'wordt de kloof niet kleiner' holds.
+- §6.3 figures against the round-2 report: factors 6 to 50 and factor 2; left side below 10^-37 (report: 1e-59 to 1e-38); N up to 40 and t up to 80.
+- Section 0 and §5.2 against the theorems: hypotheses, formulas (m = L ln(I_1/I_2), 3/8 g^2 ell, ln(1/(6(D-1) tanh beta))) and the numbers 0,0556 and 2,3 to 2,5 agree with Stelling A, B, C and with REPORT.md, apart from the abbreviations in F27 and the framing points F01 and F12.
+- Cross-references: all section numbers (§1.2 to §6.3, hoofdstuk 2 to 7), equation tags (2.1)-(2.7), (3.1)-(3.3), (4.1), (4.2), labels (G1)-(G3), (R1)-(R2), (K1)-(K2), (TV1)-(TV2), (S1)-(S6), lemma B.1, lemma C.1-C.5, propositie C.6, and every 'punt n' and 'stap n' reference point to something that exists and says what is claimed.
+- External references: THEORY.md §1, §4, §5, §5.5, §5.6, §9 and REPORT.md §0 and tabel 3 exist with the cited content; the formula for a Lambda_L in §5.1 is identical to THEORY.md §4.5; ym/exact.py, literature.json, both test files, review/proofs/findings_round1.txt and findings_round2.txt, ref_b_r2_correlator.py, r2_test_c_mutations.py, r3_test_ab_mutations.py and pdf/make_bewijzen_pdf.py exist. Only BEWIJZEN.pdf is missing (F23).
+- Citations: every author-year citation in the running text (Osterwalder en Seiler 1978; Chatterjee 2020 and 2021; Jaffe en Witten 2000; Guth 1980; Fröhlich en Spencer 1982; Forsström 2022; Bałaban; Gross, King en Sengupta 1989; Driver 1989; Ashtekar en anderen 1997) has an entry in chapter 7. The bibliographic data agree with my memory of these papers; I did not check them online.
+- Markup: 58 fenced math blocks, all opened with ```math and closed; single and double dollar signs balanced on every line; 16 single-line $$...$$ displays inside blockquotes and lists, all balanced; five tables with a consistent column count (4, 5, 4, 3, 3); paired delimiters balanced in all 1450 math segments; no raw <, >, |, \, or \{ in inline math; no placeholders or unfinished sentences. Rendering on GitHub or in the pdf was not checked visually.
+- Dutch spelling: no spelling errors found; the grammar and readability points are in F17, F18, F20, F24 and F25.
+- Mathematics: reading every proof once, without searching for errors, I noticed no wrong step; the only logical slip is the 'dus' in the prose of §5.1 item 3 (F17).
+

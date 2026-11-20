@@ -9,6 +9,7 @@ millenniumprobleem; deze map verandert daar niets aan.
 |---|---|
 | `findings_round1.txt` | vier leesrapporten van 15 november 2026 (stelling A; stelling B; de lemma's van stelling C; uitspraak en bewijs van stelling C): geen foute stap, 32 kleine punten |
 | `findings_round2.txt` | drie rapporten van 16 november 2026: over alle passages die na ronde 1 nieuw of gewijzigd waren (geen fout, 11 kleine punten), over het afmaken van `tests/test_proofs_c.py`, en over de verwijzingen en de uitspraken over de literatuur (alle 23 verwijzingen teruggevonden; 8 punten over toeschrijvingen) |
+| `findings_round3.txt` | het rapport van 20 november 2026 over de hele tekst (formulering, samenhang, verwijzingen, getallen, taal): geen claim dat het millenniumprobleem is opgelost; 27 punten, waarvan 4 belangrijke over te sterke formuleringen in hoofdstuk 6 en §5.2 |
 | `ref_a_*.py`, `ref_b_*.py`, `ref_c1_*.py`, `ref_c2_*.py` | rekenscripts van de vier lezers van ronde 1 |
 | `ref_d_*.py` | rekenscripts van de lezer van ronde 2 |
 | `r2_lit_checks.py` | narekenen van de formules voor Besselfuncties uit de bijlage en van de schaalformule van §5.1 (literatuurcontrole) |
