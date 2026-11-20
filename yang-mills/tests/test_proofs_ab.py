@@ -231,8 +231,12 @@ def _assert_transfer_matrix_structure(lab, tol=1e-12):
     assert np.abs(M @ P - P @ M).max() < tol * np.abs(M).max()
     assert np.abs(K @ P - P @ K).max() < tol * kmax
     assert np.abs(K - K.T).max() == 0.0 and K.min() > 0.0
-    # step 3: K is positive definite (K >= 0 and injective)
-    assert np.linalg.eigvalsh(K).min() > 0.0
+    # step 3, (2.3): K is positive definite (K >= 0 and injective).  For Z2 the operator K is a
+    # tensor product over the links of [[e^b, e^-b], [e^-b, e^b]] / 2 with eigenvalues cosh(b),
+    # sinh(b), so its smallest eigenvalue is sinh(beta)^|E| > 0 (a bare "> 0" could not tell a
+    # singular K, with a smallest eigenvalue of rounding size, from a positive one).
+    kmin = np.linalg.eigvalsh(K).min()
+    assert abs(kmin / math.sinh(lab.beta) ** lab.geo.nE - 1.0) < 1e-9
     # step 4 / point 1: T symmetric, strictly positive kernel, positive semidefinite
     assert np.abs(T - T.T).max() < tol * tmax
     assert T.min() > 0.0
@@ -543,6 +547,352 @@ def test_A2_z2_d3_3x3x3_trace_formula_against_surface_sum():
 
 
 # =============================================================================================
+# 1b.  Z2 laboratory on gauge orbits; the remark with (2.7); multiplicities (point 2); the level
+#      a given observable decays with (section 2.3)
+# =============================================================================================
+class Z2OrbitLab:
+    """T of section 2.2 for G = Z2 restricted to H_inv, also for spatial lattices that are too
+    large for the full matrices of Z2Lab (3 x 3: 2^18 configurations in 1024 gauge orbits).
+
+    The kernel T(u, u') = exp(-V(u)/2) T0(u, u') exp(-V(u')/2), T0(u, u') = mean_g K(u^g, u') of
+    step 4 is gauge invariant in each argument, so it is a function of the two orbits.  The gauge
+    group acts freely (XOR with a mask), so all orbits have the same size, and in the orthonormal
+    basis e_r = sqrt(number of orbits) x (indicator of orbit r) of H_inv the operator T has the
+    matrix Torb[r, r'] = T(r, r') / (number of orbits); for gauge invariant f1, f2 the inner
+    product <f1, f2> is the mean over the orbits.
+
+    Attributes: geo, beta, masks, reps (one configuration code per orbit), n (number of orbits),
+    sig (the links of the representatives as +-1), V and kern (V and the kernel T(u, u') at the
+    representatives), Torb, and eig = (eigenvalues of Torb in decreasing order, eigenvectors)."""
+
+    def __init__(self, sshape, beta):
+        self.geo = geo = SpatialGeometry(sshape)
+        self.beta = float(beta)
+        nE, ns = geo.nE, geo.ns
+        codes = np.arange(2 ** nE, dtype=np.int64)
+        masks = set()
+        for g in range(2 ** ns):
+            m = 0
+            for e, (x, y) in enumerate(geo.link_ends()):
+                m |= (((g >> x) ^ (g >> y)) & 1) << e
+            masks.add(m)
+        self.masks = np.array(sorted(masks), dtype=np.int64)
+        self.reps, counts = np.unique(self.orbit_minimum(codes), return_counts=True)
+        assert np.all(counts == len(self.masks))
+        self.n = n = len(self.reps)
+        reps = self.reps
+        self.sig = sig = (1 - 2 * ((reps[:, None] >> np.arange(nE)[None, :]) & 1)).astype(float)
+        splaq = np.zeros(n)
+        for (a, b, c, d) in geo.plaquettes():
+            splaq += sig[:, a] * sig[:, b] * sig[:, c] * sig[:, d]
+        self.V = -self.beta * splaq
+        ktab = np.exp(self.beta * (nE - 2.0 * np.arange(nE + 1)))       # K = exp(beta sum_e u_e u'_e)
+        x = (reps[:, None] ^ reps[None, :]).astype(np.uint64)
+        T0 = np.zeros((n, n))
+        for m in self.masks:
+            T0 += ktab[np.bitwise_count(x ^ np.uint64(m))]
+        T0 /= len(self.masks)
+        self.kern = np.exp(-0.5 * self.V)[:, None] * T0 * np.exp(-0.5 * self.V)[None, :]
+        self.Torb = self.kern / n
+
+    def orbit_minimum(self, codes):
+        out = codes.copy()
+        for m in self.masks:
+            np.minimum(out, codes ^ m, out=out)
+        return out
+
+    def orbit_of(self, codes):
+        """Index (into reps) of the orbit of each configuration code."""
+        canon = self.orbit_minimum(np.asarray(codes, dtype=np.int64))
+        idx = np.searchsorted(self.reps, canon)
+        assert np.array_equal(self.reps[idx], canon)
+        return idx
+
+    @functools.cached_property
+    def eig(self):
+        lam, vec = np.linalg.eigh(self.Torb)
+        return lam[::-1].copy(), vec[:, ::-1].copy()
+
+
+@functools.lru_cache(maxsize=None)
+def z2_orbit_lab(sshape, beta):
+    return Z2OrbitLab(sshape, beta)
+
+
+def _check_remark_2_7(kern, mu, crude_exponent):
+    """The remark 'wat stelling A niet geeft' after the proof of Stelling A, line by line, for a
+    symmetric kernel T(u, u') > 0 on a finite probability space with weights mu, i.e. for the
+    operator (T f)(u) = sum_u' T(u, u') f(u') mu(u'):  q = T(u,u') Omega(u') / (lambda_0 Omega(u))
+    is a positive kernel with int q du' = 1 and q phi = (lambda_n/lambda_0) phi for phi =
+    psi_n/Omega; q(u, u') >= (c/C) rho(u') with rho = Omega / int Omega; the displayed
+    inequality for the oscillation of phi; (2.7): lambda_1/lambda_0 <= 1 - c/C and m >= -ln(1 -
+    c/C) >= c/C; c < C; and the explicit estimate c >= e^-x, C <= e^x, c/C >= e^(-2x) with
+    x = crude_exponent = beta (|E| + |P_s|).  Returns (c/C, lambda_1/lambda_0).
+
+    Tolerances: rounding of a symmetric eigenproblem (1e-15 relative to lambda_0), amplified by
+    max(Omega)/min(Omega) in q and phi; 1e-8 relative is ample for the cases used."""
+    s = np.sqrt(mu)
+    lam, vec = np.linalg.eigh(s[:, None] * kern * s[None, :])          # unitarily equivalent to T
+    lam, vec = lam[::-1], vec[:, ::-1]
+    omega = vec[:, 0] / s
+    omega = omega * np.sign(omega[0])
+    assert omega.min() > 0.0 and abs(np.sum(mu * omega ** 2) - 1.0) < 1e-12
+    c, C = kern.min(), kern.max()
+    eps = c / C
+    assert 0.0 < c < C                                      # "in het bijzonder is c < C"
+    q = kern * omega[None, :] / (lam[0] * omega[:, None])
+    assert q.min() > 0.0 and np.abs(q @ mu - 1.0).max() < 1e-10
+    rho = omega / np.sum(mu * omega)
+    assert abs(np.sum(mu * rho) - 1.0) < 1e-12
+    assert (q - eps * rho[None, :]).min() >= -1e-12 * rho.max()        # minorisation
+    # all eigenfunctions with n >= 1 and eigenvalue not zero (the others are not in H_inv or are
+    # below the resolution of the eigensolver)
+    keep = np.arange(1, len(lam))[lam[1:] > 1e-9 * lam[0]]
+    assert len(keep) >= 1
+    ratio = lam[keep] / lam[0]
+    phi = (vec[:, keep] / s[:, None]) / omega[:, None]
+    scale = np.abs(phi).max(axis=0)
+    assert np.abs(mu @ (phi * omega[:, None] ** 2)).max() < 1e-10 * scale.max()      # psi perp Omega
+    assert (np.abs((q * mu[None, :]) @ phi - phi * ratio[None, :]) / scale[None, :]).max() < 1e-8
+    i1, i2 = phi.argmax(axis=0), phi.argmin(axis=0)
+    cols = np.arange(len(keep))
+    osc = phi[i1, cols] - phi[i2, cols]
+    assert np.all(osc > 1e-6 * scale)                       # phi is not constant
+    # (lambda_n/lambda_0)(phi(u1) - phi(u2)) = int [(q(u1,.) - eps rho) - (q(u2,.) - eps rho)] phi
+    #                                        <= (1 - eps)(max phi - min phi)
+    q1 = q[i1, :] - eps * rho[None, :]
+    q2 = q[i2, :] - eps * rho[None, :]
+    assert np.abs(q1 @ mu - (1.0 - eps)).max() < 1e-10 and np.abs(q2 @ mu - (1.0 - eps)).max() < 1e-10
+    lhs = np.einsum("nu,u,un->n", q1 - q2, mu, phi)
+    assert np.all(np.abs(lhs - ratio * osc) < 1e-8 * scale)
+    assert np.all(lhs <= (1.0 - eps) * osc + 1e-8 * scale)
+    assert np.all(ratio <= 1.0 - eps)
+    # (2.7)
+    r1 = ratio[0]
+    m = -math.log(r1)
+    assert r1 <= 1.0 - eps and m >= -math.log1p(-eps) >= eps
+    # the explicit estimate
+    assert c >= math.exp(-crude_exponent) * (1.0 - 1e-12) and C <= math.exp(crude_exponent) * (1.0 + 1e-12)
+    assert eps >= math.exp(-2.0 * crude_exponent) * (1.0 - 1e-12)
+    return eps, r1
+
+
+@pytest.mark.parametrize("sshape, beta", [((1,), 0.7), ((1,), 2.0), ((3,), 0.8), ((4,), 0.5),
+                                          ((2, 2), 0.3), ((2, 2), 0.9), ((3, 3), 0.5)])
+def test_A_remark_2_7_gap_bound_in_z2_laboratories(sshape, beta):
+    """The remark after the proof of Stelling A, formula (2.7), in Z2 laboratories:
+    lambda_1/lambda_0 <= 1 - c/C with c = min T(u,u'), C = max T(u,u'), every line of its proof,
+    and c/C >= exp(-2 beta (|E| + |P_s|)) from |V| <= beta |P_s| and e^(-beta|E|) <= K <=
+    e^(beta|E|).  D = 2 rings with L = 1, 3, 4 links (|P_s| = 0) and the D = 3 laboratories with
+    spatial lattice 2 x 2 (|E| = 8, |P_s| = 4, V != 0) and 3 x 3 (|E| = 18, |P_s| = 9; on the
+    1024 gauge orbits).
+
+    How sharp the inequalities are here, i.e. how wrong a bound would have to be to be noticed:
+    * (2.7) on a ring: lambda_1/lambda_0 = t^L and c/C = (1 - t^L)/(1 + t^L), t = tanh(beta), so
+      (1 - c/C)/(lambda_1/lambda_0) = 2/(1 + t^L) < 2 (1.02 for L = 1, beta = 2): a bound
+      1 - 2 c/C fails on every ring, which is asserted.  In D = 3 the ratio is 9.2 (2 x 2,
+      beta = 0.3), 1.14 (2 x 2, beta = 0.9) and 5.3 (3 x 3, beta = 0.5).
+    * the estimate for c/C is an EQUALITY on the ring with one link (below the hypothesis
+      L >= 3, which this algebra does not use), asserted; otherwise it is far from sharp
+      (c/C is 50 to 2e7 times larger).  The term |P_s| in it is not tested sharply by any
+      laboratory: c/C >= exp(-2 beta |E|) also holds in all of them (2 x 2: by a factor 5 to 8)."""
+    full = 2 ** (len(sshape) * int(np.prod(sshape))) <= 256
+    lab = Z2Lab(sshape, beta) if full else z2_orbit_lab(sshape, beta)
+    geo = lab.geo
+    kern = lab.T * lab.nC if full else lab.kern
+    nE, nPs = geo.nE, len(geo.plaquettes())
+    assert np.abs(lab.V).max() <= beta * nPs * (1.0 + 1e-12)            # |V| <= beta |P_s|
+    if full:                                                # e^(-beta|E|) <= K <= e^(beta|E|), attained
+        assert abs(lab.Kker.max() / math.exp(beta * nE) - 1.0) < 1e-12
+        assert abs(lab.Kker.min() * math.exp(beta * nE) - 1.0) < 1e-12
+    mu = np.full(len(kern), 1.0 / len(kern))
+    eps, r1 = _check_remark_2_7(kern, mu, beta * (nE + nPs))
+    if len(sshape) == 1:
+        L, t = sshape[0], math.tanh(beta)
+        assert abs(r1 / t ** L - 1.0) < 1e-10 and abs(eps * (1.0 + t ** L) / (1.0 - t ** L) - 1.0) < 1e-10
+        assert r1 > 1.0 - 2.0 * eps                         # "1 - 2 c/C" would be false
+        if L == 1:
+            assert abs(eps / math.exp(-2.0 * beta * (nE + nPs)) - 1.0) < 1e-12       # estimate attained
+            assert (1.0 - eps) / r1 < 1.25
+    else:
+        assert nPs == int(np.prod(sshape)) and np.abs(lab.V).max() > 0.5 * beta * nPs
+        assert eps > math.exp(-2.0 * beta * nE)             # see the docstring: |P_s| is not needed here
+
+
+def _multiplicities(lam, atol):
+    """Sizes of the groups of equal eigenvalues in the decreasing sequence lam (two eigenvalues
+    are equal if they differ by at most atol)."""
+    mult = [1]
+    for a, b in zip(lam, lam[1:]):
+        if a - b <= atol:
+            mult[-1] += 1
+        else:
+            mult.append(1)
+    return mult
+
+
+def test_A_point_2_eigenvalues_counted_with_multiplicity():
+    """Stelling A, point 2 as it reads after the first referee round: the eigenvalues of T on
+    H_inv have finite multiplicity and form, EACH REPEATED ACCORDING TO ITS MULTIPLICITY, a
+    sequence lambda_0 >= lambda_1 >= ... > 0, with an orthonormal basis of real eigenfunctions
+    of H_inv; T = 0 on the complement; and (point 4) E_0 < E_1 <= E_2 <= ...
+    In the Z2 laboratories in D = 3 degenerate eigenvalues really occur: lambda_1 = lambda_2
+    (winding loops in the two directions, exchanged by the symmetry x <-> y of the lattice), so
+    the 'smaller or equal' signs and the counting with multiplicity matter.  Checked: the
+    number of non-zero eigenvalues counted with multiplicity is dim H_inv; lambda_0 is simple
+    and lambda_1 = lambda_2 > lambda_3; real orthonormal eigenbasis that spans exactly H_inv;
+    Z = Tr T^N = sum_n lambda_n^N holds with multiplicities (against the sum over all 2^24
+    configurations of the 2 x 2 x 2 lattice) and fails by more than 5 % for the sum over the
+    distinct eigenvalues.  Also the Q8 ring of Stelling B's laboratory (multiplicities 1, 1, 3)."""
+    # (a) spatial lattice 2 x 2, full 256 x 256 matrices
+    beta = 0.55
+    lab = Z2Lab((2, 2), beta)
+    nC = lab.nC
+    lam, vec = np.linalg.eigh(lab.T)
+    lam, vec = lam[::-1], vec[:, ::-1]
+    dim = int(round(np.trace(lab.P)))
+    assert dim == 32
+    assert np.all(lam[:dim] > 1e-6 * lam[0]) and np.abs(lam[dim:]).max() < 1e-12 * lam[0]
+    # eigenvalues are accurate to ~1e-15 lambda_0; distinct ones differ by > 1e-6 lambda_0 here
+    mult = _multiplicities(lam[:dim], 1e-10 * lam[0])
+    gaps = -np.diff(lam[:dim])
+    assert np.all((gaps < 1e-12 * lam[0]) | (gaps > 1e-6 * lam[0]))     # no borderline case
+    assert sum(mult) == dim and mult[:4] == [1, 2, 1, 2] and max(mult) >= 6
+    assert lam[0] > lam[1] and abs(lam[1] - lam[2]) < 1e-12 * lam[0] and lam[2] > lam[3]
+    psi = vec[:, :dim] * math.sqrt(nC)                      # orthonormal in L^2(C, du)
+    assert np.isrealobj(psi)
+    assert np.abs(psi.T @ psi / nC - np.eye(dim)).max() < 1e-12
+    assert np.abs(lab.T @ psi - psi * lam[None, :dim]).max() < 1e-12 * lam[0] * np.abs(psi).max()
+    assert np.abs(psi @ psi.T / nC - lab.P).max() < 1e-12   # the psi_n span exactly H_inv = P H
+    nl, plaq = lab.geo.full_lattice(2)
+    Zb = z2_sum_over_all_configurations(nl, plaq, beta)
+    assert abs(np.sum(lam[:dim] ** 2) / Zb - 1.0) < 1e-12
+    distinct = lam[np.cumsum([0] + mult[:-1])]
+    assert len(distinct) == len(mult) and abs(np.sum(distinct ** 2) / Zb - 1.0) > 0.05
+    # the degeneracy is forced by a symmetry: exchanging the two axes commutes with T and maps
+    # the winding loop in direction 0 to the one in direction 1
+    geo = lab.geo
+    perm = np.zeros(nC, dtype=np.int64)
+    codes = np.arange(nC)
+    for x in geo.sites:
+        for i in range(2):
+            perm |= ((codes >> geo.link(x, i)) & 1) << geo.link(x[::-1], 1 - i)
+    assert np.array_equal(np.sort(perm), codes)
+    assert np.abs(lab.T[perm][:, perm] - lab.T).max() < 1e-13 * lab.T.max()
+    # the orbit representation used for larger lattices gives the same eigenvalues
+    orb = z2_orbit_lab((2, 2), beta)
+    assert orb.n == dim and np.abs(orb.eig[0] - lam[:dim]).max() < 1e-12 * lam[0]
+    # (b) spatial lattice 3 x 3 (hypotheses of the theorem satisfied), on the 1024 gauge orbits
+    orb = z2_orbit_lab((3, 3), 0.5)
+    lam3 = orb.eig[0]
+    assert orb.n == 2 ** 18 // 2 ** 8 == 1024 and lam3[-1] > 1e-12 * lam3[0]         # injective on H_inv
+    head = lam3[lam3 > 1e-3 * lam3[0]]
+    gaps = -np.diff(head)
+    assert np.all((gaps < 1e-12 * lam3[0]) | (gaps > 1e-6 * lam3[0]))
+    mult3 = _multiplicities(head, 1e-10 * lam3[0])
+    assert mult3[:5] == [1, 2, 4, 1, 1]
+    # (c) Q8 ring with L = 3: (cosh b + 3)/4, sinh(b)/4, and three times (cosh b - 1)/4, each ^L
+    q8 = Q8Ring(3, 1.1)
+    ev = np.sort(np.linalg.eigvalsh(0.5 * (q8.T + q8.T.T)))[::-1]
+    assert _multiplicities(ev[:5], 1e-10 * ev[0]) == [1, 1, 3] and np.abs(ev[5:]).max() < 1e-12 * ev[0]
+
+
+@pytest.mark.parametrize("sshape, beta", [((2, 2), 0.55), ((3, 3), 0.5)])
+def test_A_point_5_observable_decays_with_the_lowest_level_it_overlaps_with(sshape, beta):
+    """The plain-language paragraph of section 2.3 (new after the first referee round): the
+    correlator of a chosen observable F decays with the lowest level E_n - E_0 for which
+    <psi_n, F Omega> != 0; that number is at least m, and equals m only if F 'sees' a state of
+    energy E_1.  Z2 laboratory in D = 3, spatial lattice 2 x 2 and 3 x 3 (gauge orbits), where
+    the lightest state is the winding loop ('torelon'), as on the lattices of table 3 of
+    REPORT.md:
+    * F = sum of the spatial plaquettes has zero overlap with EVERY state of energy E_1 (they are
+      odd under a centre flip, F Omega is even); its lowest level E* lies well above m; the
+      effective mass ln(C_F(t)/C_F(t+1)) is >= E* at every t and tends to E*, never to m;
+    * F = winding loop sees the states of energy E_1 and its effective mass tends to m;
+    * both obey 0 <= C_F(t) <= |F|^2 e^(-m t) of point 5.
+    C_F(t) is evaluated from the spectral sum of point 5 and, independently of the
+    eigendecomposition, from the first formula of point 5 with matrix powers on a lattice with
+    N = 40 time slices.  (3 x 3, beta = 0.5: m = 1.661, E* = 2.714.)"""
+    lab = z2_orbit_lab(sshape, beta)
+    geo, sig, n = lab.geo, lab.sig, lab.n
+    lam, vec = lab.eig
+    r = lam / lam[0]
+    E = -np.log(r)                                          # E_n - E_0
+    m = E[1]
+    omega = vec[:, 0] * np.sign(vec[0, 0])                  # in the orthonormal orbit basis
+    assert omega.min() > 0.0
+    plaq = np.zeros(n)
+    for (a, b, c, d) in geo.plaquettes():
+        plaq += sig[:, a] * sig[:, b] * sig[:, c] * sig[:, d]
+    wind = np.ones(n)
+    for k in range(sshape[0]):                              # the loop around direction 0 through (0, 0)
+        wind *= sig[:, geo.link((k, 0), 0)]
+    # centre flips Z_i: sigma -> -sigma on the links (x, i) with x_i = 0.  They commute with T,
+    # leave the plaquettes invariant and change the sign of the winding loop in direction i.
+    perms = []
+    for i in range(2):
+        zmask = sum(1 << geo.link(x, i) for x in geo.sites if x[i] == 0)
+        perms.append(lab.orbit_of(lab.reps ^ zmask))
+        assert np.array_equal(np.sort(perms[i]), np.arange(n))
+        assert np.abs(lab.Torb[perms[i]][:, perms[i]] - lab.Torb).max() < 1e-13 * lab.Torb.max()
+        assert np.array_equal(plaq[perms[i]], plaq)
+        assert np.array_equal(wind[perms[i]], wind * (-1.0 if i == 0 else 1.0))
+    level1 = np.abs(E - m) < 1e-9
+    assert level1.sum() == 2 and not level1[0]              # E_1 = E_2 < E_3
+    # the two states of energy E_1 are odd under Z_0 Z_1 (each is odd under exactly one flip)
+    both = perms[0][perms[1]]
+    assert np.abs(vec[both][:, level1] + vec[:, level1]).max() < 1e-9
+
+    def overlaps(F):                                        # a_n = <psi_n, F Omega>
+        return vec.T @ (F * omega)
+
+    def C(a, t):                                            # C_F(t) of point 5
+        return float(np.sum(r[1:] ** t * a[1:] ** 2))
+
+    a_p, a_w = overlaps(plaq), overlaps(wind)
+    tot_p, tot_w = np.sum(a_p[1:] ** 2), np.sum(a_w[1:] ** 2)
+    assert np.sum(a_p[level1] ** 2) < 1e-24 * tot_p         # the plaquette does not see E_1 at all
+    assert np.sum(a_w[level1] ** 2) > 0.3 * tot_w           # the winding loop does
+    nstar = 1 + int(np.argmax(a_p[1:] ** 2 > 1e-12 * tot_p))
+    Estar = E[nstar]
+    assert np.all(a_p[1:nstar] ** 2 < 1e-24 * tot_p)
+    assert Estar > m + 1.0                                  # 2.349 against 0.799; 2.714 against 1.661
+    # effective masses for t = 1 .. 20.  (The overlaps that vanish by symmetry are 1e-16 in the
+    # computation; relative to the true C_F(t) they are amplified by e^((E* - m) t) <= 1e14 and
+    # stay below 1e-18.)  Each effective mass is a weighted mean of the levels present, so it is
+    # >= the lowest one and decreases with t.
+    ts = np.arange(1, 21)
+    meff_p = np.array([math.log(C(a_p, t) / C(a_p, t + 1)) for t in ts])
+    meff_w = np.array([math.log(C(a_w, t) / C(a_w, t + 1)) for t in ts])
+    assert np.all(meff_p >= Estar - 1e-9) and np.all(np.diff(meff_p) <= 1e-9)
+    assert np.all(meff_w >= m - 1e-9) and np.all(np.diff(meff_w) <= 1e-9)
+    assert abs(meff_p[-1] - Estar) < 1e-6 and abs(meff_w[-1] - m) < 1e-4
+    assert meff_p.min() > m + 1.0                           # at no t does the plaquette decay like e^(-m t)
+    for t in ts:
+        assert 0.0 <= C(a_p, t) <= np.abs(plaq).max() ** 2 * math.exp(-m * t)
+        assert 0.0 <= C(a_w, t) <= math.exp(-m * t) * (1.0 + 1e-12)                 # |wind| = 1
+        assert C(a_p, t) <= tot_p * math.exp(-Estar * t) * (1.0 + 1e-9)             # the sharper statement
+    # the same from the first formula of point 5 on a lattice with N = 40 time slices, by matrix
+    # powers of T on H_inv (F is gauge invariant and T = 0 on the complement, so the trace over
+    # H equals the trace over H_inv); the wrap-around terms are of relative order e^(-m (N - 2t))
+    N = 40
+    S = lab.Torb / lam[0]
+    powers = {1: S}
+    for t in (2, 3, 4):
+        powers[t] = powers[t - 1] @ S
+    powers[N - 4] = np.linalg.matrix_power(S, N - 4)
+    for t in (N - 3, N - 2, N - 1, N):
+        powers[t] = powers[t - 1] @ S
+    ZN = np.trace(powers[N])
+    for F, a in ((plaq, a_p), (wind, a_w)):
+        one = np.trace(F[:, None] * powers[N]) / ZN
+        for t in (1, 2, 3, 4):
+            two = np.sum((F[:, None] * powers[t]) * (F[:, None] * powers[N - t]).T) / ZN
+            wrap = math.exp(-m * (N - 2 * t))
+            assert abs((two - one ** 2) - C(a, t)) < (1e-10 + 4.0 * wrap) * np.abs(F).max() ** 2
+
+
+# =============================================================================================
 # 2.  The Q8 laboratory (non-abelian finite subgroup of SU(2))
 # =============================================================================================
 _S0 = np.eye(2, dtype=complex)
@@ -819,9 +1169,10 @@ def test_A3_su2_kernel_K_is_positive_semidefinite(nlinks, beta):
     """Step 3 of the proof of Stelling A, (2.2)-(2.3): the kernel K(u, u') = prod_e k(u_e u'_e^-1)
     of section 2.2 is positive semidefinite.  For n random points u^1 .. u^n of SU(2)^E the Gram
     matrix K(u^a, u^b) must have no negative eigenvalue (smallest eigenvalue >= -1e-9 x largest;
-    the rounding error of eigvalsh is about n * eps * largest = 3e-14 x largest).  Also the
-    identity of step 3, A(u,u') = sum_e Tr(u_e u'_e^-1) = sum_i phi_i(u) conj(phi_i(u')), with
-    phi_i the matrix elements."""
+    the rounding error of eigvalsh is about n * eps * largest = 3e-14 x largest), both for
+    Haar-random points and for points clustered so closely that the off-diagonal elements of the
+    Gram matrix matter.  Also the identity of step 3, A(u,u') = sum_e Tr(u_e u'_e^-1) =
+    sum_i phi_i(u) conj(phi_i(u')), with phi_i the matrix elements."""
     n = 150
     rng = np.random.default_rng(300 + nlinks)
     u = su2_haar(rng, (n, nlinks))
@@ -836,6 +1187,23 @@ def test_A3_su2_kernel_K_is_positive_semidefinite(nlinks, beta):
     assert Kg.min() > 0.0
     ev = np.linalg.eigvalsh(0.5 * (Kg + Kg.T))
     assert ev[0] >= -1e-9 * ev[-1]
+    # Haar-random points are far apart: for 18 links and beta >= 1 the Gram matrix above is
+    # diagonal up to 5e-5 (beta = 1) .. 1e-37 (beta = 8) and is then positive for ANY kernel with
+    # a dominant diagonal.  Second set of points, clustered around one configuration at the
+    # distance 1/sqrt(beta |E|) at which K(u^a, u^b) / K(u^a, u^a) = O(1): there the off-diagonal
+    # elements decide.  Asserted: the Gram matrix is not close to diagonal, it is positive
+    # semidefinite, and the same points refute positivity of exp(-(beta/2) A) in every case.
+    base = su2_haar(rng, (1, nlinks))
+    v = min(1.0, 1.0 / math.sqrt(beta * nlinks)) * rng.normal(size=(n, nlinks, 3))
+    ang = np.linalg.norm(v, axis=-1)
+    uc = base @ su2_from_q(np.concatenate([np.cos(ang)[..., None], (np.sin(ang) / ang)[..., None] * v], axis=-1))
+    Ac = np.einsum("aeij,beji->ab", uc, inv(uc)).real - 2.0 * nlinks      # A(u, u') - A(u, u) <= 0
+    Kc = np.exp(0.5 * beta * Ac)                            # K(u^a, u^b) / K(u^a, u^a)
+    assert np.median(Kc[~np.eye(n, dtype=bool)]) > 0.03
+    evc = np.linalg.eigvalsh(0.5 * (Kc + Kc.T))
+    assert evc[0] >= -1e-9 * evc[-1]
+    ev_bad = np.linalg.eigvalsh(np.exp(-0.5 * beta * Ac))
+    assert ev_bad[0] < -0.02 * ev_bad[-1]
 
 
 def test_A3_su2_kernel_gram_test_has_power_and_monomial_expansion():
@@ -1268,31 +1636,59 @@ def test_B3_eigenvalue_equation_by_monte_carlo(L, beta, seed):
 def test_B3_eigenvalue_equation_by_reweighted_haar_sampling():
     """Stelling B, point 2, with the absolute normalisation and an independent sampler: for
     Haar-distributed a_i (numpy generator), E[prod_i k(a_i) chi_j(a_1^-1 u_1 ... a_L^-1 u_L)] =
-    (c_j/d_j)^L chi_j(h(u)) = ((2/beta) I_(2j+1)(beta))^L chi_j(h(u)).  L = 2 and 3, beta = 1.
-    Criterion: 4 standard errors."""
+    (c_j/d_j)^L chi_j(h(u)) = ((2/beta) I_(2j+1)(beta))^L chi_j(h(u)).  beta = 3; L = 2 with
+    j = 0, 1/2, 1 and L = 3 with j = 0, 1/2.  Criterion: 4 standard errors, and every prediction
+    that is compared is at least 10 standard errors away from zero.
+
+    (The reweighting from the Haar measure has a variance that grows like (c_0(2 beta) /
+    c_0(beta)^2)^L, so only the lowest representations can be resolved this way.  At beta = 1
+    and random u, as in the first version of this test, the predictions for j = 1 were 0.1
+    standard errors and the one for L = 3, j = 1/2 was 3 standard errors: those comparisons
+    could not fail.  Here u is chosen with a holonomy of class angle 0.35, so that chi_j(h(u))
+    is close to its maximum d_j; L = 3, j = 1 would still be only 4 standard errors and is left
+    to the heatbath-sampled and the quadrature versions above.)"""
     rng = np.random.default_rng(909)
-    n, beta = 400000, 1.0
-    for L in (2, 3):
+    n, beta = 400000, 3.0
+    target = su2_from_q(np.array([math.cos(0.35), 0.6 * math.sin(0.35), 0.0, 0.8 * math.sin(0.35)]))
+    for L, twojs in ((2, (0, 1, 2)), (3, (0, 1))):
         a = su2_haar(rng, (n, L))
         wgt = np.exp(0.5 * beta * trace(a).real).prod(axis=1)
         u = su2_haar(rng, (L,))
+        head = u[0]
+        for i in range(1, L - 1):
+            head = head @ u[i]
+        u[L - 1] = inv(head) @ target                       # h(u) = target, the u_i generic
         g = dag(a[:, 0]) @ u[0]
         hol = u[0]
         for i in range(1, L):
             g = g @ dag(a[:, i]) @ u[i]
             hol = hol @ u[i]
-        for twoj in (0, 1, 2):
+        assert np.abs(hol - target).max() < 1e-13
+        for twoj in twojs:
             vals = wgt * chi(twoj, g)
             mean, sem = vals.mean(), vals.std(ddof=1) / math.sqrt(n)
             pred = (2.0 / beta * special.iv(twoj + 1, beta)) ** L * chi(twoj, hol)
             assert abs(mean - pred) < 4.0 * sem
-            if twoj == 0:                                   # c_0^L is resolved to better than 1 %
-                assert sem < 0.01 * abs(pred)
+            assert abs(pred) > 10.0 * sem                   # the comparison has power
 
 
 def _T0_prediction(beta, L, hu, hup, nrep=60):
     """sum_j Lambda_j chi_j(h) chi_j(h'), Lambda_j = ((2/beta) I_(2j+1)(beta))^L."""
     return sum((2.0 / beta * special.iv(n + 1, beta)) ** L * chi(n, hu) * chi(n, hup) for n in range(nrep))
+
+
+def T0_by_gauge_integration(beta, u, up, g, w):
+    """T0(u, u') = int K(u^g, u') dg (step 4 of Stelling A) for a ring of L >= 2 links (section
+    3.1), straight from the definitions: K(u^g, u') = prod_i k(g_i u_i g_(i+1)^-1 (u'_i)^-1), every
+    g_i integrated with the quadrature rule (g, w) on SU(2).  Factor i contains only g_i and
+    g_(i+1), so the L-fold sum is the trace of a product of the L matrices
+    X_i[m, n] = k(g_m u_i g_n^-1 (u'_i)^-1) w_n.  No characters and no Bessel functions."""
+    gi = inv(g)
+    prod = None
+    for i in range(len(u)):
+        X = np.exp(0.5 * beta * np.einsum("mij,nji->mn", g @ u[i], gi @ inv(up[i])).real) * w[None, :]
+        prod = X if prod is None else prod @ X
+    return float(np.trace(prod))
 
 
 def test_AB_su2_kernel_of_T_in_two_dimensions():
@@ -1303,7 +1699,8 @@ def test_AB_su2_kernel_of_T_in_two_dimensions():
     non-zero eigenvalue), (iv) is strictly positive, in fact T0 >= 1 (Jensen's inequality,
     because int Tr(g A) dg = 0).  Rings with L = 1 and L = 2 links by quadrature over the gauge
     group (below the hypothesis L >= 3 of the theorem, but the proofs do not use it here), L = 3
-    by Monte Carlo over Haar-distributed gauge transformations."""
+    by the same quadrature (beta = 0.5, resolving the terms j <= 1 of the spectral sum) and by
+    Monte Carlo over Haar-distributed gauge transformations (beta = 1.2, resolving j <= 1/2)."""
     rng = np.random.default_rng(64)
     # L = 1: T0(u, u') = int k(g u g^-1 u'^-1) dg; the exponent is quadratic in g with modulus
     # <= beta: polynomial degree 2l with coefficient beta^l / l!  ->  degree 40 for 1e-16 at beta <= 1.2
@@ -1337,19 +1734,266 @@ def test_AB_su2_kernel_of_T_in_two_dimensions():
         upb = np.array([b[0] @ up[0] @ inv(b[1]), b[1] @ up[1] @ inv(b[0])])
         assert abs(T0(ua, upb) - val) < 1e-10 * math.exp(2 * beta)             # gauge invariant in each argument
         assert val >= 1.0
-    # L = 3 by Monte Carlo over g in SU(2)^3
+        assert abs(T0_by_gauge_integration(beta, u, up, g, w) - val) < 1e-12 * math.exp(2 * beta)
+    # L = 3 (a ring that satisfies the hypothesis of the theorems), same rule: the exponent is
+    # again linear in each g_i with modulus <= 2 beta = 1.  The terms j = 1/2 and j = 1 of the
+    # spectral sum are of relative size 2e-3 and 1e-6 (times the characters); tolerance 1e-10.
+    for _ in range(2):
+        u, up = su2_haar(rng, (3,)), su2_haar(rng, (3,))
+        val = T0_by_gauge_integration(beta, u, up, g, w)
+        hu, hup = u[0] @ u[1] @ u[2], up[0] @ up[1] @ up[2]
+        assert abs(val - _T0_prediction(beta, 3, hu, hup)) < 1e-10 * math.exp(3 * beta)
+        assert abs(T0_by_gauge_integration(beta, up, u, g, w) - val) < 1e-10 * math.exp(3 * beta)
+        assert val >= 1.0
+        # the terms j = 1/2 and j = 1 are 1000 and 10 times larger than the tolerance at these u, u'
+        for twoj, factor in ((1, 1e3), (2, 10.0)):
+            term = (2.0 / beta * special.iv(twoj + 1, beta)) ** 3 * chi(twoj, hu) * chi(twoj, hup)
+            assert abs(term) > factor * 1e-10 * math.exp(3 * beta)
+    # L = 3 by Monte Carlo over g in SU(2)^3 (independent of the quadrature rule), at u, u' whose
+    # holonomies have class angles 0.3 and 0.4, where the j = 1/2 term is close to its maximum.
+    # (At random u, u', as in the first version of this test, that term was 2.4 standard errors
+    # and the comparison tested the j = 0 term only.)
     n, beta, L = 300000, 1.2, 3
     g = su2_haar(rng, (n, L))
     u, up = su2_haar(rng, (L,)), su2_haar(rng, (L,))
+    u[2] = inv(u[0] @ u[1]) @ su2_from_q(np.array([math.cos(0.3), 0.0, math.sin(0.3), 0.0]))
+    up[2] = inv(up[0] @ up[1]) @ su2_from_q(np.array([math.cos(0.4), math.sin(0.4), 0.0, 0.0]))
     expo = np.zeros(n)
     for i in range(L):
         expo += trace(g[:, i] @ u[i] @ dag(g[:, (i + 1) % L]) @ inv(up[i])).real
     vals = np.exp(0.5 * beta * expo)
     mean, sem = vals.mean(), vals.std(ddof=1) / math.sqrt(n)
-    pred = _T0_prediction(beta, L, u[0] @ u[1] @ u[2], up[0] @ up[1] @ up[2])
+    hu, hup = u[0] @ u[1] @ u[2], up[0] @ up[1] @ up[2]
+    pred = _T0_prediction(beta, L, hu, hup)
     lead = (2.0 / beta * special.iv(1, beta)) ** L
+    half = (2.0 / beta * special.iv(2, beta)) ** L * chi(1, hu) * chi(1, hup)
     assert abs(mean - pred) < 4.0 * sem
-    assert sem < 0.01 * lead                                # the j = 0 term alone is resolved to 1 %
+    assert sem < 0.01 * lead                                # the j = 0 term is resolved to 1 %
+    assert half > 10.0 * sem                                # and the j = 1/2 term to 10 %
+
+
+# =============================================================================================
+# 5b.  Stelling B without characters and without Bessel functions: the transfer operator on
+#      class functions, discretised (dictionary of point 3, point 4, section 3.4, (2.7) for SU(2))
+# =============================================================================================
+def class_angle(h):
+    """theta in [0, pi] with (1/2) Tr h = cos(theta) (section 3.1)."""
+    return np.arccos(np.clip(0.5 * trace(h).real, -1.0, 1.0))
+
+
+def class_kernel(beta, t1, t2):
+    """e^(-beta) x the kernel of T for a ring of ONE link as a function of the class angles:
+    for h, h' in SU(2) with class angles t1, t2,
+
+        int k(g h g^-1 h'^-1) dg = e^(beta cos t1 cos t2) sinh(x)/x,    x = beta sin t1 sin t2,
+
+    because (1/2) Tr(g h g^-1 h'^-1) = cos t1 cos t2 + sin t1 sin t2 (n . n'), where the rotated
+    axis n of g h g^-1 is uniformly distributed on the sphere, and the mean of e^(x z) over
+    z in [-1, 1] is sinh(x)/x.  (Checked against a quadrature over g in the test below.)  With
+    the factor e^(-beta) this is e^(beta (cos(t1 - t2) - 1)) (1 - e^(-2x))/(2x), which stays in
+    range for large beta."""
+    x = beta * np.sin(t1) * np.sin(t2)
+    small = x < 1e-5
+    xs = np.where(small, 1.0, x)
+    f = np.where(small, 1.0 - x + (2.0 / 3.0) * x * x, -np.expm1(-2.0 * xs) / (2.0 * xs))
+    return np.exp(beta * (np.cos(t1 - t2) - 1.0)) * f
+
+
+def class_operator(beta, n):
+    """Nystrom discretisation of the one-link operator phi -> int class_kernel(., t') phi(t')
+    dmu(t') on L^2_kl(G) = L^2([0, pi], dmu), dmu = (2/pi) sin^2(t) dt (section 3.1), with the
+    n-point Gauss-Legendre rule.  Returns the nodes, the weights mu (a probability vector) and
+    the symmetric matrix A = sqrt(mu) kernel sqrt(mu).  The kernel is entire in both angles,
+    so the discretisation error decreases faster than exponentially in n; the tests compare two
+    values of n."""
+    th, w = composite_gauss_legendre(0.0, np.pi, 1, n)
+    mu = (2.0 / np.pi) * np.sin(th) ** 2 * w
+    s = np.sqrt(mu)
+    return th, mu, s[:, None] * class_kernel(beta, th[:, None], th[None, :]) * s[None, :]
+
+
+def class_kernel_power(beta, L, t1, t2, n=80):
+    """e^(-beta L) x the L-fold iterate of the one-link class kernel, at the angles t1 (rows)
+    and t2 (columns); the L - 1 inner integrals with the n-point rule of class_operator."""
+    t1, t2 = np.atleast_1d(t1), np.atleast_1d(t2)
+    if L == 1:
+        return class_kernel(beta, t1[:, None], t2[None, :])
+    th, mu, _ = class_operator(beta, n)
+    right = class_kernel(beta, th[:, None], t2[None, :])
+    step = class_kernel(beta, th[:, None], th[None, :]) * mu[None, :]
+    for _ in range(L - 2):
+        right = step @ right
+    return (class_kernel(beta, t1[:, None], th[None, :]) * mu[None, :]) @ right
+
+
+def test_B_point_3_kernel_of_T_on_class_angles_from_the_definition():
+    """Stelling A, step 4, and Stelling B, point 1, for SU(2) rings with L = 1, 2, 3 links,
+    without characters and without Bessel functions: the kernel T(u, u') = int K(u^g, u') dg,
+    integrated over the gauge group straight from the definitions of sections 2.1-2.2, equals
+    the L-fold iterate of the elementary one-link class kernel at the class angles of the two
+    holonomies.  Together with point 1 (phi -> phi o h is an isometry of L^2_kl(G) onto H_inv,
+    tested above: the holonomy of Haar links is Haar distributed) this says that T restricted
+    to H_inv is the L-th power of the one-link operator on L^2([0, pi], (2/pi) sin^2), which the
+    next tests discretise.  Tolerance 1e-10 x e^(beta L) (the quadrature rules are exact to
+    rounding for these beta, see test_AB_su2_kernel_of_T_in_two_dimensions); the terms that
+    distinguish the levels j = 1/2 and j = 1 are 1e3 and 10 times larger."""
+    rng = np.random.default_rng(31415)
+    g, w = su2_rule(24, 21, 42)                             # L = 1: exponent quadratic in g
+    for beta in (0.4, 1.2):
+        for _ in range(3):
+            u, up = su2_haar(rng), su2_haar(rng)
+            direct = np.sum(w * np.exp(0.5 * beta * trace(g @ u @ inv(g) @ inv(up)).real))
+            mine = math.exp(beta) * class_kernel(beta, class_angle(u), class_angle(up))
+            assert abs(direct - mine) < 1e-11 * math.exp(beta)
+    g, w = su2_rule(12, 10, 19)                             # L >= 2: exponent linear in each g_i
+    beta = 0.5
+    for L in (2, 3):
+        for _ in range(2):
+            u, up = su2_haar(rng, (L,)), su2_haar(rng, (L,))
+            hu, hup = u[0], up[0]
+            for i in range(1, L):
+                hu, hup = hu @ u[i], hup @ up[i]
+            direct = T0_by_gauge_integration(beta, u, up, g, w)
+            mine = math.exp(beta * L) * class_kernel_power(beta, L, class_angle(hu), class_angle(hup))[0, 0]
+            assert abs(direct - mine) < 1e-10 * math.exp(beta * L)
+            assert abs(class_kernel_power(beta, L, class_angle(hu), class_angle(hup), n=40)[0, 0]
+                       * math.exp(beta * L) - mine) < 1e-12 * math.exp(beta * L)     # n = 40 or 80
+            # sensitivity: T0 depends on the holonomies, not just through the j = 0 term
+            lead = (2.0 / beta * special.iv(1, beta)) ** L
+            assert abs(direct - lead) > 1e5 * 1e-10 * math.exp(beta * L)
+
+
+@pytest.mark.parametrize("beta, L", [(1.0, 3), (2.0, 3), (6.0, 4), (2.5, 5)])
+def test_B_point_3_dictionary_point_4_and_section_3_4_from_discretised_operator(beta, L):
+    """Stelling B, points 2-4, and section 3.4, from a discretisation of the SU(2) transfer
+    operator on H_inv (L-th power of the one-link operator on class functions, see the previous
+    test) that uses neither characters nor Bessel functions:
+    * point 3, last sentence (the dictionary with Stelling A): the eigenvalues in decreasing
+      order, lambda_0 > lambda_1 > ..., are all simple and lambda_n = Lambda_(n/2) =
+      ((2/beta) I_(n+1)(beta))^L; psi_n = chi_(n/2) o h; Omega = 1; the gap E_1 - E_0 of
+      Stelling A is L ln(I_1/I_2);
+    * point 4: Z = Tr T^N = sum_j Lambda_j^N for N = 3, 4, 6, where the terms j > 0 exceed the
+      tolerance by a factor of at least 1e4;
+    * section 3.4: the norm of T/Lambda_0 minus the projection on Omega is (I_2/I_1)^L =
+      sup_(j>0) (I_(2j+1)/I_1)^L.
+    Tolerances: the eigenvalues of the symmetric 120 x 120 matrix are accurate to ~1e-14 x the
+    largest; an eigenvalue 1e-5 times the largest therefore to 1e-9 relative, its L-th power to
+    L x 1e-9.  Only eigenvalues above 1e-5 x the largest are compared relatively."""
+    th, mu, A = class_operator(beta, 120)
+    ev, vec = np.linalg.eigh(A)
+    ev, vec = ev[::-1], vec[:, ::-1]
+    assert ev[-1] > -1e-13 * ev[0]                          # T >= 0, (2.4)
+    assert np.abs(np.linalg.eigvalsh(class_operator(beta, 80)[2])[::-1][:8] - ev[:8]).max() < 1e-13 * ev[0]
+    nres = int(np.sum(ev > 1e-5 * ev[0]))
+    assert nres >= 5
+    n = np.arange(nres)
+    one_link = 2.0 / beta * special.ive(n + 1, beta)        # e^(-beta) (c_j / d_j), 2j = n, (3.1)
+    # dictionary: n-th eigenvalue of T on H_inv = Lambda_(n/2), all simple
+    assert np.abs((ev[:nres] / one_link) ** L - 1.0).max() < 1e-8 * L
+    assert np.all(ev[:nres - 1] - ev[1:nres] > 1e-6 * ev[0])
+    for k in range(nres):                                   # psi_n = chi_(n/2) o h (up to a sign)
+        chi_k = np.sqrt(mu) * np.sin((k + 1) * th) / np.sin(th)
+        assert abs(abs(vec[:, k] @ chi_k) - 1.0) < 1e-8
+    omega = np.sqrt(mu)                                     # the constant function 1, norm 1
+    assert abs(abs(vec[:, 0] @ omega) - 1.0) < 1e-12
+    m = L * math.log(ev[0] / ev[1])                         # E_1 - E_0 in the numbering of Stelling A
+    assert abs(m / (L * math.log(special.ive(1, beta) / special.ive(2, beta))) - 1.0) < 1e-10
+    # point 4 (both sides carry the factor e^(-beta L N))
+    all_j = 2.0 / beta * special.ive(np.arange(1, 200), beta)
+    for N in (3, 4, 6):
+        Z = np.trace(np.linalg.matrix_power(A, L * N))
+        assert abs(Z / np.sum(all_j ** (L * N)) - 1.0) < 1e-10
+        assert abs(np.sum(np.clip(ev, 0.0, None) ** (L * N)) / Z - 1.0) < 1e-10
+        if N == 3:
+            assert abs(Z / all_j[0] ** (L * N) - 1.0) > 1e4 * 1e-10     # the sum over j is tested
+    # section 3.4
+    S = np.linalg.matrix_power(A / ev[0], L)
+    nrm = np.linalg.norm(S - np.outer(omega, omega), 2)
+    u = special.ive(2, beta) / special.ive(1, beta)
+    assert abs(nrm / u ** L - 1.0) < 1e-10
+    assert np.argmax(special.ive(np.arange(2, 60), beta)) == 0          # the supremum is at j = 1/2
+    assert abs(np.linalg.norm(S, 2) - 1.0) < 1e-12          # without the projection the norm is 1
+
+
+def test_B_section_3_4_norm_at_fixed_beta_and_its_continuum_counterpart():
+    """Section 3.4, 'Waarom dit het millenniumprobleem niet raakt': (i) at fixed beta the norm
+    of T/Lambda_0 minus the projection on Omega, (I_2/I_1)^L, tends to 0 for L -> infinity
+    (discretised operator, L = 3 .. 12); (ii) the continuum counterpart: with a = ell/L,
+    beta = 4/(g^2 a^2) and N a = tau the norm of (T/Lambda_0)^N minus the projection on Omega,
+    which is (I_2/I_1)^(L N), tends to e^(-(3/8) g^2 ell tau), the norm of e^(-tau H_c) minus
+    the projection; from the discretised operator for L = 3 .. 8 (beta up to 256) and from the
+    formula for L up to 1e5.  The logarithm deviates from -(3/8) g^2 ell tau by the relative
+    amount 1/(2 beta) + O(beta^-2) (see test_B5_bessel_asymptotics_3_3)."""
+    # (i)
+    beta = 2.5
+    th, mu, A = class_operator(beta, 120)
+    omega = np.sqrt(mu)
+    ev0 = np.linalg.eigvalsh(A)[-1]
+    u = special.ive(2, beta) / special.ive(1, beta)
+    norms = []
+    for L in range(3, 13):
+        nrm = np.linalg.norm(np.linalg.matrix_power(A / ev0, L) - np.outer(omega, omega), 2)
+        assert abs(nrm / u ** L - 1.0) < 1e-10
+        norms.append(nrm)
+    assert all(b < a for a, b in zip(norms, norms[1:])) and norms[-1] < 1e-3
+    # (ii) discretised operator; g = 1, ell = tau = 1.3, N = L
+    g, ell = 1.0, 1.3
+    target = 0.375 * g * g * ell * ell                      # (3/8) g^2 ell tau
+    devs = []
+    for L in (3, 4, 6, 8):
+        beta = 4.0 * L * L / (g * g * ell * ell)
+        th, mu, A = class_operator(beta, 160 if L < 6 else 320)
+        omega = np.sqrt(mu)
+        ev = np.linalg.eigvalsh(A)[::-1]
+        nrm = np.linalg.norm(np.linalg.matrix_power(A / ev[0], L * L) - np.outer(omega, omega), 2)
+        # = (I_2/I_1)^(L N); L N <= 64 powers of a matrix with rounding 1e-14: tolerance 1e-10
+        assert abs(nrm / (special.ive(2, beta) / special.ive(1, beta)) ** (L * L) - 1.0) < 1e-10
+        rel = -math.log(nrm) / target - 1.0
+        assert abs(rel - 0.5 / beta) < 16.0 / beta ** 2     # as in test_B5 (nu = 2)
+        devs.append(rel)
+    assert all(0.0 < b < a for a, b in zip(devs, devs[1:])) and devs[-1] < 5e-3
+    # (ii) formula, generic tau: N = round(tau L / ell)
+    for g, ell in CONTINUUM_CASES:
+        tau = ell / math.sqrt(2.0)
+        for L in (100, 1000, 10000, 100000):
+            beta = 4.0 * L * L / (g * g * ell * ell)
+            N = round(tau * L / ell)
+            lognorm = -N * L * float(log_i1_over_inu(beta, np.array([2.0]))[0])
+            x = 0.375 * g * g * ell * tau
+            assert abs(lognorm / (-x) - 1.0) <= abs(N * ell / (L * tau) - 1.0) + 1.0 / beta
+        assert abs(lognorm + x) < 2e-5 * x                  # L = 1e5: |N a / tau - 1| <= ell/(2 L tau) = 7e-6
+    # the continuum operator itself: sup over j > 0 of e^(-tau (g^2 ell/2) j(j+1)) is at j = 1/2
+    twoj = np.arange(1, 50)
+    q = np.exp(-0.9 * 0.5 * 1.7 * 0.25 * twoj * (twoj + 2.0))
+    assert q.argmax() == 0 and abs(q[0] - math.exp(-0.375 * 1.7 * 0.9)) < 1e-15
+
+
+@pytest.mark.parametrize("beta, L", [(1.0, 1), (3.0, 1), (0.5, 3), (2.0, 3), (3.0, 4)])
+def test_A_remark_2_7_gap_bound_for_su2_in_two_dimensions(beta, L):
+    """The remark with (2.7) for real SU(2) on a D = 2 ring (|E| = L, |P_s| = 0): with the
+    kernel of T on class angles (previous tests), lambda_1/lambda_0 = (I_2/I_1)^L <= 1 - c/C,
+    every line of the proof of (2.7) on the discretised operator, and c/C >= e^(-2 beta L).
+    The estimate is an equality for L = 1 (c = e^-beta at (h, h') = (1, -1), C = e^beta at
+    (1, 1)); for L >= 2 the true c/C is much larger and tends to 1 for growing L (so in D = 2
+    the bound (2.7) itself is not small; only the explicit estimate is)."""
+    th, mu, A = class_operator(beta, 80)
+    scale = math.exp(beta * L)
+    eps_nodes, r1 = _check_remark_2_7(scale * class_kernel_power(beta, L, th, th), mu, beta * L)
+    assert abs(r1 / (special.ive(2, beta) / special.ive(1, beta)) ** L - 1.0) < 1e-9
+    # c and C over all pairs of classes: grid of class angles including 0 and pi
+    grid = np.linspace(0.0, np.pi, 181)
+    kg = scale * class_kernel_power(beta, L, grid, grid)
+    c, C = kg.min(), kg.max()
+    assert c == kg[0, -1] and abs(C / kg[0, 0] - 1.0) < 1e-12           # extremes at (1, -1) and (1, 1)
+    assert c / C <= eps_nodes                               # the nodes do not contain the extremes
+    assert r1 <= 1.0 - c / C
+    assert c >= math.exp(-beta * L) * (1.0 - 1e-12) and C <= scale * (1.0 + 1e-12)
+    assert c / C >= math.exp(-2.0 * beta * L) * (1.0 - 1e-12)
+    if L == 1:
+        assert abs(c / C / math.exp(-2.0 * beta) - 1.0) < 1e-12        # the estimate is attained
+        assert abs(c * math.exp(beta) - 1.0) < 1e-12 and abs(C / math.exp(beta) - 1.0) < 1e-12
+    else:
+        assert c / C > 10.0 * math.exp(-2.0 * beta * L)     # and not attained for L >= 3
 
 
 # =============================================================================================
@@ -1358,8 +2002,8 @@ def test_AB_su2_kernel_of_T_in_two_dimensions():
 def test_B4_lemma_B1_and_riccati_equation():
     """Stelling B, lemma B.1 and formula (3.2): r(x) = I_(n+1)(x)/I_n(x) satisfies
     r' = 1 - r^2 - (2n+1) r / x (five-point central differences), 0 < I_(n+1)(x) < I_n(x) on a
-    grid of x in [1e-3, 1e4] and n = 0 .. 40, r(x) -> 0 for x -> 0, the derivative relations of
-    (S6), and the sign argument of the proof (r' < 0 wherever r = 1 would hold)."""
+    grid of x in [1e-3, 1e4] and n = 0 .. 40, r(x) -> 0 for x -> 0, and the derivative relations
+    of (S6)."""
     def r(n, x):
         return special.ive(n + 1, x) / special.ive(n, x)
 
@@ -1386,8 +2030,8 @@ def test_B4_lemma_B1_and_riccati_equation():
         assert np.all(rr > 0.0) and np.all(rr < 1.0)
         # r(x) -> 0 for x -> 0: r = x / (2 (n+1)) (1 + O(x^2))
         assert abs(rr[0] / (xs[0] / (2.0 * (n + 1))) - 1.0) < 1e-6
-        # the contradiction in the proof: at r = 1 the right-hand side of (3.2) is -(2n+1)/x < 0
-        assert np.all(1.0 - 1.0 ** 2 - (2 * n + 1) * 1.0 / xs < 0.0)
+        # (the last step of the proof, "(3.2) gives r'(x_0) = -(2n+1)/x_0 < 0 where r = 1", is
+        # arithmetic and is not tested: an assertion of it would compare the formula with itself)
     # consequence (point 3): Lambda_0 > Lambda_1/2 > ... > 0 and the gap formula
     for beta in (0.05, 0.5, 2.5, 20.0, 500.0):
         seq = special.ive(np.arange(1, 60), beta)
@@ -1659,15 +2303,35 @@ def test_B7_consistency_with_ym_exact():
     assert abs(full / exact.torelon_correlator_2d(8.0, 2, 2, 1) - 1.0) > 0.02
 
 
+def _document_text():
+    return DOC.read_text(encoding="utf-8")
+
+
 def test_B_numbers_quoted_in_the_document():
     """Numbers and identities quoted in the text that follow from Stelling B: m = L ln(I_1/I_2)
     (overview table, point 3); the string tension a^2 sigma = -ln u(beta) = m / L (sec. 3.2,
     3.4); continuum string tension (3/8) g^2 (sec. 3.4); and section 4.6: at beta = 0.1, L = 3
-    the exact gap is 3 x 3.689 = 11.07 and the lower bound of Stelling C is 0.514."""
+    the exact gap is 3 x 3.689 = 11.07 and the lower bound of Stelling C is 0.514, valid for
+    beta < 0.1682.  The numbers and the formulas that this file tests are looked up in the text
+    of BEWIJZEN.md, so that the test fails if the document is changed and the tests are not."""
     x = math.log(special.iv(1, 0.1) / special.iv(2, 0.1))
     assert f"{x:.3f}" == "3.689" and f"{3 * x:.2f}" == "11.07"
     assert f"{-math.log(6 * math.tanh(0.1)):.3f}" == "0.514"
     assert 3 * x > -math.log(6 * math.tanh(0.1))
+    # ... and these are the numbers printed in the document (decimal comma, written {,} in LaTeX)
+    text = _document_text()
+    for printed in ("3 \\times 3{,}689 = 11{,}07", "ondergrens $0{,}514$",
+                    "\\ln(1/(6\\tanh\\beta))$ voor $\\beta \\lt 0{,}1682$"):
+        assert printed in text, printed
+    assert f"{math.atanh(1.0 / 6.0):.4f}" == "0.1682"       # 6 tanh(beta) = 1
+    # the formulas of Stelling B that the tests of this file evaluate, as printed in section 3.2
+    for printed in ("\\Lambda_j = \\Big( \\frac{2}{\\beta}\\  I_{2j+1}(\\beta) \\Big)^{L}",
+                    "m = E_{1/2} - E_0 = L\\  \\ln\\frac{I_1(\\beta)}{I_2(\\beta)}",
+                    "\\lim_{L \\to \\infty} \\frac{m}{a} = \\frac{3}{8}\\  g^2 \\ell",
+                    "\\frac{\\lambda_1}{\\lambda_0} \\ \\leq\\ 1 - \\frac{c}{C}",
+                    "c/C \\geq e^{-2\\beta(\\lvert E\\rvert + \\lvert\\mathcal{P}_s\\rvert)}",
+                    "\\big(I_2(\\beta)/I_1(\\beta)\\big)^{L}", "e^{-\\frac38 g^2 \\ell \\tau}"):
+        assert printed in text, printed
     for beta in (0.1, 2.2, 2.5, 10.0):
         assert abs(-math.log(exact.u(beta)) - math.log(special.iv(1, beta) / special.iv(2, beta))) < 1e-13
     # sigma = (3/8) g^2 in the continuum: a^2 sigma = -ln u(4/(g^2 a^2)) ~ (3/8) g^2 a^2
@@ -1758,6 +2422,68 @@ def test_B8_engine_polyakov_correlator_and_plaquette_quick():
     assert abs(res["m_eff_exact"] - res["m_gap"]) < 0.01
     assert abs(res["m_eff"] - res["m_gap"]) < 4.0 * res["m_err"] + 0.01
     assert res["m_err"] < 0.05 * res["m_gap"]
+
+
+def test_B_point_4_engine_on_a_small_torus_where_the_sum_over_j_matters():
+    """Stelling B, point 4, for N >= 3 against a computation that knows nothing of the theorem:
+    a heatbath simulation with the engine on the L x N = 4 x 4 torus at beta = 8 (3e5 sweeps,
+    fixed seed).  There (I_2/I_1)^(L N) = 0.041, so the sum over j in Z = sum_j ((2/beta)
+    I_(2j+1))^(L N) is visible: the plaquette (1/(L N)) d ln Z / d beta = 0.820307 differs from
+    its j = 0 term u(beta) = 0.819249 by 1.06e-3, about 14 standard errors of the simulation.
+    Criterion: the simulation agrees with point 4 within 4 standard errors (plaquette and
+    Polyakov-loop correlator), and the j = 0 term alone and the leading-representation
+    correlator are excluded by more than 8 and 4 standard errors respectively.  (In the other
+    engine tests (I_2/I_1)^(L N) <= 1.5e-3 and the sum over j is tested only through the
+    correlator.)"""
+    N, L, beta = 4, 4, 8.0
+    res = _compare_simulation_with_stelling_B(N, L, beta, seed=20261116, nmeas=300000)
+    _assert_simulation_agrees(res)
+    j0_only = special.ive(2, beta) / special.ive(1, beta)                  # the j = 0 term of d ln Z / d beta
+    assert abs(res["p_exact"] - j0_only - 1.06e-3) < 1e-5
+    assert res["p_exact"] - j0_only > 8.0 * res["p_err"]
+    assert res["p_val"] - j0_only > 4.0 * res["p_err"]
+    # correlator at t = 1, 2: the formula with j, j' <= 1/2 only (ym.exact.torelon_correlator_2d)
+    lead = np.array([exact.torelon_correlator_2d(beta, L, N, t) for t in (1, 2)])
+    assert np.all(np.abs(res["c_exact"][1:3] - lead) > 4.0 * res["c_err"][1:3])
+
+
+def _haar_estimate_of_Z(beta, L, N, n, seed, chunk=50000):
+    """Z = int w(U) dU of section 1.3 for the L x N lattice in D = 2 as the mean of w(U) over n
+    Haar-random configurations (numpy generator), with its standard error.  w from the plaquette
+    U_p = U_(x,1) U_(x+1,2) U_(x+2,1)^-1 U_(x,2)^-1 of section 1.2."""
+    assert n % chunk == 0
+    rng = np.random.default_rng(seed)
+    s1 = s2 = 0.0
+    for _ in range(n // chunk):
+        U = su2_haar(rng, (chunk, L, N, 2))                 # [sample, x, t, direction]
+        Up = (U[:, :, :, 0] @ np.roll(U[:, :, :, 1], -1, axis=1)
+              @ inv(np.roll(U[:, :, :, 0], -1, axis=2)) @ inv(U[:, :, :, 1]))
+        w = np.exp(0.5 * beta * trace(Up).real.sum(axis=(1, 2)))
+        s1 += w.sum()
+        s2 += np.sum(w * w)
+    mean = s1 / n
+    return mean, math.sqrt((s2 / n - mean * mean) / (n - 1))
+
+
+def test_B_point_4_partition_function_from_the_definition_by_monte_carlo():
+    """Stelling B, point 4, with its absolute normalisation, straight from the definition of Z
+    in section 1.3 (no transfer matrix): Z = int w(U) dU on the smallest lattice of the theorem,
+    L = N = 3 (18 links, 9 plaquettes), as the mean of w over 2e5 Haar-random configurations,
+    against sum_j ((2/beta) I_(2j+1)(beta))^(L N) at beta = 0.8.  Criterion: 4 standard errors,
+    with a standard error below 0.5 % of Z.  This resolves the j = 0 term ((2/beta) I_1)^9 =
+    2.035 only: a wrong exponent (L N +- 1 changes Z by 8 %), a missing factor 2/beta or a
+    wrong Bessel index fail by more than 15 standard errors, but the terms j > 0 are 4e-7 of Z
+    here.  (Reweighting from the Haar measure cannot reach the beta where they matter: the
+    relative variance grows like (c_0(2 beta)/c_0(beta)^2)^(L N).  The sum over j is tested by
+    the discretised operator and by the engine above.)"""
+    beta, L, N = 0.8, 3, 3
+    mean, sem = _haar_estimate_of_Z(beta, L, N, 200000, seed=4)
+    Z = float(np.sum((2.0 / beta * special.iv(np.arange(1, 60), beta)) ** (L * N)))
+    assert abs(mean - Z) < 4.0 * sem
+    assert sem < 0.005 * Z
+    lead = 2.0 / beta * special.iv(1, beta)
+    assert abs(Z / lead ** (L * N) - 1.0) < 1e-6            # the j = 0 term is all that is resolved
+    assert abs(lead ** (L * N + 1) - Z) > 15.0 * sem and abs(lead ** (L * N - 1) - Z) > 15.0 * sem
 
 
 @pytest.mark.slow

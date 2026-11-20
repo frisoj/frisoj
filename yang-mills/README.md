@@ -21,7 +21,9 @@ betrouwbaarheid) in `literature.json`.
 | --- | --- |
 | `REPORT.md` | eindrapport: wat er gemeten is, alle controles en spanningen, en wat het wel en niet bewijst |
 | `REPORT.pdf` | hetzelfde rapport als pdf, met een titelpagina, een hoofdstuk over wat wel en niet is bevestigd, en een bijlage met de uitslagen van alle dertien analyses; gemaakt met `pdf/make_pdf.py` |
-| `pdf/` | bouwscript van de pdf (`make_pdf.py`, opmaak in `style.css`, afdrukken met `print_pdf.js`); valt buiten de testsuite |
+| `pdf/` | bouwscripts van de pdf's (`make_pdf.py` voor het rapport, `make_bewijzen_pdf.py` voor de bewijzen; opmaak in `style.css` en `style_bewijzen.css`, afdrukken met `print_pdf.js`); valt buiten de testsuite |
+| `BEWIJZEN.md` | drie stellingen over de roostertheorie met volledig uitgeschreven bewijs (eindig rooster: uniek vacuüm en kloof; twee dimensies: exact spectrum; sterke koppeling: kloof uniform in het volume) en een hoofdstuk over wat daarmee níet bewezen is. **Geen bewijs van het millenniumprobleem.** |
+| `BEWIJZEN.pdf` | hetzelfde document als pdf; gemaakt met `pdf/make_bewijzen_pdf.py` |
 | `ym/lattice.py` | motor: heatbath (Creutz / Kennedy–Pendleton) + overrelaxatie, plaquette, Wilson- en Polyakov-lussen |
 | `ym/exact.py` | exacte D=2-formules, sterke-koppelingsreeks, twee-lus-schaalformule |
 | `ym/observables.py` | APE-smearing, glueball- (0++) en torelon-operatoren per tijdplak |
@@ -31,7 +33,7 @@ betrouwbaarheid) in `literature.json`.
 | `analyze.py` | analyse van één ensemble (meerdere stromen) → JSON + figuren |
 | `run_all_production.sh`, `run_extra_production.sh`, `run_round3_production.sh` | de productie-ensembles zoals ze gedraaid zijn (ronde 1, 2 en 3; het doel van ronde 2 en 3 staat bovenaan het script, vastgelegd vóór de run) |
 | `round3_plan.md` | analyseplan voor ronde 3, vastgelegd voordat de data van die ronde werden bekeken |
-| `review/` | scripts en tekstuitvoer van de controleronde (statistiek, natuurkunde, rekensommen voor het rapport), ongewijzigd zoals ze zijn gedraaid; hoort niet bij de geteste code |
+| `review/` | scripts en tekstuitvoer van de controleronde (statistiek, natuurkunde, rekensommen voor het rapport), ongewijzigd zoals ze zijn gedraaid; hoort niet bij de geteste code; `review/proofs/` bevat de rapporten en rekenscripts van de controle van `BEWIJZEN.md` |
 | `independent_analysis.py` | onafhankelijke heranalyse van de ruwe data (deelt geen code met `ym/stats.py` en `analyze.py`; bootstrapfouten) → `results/independent/` |
 | `summarize.py` | synthese over alle ensembles: tabellen, schaalfits, volume- en replicatievergelijkingen, vergelijking met `literature.json` → `results/summary.json`, `results/summary.md` en drie figuren |
 | `results/` | uitkomsten: per ensemble `<naam>.json` en drie figuren (uitvoer van `analyze.py`), `logs/` (dezelfde samenvattingen als tekst), `summary.*` (uitvoer van `summarize.py`), `independent/` (uitvoer van `independent_analysis.py`, met `COMPARISON.md`); `raw/` bevat de ruwe data en staat niet in git |

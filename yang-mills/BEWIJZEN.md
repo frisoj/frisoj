@@ -4,7 +4,7 @@
 
 **Wat dit document niet is.** Het is **geen bewijs van het millenniumprobleem** "Yang–Mills: bestaan en massakloof". Dat probleem is open. Hoofdstuk 5 zegt precies welke stap ontbreekt en waarom de methoden van dit document daar ophouden. Wie beweert dat de stellingen hieronder het millenniumprobleem oplossen, leest ze verkeerd.
 
-**Niet nieuw.** De drie stellingen zijn bekende resultaten uit de jaren zeventig en tachtig (hoofdstuk 7). Wat dit document toevoegt, is dat de bewijzen in één notatie stap voor stap zijn uitgeschreven, met alleen de standaardresultaten uit de bijlage als voorkennis, en dat de stappen ook numeriek zijn nagerekend (hoofdstuk 6).
+**Niet nieuw.** De uitspraken van de drie stellingen zijn bekend uit de literatuur van de jaren zeventig tot en met negentig (hoofdstuk 7). De expliciete constanten van stelling C ($\beta_0(D)$ en de ondergrens $\ln(1/\alpha)$) zijn hier zelf uitgerekend en staan, voor zover wij konden nagaan, niet in deze vorm in de literatuur. Wat dit document toevoegt, is dat de bewijzen in één notatie stap voor stap zijn uitgeschreven, met alleen de standaardresultaten uit de bijlage als voorkennis, en dat de stappen ook numeriek zijn nagerekend (hoofdstuk 6).
 
 **Wie het heeft nagekeken.** De bewijzen zijn geschreven door een AI-systeem. Geen wiskundige heeft dit document beoordeeld. Hoofdstuk 6 zegt welke controles zijn gedaan en welke niet.
 
@@ -31,7 +31,7 @@ Wat ontbreekt: de limiet $a \to 0$ in vier dimensies ligt bij $\beta \to \infty$
 | **Stelling A** | elke dimensie $D \geq 2$, elke $\beta \gt 0$, elk eindig rooster met alle afmetingen minstens 3 | positieve overdrachtsmatrix, uniek vacuüm, kloof $m \gt 0$ | geen ondergrens die standhoudt als het volume groeit |
 | **Stelling B** | $D = 2$, elke $\beta \gt 0$, elke omtrek $L \geq 3$ | exact spectrum; kloof $m = L \ln\big(I_1(\beta)/I_2(\beta)\big)$; continuümlimiet van het spectrum, met kloof $\tfrac38 g^2 \ell$ | niets over $D = 3$ of $D = 4$ |
 | **Stelling C** | elke $D \geq 2$, $\beta \lt \beta_0(D)$, elk rooster met alle afmetingen minstens 3 | kloof $m \geq \ln\big(1/(6(D-1)\tanh\beta)\big)$, uniform in het volume; limiet van oneindig volume bestaat | niets voor $\beta \geq \beta_0(D)$, dus niets over de continuümlimiet |
-| **Millenniumprobleem** | $D = 4$, continuüm ($\beta \to \infty$), oneindig volume | bestaan én kloof | **niet bewezen**, hier noch elders |
+| **Millenniumprobleem** | $D = 4$, continuüm ($\beta \to \infty$), oneindig volume | bestaan én kloof | **niet bewezen**: hier niet, en ook elders niet in een gepubliceerd en getoetst bewijs (zie de kanttekening over recente berichten in `THEORY.md` §1) |
 
 De grenswaarden zijn $\beta_0(2) = 0{,}1682$, $\beta_0(3) = 0{,}0835$ en $\beta_0(4) = 0{,}0556$.
 
@@ -347,7 +347,7 @@ Verder is $I_\nu$ de gemodificeerde Besselfunctie van de eerste soort (bijlage, 
 >    $$\lim_{L\to\infty} \frac{E_j - E_0}{a} = \frac{g^2\ell}{2}\  j(j+1), \qquad \text{in het bijzonder} \qquad \lim_{L \to \infty} \frac{m}{a} = \frac{3}{8}\  g^2 \ell .$$
 >    Is bovendien $\tau \gt 0$ en $N = N(L) \geq 1$ een rij positieve gehele getallen met $Na \to \tau$, dan convergeert $(\mathsf{T}/\Lambda_0)^N$, opgevat als operator op $L^2_{\mathrm{kl}}(G)$ via punt 1, in operatornorm naar $e^{-\tau H_{\mathrm{c}}}$, waarin $H_{\mathrm{c}}$ de operator is met $H_{\mathrm{c}}\chi_j = \tfrac{g^2\ell}{2}\  j(j+1)\  \chi_j$.
 
-*In gewone taal.* In twee dimensies is de enige vrijheidsgraad die overblijft de holonomie: wat een deeltje "voelt" als het één keer de ring rondgaat. De toestanden zijn genummerd door $j$, en toestand $j$ is een buis van flux die om de ring gewikkeld is. De energie is evenredig met de lengte $L$ van de ring; de evenredigheidsconstante $\ln(I_1/I_2)$ voor $j = \tfrac12$ is precies de snaarspanning $a^2\sigma = -\ln u(\beta)$ uit `THEORY.md` §5.6. In de limiet $a \to 0$ blijft er een eindige kloof $\tfrac38 g^2\ell$ over. Voor twee dimensies is daarmee op een ring bewezen dat het spectrum en de tijdsevolutie van de ijkinvariante toestanden een continuümlimiet hebben, en dat die limiet een kloof heeft. Dat is minder dan wat het millenniumprobleem onder "bestaan" verstaat: de continuümlimiet van álle verwachtingswaarden (Wilson-lussen) en de axioma's, waaronder draai-invariantie, worden hier niet bewezen; voor twee dimensies staat dat in de literatuur (Driver 1989; Gross, King en Sengupta 1989; zie hoofdstuk 7). Let ook op de kanttekening in §3.4.
+*In gewone taal.* In twee dimensies is de enige vrijheidsgraad die overblijft de holonomie: wat een deeltje "voelt" als het één keer de ring rondgaat. De toestanden zijn genummerd door $j$, en toestand $j$ is een buis van flux die om de ring gewikkeld is. De energie is evenredig met de lengte $L$ van de ring; de evenredigheidsconstante $\ln(I_1/I_2)$ voor $j = \tfrac12$ is precies de snaarspanning $a^2\sigma = -\ln u(\beta)$ uit `THEORY.md` §5.6. In de limiet $a \to 0$ blijft er een eindige kloof $\tfrac38 g^2\ell$ over. Voor twee dimensies is daarmee op een ring bewezen dat het spectrum en de tijdsevolutie van de ijkinvariante toestanden een continuümlimiet hebben, en dat die limiet een kloof heeft. Dat is minder dan wat het millenniumprobleem onder "bestaan" verstaat: de continuümlimiet van álle verwachtingswaarden (Wilson-lussen) en de axioma's, waaronder draai-invariantie, worden hier niet bewezen. In de literatuur staat voor twee dimensies meer: Gross, King en Sengupta (1989) en Driver (1989) construeren de continuümmaat op het vlak, en Driver bewijst dat de roosterverwachtingen ernaar convergeren; voor het vlak en de cilinder (de ring van dit hoofdstuk) geven Ashtekar en anderen (1997) formules voor alle Wilson-lussen, het verband met de Hamiltoniaanse beschrijving en een voor ijktheorieën aangepaste vorm van de axioma's van Osterwalder en Schrader (zie hoofdstuk 7). Let ook op de kanttekening in §3.4.
 
 ### 3.3 Bewijs
 
@@ -685,7 +685,7 @@ Voor elke $L \geq 2r+3$ geldt dus de ongelijkheid van punt 1 voor $\mu_L$ met in
 
 **Toets aan stelling B.** In $D = 2$ geeft stelling B de exacte kloof $m = L\ln(I_1(\beta)/I_2(\beta))$ met $L \geq 3$, en stelling C de ondergrens $\ln(1/(6\tanh\beta))$ voor $\beta \lt 0{,}1682$. Bij $\beta = 0{,}1$ en $L = 3$ is de exacte kloof $3 \times 3{,}689 = 11{,}07$ en de ondergrens $0{,}514$. De ondergrens klopt en is ruim.
 
-**Verband met clusterontwikkelingen.** Het klassieke bewijs van een kloof bij sterke koppeling (Osterwalder en Seiler, 1978) gebruikt een convergente clusterontwikkeling en geeft ook de oppervlaktewet voor Wilson-lussen (opsluiting). Het bewijs hierboven volgt de techniek van Dobrushin voor zwak gekoppelde systemen; het is korter, maar geeft alleen het verval van correlaties en de kloof, niet de oppervlaktewet.
+**Verband met clusterontwikkelingen.** Het klassieke bewijs van een kloof bij sterke koppeling (Osterwalder en Seiler, 1978) gebruikt een convergente clusterontwikkeling en geeft ook de oppervlaktewet voor Wilson-lussen (opsluiting). Het bewijs hierboven volgt de techniek van Dobrushin voor zwak gekoppelde systemen; het is korter, maar geeft alleen het verval van correlaties en de kloof, niet de oppervlaktewet. Ook die weg is niet nieuw: Chatterjee (2020) gebruikt een variant van de voorwaarde van Dobrushin voor het exponentiële verval bij sterke koppeling in de roosterijktheorie met groep $\mathbb{Z}_2$, en Chatterjee (2021) bewijst dat exponentieel verval onder willekeurige randvoorwaarden, zoals in propositie C.6, de oppervlaktewet impliceert als het centrum van de groep niet triviaal is; dat wordt hier niet uitgewerkt (zie hoofdstuk 7).
 
 ---
 
@@ -693,7 +693,7 @@ Voor elke $L \geq 2r+3$ geldt dus de ongelijkheid van punt 1 voor $\mu_L$ met in
 
 ### 5.1 Wat het millenniumprobleem vraagt
 
-De officiële probleemstelling (Jaffe en Witten, 2000) vraagt: bewijs dat voor elke compacte enkelvoudige ijkgroep een kwantum-Yang–Mills-theorie op $\mathbb{R}^4$ bestaat die voldoet aan axioma's minstens zo sterk als die van Wightman of Osterwalder–Schrader, en dat die theorie een massakloof $\Delta \gt 0$ heeft. Langs de weg van het rooster betekent dat voor SU(2) (zie `THEORY.md` §5.5):
+De officiële probleemstelling (Jaffe en Witten, 2000) vraagt: bewijs dat voor elke compacte enkelvoudige ijkgroep een niet-triviale kwantum-Yang–Mills-theorie op $\mathbb{R}^4$ bestaat die voldoet aan axioma's minstens zo sterk als die van Wightman of Osterwalder–Schrader, en dat die theorie een massakloof $\Delta \gt 0$ heeft. Langs de weg van het rooster betekent dat voor SU(2) (zie `THEORY.md` §5.5):
 
 1. De limiet $a \to 0$ (dus $\beta \to \infty$) en het oneindige volume van de correlatiefuncties bestaan, en de limiet is niet triviaal.
 2. De limiet voldoet aan de axioma's, waaronder volledige draai-invariantie, die het rooster niet heeft.
@@ -723,7 +723,7 @@ De vijf regels met "nee" zijn samen het millenniumprobleem. Geen daarvan wordt i
 
 **Waarom stelling C daar niet komt.** Het bewijs van stelling C berust op zwakke afhankelijkheid: de verdeling van één link verandert weinig als één buur verandert, en de som van die invloeden over alle buren is kleiner dan 1. Voor grote $\beta$ is dat niet waar: numeriek (hoofdstuk 6) nadert de afhankelijkheidscoëfficiënt tussen twee buren dan 1, en de som nadert $6(D-1)$. Een betere constante helpt de methode dus niet; haar uitgangspunt vervalt. (Dat zegt iets over de methode, niet over de kloof: zie de opmerking in §4.6 over twee dimensies.)
 
-**Waarom een algemeen argument niet kan volstaan.** De punten 1 en 3 van stelling C gebruiken van de groep alleen dat de actie per plaquette begrensd is; punt 2 gebruikt daarnaast stelling A. Met $\tfrac12\operatorname{Tr}$ vervangen door het reële deel (gewicht $\exp(\beta\sum_p \mathrm{Re}\  U_p)$) gaat alles ook door voor de ijkgroep U(1), de roosterversie van het elektromagnetisme, met dezelfde constanten. In stap 3 van het bewijs van stelling A moeten dan naast $u_e$ ook $\overline{u_e}$ als voortbrengers worden genomen, omdat (G2) voor U(1) niet geldt. Maar voor U(1) in vier dimensies is bewezen dat de theorie zich bij zwakke koppeling anders gedraagt dan bij sterke koppeling: er is dan geen opsluiting (Guth 1980; Fröhlich en Spencer 1982), en Fröhlich en Spencer beschrijven die fase als masseloos, de fase van het vrije foton. In een masseloze fase vallen de correlaties niet exponentieel af en is er geen kloof die uniform is in het volume. Een bewijs van de kloof voor SU(2) bij alle $\beta$ in vier dimensies moet dus iets gebruiken wat SU(2) van U(1) onderscheidt. Stelling C doet dat niet; daarom is niet te verwachten dat zij in vier dimensies tot alle $\beta$ kan worden opgerekt. (Het ontbreken van opsluiting alleen is hiervoor niet genoeg: voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling evenmin opsluiting, maar daar vallen de correlaties volgens de literatuur wel exponentieel af (Forsström 2022; zie hoofdstuk 7). Dit document bewijst dat niet.)
+**Waarom een algemeen argument niet kan volstaan.** De punten 1 en 3 van stelling C gebruiken van de groep alleen dat de actie per plaquette begrensd is; punt 2 gebruikt daarnaast stelling A. Met $\tfrac12\operatorname{Tr}$ vervangen door het reële deel (gewicht $\exp(\beta\sum_p \mathrm{Re}\  U_p)$) gaat alles ook door voor de ijkgroep U(1), de roosterversie van het elektromagnetisme, met dezelfde constanten. In stap 3 van het bewijs van stelling A moeten dan naast $u_e$ ook $\overline{u_e}$ als voortbrengers worden genomen, omdat (G2) voor U(1) niet geldt. Maar voor U(1) in vier dimensies is bewezen dat de theorie zich bij zwakke koppeling anders gedraagt dan bij sterke koppeling: de verwachtingswaarde van een Wilson-lus heeft dan een ondergrens van Coulomb-vorm, zodat er geen opsluiting is (Guth 1980, voor de Villain-vorm van de actie; Fröhlich en Spencer 1982, met een bewijs dat volgens de auteurs niet aan die vorm gebonden is). Fröhlich en Spencer noemen die fase masseloos, de fase van het vrije foton. In een masseloze fase vallen de correlaties niet exponentieel af en is er geen kloof die uniform is in het volume; of dat voor U(1) ook als stelling is bewezen, hebben wij niet kunnen nagaan, en wij gebruiken het hier als verwachting. Als die verwachting juist is, moet een bewijs van de kloof voor SU(2) bij alle $\beta$ in vier dimensies iets gebruiken wat SU(2) van U(1) onderscheidt. Stelling C doet dat niet; daarom is niet te verwachten dat zij in vier dimensies tot alle $\beta$ kan worden opgerekt. Voor de methode van hoofdstuk 4 is er bovendien een argument dat op bewezen uitspraken uit de literatuur steunt: propositie C.6 zegt dat de invloed van willekeurige randvoorwaarden exponentieel uitdooft, en volgens Chatterjee (2021) volgt uit zulk verval, voor een ijkgroep met niet-triviaal centrum, de oppervlaktewet; die geldt voor U(1) in vier dimensies bij zwakke koppeling niet. (Of propositie C.6 precies de voorwaarde van Chatterjee levert, is hier niet uitgeschreven.) (Het ontbreken van opsluiting alleen is hiervoor niet genoeg: voor de ijkgroep $\mathbb{Z}_2$ in vier dimensies is er bij zwakke koppeling evenmin opsluiting, maar daar vallen de correlaties volgens de literatuur wel exponentieel af (Forsström 2022; zie hoofdstuk 7). Dit document bewijst dat niet.)
 
 **Waarom stelling A niet helpt.** Stelling A geldt voor elke $\beta$, maar het bewijs gebruikt alleen dat de kern van $\mathsf{T}$ op een compacte ruimte strikt positief is. De expliciete ondergrens voor de kloof die dat argument oplevert, namelijk (2.7) met de afschatting $c/C \geq e^{-2\beta(\lvert E\rvert + \lvert\mathcal{P}_s\rvert)}$, is exponentieel klein in het aantal links. Stelling A sluit dus niet uit dat de kloof naar nul gaat bij groeiend volume. Ook dat is geen detail: hetzelfde bewijs geldt, met de genoemde aanpassing in stap 3, voor U(1).
 
@@ -731,7 +731,7 @@ De vijf regels met "nee" zijn samen het millenniumprobleem. Geen daarvan wordt i
 
 ### 5.4 Wat er wel zou moeten gebeuren
 
-Een bewijs langs het rooster heeft een methode nodig die de theorie schaal voor schaal volgt van de roosterafstand tot de correlatielengte, en die op elke schaal de effectieve koppeling beheerst: een rigoureuze renormalisatiegroep. Het verst gevorderde werk in die richting (Bałaban, 1984–1989) bewijst dat de toestandssom in een vast fysisch volume begrensd blijft als $a \to 0$. Dat is een resultaat over de korte afstanden. Over de lange afstanden, waar de kloof zit, zegt het niets. De stap van "beheerste korte afstanden" naar "een kloof op lange afstanden" is precies het open deel van het probleem, en dit document draagt daar niets aan bij.
+Een bewijs langs het rooster heeft een methode nodig die de theorie schaal voor schaal volgt van de roosterafstand tot de correlatielengte, en die op elke schaal de effectieve koppeling beheerst: een rigoureuze renormalisatiegroep. Het verst gevorderde gepubliceerde werk in die richting (Bałaban, 1984–1989) bewijst ultraviolette stabiliteit: de toestandssom van de roostertheorie in een vast fysisch volume blijft, na renormalisatie, uniform begrensd als $a \to 0$ (in drie dimensies 1985, in vier dimensies 1987–1989). Dat is een resultaat over de korte afstanden; convergentie van verwachtingswaarden volgt er niet uit. Over de lange afstanden, waar de kloof zit, zegt het niets. De stap van "beheerste korte afstanden" naar "een kloof op lange afstanden" is precies het open deel van het probleem, en dit document draagt daar niets aan bij.
 
 ### 5.5 Verhouding tot de simulaties
 
@@ -739,45 +739,128 @@ Stelling A zegt dat de kloof $m$ van de overdrachtsmatrix op het gesimuleerde ro
 
 ---
 
-## 6. Numerieke controles van de bewijzen
+## 6. Wat er gecontroleerd is, en wat niet
 
-*(Dit hoofdstuk wordt ingevuld nadat de controles zijn gedraaid.)*
+Alles in dit hoofdstuk is gedaan door hetzelfde AI-systeem dat de bewijzen heeft geschreven, in afzonderlijke rondes die elkaars werk niet kenden. Geen wiskundige heeft dit document gelezen. Een controle door een AI-systeem is geen vervanging voor de beoordeling door vakgenoten; er kunnen fouten zijn blijven staan.
+
+### 6.1 Leesrondes
+
+| ronde | wat is nagelopen | uitkomst |
+|---|---|---|
+| 1 (15 november 2026) | vier afzonderlijke lezers, elk één deel regel voor regel: stelling A; stelling B; de lemma's van stelling C; de uitspraak en het bewijs van stelling C | geen foute stap in de drie stellingen; 32 kleine punten (6, 9, 5 en 12), alle verwerkt |
+| 2 (16 november 2026) | één lezer voor alle passages die na ronde 1 nieuw of gewijzigd waren | geen fout; 11 kleine punten, alle verwerkt |
+| literatuur (16 november 2026) | hoofdstuk 7, de bijlage en de uitspraken over de literatuur in hoofdstuk 3, 4 en 5 | alle 23 verwijzingen bestaan met de genoemde vindplaats; 8 punten over te ruime of onnauwkeurige toeschrijvingen, alle verwerkt |
+
+De belangrijkste correcties uit deze rondes:
+
+- Een toelichting bij stelling A beweerde dat het minimum van de kern van $\mathsf{T}$ exponentieel naar nul gaat. Dat is in twee dimensies onjuist. Zij is vervangen door de bewezen ongelijkheid (2.7).
+- De tekst stelde de kloof $m$ gelijk aan "wat de simulaties meten". Een simulatie meet het laagste niveau in één kanaal; dat is minstens $m$ en kan hoger liggen (§2.3).
+- Bij stelling B stond "volledig opgelost". Bewezen is de continuümlimiet van het spectrum en van de tijdsevolutie op een ring, niet meer (§3.2, §3.4).
+- In het bewijs van punt 3 van stelling C ontbrak de stap dat de linkafstand op een groot periodiek rooster gelijk is aan die in $\mathbb{Z}^D$; die is uitgeschreven (§4.5).
+- Eén getal in de tabel van §4.1 was verkeerd afgerond (1,4273 in plaats van 1,4272). Alle ondergrenzen zijn nu naar beneden afgerond.
+- De simulaties in vier dimensies liggen bij $\beta = 2{,}3$ tot $2{,}5$, niet $2{,}2$ tot $2{,}5$.
+- De uitspraken over U(1) in §5.3 gingen verder dan wat wij uit de literatuur konden bevestigen; zij zijn teruggebracht tot wat bevestigd is, en de rest staat er als verwachting.
+
+De volledige rapporten staan in `review/proofs/findings_round1.txt` en `review/proofs/findings_round2.txt`; de rekenscripts van de lezers in `review/proofs/`.
+
+### 6.2 Numerieke toetsen
+
+Elke stap van de bewijzen die zich laat narekenen, is nagerekend. Twee soorten "laboratorium" komen steeds terug:
+
+- **Eindige groepen.** Voor de ijkgroep $\mathbb{Z}_2 = \lbrace +1, -1\rbrace$, het centrum van SU(2), met hetzelfde gewicht, is alles een eindige som: de overdrachtsmatrix is een gewone matrix en elke verwachtingswaarde kan exact worden uitgeteld. Het bewijs van stelling C gebruikt van de groep alleen $\lvert\operatorname{Tr}\rvert \leq 2$, dus alle uitspraken van hoofdstuk 4 moeten daar met dezelfde constanten gelden. De lezers gebruikten daarnaast de niet-abelse eindige ondergroepen $Q_8$ en $2T$ van SU(2).
+- **SU(2) zelf.** Integralen over de groep met kwadratuur op de bol $S^3$, en simulaties met de code van het rapport (`ym/`).
+
+| bestand | toetsen | uitkomst |
+|---|---|---|
+| `tests/test_proofs_ab.py` (stelling A en B) | 79 | 74 geslaagd, 5 overgeslagen in de standaardrun; 79 geslaagd met de trage toetsen erbij |
+| `tests/test_proofs_c.py` (stelling C) | 160 | 151 geslaagd, 9 overgeslagen in de standaardrun; 160 geslaagd met de trage toetsen erbij |
+
+Wat is getoetst, met enkele uitkomsten:
+
+**Stelling A.**
+
+- $Z = \operatorname{Tr}\mathsf{T}^N$ tegen het uittellen van alle configuraties, voor $\mathbb{Z}_2$ in twee en drie dimensies: gelijk tot op afronding (relatief verschil hoogstens $3\cdot10^{-15}$). Bijvoorbeeld op het $3\times3\times3$-rooster bij $\beta = 0{,}4$: 603,4901773970 langs beide wegen.
+- De correlatieformule van punt 5 tegen uittellen: verschil hoogstens $2\cdot10^{-16}$.
+- De ontbinding (2.1) op willekeurige SU(2)-configuraties in twee, drie en vier dimensies: verschil hoogstens $2\cdot10^{-15}$; met de verkeerde keuze $g^t = v^t$ in plaats van de inverse is het verschil van orde 1 tot 10.
+- Positiviteit van de kern $K$ voor SU(2) (stap 3) en de reeks (2.2) voor één link: verschil hoogstens $3\cdot10^{-14}$.
+- De ongelijkheid (2.7) in $\mathbb{Z}_2$-laboratoria en voor SU(2) in twee dimensies.
+- Dat een grootheid uitdooft met het laagste niveau dat zij "ziet", en dat dit boven $m$ kan liggen: in het $\mathbb{Z}_2$-laboratorium met een ruimtelijk $3\times3$-rooster bij $\beta = 0{,}4$ dooft de plaquettecorrelatie uit met 3,797 terwijl $m = 2{,}574$.
+
+**Stelling B.**
+
+- De coëfficiënten $c_j$ op vier manieren uitgerekend (twee kwadraturen, de machtreeks, de gesloten formule (3.1)): onderling gelijk tot $2\cdot10^{-14}$.
+- De stap met het lemma van Schur met kwadratuur over de groep: gelijk tot $2\cdot10^{-11}$.
+- De eigenwaardevergelijking van punt 2 voor SU(2) met een Monte-Carlo-integraal: alle gevallen binnen 1,6 standaardafwijkingen.
+- Lemma B.1 en de Riccati-vergelijking (3.2); de asymptotiek (3.3).
+- De continuümlimiet van punt 5: voor $g = \ell = 1$ en $j = \tfrac12$ is $(E_j - E_0)/a$ gelijk aan 0,38024 ($L = 3$), 0,37547 ($L = 10$), 0,375005 ($L = 100$) en 0,375000 ($L = 1000$); de limiet is $\tfrac38 = 0{,}375$.
+- De convergentie in operatornorm: het verschil is $4{,}6\cdot10^{-4}$, $4{,}6\cdot10^{-6}$ en $4{,}6\cdot10^{-8}$ voor $L = 10$, 100 en 1000.
+- Een toets van begin tot eind met de simulatiecode van het rapport in twee dimensies (hier de getallen van `review/proofs/ref_b_r2_correlator.py`): op een $4\times4$-rooster bij $\beta = 8$ is de gemeten plaquette 0,820276(35) tegen 0,820307 uit stelling B (punt 4), en de gemeten correlatie van de lus rond de ring 0,133046(189) tegen 0,132953 uit stelling A (punt 5) en stelling B samen. De formule voor oneindig volume, $u(\beta) = 0{,}819249$, ligt 29 standaardafwijkingen van de meting: de toets onderscheidt de exacte formule van de benadering.
+
+**Stelling C.**
+
+- Lemma C.1 op 33 600 willekeurige gevallen: nooit geschonden, en de grens wordt bereikt (grootste verhouding 1,000000).
+- De meetkunde van §1.2 en §4.5 door uittellen op roosters van afmeting 3, 4 en 5 in twee, drie en vier dimensies, inclusief het optillen van paden in het bewijs van punt 3.
+- Lemma C.2, C.3 en C.4 met exacte warmtebadstappen op het $\mathbb{Z}_2$-model en op andere eindige systemen: nooit geschonden; lemma C.2 en C.3 worden bereikt (verhouding 1,0000).
+- Lemma C.5: voor $\mathbb{Z}_2$ is de som van de exacte coëfficiënten hoogstens 0,9975 maal $\alpha$. Voor SU(2) is de werkelijke coëfficiënt bij kleine $\beta$ gelijk aan $0{,}4244\ \beta$, dat is $4\beta/(3\pi)$; de som over de buren bij $\beta_0(D)$ is 0,427, 0,425 en 0,425 voor $D = 2, 3, 4$ en bereikt 1 bij 2,36 tot 2,37 maal $\beta_0(D)$. Voor grote $\beta$ nadert de coëfficiënt 1: 0,975 bij $\beta = 5$ en 0,99976 bij $\beta = 10$ (voor $D \geq 3$). Dit zijn de getallen waarnaar §4.1, §4.6 en §5.3 verwijzen.
+- Propositie C.6 en punt 1 van stelling C op het $3\times3$-rooster: nooit geschonden; de grootste verhouding tussen linker- en rechterlid is 0,04 respectievelijk 0,02.
+- Punt 2: de exacte kloof van het $\mathbb{Z}_2$-model. In twee dimensies met $L = 3$: 11,7365, 8,9897 en 6,9177 bij $\beta = 0{,}02$, $0{,}05$ en $0{,}10$, tegen de ondergrenzen 2,1204, 1,2048 en 0,5141. In drie dimensies met een ruimtelijk $3\times3$-rooster ($2^{18}$ toestanden): 11,7365, 8,9894 en 7,5823 bij $\beta = 0{,}02$, $0{,}05$ en $0{,}08$, tegen 1,4272, 0,5116 en 0,0429. Op grotere ruimtelijke roosters ($3\times4$, $4\times4$, $4\times5$) wordt de kloof niet kleiner.
+- Elk getal in hoofdstuk 4 en in de alinea's van §5.3 over stelling C wordt door de toetsen uit dit document zelf gelezen en nagerekend; verandert een getal in de tekst, dan faalt de toets.
+
+**Hebben de toetsen onderscheidend vermogen?** Dat is nagegaan door formules opzettelijk te verstoren en te kijken of de toetsen dan falen (`review/proofs/r2_test_c_mutations.py`, `review/proofs/r3_test_ab_mutations.py`). Voor stelling A en B: 10 van de 10 verstoringen worden opgemerkt. Voor stelling C: 43 van de 51; de 8 die niet worden opgemerkt, zijn vooraf als zodanig voorspeld en staan hieronder bij de beperkingen.
+
+### 6.3 Wat niet is gecontroleerd
+
+- **Geen menselijke lezer.** Zie het begin van dit hoofdstuk.
+- **Stelling C voor SU(2) zelf.** Propositie C.6 en de punten 1, 2 en 3 zijn alleen op $\mathbb{Z}_2$-modellen en andere eindige systemen uitgeteld. Voor SU(2) is alleen de coëfficiënt van lemma C.5 nagerekend, met kwadratuur en een numerieke zoektocht naar het maximum; dat is geen gecertificeerd supremum.
+- **De constanten van propositie C.6 en punt 1.** In de laboratoria zijn deze grenzen ruim. Een constante die een factor 6 tot 50 te klein zou zijn, of een uitdovingssnelheid die tot een factor 2 te groot zou zijn, zouden de toetsen niet opmerken. Dat de constanten kloppen, berust dus op het bewijs en op de twee leesrondes, niet op de toetsen.
+- **Punt 3 van stelling C.** In twee dimensies is het linkerlid kleiner dan $10^{-37}$; die toets laat alleen zien dat er niets tegenstrijdigs gebeurt.
+- **Limieten.** De limieten $N \to \infty$ en $t \to \infty$ zijn alleen bij eindige waarden bekeken ($N$ tot 40, $t$ tot 80).
+- **Maattheorie.** Uitspraken over meetbaarheid, nulverzamelingen en het verwisselen van integralen laten zich niet numeriek toetsen; zij zijn alleen gelezen.
+- **De beoordeling van de toetsen voor stelling A en B.** Een aparte ronde die dit toetsbestand kritisch moest nalopen, is twee keer afgebroken door een gebruikslimiet. Zij heeft negen toetsen toegevoegd maar geen verslag opgeleverd. De toetsen slagen en de tien verstoringen hierboven worden alle opgemerkt; een volledige tweede blik op dit bestand ontbreekt.
+- **De literatuur.** Geen van de aangehaalde artikelen kon worden geopend (hoofdstuk 7). Wat er over hun inhoud staat, berust op titels, samenvattingen in zoekresultaten en het geheugen van het AI-systeem.
+- **De opmaak van de pdf.** De formules in `BEWIJZEN.pdf` zijn gezet met een eenvoudig zetprogramma (dat van `matplotlib`); `pdf/make_bewijzen_pdf.py` vertaalt de notatie daarvoor. Het bronbestand `BEWIJZEN.md` is leidend.
 
 ---
 
 ## 7. Herkomst en literatuur
 
-De stellingen in dit document zijn bekend. De bewijzen zijn hier opnieuw uitgeschreven; de schrijver heeft de oorspronkelijke artikelen in deze sessie niet kunnen openen, dus de toeschrijvingen hieronder berusten op het geheugen van het AI-systeem en op zoekresultaten. Legenda: ✔ = titel en vindplaats via een zoekmachine teruggevonden; ○ = uit het geheugen geciteerd, niet opnieuw gecontroleerd (jaartal, band of pagina kan een fout bevatten).
+De uitspraken van de drie stellingen zijn bekend; de bewijzen zijn hier opnieuw uitgeschreven. De schrijver heeft geen van de artikelen hieronder kunnen openen: de uitgeverssites waren in deze sessie niet bereikbaar. De toeschrijvingen berusten daarom op het geheugen van het AI-systeem, op titels en vindplaatsen uit zoekresultaten, en waar vermeld op samenvattingen die in zoekresultaten te lezen waren. Legenda: ✔ = titel en vindplaats via een zoekmachine teruggevonden (op 11 of 16 november 2026); ○ = uit het geheugen geciteerd, niet teruggevonden (jaartal, band of pagina kan een fout bevatten). Een ✔ zegt dus niets over de inhoud van het artikel.
 
 **Stelling A (overdrachtsmatrix, reflectiepositiviteit, uniek vacuüm).**
 
-- ○ M. Lüscher, "Construction of a selfadjoint, strictly positive transfer matrix for Euclidean lattice gauge theories", Commun. Math. Phys. 54 (1977) 283.
+- ✔ M. Lüscher, "Construction of a selfadjoint, strictly positive transfer matrix for Euclidean lattice gauge theories", Commun. Math. Phys. 54 (1977) 283–292.
 - ✔ K. Osterwalder, E. Seiler, "Gauge field theories on a lattice", Ann. Phys. 110 (1978) 440–471.
-- ○ M. Creutz, "Gauge fixing, the transfer matrix, and confinement on a lattice", Phys. Rev. D15 (1977) 1128.
-- ○ E. Seiler, *Gauge Theories as a Problem of Constructive Quantum Field Theory and Statistical Mechanics*, Lecture Notes in Physics 159, Springer (1982).
-- De uniciteit van het vacuüm volgt uit de stelling van Perron–Frobenius in de vorm van Jentzsch voor integraaloperatoren met positieve kern; zie bijvoorbeeld ○ M. Reed, B. Simon, *Methods of Modern Mathematical Physics IV*, Academic Press (1978), §XIII.12.
+- ✔ M. Creutz, "Gauge fixing, the transfer matrix, and confinement on a lattice", Phys. Rev. D15 (1977) 1128–1136.
+- ✔ E. Seiler, *Gauge Theories as a Problem of Constructive Quantum Field Theory and Statistical Mechanics*, Lecture Notes in Physics 159, Springer (1982).
+- De uniciteit van het vacuüm volgt uit de stelling van Perron–Frobenius in de vorm van Jentzsch voor integraaloperatoren met positieve kern; zie bijvoorbeeld ✔ M. Reed, B. Simon, *Methods of Modern Mathematical Physics IV: Analysis of Operators*, Academic Press (1978), §XIII.12 (het sectienummer is teruggevonden in artikelen die ernaar verwijzen), en ○ R. Jentzsch, "Über Integralgleichungen mit positivem Kern", J. Reine Angew. Math. 141 (1912) 235–244.
 
 **Stelling B (twee dimensies).**
 
-- ○ A. A. Migdal, "Recursion equations in gauge field theories", Sov. Phys. JETP 42 (1975) 413.
-- ○ D. J. Gross, E. Witten, "Possible third-order phase transition in the large-N lattice gauge theory", Phys. Rev. D21 (1980) 446 (de één-plaquette-integraal en de karakterontwikkeling).
-- ○ E. Witten, "On quantum gauge theories in two dimensions", Commun. Math. Phys. 141 (1991) 153–209.
-- ✔ B. K. Driver, "$\mathrm{YM}_2$: continuum expectations, lattice convergence, and lassos", Commun. Math. Phys. 123 (1989) 575–616; ✔ L. Gross, C. King, A. Sengupta, "Two-dimensional Yang–Mills theory via stochastic differential equations", Ann. Phys. 194 (1989) 65–112 (rigoureuze constructie van de continuümtheorie in twee dimensies).
+- ✔ A. A. Migdal, "Recursion equations in gauge field theories", Sov. Phys. JETP 42 (1975) 413.
+- ✔ D. J. Gross, E. Witten, "Possible third-order phase transition in the large-N lattice gauge theory", Phys. Rev. D21 (1980) 446 (in twee dimensies valt de roostertheorie uiteen in één-plaquette-integralen; daar opgelost voor U(N) bij grote N).
+- ○ J.-M. Drouffe, J.-B. Zuber, "Strong coupling and mean field methods in lattice gauge theories", Phys. Rep. 102 (1983) 1–119 (karakterontwikkeling).
+- ✔ J. E. Hetrick, Y. Hosotani, "Yang–Mills theory on a circle", Phys. Lett. B230 (1989) 88–92; ○ S. G. Rajeev, "Yang–Mills theory on a cylinder", Phys. Lett. B212 (1988) 203–205; ○ J. Dimock, "Canonical quantization of Yang–Mills on a circle", Rev. Math. Phys. 8 (1996) 85–102 (de Hamiltoniaan op een cirkel, met spectrum evenredig met $j(j+1)$).
+- ✔ E. Witten, "On quantum gauge theories in two dimensions", Commun. Math. Phys. 141 (1991) 153–209.
+- ✔ L. Gross, C. King, A. Sengupta, "Two-dimensional Yang–Mills theory via stochastic differential equations", Ann. Phys. 194 (1989) 65–112; ✔ B. K. Driver, "$\mathrm{YM}_2$: continuum expectations, lattice convergence, and lassos", Commun. Math. Phys. 123 (1989) 575–616 (rigoureuze constructie van de continuümmaat op het vlak; Driver: convergentie van de roosterverwachtingen).
+- ✔ A. Ashtekar, J. Lewandowski, D. Marolf, J. Mourão, T. Thiemann, "SU(N) quantum Yang–Mills theory in two dimensions: a complete solution", J. Math. Phys. 38 (1997) 5453–5482 (vlak en cilinder; alle Wilson-lussen; verband met de Hamiltoniaan; aangepaste Osterwalder–Schrader-axioma's; volgens de samenvatting).
 
 **Stelling C (sterke koppeling).**
 
 - ✔ K. Osterwalder, E. Seiler (1978), hierboven: kloof en opsluiting bij sterke koppeling met een clusterontwikkeling.
-- ○ R. L. Dobrushin, "The description of a random field by means of conditional probabilities and conditions of its regularity", Theory Probab. Appl. 13 (1968) 197–224; "Prescribing a system of random variables by conditional distributions", Theory Probab. Appl. 15 (1970) 458–486 (de uniciteitsvoorwaarde waarop §4 berust).
-- ○ H. Föllmer, "A covariance estimate for Gibbs measures", J. Funct. Anal. 46 (1982) 387–395; ○ H. Künsch, "Decay of correlations under Dobrushin's uniqueness condition and its applications", Commun. Math. Phys. 84 (1982) 207–222.
-- ○ B. Simon, *The Statistical Mechanics of Lattice Gases*, vol. 1, Princeton University Press (1993), hoofdstuk V; ○ H.-O. Georgii, *Gibbs Measures and Phase Transitions*, de Gruyter (1988), hoofdstuk 8.
+- ✔ R. L. Dobrushin, "The description of a random field by means of conditional probabilities and conditions of its regularity", Theory Probab. Appl. 13 (1968) 197–224; ✔ "Prescribing a system of random variables by conditional distributions", Theory Probab. Appl. 15 (1970) 458–486 (de uniciteitsvoorwaarde waarop hoofdstuk 4 berust).
+- ✔ L. Gross, "Decay of correlations in classical lattice models at high temperature", Commun. Math. Phys. 68 (1979) 9–27; ✔ H. Föllmer, "A covariance estimate for Gibbs measures", J. Funct. Anal. 46 (1982) 387–395; ✔ H. Künsch, "Decay of correlations under Dobrushin's uniqueness condition and its applications", Commun. Math. Phys. 84 (1982) 207–222.
+- ✔ B. Simon, *The Statistical Mechanics of Lattice Gases*, vol. 1, Princeton University Press (1993), hoofdstuk V; ✔ H.-O. Georgii, *Gibbs Measures and Phase Transitions*, de Gruyter (1988), hoofdstuk 8.
+- ✔ S. Chatterjee, "Wilson loops in Ising lattice gauge theory", Commun. Math. Phys. 377 (2020) 307–340 (band en pagina's ○; een variant van de voorwaarde van Dobrushin bij sterke koppeling, voor de groep $\mathbb{Z}_2$); ✔ S. Chatterjee, "A probabilistic mechanism for quark confinement", Commun. Math. Phys. 385 (2021) 1007–1039 (exponentieel verval onder willekeurige randvoorwaarden impliceert opsluiting als het centrum van de groep niet triviaal is).
 - ✔ H. Shen, R. Zhu, X. Zhu, "A stochastic analysis approach to lattice Yang–Mills at strong coupling", Commun. Math. Phys. 400 (2023) 805–851 (een recent bewijs van de kloof bij sterke koppeling met expliciete grens, langs een andere weg).
+
+De expliciete constanten van stelling C, $\beta_0(D) = \operatorname{artanh}\big(1/(6(D-1))\big)$ en de ondergrens $\ln(1/\alpha)$, zijn in dit document zelf uitgerekend; wij hebben ze in deze vorm niet in de literatuur teruggevonden.
 
 **Het open probleem en de gedeeltelijke resultaten (hoofdstuk 5).**
 
 - ✔ A. Jaffe, E. Witten, "Quantum Yang–Mills Theory", officiële probleembeschrijving, Clay Mathematics Institute (2000).
-- ○ A. H. Guth, Phys. Rev. D21 (1980) 2291; ○ J. Fröhlich, T. Spencer, Commun. Math. Phys. 83 (1982) 411 (U(1) in vier dimensies bij zwakke koppeling).
+- ✔ A. H. Guth, "Existence proof of a nonconfining phase in four-dimensional U(1) lattice gauge theory", Phys. Rev. D21 (1980) 2291 (ondergrens van Coulomb-vorm voor Wilson-lussen bij zwakke koppeling, voor de Villain-vorm van de actie); ✔ J. Fröhlich, T. Spencer, "Massless phases and symmetry restoration in abelian gauge theories and spin systems", Commun. Math. Phys. 83 (1982) 411–454 (nieuw bewijs, volgens de auteurs niet gebonden aan de Villain-vorm; de samenvatting noemt de fase bij zwakke koppeling masseloos).
+- ✔ M. P. Forsström, "Decay of correlations in finite Abelian lattice gauge theories", Commun. Math. Phys. 393 (2022) 1311–1346 (verval van correlaties voor eindige abelse ijkgroepen in vier dimensies bij zwakke koppeling); ✔ R. Marra, S. Miracle-Solé, "On the statistical mechanics of the gauge invariant Ising model", Commun. Math. Phys. 67 (1979) 233–240 (ontwikkeling bij lage temperatuur voor $\mathbb{Z}_2$; dat daaruit de omtrekwet volgt, is uit het geheugen).
 - ✔ T. Bałaban, "Renormalization group approach to lattice gauge field theories I", Commun. Math. Phys. 109 (1987) 249–301, en de overige artikelen van de reeks (zie `THEORY.md` §9).
-- ✔ M. P. Forsström, "Decay of correlations in finite Abelian lattice gauge theories", Commun. Math. Phys. 393 (2022) 1311–1346 (exponentieel verval van correlaties voor eindige abelse ijkgroepen in vier dimensies bij zwakke koppeling); ○ R. Marra, S. Miracle-Solé, "On the statistical mechanics of the gauge invariant Ising model", Commun. Math. Phys. 67 (1979) 233–240 (omtrekwet voor $\mathbb{Z}_2$ bij zwakke koppeling).
 
 De volledige lijst met de numerieke literatuur staat in `THEORY.md` §9 en `literature.json`.
 

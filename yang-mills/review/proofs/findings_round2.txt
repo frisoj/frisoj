@@ -1,8 +1,9 @@
 Reports on BEWIJZEN.md, round 2 (16 November 2026).
 
-Two passes by the same AI system that wrote the document: a line-by-line check of every passage that
+Three passes by the same AI system that wrote the document: a line-by-line check of every passage that
 was new or changed after round 1 ("referee:delta", against commit 131fa9c), and the completion of
-tests/test_proofs_c.py ("tests:C-finish"). No mathematician has reviewed the document. The findings
+tests/test_proofs_c.py ("tests:C-finish"), and a check of the references and of the statements about the
+literature ("literature"; only search results were available, no paper could be opened). No mathematician has reviewed the document. The findings
 were processed afterwards (see README.md in this folder).
 
 ====================================================================================================
@@ -478,4 +479,223 @@ TESTS
     checks: Stelling C point 3, last sentence: the inequality of point 1 for the infinite-volume state with Z^D distances
     method: exact infinite-volume expectations (Z2, D = 2), BFS on Z^2, 14 (A,B,f,g), three beta, five theta (NEW test)
     result: pass; max |<fg>-<f><g>| / bound = 0.0099
+
+====================================================================================================
+REPORT OF literature
+====================================================================================================
+
+SUMMARY
+Scope: section 7, the appendix, and the literature claims in sections 3.2, 3.4, 4.6 and 5 of /home/user/frisoj/yang-mills/BEWIJZEN.md. No fatal or major problem. The document nowhere claims to solve the Millennium problem. BEWIJZEN.md was not edited and nothing was committed.
+
+Limits of this check: only search-result snippets were available. Direct fetches of arxiv.org, archives.ihes.fr and typeset.io failed because those hosts are outside the session's allowed network domains, so no primary source was opened. To open the papers, those hosts (and link.springer.com, projecteuclid.org) would have to be allowed in the network settings.
+
+1. References. All 23 entries of section 7 exist, and I found no wrong author, journal, volume, year or first page. The ○ entries can be upgraded to ✔ for title and venue, with these additions:
+- Lüscher: pages 283–292.
+- Creutz: pages 1128–1136.
+- Fröhlich–Spencer: pages 411–454; the entry has no title.
+- Guth: the entry has no title.
+- Simon: chapter V is "High Temperature and Low Densities"; Dobrushin's theorem is Theorem V.1.1/V.1.3.
+- Georgii: chapter 8 is "Uniqueness", §8.1 "Dobrushin's condition of weak dependence".
+- Reed–Simon: §XIII.12 is confirmed by secondary citations.
+
+2. Attributions.
+- **Lüscher, Osterwalder–Seiler, Creutz:** accurate.
+- **Driver and Gross–King–Sengupta:** over-attributed in §3.2. They treat the plane R^2, not the ring of Stelling B. Driver's abstract gives Wilson-loop expectations and lattice convergence and does not mention the axioms. The fitting source for cylinder, Hamiltonian and OS-type axioms is Ashtekar et al. 1997.
+- **Guth:** a Coulomb-form lower bound on Wilson loops, hence no confinement, for the Villain action only.
+- **Fröhlich–Spencer:** a new proof not tied to the Villain action; their abstract calls the phase "massless (QED)". I could not verify that any theorem proves absence of exponential decay of a gauge-invariant correlation. The "dus" in §5.3 therefore rests on an unverified premise.
+- **A rigorous route for the method:** Proposition C.6, together with Chatterjee 2021 (decay under arbitrary boundary conditions implies the area law for compact connected groups with non-trivial center) and the proven perimeter law, shows that condition (4.1) cannot hold for U(1) in four dimensions at weak coupling. This rests on the abstract of Chatterjee 2021; the exact hypothesis must be checked.
+- **Z2 parenthetical:** accurate. Forsström's result is confirmed; the perimeter-law content of Marra–Miracle-Solé is not.
+- **Bałaban (§5.4):** correct in substance, but "na renormalisatie" is missing.
+- **Jaffe–Witten (§5.1):** the paraphrase drops "non-trivial".
+
+3. Appendix. S1–S5 are correct as stated. S6 is correct, and the DLMF sections are right: 10.25 (10.25.2), 10.29 (10.29.1, 10.29.2), 10.32 (10.32.3), 10.40 (10.40.1). The section numbers are from memory plus snippets; the formulas pass numerically in /home/user/frisoj/yang-mills/review/proofs/r2_lit_checks.py.
+
+4. Two-loop formula. The formula in §5.1 is identical to THEORY.md §4.5 and to a_lambda_two_loop, and reproduces the THEORY.md table. The doubling step is 11 ln 2/(3 pi^2) = 0.2575 asymptotically and 0.2745 at beta = 2.4, so "ongeveer 0,26" and "ongeveer 0,27" are right.
+
+5. Earlier Dobrushin-type work on lattice gauge theory exists, all recent:
+- Chatterjee, CMP 377 (2020): a variant of Dobrushin's condition for Z2 at strong coupling.
+- Chatterjee, CMP 385 (2021): a remark pointing to Dobrushin–Shlosman for strong coupling.
+- Chatterjee's 2026 lecture notes, ch. 15–16, and M. R. Douglas's Lean project "lgt" (U(n), beta < 1/(32n(d-1))); both seen only as an unrefereed project page.
+- Forsström 2022: disagreement percolation at weak coupling.
+I found no pre-2018 paper applying Dobrushin's condition to lattice gauge theory.
+
+6. "Known results". Fair for the qualitative statements, with three gaps:
+- The explicit constants of Stelling C are the document's own.
+- The Dobrushin route in gauge theory is not cited.
+- Point 5 of Stelling B has no source for the Hamiltonian on a circle, and those sources are from 1988–1997, not "zeventig en tachtig".
+
+REFERENCES
+- [found_correct] ○ M. Lüscher, "Construction of a selfadjoint, strictly positive transfer matrix for Euclidean lattice gauge theories", Commun. Math. Phys. 54 (1977) 283.
+    corrected: M. Lüscher, "Construction of a selfadjoint, strictly positive transfer matrix for Euclidean lattice gauge theories", Commun. Math. Phys. 54 (1977) 283–292. Can be marked ✔.
+    attribution: Yes. The abstract fragment in the search result says physical positivity holds in Wilson's lattice gauge theory, and that the state space and the transfer matrix e^{-aH} are constructed. The paper includes fermions.
+    source: Search results: Project Euclid listing (CMP volume 54, issue 3), Scilit record, abstract fragment.
+- [found_correct] ✔ K. Osterwalder, E. Seiler, "Gauge field theories on a lattice", Ann. Phys. 110 (1978) 440–471.
+    corrected: No change.
+    attribution: Yes, with a caveat on the source. The area law at strong coupling is confirmed by secondary sources (Chatterjee's papers credit it to Osterwalder–Seiler). Reflection positivity and the mass gap by cluster expansion are from memory; no abstract is indexed.
+    source: Search results: Scilit record (Ann. Phys. 110(2), 440–471); secondary citations in Chatterjee, arXiv:2006.16229 and arXiv:1502.07719.
+- [found_correct] ○ M. Creutz, "Gauge fixing, the transfer matrix, and confinement on a lattice", Phys. Rev. D15 (1977) 1128.
+    corrected: M. Creutz, "Gauge fixing, the transfer matrix, and confinement on a lattice", Phys. Rev. D 15 (1977) 1128–1136. Can be marked ✔.
+    attribution: Yes. The abstract describes the transfer matrix in temporal gauge linking Wilson's formulation to the Kogut–Susskind Hamiltonian.
+    source: Search results: Scilit and OSTI records; citations in hep-lat/0106006.
+- [found_correct] ○ E. Seiler, Gauge Theories as a Problem of Constructive Quantum Field Theory and Statistical Mechanics, Lecture Notes in Physics 159, Springer (1982).
+    corrected: No change (iv + 192 pp.). Can be marked ✔.
+    attribution: Yes; cited as a general reference only.
+    source: Search results: library catalogue records (Texas A&M, Patras), bookseller listing.
+- [found_correct] ○ M. Reed, B. Simon, Methods of Modern Mathematical Physics IV, Academic Press (1978), §XIII.12.
+    corrected: M. Reed, B. Simon, Methods of Modern Mathematical Physics IV: Analysis of Operators, Academic Press (1978), §XIII.12 ("Nondegeneracy of the ground state"; Theorems XIII.43 and XIII.44).
+    attribution: Yes. Secondary citations attribute to Section XIII.12 exactly the result used: if the norm of a positivity-improving operator is an eigenvalue, it is simple with a strictly positive eigenvector. The section title is from memory; whether the section names Jentzsch was not checked.
+    source: Search results: arXiv papers citing "Section XIII.12" and "Theorem XIII.43" (hep-th/0405163, 1610.05503, 1008.2469). The table of contents was not seen.
+- [found_correct] ○ A. A. Migdal, "Recursion equations in gauge field theories", Sov. Phys. JETP 42 (1975) 413.
+    corrected: A. A. Migdal, "Recursion equations in gauge field theories", Sov. Phys. JETP 42 (1975) 413 [Zh. Eksp. Teor. Fiz. 69 (1975) 810]. Can be marked ✔.
+    attribution: Yes. The abstract says the recursion equation becomes exact in two-dimensional space-time.
+    source: Search results: JETP archive listing (ZhETF 69, no. 3, p. 810; translation JETP 42, no. 3, p. 413).
+- [found_correct] ○ D. J. Gross, E. Witten, "Possible third-order phase transition in the large-N lattice gauge theory", Phys. Rev. D21 (1980) 446 (de één-plaquette-integraal en de karakterontwikkeling).
+    corrected: D. J. Gross, E. Witten, "Possible third-order phase transition in the large-N lattice gauge theory", Phys. Rev. D 21 (1980) 446–453 (end page from memory). Can be marked ✔.
+    attribution: Partly. The abstract describes a steepest-descent solution of the two-dimensional U(N) theory at large N. The reduction to a one-plaquette integral is in the paper (from memory). A character expansion is not what the paper does, and it concerns U(N), not SU(2). See the finding on section 7.
+    source: Search results: Princeton publication record, OSTI, abstract.
+- [found_correct] ○ E. Witten, "On quantum gauge theories in two dimensions", Commun. Math. Phys. 141 (1991) 153–209.
+    corrected: No change. Can be marked ✔.
+    attribution: Yes; cited as a general reference. It is from 1991, so it does not fit "jaren zeventig en tachtig".
+    source: Search results: Project Euclid listing (CMP 141, issue 1), Scilit, Princeton record.
+- [found_correct] ✔ B. K. Driver, "YM_2: continuum expectations, lattice convergence, and lassos", Commun. Math. Phys. 123 (1989) 575–616.
+    corrected: No change.
+    attribution: Partly. The abstract covers the continuum theory in complete axial gauge on the plane, expectations of gauge-invariant functions of parallel transport, and convergence of the Wilson lattice expectations. It does not mention the axioms, and it concerns the plane, not the ring of Stelling B. The §7 gloss is fine; the §3.2 sentence attributes too much.
+    source: Search results: Springer abstract (BF01218586), author's page listing.
+- [found_correct] ✔ L. Gross, C. King, A. Sengupta, "Two-dimensional Yang–Mills theory via stochastic differential equations", Ann. Phys. 194 (1989) 65–112.
+    corrected: No change.
+    attribution: Partly, as for Driver. Secondary sources credit Gross, Driver, King and Sengupta with the first rigorous constructions of continuous two-dimensional Yang–Mills theory. That it is on the plane is from memory. No evidence that the axioms are verified there.
+    source: Not re-searched bibliographically (marked ✔ in THEORY.md §9 on 11 November 2026). Content from a secondary snippet (arXiv:2602.08591); the abstract was not found.
+- [found_correct] ○ R. L. Dobrushin, "The description of a random field by means of conditional probabilities and conditions of its regularity", Theory Probab. Appl. 13 (1968) 197–224.
+    corrected: No change (Theory Probab. Appl. 13, no. 2 (1968) 197–224; Russian original Teor. Veroyatnost. i Primenen. 13:2 (1968) 201–229). Math-Net.Ru shows a different back-translation of the title; the cited title is the SIAM one. Can be marked ✔.
+    attribution: Yes. The abstract says uniqueness holds when the conditional distributions are close to those of independent variables.
+    source: Search results: Math-Net.Ru (tvp839), mathdoc record.
+- [found_correct] ○ R. L. Dobrushin, "Prescribing a system of random variables by conditional distributions", Theory Probab. Appl. 15 (1970) 458–486.
+    corrected: No change (Theory Probab. Appl. 15, no. 3 (1970) 458–486; Russian original 15:3, 469–497). Can be marked ✔.
+    attribution: Yes: existence and uniqueness of random fields with given conditional distributions.
+    source: Search results: Scilit record (DOI 10.1137/1115049), Math-Net.Ru (tvp1856).
+- [found_correct] ○ H. Föllmer, "A covariance estimate for Gibbs measures", J. Funct. Anal. 46 (1982) 387–395.
+    corrected: No change. Can be marked ✔.
+    attribution: Yes: a covariance bound under Dobrushin's uniqueness condition.
+    source: Search results: Scilit record (J. Funct. Anal. 46(3), 387–395).
+- [found_correct] ○ H. Künsch, "Decay of correlations under Dobrushin's uniqueness condition and its applications", Commun. Math. Phys. 84 (1982) 207–222.
+    corrected: No change. Can be marked ✔.
+    attribution: Yes. The abstract gives an estimate on the correlation of functionals of Gibbs fields satisfying Dobrushin's uniqueness condition.
+    source: Search results: Springer record (BF01208568).
+- [found_correct] ○ B. Simon, The Statistical Mechanics of Lattice Gases, vol. 1, Princeton University Press (1993), hoofdstuk V.
+    corrected: B. Simon, The Statistical Mechanics of Lattice Gases, Volume I, Princeton University Press (1993), chapter V ("High Temperature and Low Densities"), §V.1 (Dobrushin's uniqueness theorem, Theorems V.1.1 and V.1.3). Can be marked ✔.
+    attribution: Yes; the chapter number is right.
+    source: Search results: publisher and bookseller tables of contents (chapter V at p. 400); an arXiv paper citing "[Sim93, Theorem V.1.3]".
+- [found_correct] ○ H.-O. Georgii, Gibbs Measures and Phase Transitions, de Gruyter (1988), hoofdstuk 8.
+    corrected: No change (chapter 8 "Uniqueness": §8.1 "Dobrushin's condition of weak dependence", §8.2 "Further consequences of Dobrushin's condition"). Can be marked ✔.
+    attribution: Yes; the chapter number is right.
+    source: Search results: table of contents on the Lehmanns listing; library record of the Austrian Academy of Sciences.
+- [found_correct] ✔ H. Shen, R. Zhu, X. Zhu, "A stochastic analysis approach to lattice Yang–Mills at strong coupling", Commun. Math. Phys. 400 (2023) 805–851.
+    corrected: No change.
+    attribution: Yes (mass gap at strong coupling with an explicit bound, by Langevin dynamics and functional inequalities); not re-examined in depth.
+    source: Marked ✔ in THEORY.md §9 on 11 November 2026; the title was seen again in a university publication listing.
+- [found_correct] ✔ A. Jaffe, E. Witten, "Quantum Yang–Mills Theory", officiële probleembeschrijving, Clay Mathematics Institute (2000).
+    corrected: No change.
+    attribution: Nearly. The official statement asks for a "non-trivial" quantum Yang–Mills theory; the lead sentence of §5.1 omits that word, although item 1 of the list mentions it.
+    source: Search results: Wikipedia article "Yang–Mills existence and mass gap", which quotes the statement; the Clay monograph PDF appeared in the results but was not opened.
+- [found_with_corrections] ○ A. H. Guth, Phys. Rev. D21 (1980) 2291
+    corrected: A. H. Guth, "Existence proof of a nonconfining phase in four-dimensional U(1) lattice gauge theory", Phys. Rev. D 21 (1980) 2291–2307 (end page from memory). Can be marked ✔ for title and first page.
+    attribution: Yes for "no confinement at weak coupling", with one restriction: the abstract says the bound is for the Villain form of the action. It is a Coulomb-form lower bound on the Wilson loop. Nothing in it concerns a mass gap.
+    source: Search results: APS DOI 10.1103/PhysRevD.21.2291 with abstract summary; the Fröhlich–Spencer IHES preprint describing Guth's result.
+- [found_with_corrections] ○ J. Fröhlich, T. Spencer, Commun. Math. Phys. 83 (1982) 411 (U(1) in vier dimensies bij zwakke koppeling).
+    corrected: J. Fröhlich, T. Spencer, "Massless phases and symmetry restoration in abelian gauge theories and spin systems", Commun. Math. Phys. 83 (1982) 411–454. Can be marked ✔.
+    attribution: Yes for "no confinement" and for "beschrijven die fase als masseloos". The abstract reads: a new, elementary proof of a deconfining transition to a massless (QED) phase in the four-dimensional U(1) lattice gauge theory. The preprint says the method is not tied to the Villain action. Not verified: that a theorem proves absence of exponential decay of some gauge-invariant correlation.
+    source: Search results: Springer record (BF01213610), OSTI, abstract and snippets of IHES preprint P/81/40. The PDF could not be opened.
+- [found_correct] ✔ T. Bałaban, "Renormalization group approach to lattice gauge field theories I", Commun. Math. Phys. 109 (1987) 249–301, en de overige artikelen van de reeks.
+    corrected: No change.
+    attribution: Mostly. Secondary sources confirm ultraviolet stability in d = 3 and 4, meaning stability bounds on the partition function uniform in the cutoff, and that convergence of expectations is not established. §5.4 omits "na renormalisatie", which THEORY.md §6.2 has.
+    source: Marked ✔ in THEORY.md §9; content from search snippets (survey arXiv:2204.08252, Dimock's expository papers arXiv:1108.1335 and 1212.5562).
+- [found_correct] ✔ M. P. Forsström, "Decay of correlations in finite Abelian lattice gauge theories", Commun. Math. Phys. 393 (2022) 1311–1346.
+    corrected: No change (arXiv:2104.03752).
+    attribution: Yes: lattice gauge theory on Z^4 with finite abelian group at large inverse coupling, with an upper bound on the decay of correlations of local functions. That the bound is exponential in the distance is from memory of the theorem.
+    source: Search results: Springer record (DOI 10.1007/s00220-022-04391-0), arXiv listing.
+- [found_correct] ○ R. Marra, S. Miracle-Solé, "On the statistical mechanics of the gauge invariant Ising model", Commun. Math. Phys. 67 (1979) 233–240 (omtrekwet voor Z_2 bij zwakke koppeling).
+    corrected: No change (Commun. Math. Phys. 67, no. 3 (1979) 233–240). Can be marked ✔ for the bibliographic data only.
+    attribution: Not confirmed. No abstract is indexed. Secondary snippets say the Wilson loop of the pure Z2 theory obeys a perimeter law at low temperature and mention the Marra–Miracle-Solé expansion, but none ties the perimeter law to this paper. A second, verifiable source is advisable; see the suggested references.
+    source: Search results: Project Euclid record (euclid.cmp/1103905211), Scilit, Sciencegate.
+
+FACTUAL FINDINGS
+
+--- [minor] §5.3, paragraph "Waarom een algemeen argument niet kan volstaan"
+QUOTE: Maar voor U(1) in vier dimensies is bewezen dat de theorie zich bij zwakke koppeling anders gedraagt dan bij sterke koppeling: er is dan geen opsluiting (Guth 1980; Fröhlich en Spencer 1982), en Fröhlich en Spencer beschrijven die fase als masseloos, de fase van het vrije foton. In een masseloze fase vallen de correlaties niet exponentieel af en is er geen kloof die uniform is in het volume. Een bewijs van de kloof voor SU(2) bij alle β in vier dimensies moet dus iets gebruiken wat SU(2) van U(1) onderscheidt.
+PROBLEM: Three points.
+(a) Guth's theorem is for the Villain action. The sentence before it is about the weight exp(beta * sum Re U_p). For that weight only Fröhlich–Spencer applies; their preprint says their method is not tied to the Villain action.
+(b) What is proved is a Coulomb-form lower bound on the Wilson loop, so no area law. "Masseloos" is the wording of the Fröhlich–Spencer abstract. Neither round 1 nor this check could confirm a theorem that some gauge-invariant truncated correlation fails to decay exponentially, or that the transfer-matrix gap on periodic lattices is not uniform. A lower bound on Wilson loops does not imply that.
+(c) The "dus" therefore rests on an unverified premise. It is certainly the physical expectation, but it is presented as a consequence of proved statements.
+For the narrower conclusion about the method there is a route that uses only proved statements. Proposition C.6 gives exponentially small influence of arbitrary boundary conditions. Chatterjee (CMP 385, 2021) proves that exponential decay under arbitrary boundary conditions implies the area law for a compact connected group with non-trivial center. The area law is proved false for U(1) in four dimensions at weak coupling. I saw only the abstract of Chatterjee 2021, so the match between C.6 and his hypothesis must be checked before this is stated as a theorem.
+PROPOSED FIX: Vervang de drie geciteerde zinnen en de twee zinnen erna door:
+
+"Maar voor U(1) in vier dimensies is bewezen dat de theorie zich bij zwakke koppeling anders gedraagt dan bij sterke koppeling: de verwachtingswaarde van een Wilson-lus heeft dan een ondergrens van Coulomb-vorm, die niet sneller daalt dan exponentieel in de omtrek van de lus, zodat er geen opsluiting is (Guth 1980, voor de Villain-vorm van de actie; Fröhlich en Spencer 1982, met een bewijs dat volgens de auteurs niet aan die vorm gebonden is). Fröhlich en Spencer noemen die fase masseloos, de fase van het vrije foton. In een masseloze fase vallen de correlaties niet exponentieel af en is er geen kloof die uniform is in het volume; of dat voor U(1) ook als stelling is bewezen, hebben wij niet kunnen nagaan, en wij gebruiken het hier als verwachting. Als die verwachting juist is, moet een bewijs van de kloof voor SU(2) bij alle $\beta$ in vier dimensies iets gebruiken wat SU(2) van U(1) onderscheidt. Voor de methode van hoofdstuk 4 is er een argument dat alleen op bewezen uitspraken steunt: propositie C.6 zegt dat de invloed van willekeurige randvoorwaarden exponentieel uitdooft, en volgens Chatterjee (2021) volgt uit exponentieel verval van correlaties onder willekeurige randvoorwaarden, voor een samenhangende compacte ijkgroep met niet-triviaal centrum, de oppervlaktewet. Die geldt voor U(1) in vier dimensies bij zwakke koppeling bewezen niet. De voorwaarde (4.1) kan daar dus niet gelden, en omdat de afschattingen van hoofdstuk 4 voor U(1) en SU(2) dezelfde zijn, is niet te verwachten dat stelling C in vier dimensies tot alle $\beta$ kan worden opgerekt. (Of propositie C.6 precies de voorwaarde van Chatterjee levert, is hier niet uitgeschreven.)"
+
+De slotzin tussen haakjes over $\mathbb{Z}_2$ kan blijven staan.
+
+--- [minor] §3.2, last sentences of "In gewone taal"; §7, gloss on Driver and Gross–King–Sengupta
+QUOTE: de continuümlimiet van álle verwachtingswaarden (Wilson-lussen) en de axioma's, waaronder draai-invariantie, worden hier niet bewezen; voor twee dimensies staat dat in de literatuur (Driver 1989; Gross, King en Sengupta 1989; zie hoofdstuk 7).
+PROBLEM: Over-attribution. Driver's abstract covers the continuum theory on the plane in complete axial gauge, expectations of gauge-invariant functions of parallel transport, and convergence of the Wilson lattice expectations. Gross–King–Sengupta construct the continuum measure. Neither abstract mentions Osterwalder–Schrader or Wightman axioms, and both concern the plane R^2, not the ring of Stelling B. The source that covers plane and cylinder, the link to the Hamiltonian, and an Osterwalder–Schrader-type axiom scheme is Ashtekar, Lewandowski, Marolf, Mourão, Thiemann, J. Math. Phys. 38 (1997) 5453–5482 (abstract seen). That the limit depends only on enclosed areas and crossing topology is from my memory of Driver's abstract.
+PROPOSED FIX: "Dat is minder dan wat het millenniumprobleem onder "bestaan" verstaat: de continuümlimiet van álle verwachtingswaarden (Wilson-lussen) en de axioma's, waaronder draai-invariantie, worden hier niet bewezen. In de literatuur staat voor twee dimensies meer. Gross, King en Sengupta (1989) en Driver (1989) construeren de continuümmaat op het vlak $\mathbb{R}^2$, en Driver bewijst dat de roosterverwachtingen van Wilson-lussen ernaar convergeren; de limiet hangt alleen af van de omsloten oppervlakken en van de manier waarop de krommen elkaar kruisen, en is dus draai-invariant. Voor het vlak en de cilinder (de ring van dit hoofdstuk) geven Ashtekar, Lewandowski, Marolf, Mourão en Thiemann (1997) gesloten formules voor alle Wilson-lussen, het verband met de Hamiltoniaanse beschrijving en een voor ijktheorieën aangepaste vorm van de Osterwalder–Schrader-axioma's (zie hoofdstuk 7). Let ook op de kanttekening in §3.4."
+
+In §7 de toelichting bij Driver en Gross–King–Sengupta wijzigen in: "(rigoureuze constructie van de continuümmaat op het vlak; Driver: convergentie van de roosterverwachtingen)" en toevoegen: "- ✔ A. Ashtekar, J. Lewandowski, D. Marolf, J. Mourão, T. Thiemann, "SU(N) quantum Yang–Mills theory in two dimensions: a complete solution", J. Math. Phys. 38 (1997) 5453–5482, arXiv:hep-th/9605128 (vlak en cilinder; alle Wilson-lussen; verband met de Hamiltoniaan; aangepaste Osterwalder–Schrader-axioma's)."
+
+--- [minor] Opening paragraph "Niet nieuw"; §7, first sentence; §4.6 "Verband met clusterontwikkelingen"
+QUOTE: De drie stellingen zijn bekende resultaten uit de jaren zeventig en tachtig (hoofdstuk 7).
+PROBLEM: Fair for the qualitative statements, but imprecise in three ways.
+(1) The explicit constants of Stelling C (beta_0(D) = artanh(1/(6(D-1))) and the bound ln(1/(6(D-1) tanh beta))) are the document's own computation. I found them nowhere. "Bekend" lends them an authority they do not have.
+(2) The Dobrushin route in lattice gauge theory is documented only recently, and none of it is cited: Chatterjee, "Wilson loops in Ising lattice gauge theory" (CMP 2020), uses a variant of Dobrushin's condition for Z2 at strong coupling and, per the search snippet, says he could not find the exact statement in the literature; Chatterjee (CMP 385, 2021) points to Dobrushin–Shlosman for strong coupling; a Lean project by M. R. Douglas formalises the same method for U(n) at beta < 1/(32n(d-1)), citing Chatterjee's 2026 lecture notes.
+(3) Point 5 of Stelling B (spectrum (g^2 l/2) j(j+1) on a circle) has no source in §7, and the natural sources are from 1988–1997, not "zeventig en tachtig".
+In addition, §4.6 says the Dobrushin proof gives "niet de oppervlaktewet". That is true of the proof as written, but by Chatterjee 2021 decay under arbitrary boundary conditions (Proposition C.6) implies the area law for SU(2); a pointer would be accurate.
+PROPOSED FIX: Openingsalinea: "**Niet nieuw.** De uitspraken van de drie stellingen zijn bekend uit de literatuur van de jaren zeventig tot en met negentig (hoofdstuk 7). De expliciete constanten van stelling C ($\beta_0(D)$ en de ondergrens $\ln(1/\alpha)$) zijn hier zelf uitgerekend en staan, voor zover wij konden nagaan, niet in deze vorm in de literatuur. Wat dit document toevoegt, is dat de bewijzen in één notatie stap voor stap zijn uitgeschreven, met alleen de standaardresultaten uit de bijlage als voorkennis, en dat de stappen ook numeriek zijn nagerekend (hoofdstuk 6)."
+
+§4.6, na de laatste zin: "Die weg is niet nieuw: Chatterjee (2020) gebruikt een variant van de voorwaarde van Dobrushin voor het exponentiële verval bij sterke koppeling in de roosterijktheorie met groep $\mathbb{Z}_2$, en Chatterjee (2021) verwijst voor sterke koppeling bij algemene compacte groepen naar het criterium van Dobrushin en Shlosman. Hij bewijst daar ook dat exponentieel verval onder willekeurige randvoorwaarden, zoals in propositie C.6, voor een samenhangende compacte groep met niet-triviaal centrum de oppervlaktewet impliceert; dat wordt hier niet uitgewerkt."
+
+§7, bij stelling C toevoegen: "- ✔ S. Chatterjee, "Wilson loops in Ising lattice gauge theory", Commun. Math. Phys. 377 (2020) 307–340, arXiv:1811.09770 (variant van de voorwaarde van Dobrushin bij sterke koppeling, voor $\mathbb{Z}_2$; band en pagina's ○); ✔ S. Chatterjee, "A probabilistic mechanism for quark confinement", Commun. Math. Phys. 385 (2021) 1007–1039 (verval onder willekeurige randvoorwaarden impliceert opsluiting); ✔ L. Gross, "Decay of correlations in classical lattice models at high temperature", Commun. Math. Phys. 68 (1979) 9–27."
+
+§7, bij stelling B toevoegen: "- ✔ J. E. Hetrick, Y. Hosotani, "Yang–Mills theory on a circle", Phys. Lett. B230 (1989) 88–92; ○ S. G. Rajeev, "Yang–Mills theory on a cylinder", Phys. Lett. B212 (1988) 203–205; ○ J. Dimock, "Canonical quantization of Yang–Mills on a circle", Rev. Math. Phys. 8 (1996) 85–102 (de Hamiltoniaan op een cirkel, met spectrum evenredig met $j(j+1)$)."
+
+--- [minor] §7, Stelling B, entry Gross–Witten
+QUOTE: Phys. Rev. D21 (1980) 446 (de één-plaquette-integraal en de karakterontwikkeling).
+PROBLEM: The gloss does not match the paper. Its abstract describes a steepest-descent solution of the two-dimensional U(N) Wilson theory at large N and a third-order transition at lambda = 2. It reduces the two-dimensional theory to a one-plaquette integral (from memory), but it is not a source for the character expansion, and it treats U(N), not SU(2). The character expansion with Bessel coefficients used in §3.3 is derived in the document itself; a standard source is Drouffe–Zuber, Phys. Rep. 102 (1983) 1–119 (from memory).
+PROPOSED FIX: "- ✔ D. J. Gross, E. Witten, "Possible third-order phase transition in the large-N lattice gauge theory", Phys. Rev. D21 (1980) 446–453 (in twee dimensies valt de roostertheorie uiteen in één-plaquette-integralen; daar opgelost voor U(N) bij grote N). ○ J.-M. Drouffe, J.-B. Zuber, "Strong coupling and mean field methods in lattice gauge theories", Phys. Rep. 102 (1983) 1–119 (karakterontwikkeling)."
+
+--- [minor] §5.4
+QUOTE: Het verst gevorderde werk in die richting (Bałaban, 1984–1989) bewijst dat de toestandssom in een vast fysisch volume begrensd blijft als $a \to 0$.
+PROBLEM: Imprecise. Bałaban's ultraviolet stability is a bound on the renormalised partition function, uniform in the lattice spacing; the bare partition function is not bounded. THEORY.md §6.2 says this correctly ("na renormalisatie, uniform begrensd", three dimensions 1985, four dimensions 1987–1989). "Het verst gevorderde werk" should also be limited to published, refereed work, given the unverifiable 2026 claim that THEORY.md §1 documents.
+PROPOSED FIX: "Het verst gevorderde gepubliceerde werk in die richting (Bałaban, 1984–1989) bewijst ultraviolette stabiliteit: de toestandssom van de roostertheorie in een vast fysisch volume blijft, na renormalisatie, uniform begrensd als $a \to 0$ (in drie dimensies 1985, in vier dimensies 1987–1989). Dat is een resultaat over de korte afstanden; convergentie van verwachtingswaarden volgt er niet uit."
+
+--- [cosmetic] §5.1, first sentence
+QUOTE: bewijs dat voor elke compacte enkelvoudige ijkgroep een kwantum-Yang–Mills-theorie op $\mathbb{R}^4$ bestaat die voldoet aan axioma's minstens zo sterk als die van Wightman of Osterwalder–Schrader
+PROBLEM: The official statement, quoted in THEORY.md §1, says "a non-trivial quantum Yang–Mills theory". The paraphrase of what the official statement asks drops "non-trivial"; it appears only in item 1 of the lattice list below.
+PROPOSED FIX: "De officiële probleemstelling (Jaffe en Witten, 2000) vraagt: bewijs dat voor elke compacte enkelvoudige ijkgroep een niet-triviale kwantum-Yang–Mills-theorie op $\mathbb{R}^4$ bestaat die voldoet aan axioma's minstens zo sterk als die van Wightman of Osterwalder–Schrader, en dat die theorie een massakloof $\Delta \gt 0$ heeft."
+
+--- [cosmetic] §7, entries Guth / Fröhlich–Spencer and Forsström / Marra–Miracle-Solé; status markers
+QUOTE: ○ A. H. Guth, Phys. Rev. D21 (1980) 2291; ○ J. Fröhlich, T. Spencer, Commun. Math. Phys. 83 (1982) 411 (U(1) in vier dimensies bij zwakke koppeling).
+PROBLEM: (a) These are the only two entries without a title, and the gloss hides that Guth's result is for the Villain action.
+(b) The perimeter-law content of Marra–Miracle-Solé could not be confirmed (no abstract indexed); the Z2 claim in §5.3 leans on it. A verifiable second source exists: Chatterjee (CMP 2020) computes the Wilson loop of four-dimensional Z2 theory at weak coupling to leading order. That the result decays with the perimeter is from memory.
+(c) The ○ markers of Lüscher, Creutz, Seiler, Reed–Simon, Migdal, Gross–Witten, Witten, Dobrushin (both), Föllmer, Künsch, Simon, Georgii, Guth and Fröhlich–Spencer can become ✔ for title and venue as of 16 November 2026; see the reference list.
+PROPOSED FIX: "- ✔ A. H. Guth, "Existence proof of a nonconfining phase in four-dimensional U(1) lattice gauge theory", Phys. Rev. D21 (1980) 2291 (ondergrens van Coulomb-vorm voor Wilson-lussen bij zwakke koppeling, voor de Villain-actie); ✔ J. Fröhlich, T. Spencer, "Massless phases and symmetry restoration in abelian gauge theories and spin systems", Commun. Math. Phys. 83 (1982) 411–454 (nieuw bewijs, niet gebonden aan de Villain-actie; de auteurs noemen de fase bij zwakke koppeling masseloos).
+- ✔ M. P. Forsström, "Decay of correlations in finite Abelian lattice gauge theories", Commun. Math. Phys. 393 (2022) 1311–1346 (verval van correlaties voor eindige abelse ijkgroepen in vier dimensies bij zwakke koppeling); ✔ R. Marra, S. Miracle-Solé, "On the statistical mechanics of the gauge invariant Ising model", Commun. Math. Phys. 67 (1979) 233–240 (ontwikkeling bij lage temperatuur voor $\mathbb{Z}_2$; inhoud ○); ✔ S. Chatterjee, "Wilson loops in Ising lattice gauge theory", Commun. Math. Phys. 377 (2020) 307–340 (Wilson-lussen voor $\mathbb{Z}_2$ in vier dimensies bij zwakke koppeling in leidende orde; verval met de omtrek ○)."
+
+En in de legenda: "✔ = titel en vindplaats via een zoekmachine teruggevonden (op 11 of 16 november 2026)".
+
+--- [cosmetic] §0, table row "Millenniumprobleem" (related to §5.4)
+QUOTE: **niet bewezen**, hier noch elders
+PROBLEM: Not wrong by the repository's own account: THEORY.md §1 says the problem counts as unsolved and that no proof of the mass gap has even been claimed. But THEORY.md §1 also records an unverifiable October 2026 claim about the existence part. BEWIJZEN.md states "hier noch elders" flatly and has no pointer to that caveat, so the two documents differ in tone on a point a reader will check.
+PROPOSED FIX: "**niet bewezen**, hier niet en ook elders niet in een gepubliceerd en getoetst bewijs (zie de kanttekening over recente berichten in `THEORY.md` §1)"
+
+SUGGESTED ADDITIONAL REFERENCES
+- S. Chatterjee, "Wilson loops in Ising lattice gauge theory", Commun. Math. Phys. 377 (2020) 307–340, arXiv:1811.09770. Title, journal and DOI 10.1007/s00220-020-03738-9 found in search; volume and pages from memory. Uses a variant of Dobrushin's condition for exponential decay at strong coupling (Z2); also the leading-order Wilson loop at weak coupling in four dimensions. For §4.6, §5.3 and §7.
+- S. Chatterjee, "A probabilistic mechanism for quark confinement", Commun. Math. Phys. 385 (2021) 1007–1039, arXiv:2006.16229 (found; already in THEORY.md §9). Exponential decay under arbitrary boundary conditions plus non-trivial center implies the area law, for compact connected groups; remarks that the strong-coupling case can be done with the methods of Dobrushin–Shlosman. For §4.6 and §5.3.
+- R. L. Dobrushin, S. B. Shlosman, "Constructive criterion for the uniqueness of Gibbs field", in Statistical Physics and Dynamical Systems, Birkhäuser (1985), pp. 347–370. From memory; cited by Chatterjee 2021 per a search snippet.
+- L. Gross, "Decay of correlations in classical lattice models at high temperature", Commun. Math. Phys. 68 (1979) 9–27 (found: Project Euclid, zbMATH 0442.60097). Decay of correlations by adapting the Lanford and Vasershtein proofs of Dobrushin's theorem, for arbitrary spin space; predates Föllmer and Künsch.
+- S. Chatterjee, Gauge theory lecture notes (2026), chapters 15–16 (§16.3: mass gap at strong coupling by Dobrushin's uniqueness method). Seen only as a citation on the project page of the Lean 4 repository "lgt" by M. R. Douglas; exact title not verified. That project claims a formalised proof for U(n) Wilson theory on (Z/NZ)^d, d >= 2, N >= 3, beta < 1/(32n(d-1)). Unrefereed; mention only as a pointer.
+- A. Ashtekar, J. Lewandowski, D. Marolf, J. Mourão, T. Thiemann, "SU(N) quantum Yang–Mills theory in two dimensions: a complete solution", J. Math. Phys. 38 (1997) 5453–5482, arXiv:hep-th/9605128 (found, abstract seen). Plane and cylinder, all Wilson loops, equivalence with the Hamiltonian framework, extended Osterwalder–Schrader axioms. For §3.2 and §7.
+- J. E. Hetrick, Y. Hosotani, "Yang–Mills theory on a circle", Phys. Lett. B 230 (1989) 88–92 (found: Scilit). From memory, not found in this search: S. G. Rajeev, "Yang–Mills theory on a cylinder", Phys. Lett. B 212 (1988) 203–205; J. Dimock, "Canonical quantization of Yang–Mills on a circle", Rev. Math. Phys. 8 (1996) 85–102. Sources for the continuum Hamiltonian of Stelling B, point 5.
+- J.-M. Drouffe, J.-B. Zuber, "Strong coupling and mean field methods in lattice gauge theories", Phys. Rep. 102 (1983) 1–119. From memory. Standard source for the character expansion with Bessel coefficients.
+- R. Jentzsch, "Über Integralgleichungen mit positivem Kern", J. Reine Angew. Math. 141 (1912) 235–244. From memory. The original of the theorem that §7 names.
+- M. P. Forsström, F. Viklund, "Free energy and quark potential in Ising lattice gauge theory via cluster expansions" (Chalmers research listing; journal data not verified). Per the search snippet, a strong form of the perimeter law for Z2 at low temperature on Z^m, m >= 3. A verifiable source for the Z2 perimeter law in §5.3.
+- C. Borgs, "Translation symmetry breaking in four-dimensional lattice gauge theories", Commun. Math. Phys. 96 (1984) 251–284. From memory. Forsström's abstract says her results extend and refine those of Chatterjee and Borgs.
+- J. van den Berg, C. Maes, "Disagreement percolation in the study of Markov fields", Ann. Probab. 22 (1994) 749–763. From memory. The single-site disagreement technique behind Forsström 2022.
 
