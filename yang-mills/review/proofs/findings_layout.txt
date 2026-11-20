@@ -1,0 +1,164 @@
+LAYOUT CHECK OF BEWIJZEN.pdf, 20 November 2026
+==============================================
+
+Report of the separate round that looked at a trial print of the PDF built from BEWIJZEN.md
+(same AI system as the author; no human reader). Paths starting with <scratch>/ were temporary
+working files of that round and are not in the repository.
+
+What was done with the report afterwards: the changes to pdf/make_bewijzen_pdf.py and
+pdf/style_bewijzen.css listed under CHANGES MADE were kept; the proposals L1-L6, the first two
+of L7, X1 and C1 were applied to BEWIJZEN.md (commit cf73aba); L7 line 436, C2 and N1 were left
+as they are. The PDF in the repository was built after that (36 pages).
+
+SUMMARY
+-------
+Layout check of the PDF built from BEWIJZEN.md. I fixed the formula and layout defects that could be fixed in the build script and stylesheet; what remains are a handful of badly stretched justified lines that need a long inline formula turned into a display formula in the source (tested replacement text below), plus one stale file reference.
+
+Things to know first:
+- The source document changed while I was working (commit e49273c, 13:52 UTC, not by me). The first build (bcb67a2) had 33 pages; the current one has 35. All final checks are on e49273c.
+- Nothing is committed or pushed. Only pdf/make_bewijzen_pdf.py and pdf/style_bewijzen.css are modified (+119/-11 lines). No BEWIJZEN.pdf was written to the repository.
+- Final trial: <scratch>/pdfcheck/BEWIJZEN_trial.pdf (35 pages). The pre-change build files are saved in <scratch>/pdfcheck/orig/.
+
+Pages actually looked at:
+- All 33 pages of the first build at 110 dpi, with 300-900 dpi crops of anything suspicious.
+- All 35 pages of the rebuilt current version at 110 dpi, after the main fixes.
+- After the last two translation tweaks (upright sans-serif operators; no gap between an operator name and a big bracket) I re-viewed only pages 1, 3, 9, 10, 12, 14, 23, 29 and 34, plus large test renders of the affected constructions. The other pages were not re-viewed after those two tweaks.
+- I compared formulas with the LaTeX source where something looked off, not all ~1500 symbol by symbol.
+
+Defects found and fixed (details in changes_made):
+- Italic f and j were clipped at the image edge, and every formula carried up to 1 pt of uneven air.
+- Primes were tiny and detached; := was set as ": ="; daggers and stars floated; "L ln", "½Tr" and "≥ − ln" were mis-spaced; \mathsf operators were slanted.
+- Equation tags sat about 1.7 px low.
+- A lead-in line was stranded at the foot of a page, away from its lemma.
+- Punctuation could be separated from its formula at a line end.
+- English titles in chapter 7 were hyphenated by Dutch rules.
+
+What remains:
+- Three lines still have word spaces stretched 5-11x and five more 3.5-4.3x. The proposed source changes were built from a scratch copy (<scratch>/pdfcheck/BEWIJZEN_voorstel.md, giving voorstel.pdf): the 5-11x lines disappear, nothing above 3.8x remains, and the document becomes 36 pages.
+- Line 783 names only the round 1 and 2 reports, although the table above it lists round 3.
+- The new ink measurement reads matplotlib internals (written for 3.11.2); with a different matplotlib the build stops with a clear message rather than producing wrong images.
+
+FINDINGS
+--------
+
+--- finding L1 | severity: minor | category: layout
+LOCATION: BEWIJZEN.md line 524, §4.2 item (K2); page 21 of the trial
+QUOTE: Integreer in $\pi(\Pi_\ell f) = \int p(U) \int f(U^{\ell\to V})\  p(U^{\ell\to V})\  z_\ell(U)^{-1}\  dV\  dU$ eerst over $U_\ell$; dat geeft
+PROBLEM: Worst line of the document: the long inline formula cannot break, so the line "... dV dU eerst over U_l; dat geeft" is justified with word spaces about 10.8 times normal. This cannot be solved in the stylesheet without breaking a product in the middle.
+PROPOSED FIX: Zet de formule als weergaveformule (getest in de proefbouw). Vervang de zin door:
+
+Integreer in $$\pi(\Pi_\ell f) = \int p(U) \int f(U^{\ell\to V})\  p(U^{\ell\to V})\  z_\ell(U)^{-1}\  dV\  dU$$ eerst over $U_\ell$; dat geeft $\int\int f(U^{\ell\to V})\  p(U^{\ell\to V})\  dV \prod_{k\neq\ell} dU_k = \pi(f)$.
+
+--- finding L2 | severity: minor | category: layout
+LOCATION: BEWIJZEN.md line 194, §2.4 stap 2(c); page 10
+QUOTE: Verder is $(u^g)_e\  (((u')^g)_e)^{-1} = g_x\  u_e (u'_e)^{-1}\  g_x^{-1}$, dus $K(u^g, (u')^g) = K(u, u')$. Hieruit volgt $\mathsf{K}\mathsf{P} = \mathsf{P}\mathsf{K}$:
+PROBLEM: The line "= Tr(u'_e u_e^{-1}), dus K(u,u') = K(u',u) > 0. Verder is ... dus" has word spaces about 6.3 times normal, because the unbreakable formula pieces leave only a few spaces to stretch.
+PROPOSED FIX: Vervang door (getest):
+
+Verder is
+
+```math
+(u^g)_e\  (((u')^g)_e)^{-1} = g_x\  u_e (u'_e)^{-1}\  g_x^{-1},
+```
+
+dus $K(u^g, (u')^g) = K(u, u')$. Hieruit volgt $\mathsf{K}\mathsf{P} = \mathsf{P}\mathsf{K}$:
+
+--- finding L3 | severity: minor | category: layout
+LOCATION: BEWIJZEN.md line 529, §4.2 item (TV2); page 21
+QUOTE: dan geldt voor begrensde meetbare $F$: $\lvert\nu(F) - \nu'(F)\rvert \leq \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$. *Bewijs:* met
+PROBLEM: The second line of the item ("≤ osc(F) d_TV(ν,ν'). Bewijs: met c = ... en ν(F) − ν'(F)") has word spaces about 5.2 times normal.
+PROPOSED FIX: Zet de bewering en de slotafschatting als weergaveformules (getest). Vervang het item door:
+
+- **(TV2)** Hebben $\nu, \nu'$ dichtheden $q, q'$ als in (TV1), dan geldt voor begrensde meetbare $F$: $$\lvert\nu(F) - \nu'(F)\rvert \ \leq\ \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu') .$$ *Bewijs:* met $c = \tfrac12(\sup F + \inf F)$ is $\lvert F - c\rvert \leq \tfrac12\operatorname{osc}(F)$ en $\nu(F) - \nu'(F) = \int (F - c)(q - q')\  d\varsigma$, dus $$\lvert\nu(F) - \nu'(F)\rvert \ \leq\ \tfrac12\operatorname{osc}(F)\int\lvert q - q'\rvert\  d\varsigma = \operatorname{osc}(F)\  d_{\mathrm{TV}}(\nu,\nu')$$ volgens (TV1). (In dit document is $\varsigma$ steeds de Haar-maat op $G$.)
+
+--- finding L4 | severity: minor | category: layout
+LOCATION: BEWIJZEN.md line 182, §2.4 stap 2(a); page 10
+QUOTE: In de dubbele integralen hieronder is de integrand steeds integreerbaar, want $\int\int \lvert f_1(u)\rvert\  \lvert f_2(u^g)\rvert\  du\  dg \leq \lVert f_1\rVert\  \lVert f_2\rVert$; de volgorde
+PROBLEM: The line "zijn klasse. In de dubbele integralen hieronder is de integrand steeds integreerbaar, want" has word spaces about 4 times normal, because the formula that follows does not fit and cannot break before its first relation sign.
+PROPOSED FIX: Vervang door (getest):
+
+In de dubbele integralen hieronder is de integrand steeds integreerbaar, want $$\int\int \lvert f_1(u)\rvert\  \lvert f_2(u^g)\rvert\  du\  dg \ \leq\ \lVert f_1\rVert\  \lVert f_2\rVert ;$$ de volgorde van integratie mag dus worden verwisseld (S2).
+
+--- finding L5 | severity: cosmetic | category: layout
+LOCATION: BEWIJZEN.md line 174, §2.4 stap 1; top of page 10
+QUOTE: Omdat het spoor cyclisch is, is het spoor hiervan gelijk aan $\operatorname{Tr}\big[ (v^t_x)^{-1} u^t_e\  v^t_{x+\hat\imath}\  (u^{t+1}_e)^{-1} \big] = \operatorname{Tr}\big[ ((u^t)^{g^t})_e\  (u^{t+1}_e)^{-1} \big]$ met de ijktransformatie
+PROBLEM: First line of the page is visibly stretched (4.5x before my fixes, a little under 3.5x now) because of the two long formula pieces.
+PROPOSED FIX: Optioneel, getest. Vervang door:
+
+Omdat het spoor cyclisch is, is het spoor hiervan gelijk aan
+
+```math
+\operatorname{Tr}\big[ (v^t_x)^{-1} u^t_e\  v^t_{x+\hat\imath}\  (u^{t+1}_e)^{-1} \big] = \operatorname{Tr}\big[ ((u^t)^{g^t})_e\  (u^{t+1}_e)^{-1} \big]
+```
+
+met de ijktransformatie $g^t_x := (v^t_x)^{-1}$. Dus
+
+--- finding L6 | severity: cosmetic | category: layout
+LOCATION: BEWIJZEN.md line 900, Bijlage item (S6); page 35
+QUOTE: de machtreeks $I_n(x) = \sum_{k\geq0} (x/2)^{2k+n}/(k!\ (k+n)!)$; de integraalvoorstelling $I_n(x) = \frac1\pi\int_0^\pi e^{x\cos\theta}\cos(n\theta)\  d\theta$; de afgeleide
+PROBLEM: The first line of the item ("(S6) Gemodificeerde Besselfuncties. Voor gehele n ≥ 0 en x > 0: de machtreeks I_n(x)") has word spaces about 4.3 times normal; the item is a run of long inline formulas.
+PROPOSED FIX: Getest: vervang het geciteerde stuk door
+
+$$I_n(x) = \sum_{k\geq0} \frac{(x/2)^{2k+n}}{k!\ (k+n)!} = \frac1\pi\int_0^\pi e^{x\cos\theta}\cos(n\theta)\  d\theta$$ (de machtreeks en de integraalvoorstelling); de afgeleide
+
+zodat het item begint met: "Voor gehele $n \geq 0$ en $x \gt 0$: $$I_n(x) = \dots$$ (de machtreeks en de integraalvoorstelling); de afgeleide $I_n' = \dots$". Daarna blijft in het item één matig uitgerekte regel over (3,8x).
+
+--- finding L7 | severity: cosmetic | category: layout
+LOCATION: BEWIJZEN.md lines 206, 418 and 436 (pages 10, 16, 17)
+QUOTE: Voor een rijtje $I = (i_1, \dots, i_n) \in \mathcal{J}^n$ zij … | volgens de integraalvoorstelling $I_n(\beta) = \frac{1}{\pi}\int_0^\pi …$ | Uit de machtreeks volgt $r(x) \to 0$ voor $x \downarrow 0$. Stel dat
+PROBLEM: Three more lines are moderately stretched (word spaces 3.4-3.7 times normal) for the same reason. Noticeable on a close look, not ugly. Not tested with a changed source.
+PROPOSED FIX: Optioneel. Regel 206: zet de slotformule als weergaveformule, "Dan is $$A(u,u')^n = \sum_{I \in \mathcal{J}^n} \Phi_I(u)\  \overline{\Phi_I(u')}$$ en". Regel 418: "volgens de integraalvoorstelling $$I_n(\beta) = \frac{1}{\pi}\int_0^\pi e^{\beta\cos\theta}\cos(n\theta)\ d\theta$$ voor gehele $n$ (S6)." Regel 436 kan blijven staan.
+
+--- finding X1 | severity: minor | category: cross_reference
+LOCATION: BEWIJZEN.md line 783, §6.1; page 29
+QUOTE: De volledige rapporten staan in `review/proofs/findings_round1.txt` en `review/proofs/findings_round2.txt`; de rekenscripts van de lezers in `review/proofs/`.
+PROBLEM: Outside the layout task, noticed while reading the page: the table directly above lists a round 3 (20 november 2026), and review/proofs/findings_round3.txt exists in the repository, but this sentence names only the reports of rounds 1 and 2.
+PROPOSED FIX: De volledige rapporten staan in `review/proofs/findings_round1.txt`, `review/proofs/findings_round2.txt` en `review/proofs/findings_round3.txt`; de rekenscripts van de lezers in `review/proofs/`.
+
+--- finding C1 | severity: cosmetic | category: layout
+LOCATION: §6.1 table "Leesrondes", first column; page 29
+QUOTE: | 1 (15 november 2026) |
+PROBLEM: The first column is narrow, so "1 (15 november 2026)" and "literatuur (16 november 2026)" wrap over three or four lines. Nothing is cut or clipped. A stylesheet rule for this would also widen the first column of the other tables, so I left it.
+PROPOSED FIX: Optioneel: kort de cellen in tot "1 (15 nov.)", "2 (16 nov.)", "literatuur (16 nov.)", "3 (20 nov.)" en zet het jaar in de kop: "ronde (2026)".
+
+--- finding C2 | severity: cosmetic | category: layout
+LOCATION: page 18 (end of chapter 3)
+QUOTE: sies geen lokale vrijheidsgraden, geen gluonen en geen glueballs.
+PROBLEM: Every chapter starts on a new page, so chapter 3 ends with five lines on an otherwise empty page; pages 3, 5, 7, 8 and 14 are also half empty or less. No heading is stranded and no box is split; this is only how the chapter lengths fall.
+PROPOSED FIX: Geen wijziging nodig. Wie het wil vermijden: neem voorstel L4 en L5 niet over maar wel L1-L3, of laat hoofdstukken alleen op een nieuwe pagina beginnen als er minder dan een derde pagina over is (dat vraagt een ander zetprogramma dan Chromium).
+
+--- finding N1 | severity: cosmetic | category: notation
+LOCATION: whole document, inline formulas
+QUOTE: $\int f(hg)\ dg$, $\sum_{k\geq0}$, $\mathcal{H}$
+PROBLEM: Remaining limits of matplotlib's mathtext that I did not change: an inline integral sign stands directly against its integrand; limits of inline sums and integrals are set beside the sign; a formula can only break before a relation sign. All of it is legible and consistent, and §6.3 of the document already says the formulas are set with a simple typesetter.
+PROPOSED FIX: Geen wijziging nodig.
+
+CHANGES MADE (build script and stylesheet)
+------------------------------------------
+- pdf/make_bewijzen_pdf.py, typeset + new ink_extent: each formula image is now cut to the real ink (0.35 pt at the sides, 0.5 pt above and below) instead of mathtext's box rounded up to whole points. Before, 92 of 1732 images had ink outside the canvas (an italic f or j at the edge was cut by up to 0.9 pt) and inline formulas carried up to 1 pt of uneven air, visible as loose or tight spacing next to commas and brackets. Checked by rasterising all 1752 images in Chromium: no ink at an edge, margins 0.25-0.74 pt. The function reads matplotlib internals (3.11.2) and stops the build with a clear message if they differ.
+- pdf/make_bewijzen_pdf.py, to_mathtext, primes: u' is now set with the full-size prime directly on the letter (it was a tiny detached mark, as a superscript too); for u'_e and I_n' the subscript is pulled back under the prime.
+- pdf/make_bewijzen_pdf.py, to_mathtext, := and =: are now the single signs \coloneq and \eqcolon. They were set as ": =" with a gap, and a long formula could be cut between the colon and the equals sign.
+- pdf/make_bewijzen_pdf.py, to_mathtext, ^\dagger and ^\ast are braced, so the dagger or star sits on its letter instead of floating with binary-operator spaces.
+- pdf/make_bewijzen_pdf.py, to_mathtext, spacing around operator names: a thin space between a symbol and a following operator name (was "Lln(I1/I2)", "½Tr", "(1-λ)Σ"); no space between an operator name and a sized bracket (was "Tr [", "exp (" next to "Tr("); a minus or plus after a comma or a named relation is braced so it is a sign (was "≥ − ln", "{+1, − 1}").
+- pdf/make_bewijzen_pdf.py, to_mathtext, \mathsf{T} is translated to upright sans-serif, as LaTeX sets it. mathtext slanted it, which also made the equals sign crowd the letter ("T= PT= TP").
+- pdf/make_bewijzen_pdf.py, insert_math: a formula and the bracket, punctuation mark or hyphen touching it are wrapped in a no-break span, so a comma or closing bracket can no longer start a line.
+- pdf/make_bewijzen_pdf.py, insert_math: file names in running text may break after a slash or underscore. This removed the 10x stretched line before "review/proofs/findings_round1.txt" and the one in §6.2.
+- pdf/make_bewijzen_pdf.py, new protect_titles: in the literature entries of chapter 7 (list items carrying a ✔ or ○ mark) quoted and italic titles are exempt from Dutch hyphenation. It produced "equati-ons", "conditi-ons", "applicati-ons", "mo-del". Dutch commentary in the same entries is still hyphenated.
+- pdf/style_bewijzen.css, span.eqtag: equation tags are centred with a negative margin and line-height 1 instead of a transform; they sat about 1.7 px below the centre of their formula. Now within 0.01 px for all 12 tags.
+- pdf/style_bewijzen.css, p:has(+ blockquote) { break-after: avoid }: "Punt 3. We hebben nodig:" was the last line of a page with Lemma B.1 on the next; it now moves with the lemma.
+- pdf/style_bewijzen.css, small rules: span.nb (no-break), .titel (no hyphenation), td code / th code nowrap (file names in tables stay whole), img.m.rel margin 0.2em to 0.22em and 0.2em left padding in aligned rows (to make up for the tighter image edges).
+
+CHECKED AND FOUND IN ORDER
+--------------------------
+- Title page: kicker, title, subtitle, status box with the statement that the document contains no proof of the millennium problem, commit e49273c and date 20 november 2026.
+- Table of contents: 39 entries, every page number compared with the page where the heading actually is; all correct.
+- Footer on all 35 pages, including the words "geen bewijs van het millenniumprobleem" and "pagina n van 35".
+- Equation tags (2.1)-(2.7), (3.1)-(3.3), (4.1), (4.2): all present, at the right margin, vertically centred, none overlapping its formula.
+- Display formulas: none wider than the text block (the build reports none), none cut off or shrunk; the widest ones on pages 10, 13, 16, 21 and 23 fit at full size.
+- Fractions, limits of sums, products and integrals, the 2x2 matrix in §1.1, bars, hats, tildes, overlines and big delimiters as seen on the pages; vertical bars that looked bold at 110 dpi are uniform at 440 dpi (anti-aliasing only).
+- Inline formulas sit on the baseline after the change of image size.
+- Theorem, lemma and proposition boxes: none split across pages; no heading stranded at the foot of a page.
+- Tables in the overview, §4.1, §5.2, §6.1 and §6.2: no cut rows, no clipped cells, header rows present.
+- Special characters: 31 ✔ and 7 ○ marks, 8 □ and 3 ■ end-of-proof squares all render as glyphs and come back from pdftotext; no empty boxes or replacement characters.
+- pdftotext against the source: all 1812 distinct words and numbers of the running text are present in the PDF (11803 word occurrences; the only misses were words split by a line-end hyphen or by a formula image); none of the 227 distinct numbers occurs less often than in the source.
+- Repository state: git status shows only pdf/make_bewijzen_pdf.py and pdf/style_bewijzen.css modified; BEWIJZEN.md, pdf/make_pdf.py, pdf/style.css and pdf/print_pdf.js untouched; nothing committed or pushed; pdf/build/ (git-ignored) holds the build of the real source.
