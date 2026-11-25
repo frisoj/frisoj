@@ -21,9 +21,10 @@ betrouwbaarheid) in `literature.json`.
 | --- | --- |
 | `REPORT.md` | eindrapport: wat er gemeten is, alle controles en spanningen, en wat het wel en niet bewijst |
 | `REPORT.pdf` | hetzelfde rapport als pdf, met een titelpagina, een hoofdstuk over wat wel en niet is bevestigd, en een bijlage met de uitslagen van alle dertien analyses; gemaakt met `pdf/make_pdf.py` |
-| `pdf/` | bouwscripts van de pdf's (`make_pdf.py` voor het rapport, `make_bewijzen_pdf.py` voor de bewijzen; opmaak in `style.css` en `style_bewijzen.css`, afdrukken met `print_pdf.js`); valt buiten de testsuite |
+| `pdf/` | bouwscripts van de pdf's (`make_pdf.py` voor het rapport, `make_bewijzen_pdf.py` voor de bewijzen, `make_dossier_pdf.py` voor het dossier; opmaak in `style.css` en `style_bewijzen.css`, afdrukken met `print_pdf.js`); valt buiten de testsuite |
 | `BEWIJZEN.md` | drie stellingen over de roostertheorie met volledig uitgeschreven bewijs (eindig rooster: uniek vacuüm en kloof; twee dimensies: exact spectrum; sterke koppeling: kloof uniform in het volume) en een hoofdstuk over wat daarmee níet bewezen is. **Geen bewijs van het millenniumprobleem.** |
 | `BEWIJZEN.pdf` | hetzelfde document als pdf; gemaakt met `pdf/make_bewijzen_pdf.py` |
+| `DOSSIER.pdf` | één bestand met een voorblad en daarachter `BEWIJZEN.pdf` en `REPORT.pdf`, beide ongewijzigd (79 pagina's); gemaakt met `pdf/make_dossier_pdf.py`. **Geen bewijs van het millenniumprobleem.** De testuitvoer waar het voorblad naar verwijst staat in `review/dossier/` |
 | `ym/lattice.py` | motor: heatbath (Creutz / Kennedy–Pendleton) + overrelaxatie, plaquette, Wilson- en Polyakov-lussen |
 | `ym/exact.py` | exacte D=2-formules, sterke-koppelingsreeks, twee-lus-schaalformule |
 | `ym/observables.py` | APE-smearing, glueball- (0++) en torelon-operatoren per tijdplak |
