@@ -390,7 +390,10 @@ local function coinFactors(data: PlayerData, session: SessionState): { Breakdown
 		{ label = "Pets", mult = 1 + equippedPower(data, petSlotsOf(data, session)) },
 		{ label = "Fortune Upgrade", mult = 1 + upgradeEffect(data, "fortune") },
 		{ label = "Rebirths", mult = 1 + Game.rebirthCoinBonus * rebirthsOf(data) },
-		{ label = "2x Coins Pass", mult = if Formulas.hasPass(session, "doubleCoins") then Game.doubleCoinsMult else 1 },
+		{
+			label = "2x Coins Pass",
+			mult = if Formulas.hasPass(session, "doubleCoins") then Game.doubleCoinsMult else 1,
+		},
 		{ label = "Coin Boost", mult = boostMult(data, session, "coins") },
 		{ label = "VIP", mult = if Formulas.hasPass(session, "vip") then 1 + Game.vipCoinBonus else 1 },
 		{ label = "Premium", mult = if session.premium == true then 1 + Game.premiumCoinBonus else 1 },
@@ -440,8 +443,7 @@ function Formulas.computeStats(data: PlayerData, session: SessionState): Stats
 		* boostMult(data, session, "luck")
 		* clampNumber(session.serverLuck, 1, MAX_COUNT, 1)
 
-	local swingCooldown =
-		math.max(Game.minSwingCooldown, Game.baseSwingCooldown * (1 - upgradeEffect(data, "swift")))
+	local swingCooldown = math.max(Game.minSwingCooldown, Game.baseSwingCooldown * (1 - upgradeEffect(data, "swift")))
 	local storagePass = if hasPass(session, "petStorage") then Game.petStoragePassBonus else 0
 
 	return {
@@ -454,9 +456,9 @@ function Formulas.computeStats(data: PlayerData, session: SessionState): Stats
 		range = Game.baseRange + upgradeEffect(data, "reach"),
 		critChance = math.clamp(Game.baseCritChance + upgradeEffect(data, "critChance"), 0, 1),
 		critMult = Game.baseCritMult + upgradeEffect(data, "critPower"),
-		walkSpeed = Game.baseWalkSpeed
-			+ upgradeEffect(data, "sprint")
-			+ (if hasPass(session, "speed") then Game.speedPassBonus else 0),
+		walkSpeed = Game.baseWalkSpeed + upgradeEffect(data, "sprint") + (if hasPass(session, "speed")
+			then Game.speedPassBonus
+			else 0),
 		gemChanceBonus = upgradeEffect(data, "gemFinder"),
 		petSlots = petSlots,
 		petStorage = math.max(

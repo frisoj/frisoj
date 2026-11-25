@@ -92,7 +92,8 @@ return function(t)
 
 	t.test("levelUpGems = min(max, floor(base + perLevel * level)) and never decreases", function()
 		for _, level in { 2, 5, 9, 10, 11, 20, 100, 369, 370, 371, 999 } do
-			local expected = math.min(G.levelUpGemMax, math.floor(G.levelUpGemBase + G.levelUpGemPerLevel * level + 1e-9))
+			local expected =
+				math.min(G.levelUpGemMax, math.floor(G.levelUpGemBase + G.levelUpGemPerLevel * level + 1e-9))
 			t.equal(Formulas.levelUpGems(level), expected, "level " .. level)
 		end
 		local previous = 0
@@ -199,7 +200,10 @@ return function(t)
 		local def = Config.Upgrades.byId.petSlots
 		local data = newData()
 		local cost = Formulas.upgradeCost(def, 0)
-		t.equal({ Formulas.canBuyUpgrade(data, def) }, { false, "Need " .. NumberFormat.abbreviate(cost) .. " more gems" })
+		t.equal(
+			{ Formulas.canBuyUpgrade(data, def) },
+			{ false, "Need " .. NumberFormat.abbreviate(cost) .. " more gems" }
+		)
 		data.gems = cost - 1
 		t.equal({ Formulas.canBuyUpgrade(data, def) }, { false, "Need 1 more gem" })
 		data.gems = cost
@@ -354,7 +358,10 @@ return function(t)
 			end
 		end
 
-		t.equal({ Formulas.canBuyHammer(data, Config.Hammers.byId[Config.Hammers.starterId]) }, { false, "Already owned" })
+		t.equal(
+			{ Formulas.canBuyHammer(data, Config.Hammers.byId[Config.Hammers.starterId]) },
+			{ false, "Already owned" }
+		)
 		t.equal(
 			{ Formulas.canBuyHammer(data, stone) },
 			{ false, "Need " .. NumberFormat.abbreviate(stone.cost) .. " more coins" }
@@ -365,7 +372,10 @@ return function(t)
 		t.equal({ Formulas.canBuyHammer(data, stone) }, { false, "Already owned" })
 
 		data.coins = 1e30
-		t.equal({ Formulas.canBuyHammer(data, zoneTwoHammer) }, { false, "Unlock " .. Config.Zones.list[2].name .. " first" })
+		t.equal(
+			{ Formulas.canBuyHammer(data, zoneTwoHammer) },
+			{ false, "Unlock " .. Config.Zones.list[2].name .. " first" }
+		)
 		data.zones.unlocked[Config.Zones.list[2].id] = true
 		t.equal({ Formulas.canBuyHammer(data, zoneTwoHammer) }, { true })
 	end)
@@ -713,8 +723,22 @@ return function(t)
 		data.boosts = { coins = NAN, xp = -1, luck = INF, damage = "yes" :: any }
 		data.pets.list = {
 			p1 = { id = "p1", petId = "not_a_pet", tier = 1, equipped = true, locked = false, obtainedAt = 0 },
-			p2 = { id = "p2", petId = Config.Pets.list[1].id, tier = NAN, equipped = true, locked = false, obtainedAt = 0 },
-			p3 = { id = "p3", petId = Config.Pets.list[1].id, tier = 3, equipped = "yes" :: any, locked = false, obtainedAt = 0 },
+			p2 = {
+				id = "p2",
+				petId = Config.Pets.list[1].id,
+				tier = NAN,
+				equipped = true,
+				locked = false,
+				obtainedAt = 0,
+			},
+			p3 = {
+				id = "p3",
+				petId = Config.Pets.list[1].id,
+				tier = 3,
+				equipped = "yes" :: any,
+				locked = false,
+				obtainedAt = 0,
+			},
 		}
 		local session = newSession()
 		session.friendCount = NAN

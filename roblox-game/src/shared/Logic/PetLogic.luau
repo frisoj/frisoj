@@ -118,8 +118,7 @@ function PetLogic.canHatch(data: PlayerData, stats: Stats, egg: EggDef, count: n
 	end
 	local total = Formulas.countPets(data)
 	if total + count > stats.petStorage then
-		return false,
-			"Pet storage full (" .. tostring(total) .. "/" .. tostring(stats.petStorage) .. ")"
+		return false, "Pet storage full (" .. tostring(total) .. "/" .. tostring(stats.petStorage) .. ")"
 	end
 	return true, nil
 end
