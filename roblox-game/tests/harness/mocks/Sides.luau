@@ -242,6 +242,26 @@ return function(H)
 
 	-- test API -----------------------------------------------------------------------------------------------------
 
+	-- newScript(className, name, source, parent?) -> instance: creates a "ModuleScript", "Script" or "LocalScript"
+	-- whose source is the given string, so tests can require / run small inline scripts like project files.
+	function mocks.newScript(className: string, name: string, source: string, parent: any?): any
+		local kinds = { ModuleScript = "Module", Script = "Server", LocalScript = "Client" }
+		local kind = kinds[className]
+		if not kind then
+			error(`env.mocks.newScript: className must be ModuleScript, Script or LocalScript, got {tostring(className)}`, 2)
+		end
+		if type(name) ~= "string" or type(source) ~= "string" then
+			error("env.mocks.newScript expects (className, name: string, source: string, parent?)", 2)
+		end
+		local instance = H.datatypes.Instance.new(className)
+		instance.Name = name
+		env.scripts[instance] = { path = "inline/" .. name, source = source, kind = kind }
+		if parent then
+			instance.Parent = parent
+		end
+		return instance
+	end
+
 	-- startServer(): runs every enabled Script under ServerScriptService and Workspace (tree order)
 	function mocks.startServer(): { thread }
 		local threads = {}

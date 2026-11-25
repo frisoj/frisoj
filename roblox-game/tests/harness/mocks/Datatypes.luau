@@ -147,6 +147,19 @@ return function(H)
 	})
 	H.newRandom = newRandom
 
+	-- deterministic replacement for BrickColor.random / BrickColor.Random
+	local brickColorRandom = newRandom(config.randomSeed + 7)
+	local function randomBrickColor()
+		return roblox.BrickColor.palette(brickColorRandom:NextInteger(1, 127))
+	end
+	local brickColorLibrary = {}
+	for key, value in roblox.BrickColor :: any do
+		brickColorLibrary[key] = value
+	end
+	brickColorLibrary.random = randomBrickColor
+	brickColorLibrary.Random = randomBrickColor
+	datatypes.BrickColor = table.freeze(brickColorLibrary)
+
 	--------------------------------------------------------------------------------------------------------------
 	-- TweenInfo
 	--------------------------------------------------------------------------------------------------------------
@@ -166,7 +179,7 @@ return function(H)
 	typeNames[TweenInfo] = "TweenInfo"
 
 	local function expectEnum(value: any, enumName: string, argument: number)
-		if typeof(value) ~= "EnumItem" or tostring(value.EnumType) ~= enumName then
+		if typeof(value) ~= "EnumItem" or value.EnumType ~= (Enum :: any)[enumName] then
 			error(`TweenInfo.new: argument #{argument} must be an Enum.{enumName}, got {tostring(value)}`, 3)
 		end
 	end

@@ -776,6 +776,20 @@ return function(H)
 		H.signal(proxy, name):_fire(...)
 	end
 
+	-- Signal of an event without consulting the API data (for events exposed through a custom getter).
+	function H.signalOf(proxy: any, name: string): any
+		return getSignal(recordOf[proxy], name)
+	end
+
+	-- Fires an event only if somebody ever asked for its signal (cheap for per-frame events).
+	function H.fireExisting(proxy: any, name: string, ...)
+		fireIfExists(recordOf[proxy], name, ...)
+	end
+
+	function H.isDestroyed(proxy: any): boolean
+		return recordOf[proxy].destroyed == true
+	end
+
 	function H.callback(proxy: any, name: string): any
 		local callbacks = recordOf[proxy].callbacks
 		return callbacks and callbacks[name]

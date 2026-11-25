@@ -77,6 +77,7 @@ function Mocks.install(env: any)
 		serde = serde,
 		stdio = stdio,
 		realTask = realTask,
+		osclock = os.clock, -- real time (script environments get a virtual os.clock)
 		-- test-author API, exposed as env.mocks
 		mocks = {},
 		loaded = {},
