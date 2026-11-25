@@ -55,11 +55,17 @@ local function rebirthsOf(data: PlayerData): number
 	return clampInteger(data.rebirths, 0, Formulas.MAX_REBIRTHS, 0)
 end
 
--- "Need 40K more coins" (rounded up to a whole unit so it never reads "Need 0 more").
-local function needMore(missing: number, singular: string): string
-	local amount = math.max(1, math.ceil(missing))
+-- The "cannot afford" sentence used by every can* check: needMoreText(40000, "coin") -> "Need 40K more coins",
+-- needMoreText(1, "gem") -> "Need 1 more gem". Rounded up to a whole unit so it never reads "Need 0 more".
+function Formulas.needMoreText(missing: number, singular: string): string
+	-- An infinite price (rebirthCost past its curve) prints as "Need ∞ more coins".
+	local amount = if missing == math.huge
+		then math.huge
+		else math.max(1, math.ceil(clampNumber(missing, 0, MAX_CURRENCY, 0)))
 	return "Need " .. NumberFormat.abbreviate(amount) .. " more " .. singular .. (if amount == 1 then "" else "s")
 end
+
+local needMore = Formulas.needMoreText
 
 ---------------------------------------------------------------------------------------------------
 -- Levels

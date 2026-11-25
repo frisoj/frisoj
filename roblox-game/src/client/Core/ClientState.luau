@@ -52,7 +52,7 @@ local function notifyKey(current: Types.ReplicatedState, topKey: string)
 		local value = (current :: any)[topKey]
 		for _, entry in list do
 			if entry.connected then
-				local ok, message = xpcall(entry.fn, traceback, value, current)
+				local ok, message = xpcall(entry.fn :: (...any) -> ...any, traceback, value, current)
 				if not ok then
 					warn(`[ClientState] observer of "{topKey}" failed: {message}`)
 				end
@@ -226,7 +226,7 @@ function ClientState.observe(topKey: string, fn: Observer): () -> ()
 
 	local current = state
 	if current then
-		local ok, message = xpcall(fn, traceback, (current :: any)[topKey], current)
+		local ok, message = xpcall(fn :: (...any) -> ...any, traceback, (current :: any)[topKey], current)
 		if not ok then
 			warn(`[ClientState] observer of "{topKey}" failed: {message}`)
 		end
@@ -238,12 +238,19 @@ function ClientState.observe(topKey: string, fn: Observer): () -> ()
 		end
 		entry.connected = false
 		local remaining: { ObserverEntry } = {}
-		for _, other in observers[topKey] or {} do
-			if other ~= entry then
-				table.insert(remaining, other)
+		local current = observers[topKey]
+		if current then
+			for _, other in current do
+				if other ~= entry then
+					table.insert(remaining, other)
+				end
 			end
 		end
-		observers[topKey] = if #remaining > 0 then remaining else nil
+		if #remaining > 0 then
+			observers[topKey] = remaining
+		else
+			observers[topKey] = nil
+		end
 	end
 end
 

@@ -125,7 +125,7 @@ function Sound.play(name: string, pitch: number?)
 	if type(name) ~= "string" then
 		return
 	end
-	local ok, message = pcall(playNow, name, pitch)
+	local ok, message = pcall(playNow :: (...any) -> ...any, name, pitch)
 	if not ok then
 		warn(`[Sound] could not play "{name}": {tostring(message)}`)
 	end

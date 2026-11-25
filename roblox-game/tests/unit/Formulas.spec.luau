@@ -380,6 +380,21 @@ return function(t)
 		t.equal({ Formulas.canBuyHammer(data, zoneTwoHammer) }, { true })
 	end)
 
+	t.test("needMoreText words the missing amount", function()
+		t.equal(Formulas.needMoreText(40000, "coin"), "Need 40K more coins")
+		t.equal(Formulas.needMoreText(1234567, "gem"), "Need 1.23M more gems")
+		t.equal(Formulas.needMoreText(1, "gem"), "Need 1 more gem")
+		t.equal(Formulas.needMoreText(0.2, "coin"), "Need 1 more coin")
+		t.equal(Formulas.needMoreText(1.2, "coin"), "Need 2 more coins")
+		t.equal(Formulas.needMoreText(NAN, "coin"), "Need 1 more coin")
+		t.equal(Formulas.needMoreText(INF, "coin"), "Need ∞ more coins")
+		-- Past the end of the rebirth curve the price is infinite and the reason says so.
+		local data = newData()
+		data.rebirths = 5000
+		data.coins = Formulas.MAX_CURRENCY
+		t.equal({ Formulas.canRebirth(data) }, { false, "Need ∞ more coins" })
+	end)
+
 	---------------------------------------------------------------------------------------------
 	-- Crystals and boss
 

@@ -20,7 +20,7 @@ local Config = require(Shared:WaitForChild("Config"))
 
 local Theme = {}
 
-export type ButtonStyle = "primary" | "success" | "danger" | "robux" | "neutral" | "gold"
+export type ButtonStyle = "primary" | "success" | "danger" | "robux" | "neutral" | "gold" | "tab"
 export type TextStyle = "title" | "heading" | "button" | "number" | "body" | "small"
 export type Currency = "coins" | "gems" | "robux"
 
@@ -132,10 +132,11 @@ local BUTTON_GRADIENTS: { [string]: ColorSequence } = {
 	robux = Theme.Gradient.Green,
 	neutral = Theme.Gradient.Neutral,
 	gold = Theme.Gradient.Gold,
+	tab = Theme.Gradient.Tab,
 }
 
--- Gradient of a button style ("primary" blue, "success"/"robux" green, "danger" red, "gold", "neutral" grey).
--- Unknown styles fall back to "primary".
+-- Gradient of a button style ("primary" blue, "success"/"robux" green, "danger" red, "gold", "neutral" grey,
+-- "tab" muted indigo). Unknown styles fall back to "primary".
 function Theme.buttonGradient(style: string): ColorSequence
 	return BUTTON_GRADIENTS[style] or Theme.Gradient.Blue
 end

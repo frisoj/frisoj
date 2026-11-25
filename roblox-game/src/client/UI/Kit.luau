@@ -31,9 +31,11 @@
 	  Text
 	    Kit.label(props)                             TextLabel in a text style ("title", "heading", "body" ...)
 	    Kit.icon(props)                              emoji icon
+	    Kit.measureText(text, textSize, font?)       width a text needs, in design px
 	    Kit.priceTag(props) -> PriceTag              "🪙 12.5K" / "💎 340" / "R$ 399"; Kit.priceText(currency, amount)
 	  Surfaces
 	    Kit.panel(props)                             dark rounded panel with the thick outline
+	    Kit.titleBar(props) -> bar, label            gold title bar capping a window / popup
 	    Kit.card(props) -> Card                      card with outline that can show rarity / highlight / selection
 	    Kit.divider(props)                           thin separator line
 	    Kit.ribbon(props)                            "BEST VALUE" corner ribbon
@@ -354,8 +356,8 @@ export type FrameProps = {
 -- Plain container Frame: transparent and filling its parent unless told otherwise.
 --     local page = Kit.frame({ parent = content })
 --     local chip = Kit.frame({ color = Theme.Color.Inset, corner = Theme.Corner.Small, size = UDim2.fromOffset(90, 30) })
-function Kit.frame(props: FrameProps?): Frame
-	local options: FrameProps = props or {}
+function Kit.frame(props: FrameProps): Frame
+	local options: FrameProps = props
 	local frame = Instance.new("Frame")
 	frame.BorderSizePixel = 0
 	frame.Size = UDim2.fromScale(1, 1)
@@ -390,8 +392,8 @@ export type StackProps = {
 	visible: boolean?,
 }
 
-local function stack(props: StackProps?, horizontal: boolean): Frame
-	local options: StackProps = props or {}
+local function stack(props: StackProps, horizontal: boolean): Frame
+	local options: StackProps = props
 	local frame = Instance.new("Frame")
 	frame.BackgroundTransparency = 1
 	frame.BorderSizePixel = 0
@@ -409,13 +411,13 @@ end
 
 -- Transparent Frame whose children line up left → right (UIListLayout, sorted by LayoutOrder).
 --     local row = Kit.row({ gap = 10, alignX = "right", size = UDim2.new(1, 0, 0, 60), parent = content })
-function Kit.row(props: StackProps?): Frame
+function Kit.row(props: StackProps): Frame
 	return stack(props, true)
 end
 
 -- Transparent Frame whose children stack top → bottom.
 --     local column = Kit.column({ gap = 8, parent = card.instance })
-function Kit.column(props: StackProps?): Frame
+function Kit.column(props: StackProps): Frame
 	return stack(props, false)
 end
 
@@ -802,6 +804,19 @@ function Kit.label(props: LabelProps): TextLabel
 	return label
 end
 
+-- Width in design px that `text` needs on one line (an estimate when the engine cannot measure it).
+-- `font` defaults to Theme.Font.Title.
+--     local width = Kit.measureText("Sunny Meadow", Theme.TextSize.Heading) + 40
+function Kit.measureText(text: string, textSize: number, font: Enum.Font?): number
+	local ok, size = pcall(function(): Vector2
+		return TextService:GetTextSize(text, textSize, font or Theme.Font.Title, Vector2.new(4000, 200))
+	end)
+	if ok and typeof(size) == "Vector2" then
+		return size.X
+	end
+	return (utf8.len(text) or #text) * textSize * 0.55
+end
+
 export type IconProps = {
 	icon: string, -- an emoji
 	parent: Instance?,
@@ -862,7 +877,7 @@ export type PriceTag = {
 --     local price = Kit.priceTag({ currency = "coins", amount = def.cost, parent = card.instance })
 --     price:set(2500)     price:setAffordable(state.coins >= 2500)
 function Kit.priceTag(props: PriceTagProps): PriceTag
-	local currency = props.currency
+	local currency: Currency = props.currency
 	local label = Kit.label({
 		text = Kit.priceText(currency, props.amount),
 		style = "number",
@@ -906,8 +921,8 @@ export type PanelProps = {
 -- The dark indigo rounded panel with the thick outline (HUD pills, popups, sections).
 --     local pill = Kit.panel({ size = UDim2.fromOffset(220, 62), corner = Theme.Corner.Pill, parent = hudLayer })
 --     local footer = Kit.panel({ inset = true, size = UDim2.new(1, 0, 0, 56), padding = 10, parent = content })
-function Kit.panel(props: PanelProps?): Frame
-	local options: PanelProps = props or {}
+function Kit.panel(props: PanelProps): Frame
+	local options: PanelProps = props
 	local inset = options.inset == true
 	local frame = Instance.new("Frame")
 	frame.BorderSizePixel = 0
@@ -928,6 +943,68 @@ function Kit.panel(props: PanelProps?): Frame
 	end
 	place(frame, options, "Panel")
 	return frame
+end
+
+export type TitleBarProps = {
+	text: string, -- "🛒 Shop"
+	height: number?, -- default Theme.Size.TitleBar
+	corner: number?, -- radius of the top corners = radius of the surface it caps, default Theme.Corner.Window
+	textSize: number?, -- default Theme.TextSize.Title
+	sideSpace: number?, -- px kept free left and right of the title (close button), default 110
+	parent: Instance?,
+	name: string?,
+	zIndex: number?,
+}
+
+-- The gold title bar that caps a window or popup: rounded top corners, dark line below, big outlined title.
+-- Parent it to the rounded surface (which must not have padding). Returns the bar and its title label.
+--     local bar, title = Kit.titleBar({ text = "🎁 Daily Reward", parent = popup })
+--     title.Text = "🎁 Day 3"
+function Kit.titleBar(props: TitleBarProps): (Frame, TextLabel)
+	local height = props.height or Theme.Size.TitleBar
+	local radius = props.corner or Theme.Corner.Window
+	local sideSpace = props.sideSpace or 110
+
+	local bar = Instance.new("Frame")
+	bar.BackgroundTransparency = 1
+	bar.BorderSizePixel = 0
+	bar.ClipsDescendants = true
+	bar.Size = UDim2.new(1, 0, 0, height)
+
+	-- The fill is taller than the bar and clipped, so only its top corners are rounded.
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.BackgroundColor3 = WHITE
+	fill.BorderSizePixel = 0
+	fill.Size = UDim2.new(1, 0, 1, radius)
+	fill.Parent = bar
+	Kit.corner(fill, radius)
+	Kit.gradient(fill, Theme.Gradient.TitleBar)
+
+	local line = Instance.new("Frame")
+	line.Name = "Line"
+	line.BackgroundColor3 = Theme.Color.Outline
+	line.BorderSizePixel = 0
+	line.AnchorPoint = Vector2.new(0, 1)
+	line.Position = UDim2.fromScale(0, 1)
+	line.Size = UDim2.new(1, 0, 0, Theme.Stroke.Thick)
+	line.ZIndex = Theme.Z.Content
+	line.Parent = bar
+
+	local title = Kit.label({
+		text = props.text,
+		style = "title",
+		textSize = props.textSize,
+		size = UDim2.new(1, -sideSpace * 2, 1, -22),
+		anchor = Vector2.new(0.5, 0.5),
+		position = UDim2.fromScale(0.5, 0.47),
+		zIndex = Theme.Z.Content,
+		name = "Title",
+		parent = bar,
+	})
+
+	place(bar, props, "TitleBar")
+	return bar, title
 end
 
 export type CardProps = {
@@ -962,8 +1039,8 @@ export type Card = {
 --     local card = Kit.card({ rarity = petDef.rarity, onClick = function() select(pet) end, parent = grid })
 --     Kit.icon({ icon = "👑", parent = card.instance })
 --     card:setSelected(true)      card:setHighlight(Theme.Color.Success)
-function Kit.card(props: CardProps?): Card
-	local options: CardProps = props or {}
+function Kit.card(props: CardProps): Card
+	local options: CardProps = props
 	local padding = options.padding or Theme.Size.Padding
 	local radius = options.corner or Theme.Corner.Card
 
@@ -1092,8 +1169,8 @@ export type DividerProps = {
 
 -- Thin rounded separator line: full width (or full height with vertical = true).
 --     Kit.divider({ parent = column })      Kit.divider({ vertical = true, size = UDim2.new(0, 3, 0.6, 0), parent = row })
-function Kit.divider(props: DividerProps?): Frame
-	local options: DividerProps = props or {}
+function Kit.divider(props: DividerProps): Frame
+	local options: DividerProps = props
 	local thickness = options.thickness or 3
 	local line = Instance.new("Frame")
 	line.BackgroundColor3 = options.color or Theme.Color.Outline
@@ -1109,6 +1186,7 @@ export type RibbonProps = {
 	gradient: ColorSequence?, -- default Theme.Gradient.Gold
 	flat: boolean?, -- true: a horizontal pill on the top edge instead of the diagonal corner ribbon
 	extent: number?, -- side of the corner square the diagonal ribbon covers, default 150
+	inset: number?, -- padding of the parent, so the ribbon reaches its real corner; default Theme.Size.Padding
 	corner: number?, -- corner radius of the surface it sits on, default Theme.Corner.Card
 	parent: Instance?,
 	name: string?,
@@ -1116,29 +1194,36 @@ export type RibbonProps = {
 	visible: boolean?,
 }
 
--- "BEST VALUE" ribbon across the top-right corner of its parent (a card). Only use it where it is true —
--- the shop shows it for products with bestValue set and nowhere else. If the parent has padding, the ribbon
--- still hugs the real corner when you pass the same `padding` the card uses... simplest: parent it to
--- card.instance of a card built with padding = 0, or accept the small inset.
+-- "BEST VALUE" ribbon across the top-right corner of its parent. Made for Kit.card: parent it to card.instance
+-- (pass `inset` only if the card uses a non-default padding; inset = 0 for a parent without padding).
+-- Only use it where it is true: the shop shows it for products with bestValue set and nowhere else.
 --     Kit.ribbon({ parent = card.instance })      Kit.ribbon({ text = "NEW", flat = true, parent = card.instance })
-function Kit.ribbon(props: RibbonProps?): GuiObject
-	local options: RibbonProps = props or {}
+function Kit.ribbon(props: RibbonProps): GuiObject
+	local options: RibbonProps = props
 	local text = options.text or "BEST VALUE"
 	local colors = options.gradient or Theme.Gradient.Gold
+	local inset = options.inset or Theme.Size.Padding
 	local layout = { name = options.name, zIndex = options.zIndex or Theme.Z.Raised, visible = options.visible }
 
 	if options.flat then
 		local pill = Instance.new("Frame")
 		pill.AnchorPoint = Vector2.new(0.5, 0.5)
-		pill.Position = UDim2.fromScale(0.5, 0)
+		pill.Position = UDim2.new(0.5, 0, 0, -inset)
 		pill.Size = UDim2.fromOffset(170, 34)
 		pill.BackgroundColor3 = WHITE
 		pill.BorderSizePixel = 0
 		Kit.corner(pill, Theme.Corner.Pill)
 		Kit.gradient(pill, colors)
 		Kit.stroke(pill, Theme.Stroke.Medium)
-		Kit.label({ text = text, style = "button", textSize = 18, size = UDim2.new(1, -16, 1, -6),
-			anchor = Vector2.new(0.5, 0.5), position = UDim2.fromScale(0.5, 0.5), parent = pill })
+		Kit.label({
+			text = text,
+			style = "button",
+			textSize = 18,
+			size = UDim2.new(1, -16, 1, -6),
+			anchor = Vector2.new(0.5, 0.5),
+			position = UDim2.fromScale(0.5, 0.5),
+			parent = pill,
+		})
 		place(pill, layout, "Ribbon")
 		pill.Parent = options.parent
 		return pill
@@ -1148,7 +1233,7 @@ function Kit.ribbon(props: RibbonProps?): GuiObject
 	local extent = options.extent or 150
 	local clip = Instance.new("CanvasGroup")
 	clip.AnchorPoint = Vector2.new(1, 0)
-	clip.Position = UDim2.fromScale(1, 0)
+	clip.Position = UDim2.new(1, inset, 0, -inset)
 	clip.Size = UDim2.fromOffset(extent, extent)
 	clip.BackgroundTransparency = 1
 	clip.BorderSizePixel = 0
@@ -1165,9 +1250,17 @@ function Kit.ribbon(props: RibbonProps?): GuiObject
 	band.Parent = clip
 	Kit.gradient(band, colors)
 	Kit.stroke(band, Theme.Stroke.Medium)
-	Kit.label({ text = text, style = "button", textSize = 18, color = Theme.Color.TextDark, stroke = false,
-		size = UDim2.new(0.62, 0, 1, -6), anchor = Vector2.new(0.5, 0.5), position = UDim2.fromScale(0.5, 0.5),
-		parent = band })
+	Kit.label({
+		text = text,
+		style = "button",
+		textSize = 18,
+		color = Theme.Color.TextDark,
+		stroke = false,
+		size = UDim2.new(0.62, 0, 1, -6),
+		anchor = Vector2.new(0.5, 0.5),
+		position = UDim2.fromScale(0.5, 0.5),
+		parent = band,
+	})
 
 	place(clip, layout, "Ribbon")
 	clip.Parent = options.parent
@@ -1192,8 +1285,8 @@ export type Badge = {
 -- Red notification dot with a count, pinned to the top-right corner of its parent. Hidden while the count is 0.
 --     local badge = Kit.badge({ parent = menuButton, count = def.badge and def.badge() or 0 })
 --     badge:set(3)
-function Kit.badge(props: BadgeProps?): Badge
-	local options: BadgeProps = props or {}
+function Kit.badge(props: BadgeProps): Badge
+	local options: BadgeProps = props
 	local dot = Instance.new("Frame")
 	dot.AnchorPoint = Vector2.new(0.5, 0.5)
 	dot.Position = UDim2.new(1, -6, 0, 6)
@@ -1203,8 +1296,15 @@ function Kit.badge(props: BadgeProps?): Badge
 	dot.ZIndex = Theme.Z.Raised
 	Kit.corner(dot, Theme.Corner.Pill)
 	Kit.stroke(dot, Theme.Stroke.Thin)
-	local label = Kit.label({ text = "", style = "number", textSize = 20, size = UDim2.new(1, -6, 1, -4),
-		anchor = Vector2.new(0.5, 0.5), position = UDim2.fromScale(0.5, 0.5), parent = dot })
+	local label = Kit.label({
+		text = "",
+		style = "number",
+		textSize = 20,
+		size = UDim2.new(1, -6, 1, -4),
+		anchor = Vector2.new(0.5, 0.5),
+		position = UDim2.fromScale(0.5, 0.5),
+		parent = dot,
+	})
 
 	local count = 0
 	local function set(value: number)
@@ -1490,8 +1590,8 @@ export type Toggle = {
 --     local toggle = Kit.toggle({ value = settings.lowDetail, parent = row,
 --         onChange = function(on) Net.request("SetSetting", "lowDetail", on) end })
 --     toggle:set(true)
-function Kit.toggle(props: ToggleProps?): Toggle
-	local options: ToggleProps = props or {}
+function Kit.toggle(props: ToggleProps): Toggle
+	local options: ToggleProps = props
 	local value = options.value == true
 	local enabled = options.enabled ~= false
 	local onChange = options.onChange
@@ -1609,8 +1709,8 @@ export type Slider = {
 --     local slider = Kit.slider({ value = settings.music, parent = row,
 --         onChange = function(v) previewVolume(v) end,
 --         onRelease = function(v) Net.request("SetSetting", "music", v) end })
-function Kit.slider(props: SliderProps?): Slider
-	local options: SliderProps = props or {}
+function Kit.slider(props: SliderProps): Slider
+	local options: SliderProps = props
 	local minimum = options.min or 0
 	local maximum = math.max(options.max or 1, minimum + 1e-6)
 	local step = options.step
@@ -1735,7 +1835,10 @@ function Kit.slider(props: SliderProps?): Slider
 			end
 			return
 		end
-		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+		if
+			input.UserInputType ~= Enum.UserInputType.MouseButton1
+			and input.UserInputType ~= Enum.UserInputType.Touch
+		then
 			return
 		end
 		if dragging then
@@ -1819,16 +1922,6 @@ export type Tabs = {
 	getButton: (self: Tabs, id: string) -> Button?,
 }
 
-local function measureText(text: string, textSize: number, font: Enum.Font): number
-	local ok, size = pcall(function(): Vector2
-		return TextService:GetTextSize(text, textSize, font, Vector2.new(4000, 200))
-	end)
-	if ok and typeof(size) == "Vector2" then
-		return size.X
-	end
-	return (utf8.len(text) or #text) * textSize * 0.55
-end
-
 -- Row of pill tabs under a window's title bar: the selected tab is blue, the others muted. Give each tab a
 -- `page` and the Kit shows the selected page and hides the rest; onSelect is for lazy work.
 --     local tabs = Kit.tabs({
@@ -1879,7 +1972,12 @@ function Kit.tabs(props: TabsProps): Tabs
 		local content = if def.icon then `{def.icon} {def.text}` else def.text
 		local size = if props.fill
 			then UDim2.new(1 / count, -math.ceil(gap * (count - 1) / count), 1, -4)
-			else UDim2.new(0, math.ceil(measureText(content, Theme.TextSize.Button, Theme.Font.Button)) + 52, 1, -4)
+			else UDim2.new(
+				0,
+				math.ceil(Kit.measureText(content, Theme.TextSize.Button, Theme.Font.Button)) + 52,
+				1,
+				-4
+			)
 		buttons[id] = Kit.button({
 			text = def.text,
 			icon = def.icon,
@@ -1991,8 +2089,8 @@ end
 --     local input = Kit.textInput({ placeholder = "Enter code", upper = true, maxLength = 24, parent = content,
 --         onSubmit = function(code) redeem(code) end })
 --     input:get()     input:set("")     input:focus()
-function Kit.textInput(props: TextInputProps?): TextInput
-	local options: TextInputProps = props or {}
+function Kit.textInput(props: TextInputProps): TextInput
+	local options: TextInputProps = props
 	local maxLength = math.max(1, math.floor(options.maxLength or 50))
 	local upper = options.upper == true
 	local onSubmit = options.onSubmit
@@ -2092,8 +2190,8 @@ export type ProgressBar = {
 --     local bar = Kit.progressBar({ fraction = xp / needed, text = "1,240 / 3,000 XP", parent = hud })
 --     bar:set(0.75)                      -- animates the fill
 --     bar:set(1, "Ready to claim!")      Kit.progressBar({ gradient = Theme.Gradient.Blue, ... })
-function Kit.progressBar(props: ProgressBarProps?): ProgressBar
-	local options: ProgressBarProps = props or {}
+function Kit.progressBar(props: ProgressBarProps): ProgressBar
+	local options: ProgressBarProps = props
 	local radius = options.corner or Theme.Corner.Pill
 
 	local track = Instance.new("Frame")
@@ -2251,8 +2349,8 @@ export type ScrollListProps = {
 -- grows with them.
 --     local list = Kit.scrollList({ gap = 10, parent = page })
 --     Kit.card({ size = UDim2.new(1, 0, 0, 90), layoutOrder = index, parent = list })
-function Kit.scrollList(props: ScrollListProps?): ScrollingFrame
-	local options: ScrollListProps = props or {}
+function Kit.scrollList(props: ScrollListProps): ScrollingFrame
+	local options: ScrollListProps = props
 	local horizontal = options.horizontal == true
 	local inset = options.inset or 6
 	local scroll = newScroll(horizontal, inset)
@@ -2289,14 +2387,17 @@ export type ScrollGridProps = {
 --     local grid = Kit.scrollGrid({ columns = 4, cellHeight = 300, parent = page })          -- shop cards
 --     local pets = Kit.scrollGrid({ cellSize = UDim2.fromOffset(140, 140), parent = page })   -- as many as fit
 --     local index = Kit.scrollGrid({ columns = 6, cellAspect = 1, parent = page })            -- square cells
-function Kit.scrollGrid(props: ScrollGridProps?): ScrollingFrame
-	local options: ScrollGridProps = props or {}
+function Kit.scrollGrid(props: ScrollGridProps): ScrollingFrame
+	local options: ScrollGridProps = props
 	local gap = options.gap or Theme.Size.Gap
 	local inset = options.inset or 6
 	local scroll = newScroll(false, inset)
 
-	local cellSize = options.cellSize
-	if not cellSize then
+	local cellSize: UDim2
+	local explicit = options.cellSize
+	if explicit then
+		cellSize = explicit
+	else
 		local columns = math.max(1, math.floor(options.columns or 4))
 		-- Each cell gives up its share of the gaps so `columns` cells fit the row exactly.
 		local shrink = math.ceil(gap * (columns - 1) / columns)
@@ -2356,7 +2457,13 @@ function Kit.emptyState(props: EmptyStateProps): Frame
 		})
 	end
 	if props.actionText and props.onAction then
-		Kit.button({ text = props.actionText, style = "primary", onClick = props.onAction, layoutOrder = 4, parent = root })
+		Kit.button({
+			text = props.actionText,
+			style = "primary",
+			onClick = props.onAction,
+			layoutOrder = 4,
+			parent = root,
+		})
 	end
 	place(root, props, "EmptyState")
 	return root
@@ -2472,17 +2579,12 @@ end
 
 -- 3D preview: a ViewportFrame whose camera frames `model`. The viewport takes ownership of the model (it is
 -- parented into the frame and destroyed with it), so pass a freshly built one (PetModels.build,
--- HammerVisuals.buildModel). The second argument is a props table or just a size.
+-- HammerVisuals.buildModel). Pass nil as the model for an empty preview you fill later with view:setModel.
 --     local view = Kit.viewport(PetModels.build(petId, tier), { size = UDim2.new(1, 0, 0, 120), parent = card.instance })
---     Kit.viewport(model, UDim2.fromOffset(200, 200)).instance.Parent = panel
+--     Kit.viewport(HammerVisuals.buildModel(id), { spin = true, size = UDim2.fromOffset(260, 260), parent = panel })
 --     view:setModel(PetModels.build(otherPet, 1))      view:setSpin(true)
-function Kit.viewport(model: Model?, props: (ViewportProps | UDim2)?): Viewport
-	local options: ViewportProps = {}
-	if typeof(props) == "UDim2" then
-		options = { size = props :: any }
-	elseif type(props) == "table" then
-		options = props :: any
-	end
+function Kit.viewport(model: Model?, props: ViewportProps): Viewport
+	local options: ViewportProps = props
 
 	local frame = Instance.new("ViewportFrame")
 	frame.BackgroundTransparency = 1

@@ -17,7 +17,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Types = require(Shared:WaitForChild("Types"))
 local Config = require(Shared:WaitForChild("Config"))
 local Formulas = require(Shared:WaitForChild("Logic"):WaitForChild("Formulas"))
-local NumberFormat = require(Shared:WaitForChild("Util"):WaitForChild("NumberFormat"))
 local TableUtil = require(Shared:WaitForChild("Util"):WaitForChild("TableUtil"))
 local WeightedRandom = require(Shared:WaitForChild("Util"):WaitForChild("WeightedRandom"))
 
@@ -113,8 +112,7 @@ function PetLogic.canHatch(data: PlayerData, stats: Stats, egg: EggDef, count: n
 	end
 	local missing = egg.cost * count - clampNumber(data.coins, 0, Formulas.MAX_CURRENCY, 0)
 	if missing > 0 then
-		local amount = math.max(1, math.ceil(missing))
-		return false, "Need " .. NumberFormat.abbreviate(amount) .. " more coin" .. (if amount == 1 then "" else "s")
+		return false, Formulas.needMoreText(missing, "coin")
 	end
 	local total = Formulas.countPets(data)
 	if total + count > stats.petStorage then
